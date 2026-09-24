@@ -207,6 +207,7 @@ export class MessagesStore {
         };
 
         await axios.post(`${config.get('url')}message`, payload);
+        await this.refreshByApp(appId, false);
         this.snack(`Message sent to ${app.name}`);
     };
 
