@@ -3,6 +3,7 @@ export interface IApplication {
     token: string;
     ownerId?: number;
     autoAssign?: boolean;
+    receiveNotifications?: boolean;
     name: string;
     sortKey: string;
     description: string;
