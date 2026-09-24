@@ -1,6 +1,6 @@
 {
-  "short_name": "Gotify",
-  "name": "Gotify WebApp",
+  "short_name": "Gotify MU",
+  "name": "Gotify MU WebApp",
   "start_url": "./index.html",
   "display": "standalone",
   "theme_color": "#3f51b5",
