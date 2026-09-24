@@ -50,13 +50,36 @@ func (d *GormDatabase) CreateApplication(application *model.Application) error {
 			}
 		}
 
-		return tx.Create(application).Error
+		if err := tx.Create(application).Error; err != nil {
+			return err
+		}
+
+		if application.UserID != 0 {
+			membership := &model.ApplicationMembership{
+				ApplicationID:        application.ID,
+				UserID:               application.UserID,
+				ReceiveNotifications: true,
+			}
+			if err := tx.Create(membership).Error; err != nil {
+				return err
+			}
+		}
+
+		if application.AutoAssign {
+			return assignApplicationToAllUsers(tx, application.ID, application.UserID)
+		}
+		return nil
 	}, &sql.TxOptions{Isolation: sql.LevelSerializable})
 }
 
 // DeleteApplicationByID deletes an application by its id.
 func (d *GormDatabase) DeleteApplicationByID(id uint) error {
-	d.DeleteMessagesByApplication(id)
+	if err := d.DeleteMessagesByApplication(id); err != nil {
+		return err
+	}
+	if err := d.DB.Where("application_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil {
+		return err
+	}
 	return d.DB.Where("id = ?", id).Delete(&model.Application{}).Error
 }
 
@@ -64,6 +87,19 @@ func (d *GormDatabase) DeleteApplicationByID(id uint) error {
 func (d *GormDatabase) GetApplicationsByUser(userID uint) ([]*model.Application, error) {
 	var apps []*model.Application
 	err := d.DB.Where("user_id = ?", userID).Order("sort_key, id ASC").Find(&apps).Error
+	if err == gorm.ErrRecordNotFound {
+		err = nil
+	}
+	return apps, err
+}
+
+// UpdateApplication updates an application.
+// GetAccessibleApplicationsByUser returns every application that the user owns
+// or has been assigned to through an ApplicationMembership.
+func (d *GormDatabase) GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error) {
+	var apps []*model.Application
+	err := d.DB.Joins("JOIN application_memberships AS am ON am.application_id = applications.id AND am.user_id = ?", userID).
+		Order("applications.sort_key, applications.id ASC").Find(&apps).Error
 	if err == gorm.ErrRecordNotFound {
 		err = nil
 	}
