@@ -56,6 +56,9 @@ type ApplicationParams struct {
 	//
 	// example: a1
 	SortKey string `form:"sortKey" query:"sortKey" json:"sortKey"`
+	// Whether this channel should be automatically assigned to every user.
+	// Only administrators may create auto-assigned channels.
+	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
 }
 
 // CreateApplication creates an application and returns the access token.
@@ -94,6 +97,16 @@ type ApplicationParams struct {
 func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 	applicationParams := ApplicationParams{}
 	if err := ctx.Bind(&applicationParams); err == nil {
+		if applicationParams.AutoAssign {
+			current, err := a.DB.GetUserByID(auth.GetUserID(ctx))
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
+			if current == nil || !current.Admin {
+				ctx.AbortWithError(http.StatusForbidden, errors.New("only administrators can create auto-assigned channels"))
+				return
+			}
+		}
 		tokenPublic, tokenPrivate := generateApplicationToken()
 		app := model.Application{
 			Name:            applicationParams.Name,
@@ -103,6 +116,7 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			Token:           tokenPublic,
 			UserID:          auth.GetUserID(ctx),
 			Internal:        false,
+			AutoAssign:      applicationParams.AutoAssign,
 		}
 
 		if err := a.DB.CreateApplication(&app); err != nil {
