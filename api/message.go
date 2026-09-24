@@ -622,7 +622,8 @@ func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
 // Create a message.
 //
 // __NOTE__: When authenticating with a client token or basic auth, the request body
-// must include "appid" referencing an application owned by the authenticated user.
+// must include "appid" referencing an application owned by the authenticated user,
+// or a Gotify MU channel where the authenticated user is a member and member posting is enabled.
 // When authenticating with an application token, the application is derived from the
 // token and any "appid" in the body is ignored.
 //
@@ -661,17 +662,44 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 	}
 
 	app := auth.GetApplication(ctx)
+	var postingUser *model.User
 	if app == nil {
 		if message.ApplicationID == 0 {
 			ctx.AbortWithError(400, errors.New("appid is required when not authenticating with an application token"))
 			return
 		}
+
+		userID := auth.GetUserID(ctx)
 		fetchedApp, err := a.DB.GetApplicationByID(message.ApplicationID)
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		if fetchedApp == nil || fetchedApp.UserID != auth.GetUserID(ctx) {
+		if fetchedApp == nil {
 			ctx.AbortWithError(400, errors.New("appid not found"))
+			return
+		}
+
+		if fetchedApp.UserID != userID {
+			if !fetchedApp.AllowMemberPost {
+				ctx.AbortWithError(400, errors.New("appid not found"))
+				return
+			}
+			membership, err := a.DB.GetApplicationMembership(fetchedApp.ID, userID)
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
+			if membership == nil {
+				ctx.AbortWithError(400, errors.New("appid not found"))
+				return
+			}
+		}
+
+		postingUser, err = a.DB.GetUserByID(userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if postingUser == nil {
+			ctx.AbortWithError(400, errors.New("user not found"))
 			return
 		}
 		app = fetchedApp
@@ -679,7 +707,11 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 
 	message.ApplicationID = app.ID
 	if strings.TrimSpace(message.Title) == "" {
-		message.Title = app.Name
+		if postingUser != nil && app.AllowMemberPost {
+			message.Title = postingUser.Name
+		} else {
+			message.Title = app.Name
+		}
 	}
 
 	if message.Priority == nil {
@@ -692,6 +724,10 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 	}
 
 	msgInternal := toInternalMessage(&message)
+	if postingUser != nil {
+		msgInternal.SenderUserID = postingUser.ID
+		msgInternal.SenderName = postingUser.Name
+	}
 	if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
 		return
 	}
@@ -727,6 +763,8 @@ func toExternalMessage(msg *model.Message) *model.MessageExternal {
 		Title:         msg.Title,
 		Priority:      &msg.Priority,
 		Date:          msg.Date,
+		SenderUserID:  msg.SenderUserID,
+		SenderName:    msg.SenderName,
 	}
 	if len(msg.Extras) != 0 {
 		res.Extras = make(map[string]any)
