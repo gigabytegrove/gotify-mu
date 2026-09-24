@@ -358,9 +358,7 @@ const Row = ({
                             ? 'Enable notifications'
                             : 'Mute notifications'
                     }>
-                    <IconButton
-                        onClick={fToggleNotifications}
-                        className="toggle-notifications">
+                    <IconButton onClick={fToggleNotifications} className="toggle-notifications">
                         {app.receiveNotifications === false ? (
                             <NotificationsOff />
                         ) : (
