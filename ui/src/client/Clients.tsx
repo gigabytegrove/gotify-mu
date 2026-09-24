@@ -1,19 +1,21 @@
 import React, {useEffect, useState} from 'react';
-import Grid from '@mui/material/Grid';
-import IconButton from '@mui/material/IconButton';
-import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
+import {
+    Button,
+    Chip,
+    IconButton,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableRow,
+    Tooltip,
+} from '@mui/material';
 import Delete from '@mui/icons-material/Delete';
 import Edit from '@mui/icons-material/Edit';
 import Security from '@mui/icons-material/Security';
-import Button from '@mui/material/Button';
-import Tooltip from '@mui/material/Tooltip';
 import ConfirmDialog from '../common/ConfirmDialog';
 import DefaultPage from '../common/DefaultPage';
+import SurfaceCard from '../common/SurfaceCard';
 import AddClientDialog from './AddClientDialog';
 import UpdateClientDialog from './UpdateClientDialog';
 import ElevateClientDialog from './ElevateClientDialog';
@@ -30,8 +32,8 @@ const Clients = observer(() => {
     const [toDeleteClient, setToDeleteClient] = useState<IClient>();
     const [toUpdateClient, setToUpdateClient] = useState<IClient>();
     const [toElevateClient, setToElevateClient] = useState<IClient>();
-    const [createDialog, setCreateDialog] = useState<boolean>(false);
-    const [toShowToken, setToShowToken] = useState<string>('');
+    const [createDialog, setCreateDialog] = useState(false);
+    const [toShowToken, setToShowToken] = useState('');
     const clients = clientStore.getItems();
 
     useEffect(() => void clientStore.refresh(), []);
@@ -39,50 +41,49 @@ const Clients = observer(() => {
     return (
         <DefaultPage
             title="Clients"
-            maxWidth={1000}
+            description="Manage browser, mobile, and API client credentials for your account."
             rightControl={
                 <Button
                     id="create-client"
                     variant="contained"
-                    color="primary"
                     onClick={() => setCreateDialog(true)}>
                     Create Client
                 </Button>
             }>
-            <Grid size={12}>
-                <Paper elevation={6} style={{overflowX: 'auto'}}>
-                    <Table id="client-table">
-                        <TableHead>
-                            <TableRow style={{textAlign: 'center'}}>
-                                <TableCell>Name</TableCell>
-                                <TableCell>Elevation ends</TableCell>
-                                <TableCell>Expires in</TableCell>
-                                <TableCell>Last Used</TableCell>
-                                <TableCell>Created</TableCell>
-                                <TableCell />
-                                <TableCell />
-                                <TableCell />
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {clients.map((client: IClient) => (
-                                <Row
-                                    key={client.id}
-                                    name={client.name}
-                                    createdAt={client.createdAt}
-                                    lastUsed={client.lastUsed}
-                                    elevatedUntil={client.elevatedUntil}
-                                    expiresAt={client.expiresAt}
-                                    current={client.id === currentUser.user.clientId}
-                                    fEdit={() => setToUpdateClient(client)}
-                                    fDelete={() => setToDeleteClient(client)}
-                                    fElevate={() => setToElevateClient(client)}
-                                />
-                            ))}
-                        </TableBody>
-                    </Table>
-                </Paper>
-            </Grid>
+            <SurfaceCard
+                title="Authorized Clients"
+                subtitle={`${clients.length} client${clients.length === 1 ? '' : 's'}`}>
+                <Table id="client-table">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Name</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Elevation</TableCell>
+                            <TableCell>Expires</TableCell>
+                            <TableCell>Last Used</TableCell>
+                            <TableCell>Created</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {clients.map((client: IClient) => (
+                            <Row
+                                key={client.id}
+                                name={client.name}
+                                createdAt={client.createdAt}
+                                lastUsed={client.lastUsed}
+                                elevatedUntil={client.elevatedUntil}
+                                expiresAt={client.expiresAt}
+                                current={client.id === currentUser.user.clientId}
+                                fEdit={() => setToUpdateClient(client)}
+                                fDelete={() => setToDeleteClient(client)}
+                                fElevate={() => setToElevateClient(client)}
+                            />
+                        ))}
+                    </TableBody>
+                </Table>
+            </SurfaceCard>
+
             {toShowToken && (
                 <TokenConfirmDialog token={toShowToken} fClose={() => setToShowToken('')} />
             )}
@@ -95,7 +96,7 @@ const Clients = observer(() => {
                     fOnSubmit={clientStore.create}
                 />
             )}
-            {toUpdateClient != null && (
+            {toUpdateClient && (
                 <UpdateClientDialog
                     fClose={() => setToUpdateClient(undefined)}
                     fOnSubmit={(name, expiresAfterInactivitySeconds) =>
@@ -107,16 +108,16 @@ const Clients = observer(() => {
                     }
                 />
             )}
-            {toDeleteClient != null && (
+            {toDeleteClient && (
                 <ConfirmDialog
-                    title="Confirm Delete"
-                    text={'Delete ' + toDeleteClient.name + '?'}
+                    title="Delete Client"
+                    text={`Delete ${toDeleteClient.name}? Its token will stop working immediately.`}
                     fClose={() => setToDeleteClient(undefined)}
                     fOnSubmit={() => clientStore.remove(toDeleteClient.id)}
                     requireElevated
                 />
             )}
-            {toElevateClient != null && (
+            {toElevateClient && (
                 <ElevateClientDialog
                     clientName={toElevateClient.name}
                     clientId={toElevateClient.id}
@@ -150,11 +151,14 @@ const Row = ({
     fDelete,
     fElevate,
 }: IRowProps) => (
-    <TableRow selected={current} aria-current={current ? 'true' : undefined}>
+    <TableRow hover selected={current} aria-current={current ? 'true' : undefined}>
         <TableCell>
-            <span className="name">{name}</span> {current ? <i> (current)</i> : ''}
+            <strong>{name}</strong>
         </TableCell>
-        <TableCell align="right" title={elevatedUntil}>
+        <TableCell>
+            <Chip size="small" label={current ? 'Current' : 'Authorized'} variant="outlined" />
+        </TableCell>
+        <TableCell title={elevatedUntil}>
             <RemainingTime
                 until={
                     elevatedUntil && Date.parse(elevatedUntil) > Date.now()
@@ -163,29 +167,29 @@ const Row = ({
                 }
             />
         </TableCell>
-        <TableCell align="right" className="expires-in" title={expiresAt ?? undefined}>
+        <TableCell className="expires-in" title={expiresAt ?? undefined}>
             <RemainingTime until={expiresAt} />
         </TableCell>
         <TableCell>
             <LastUsedCell lastUsed={lastUsed} />
         </TableCell>
         <TableCell title={createdAt}>{formatDate(createdAt)}</TableCell>
-        <TableCell align="right" padding="none">
-            <Tooltip title="Elevate">
+        <TableCell align="right">
+            <Tooltip title="Elevate client">
                 <IconButton onClick={fElevate} className="elevate">
                     <Security />
                 </IconButton>
             </Tooltip>
-        </TableCell>
-        <TableCell align="right" padding="none">
-            <IconButton onClick={fEdit} className="edit">
-                <Edit />
-            </IconButton>
-        </TableCell>
-        <TableCell align="right" padding="none">
-            <IconButton onClick={fDelete} className="delete">
-                <Delete />
-            </IconButton>
+            <Tooltip title="Edit client">
+                <IconButton onClick={fEdit} className="edit">
+                    <Edit />
+                </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete client">
+                <IconButton onClick={fDelete} className="delete">
+                    <Delete />
+                </IconButton>
+            </Tooltip>
         </TableCell>
     </TableRow>
 );
