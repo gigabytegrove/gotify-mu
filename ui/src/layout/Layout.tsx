@@ -2,7 +2,6 @@ import {
     Box,
     CssBaseline,
     Paper,
-    Snackbar,
     StyledEngineProvider,
     ThemeProvider,
     useMediaQuery,
