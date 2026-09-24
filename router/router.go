@@ -261,7 +261,6 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.POST("/application/:id/members", applicationMembershipHandler.UpsertMember)
 		clientElevated.DELETE("/application/:id/members/:userId", applicationMembershipHandler.DeleteMember)
 		clientElevated.PUT("/application/:id/auto-assign", applicationMembershipHandler.SetAutoAssign)
-		clientElevated.PUT("/application/:id/members-can-post", applicationMembershipHandler.SetMembersCanPost)
 		clientElevated.PUT("/application/:id/owner", applicationMembershipHandler.TransferOwnership)
 		clientElevated.PUT("/application/:id/member-posting", applicationMembershipHandler.SetMemberPosting)
 		clientElevated.DELETE("/application/:id/message/all", messageHandler.DeleteMessagesForEveryone)
