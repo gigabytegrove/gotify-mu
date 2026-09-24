@@ -41,19 +41,37 @@ type ApplicationAutoAssignParams struct {
 	Enabled bool `json:"enabled"`
 }
 
-func (a *ApplicationMembershipAPI) authorizeOwnerOrAdmin(userID uint, app *model.Application) (bool, error) {
-	if app == nil { return false, nil }
-	if app.UserID == userID { return true, nil }
+func (a *ApplicationMembershipAPI) authorizeOwnerOrAdmin(
+	userID uint,
+	app *model.Application,
+) (bool, error) {
+	if app == nil {
+		return false, nil
+	}
+	if app.UserID == userID {
+		return true, nil
+	}
+
 	user, err := a.DB.GetUserByID(userID)
-	if err != nil { return false, err }
+	if err != nil {
+		return false, err
+	}
 	return user != nil && user.Admin, nil
 }
 
-func (a *ApplicationMembershipAPI) getAuthorizedApplication(ctx *gin.Context, id uint) (*model.Application, bool) {
+func (a *ApplicationMembershipAPI) getAuthorizedApplication(
+	ctx *gin.Context,
+	id uint,
+) (*model.Application, bool) {
 	app, err := a.DB.GetApplicationByID(id)
-	if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success { return nil, false }
+	if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+		return nil, false
+	}
+
 	allowed, err := a.authorizeOwnerOrAdmin(auth.GetUserID(ctx), app)
-	if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success { return nil, false }
+	if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+		return nil, false
+	}
 	if app == nil || !allowed {
 		ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist"))
 		return nil, false
@@ -63,17 +81,32 @@ func (a *ApplicationMembershipAPI) getAuthorizedApplication(ctx *gin.Context, id
 
 func (a *ApplicationMembershipAPI) GetMembers(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		app, ok := a.getAuthorizedApplication(ctx, id); if !ok { return }
+		app, ok := a.getAuthorizedApplication(ctx, id)
+		if !ok {
+			return
+		}
+
 		memberships, err := a.DB.GetApplicationMemberships(id)
-		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success { return }
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+
 		result := make([]ApplicationMemberExternal, 0, len(memberships))
 		for _, membership := range memberships {
 			user, err := a.DB.GetUserByID(membership.UserID)
-			if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success { return }
-			if user == nil { continue }
+			if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+				return
+			}
+			if user == nil {
+				continue
+			}
+
 			result = append(result, ApplicationMemberExternal{
-				UserID: user.ID, Name: user.Name, Owner: user.ID == app.UserID,
-				ReceiveNotifications: membership.ReceiveNotifications, AutoAssigned: membership.AutoAssigned,
+				UserID:               user.ID,
+				Name:                 user.Name,
+				Owner:                user.ID == app.UserID,
+				ReceiveNotifications: membership.ReceiveNotifications,
+				AutoAssigned:         membership.AutoAssigned,
 			})
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -82,30 +115,102 @@ func (a *ApplicationMembershipAPI) GetMembers(ctx *gin.Context) {
 
 func (a *ApplicationMembershipAPI) UpsertMember(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		app, ok := a.getAuthorizedApplication(ctx, id); if !ok { return }
-		params := ApplicationMemberParams{}; if err := ctx.Bind(&params); err != nil { return }
-		if app.Internal { ctx.AbortWithError(http.StatusBadRequest, errors.New("internal applications cannot be shared")); return }
-		if params.UserID == app.UserID { ctx.AbortWithError(http.StatusBadRequest, errors.New("the application owner is always a member")); return }
+		app, ok := a.getAuthorizedApplication(ctx, id)
+		if !ok {
+			return
+		}
+
+		params := ApplicationMemberParams{}
+		if err := ctx.Bind(&params); err != nil {
+			return
+		}
+		if app.Internal {
+			ctx.AbortWithError(
+				http.StatusBadRequest,
+				errors.New("internal applications cannot be shared"),
+			)
+			return
+		}
+		if params.UserID == app.UserID {
+			ctx.AbortWithError(
+				http.StatusBadRequest,
+				errors.New("the application owner is always a member"),
+			)
+			return
+		}
+
 		user, err := a.DB.GetUserByID(params.UserID)
-		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success { return }
-		if user == nil { ctx.AbortWithError(http.StatusNotFound, errors.New("user does not exist")); return }
-		receive := true; if params.ReceiveNotifications != nil { receive = *params.ReceiveNotifications }
-		membership := &model.ApplicationMembership{ApplicationID: id, UserID: params.UserID, ReceiveNotifications: receive}
-		if success := successOrAbort(ctx, http.StatusInternalServerError, a.DB.UpsertApplicationMembership(membership)); !success { return }
-		ctx.JSON(http.StatusOK, ApplicationMemberExternal{UserID: user.ID, Name: user.Name, ReceiveNotifications: membership.ReceiveNotifications})
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if user == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("user does not exist"))
+			return
+		}
+
+		receive := true
+		if params.ReceiveNotifications != nil {
+			receive = *params.ReceiveNotifications
+		}
+
+		membership := &model.ApplicationMembership{
+			ApplicationID:        id,
+			UserID:               params.UserID,
+			ReceiveNotifications: receive,
+		}
+		if success := successOrAbort(
+			ctx,
+			http.StatusInternalServerError,
+			a.DB.UpsertApplicationMembership(membership),
+		); !success {
+			return
+		}
+
+		ctx.JSON(http.StatusOK, ApplicationMemberExternal{
+			UserID:               user.ID,
+			Name:                 user.Name,
+			ReceiveNotifications: membership.ReceiveNotifications,
+		})
 	})
 }
 
 func (a *ApplicationMembershipAPI) DeleteMember(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		app, ok := a.getAuthorizedApplication(ctx, id); if !ok { return }
+		app, ok := a.getAuthorizedApplication(ctx, id)
+		if !ok {
+			return
+		}
+
 		withID(ctx, "userId", func(userID uint) {
-			if userID == app.UserID { ctx.AbortWithError(http.StatusBadRequest, errors.New("the application owner cannot be removed")); return }
+			if userID == app.UserID {
+				ctx.AbortWithError(
+					http.StatusBadRequest,
+					errors.New("the application owner cannot be removed"),
+				)
+				return
+			}
+
 			membership, err := a.DB.GetApplicationMembership(id, userID)
-			if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success { return }
-			if membership == nil { ctx.AbortWithError(http.StatusNotFound, errors.New("membership does not exist")); return }
-			if app.AutoAssign { ctx.AbortWithError(http.StatusBadRequest, errors.New("members cannot be removed while auto-assign is enabled")); return }
-			successOrAbort(ctx, http.StatusInternalServerError, a.DB.DeleteApplicationMembership(id, userID))
+			if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+				return
+			}
+			if membership == nil {
+				ctx.AbortWithError(http.StatusNotFound, errors.New("membership does not exist"))
+				return
+			}
+			if app.AutoAssign {
+				ctx.AbortWithError(
+					http.StatusBadRequest,
+					errors.New("members cannot be removed while auto-assign is enabled"),
+				)
+				return
+			}
+
+			successOrAbort(
+				ctx,
+				http.StatusInternalServerError,
+				a.DB.DeleteApplicationMembership(id, userID),
+			)
 		})
 	})
 }
@@ -113,13 +218,38 @@ func (a *ApplicationMembershipAPI) DeleteMember(ctx *gin.Context) {
 func (a *ApplicationMembershipAPI) SetAutoAssign(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		app, err := a.DB.GetApplicationByID(id)
-		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success { return }
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+
 		current, err := a.DB.GetUserByID(auth.GetUserID(ctx))
-		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success { return }
-		if app == nil || current == nil || !current.Admin { ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist")); return }
-		if app.Internal { ctx.AbortWithError(http.StatusBadRequest, errors.New("internal applications cannot be auto-assigned")); return }
-		params := ApplicationAutoAssignParams{}; if err := ctx.Bind(&params); err != nil { return }
-		if success := successOrAbort(ctx, http.StatusInternalServerError, a.DB.SetApplicationAutoAssign(id, params.Enabled)); !success { return }
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if app == nil || current == nil || !current.Admin {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist"))
+			return
+		}
+		if app.Internal {
+			ctx.AbortWithError(
+				http.StatusBadRequest,
+				errors.New("internal applications cannot be auto-assigned"),
+			)
+			return
+		}
+
+		params := ApplicationAutoAssignParams{}
+		if err := ctx.Bind(&params); err != nil {
+			return
+		}
+		if success := successOrAbort(
+			ctx,
+			http.StatusInternalServerError,
+			a.DB.SetApplicationAutoAssign(id, params.Enabled),
+		); !success {
+			return
+		}
+
 		ctx.JSON(http.StatusOK, ApplicationAutoAssignParams{Enabled: params.Enabled})
 	})
 }
@@ -129,10 +259,12 @@ func (a *ApplicationMembershipAPI) GetAssignableUsers(ctx *gin.Context) {
 		if _, ok := a.getAuthorizedApplication(ctx, id); !ok {
 			return
 		}
+
 		users, err := a.DB.GetUsers()
 		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
 			return
 		}
+
 		result := make([]*model.UserExternal, 0, len(users))
 		for _, user := range users {
 			result = append(result, toExternalUser(user))
