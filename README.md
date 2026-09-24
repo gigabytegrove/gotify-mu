@@ -53,7 +53,7 @@ Until formal Gotify MU releases are published, build and test from this reposito
 git clone https://github.com/gigabytegrove/gotify-mu.git
 cd gotify-mu
 make build-js
-go build -o gotify-mu app.go
+go build -o gotify-mu .
 ./gotify-mu serve
 ```
 
