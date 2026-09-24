@@ -216,6 +216,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			app.POST("/:id/image", applicationHandler.UploadApplicationImage)
 			app.DELETE("/:id/image", applicationHandler.RemoveApplicationImage)
 			app.PUT("/:id", applicationHandler.UpdateApplication)
+			app.PUT("/:id/notifications", applicationMembershipHandler.SetCurrentUserNotifications)
 
 			tokenMessage := app.Group("/:id/message")
 			{
@@ -254,6 +255,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.POST("/application/:id/members", applicationMembershipHandler.UpsertMember)
 		clientElevated.DELETE("/application/:id/members/:userId", applicationMembershipHandler.DeleteMember)
 		clientElevated.PUT("/application/:id/auto-assign", applicationMembershipHandler.SetAutoAssign)
+		clientElevated.PUT("/application/:id/owner", applicationMembershipHandler.TransferOwnership)
+		clientElevated.DELETE("/application/:id/message/all", messageHandler.DeleteMessagesForEveryone)
 		clientElevated.DELETE("/client/:id", clientHandler.DeleteClient)
 		clientElevated.POST("/current/user/password", userHandler.ChangePassword)
 	}
