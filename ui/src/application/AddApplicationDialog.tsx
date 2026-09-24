@@ -19,7 +19,7 @@ interface IProps {
         description: string,
         defaultPriority: number,
         autoAssign?: boolean,
-        allowMemberPost?: boolean
+        membersCanPost?: boolean
     ) => Promise<string>;
 }
 
@@ -28,7 +28,7 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
     const [description, setDescription] = useState('');
     const [defaultPriority, setDefaultPriority] = useState(0);
     const [autoAssign, setAutoAssign] = useState(false);
-    const [allowMemberPost, setAllowMemberPost] = useState(false);
+    const [membersCanPost, setMembersCanPost] = useState(false);
     const {currentUser} = useStores();
 
     const submitEnabled = name.length !== 0;
@@ -38,7 +38,7 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
             description,
             defaultPriority,
             autoAssign,
-            allowMemberPost
+            membersCanPost
         );
         fClose(token);
     };
@@ -95,9 +95,9 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                         <FormControlLabel
                             control={
                                 <Switch
-                                    checked={allowMemberPost}
+                                    checked={membersCanPost}
                                     onChange={(event) =>
-                                        setAllowMemberPost(event.target.checked)
+                                        setMembersCanPost(event.target.checked)
                                     }
                                 />
                             }
