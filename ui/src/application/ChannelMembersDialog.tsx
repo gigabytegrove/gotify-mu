@@ -35,6 +35,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
     const [users, setUsers] = useState<IUser[]>([]);
     const [loading, setLoading] = useState(false);
     const [autoAssign, setAutoAssignState] = useState(Boolean(app.autoAssign));
+    const [membersCanPost, setMembersCanPostState] = useState(Boolean(app.membersCanPost));
     const [allowMemberPost, setAllowMemberPost] = useState(Boolean(app.allowMemberPost));
 
     const load = useCallback(async () => {
@@ -75,6 +76,11 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
     const toggleMemberPosting = async (enabled: boolean) => {
         await appStore.setMemberPosting(app.id, enabled);
         setAllowMemberPost(enabled);
+    };
+
+    const toggleMembersCanPost = async (enabled: boolean) => {
+        await appStore.setMembersCanPost(app.id, enabled);
+        setMembersCanPostState(enabled);
     };
 
     const transferOwnership = async (user: IUser) => {
@@ -124,6 +130,25 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                         {autoAssign && (
                             <Typography variant="body2" sx={{mb: 1}}>
                                 This channel is assigned to every current and future user.
+                            </Typography>
+                        )}
+                        {currentUser.user.admin && (
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={membersCanPost}
+                                        onChange={(event) =>
+                                            void toggleMembersCanPost(event.target.checked)
+                                        }
+                                    />
+                                }
+                                label="Allow members to post (Chat Channel)"
+                            />
+                        )}
+                        {membersCanPost && (
+                            <Typography variant="body2" sx={{mb: 1}}>
+                                Any assigned member can post to this channel using the Web UI or a
+                                compatible Gotify client.
                             </Typography>
                         )}
                         <List dense>
