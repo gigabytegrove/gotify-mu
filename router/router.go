@@ -222,6 +222,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			{
 				tokenMessage.GET("", messageHandler.GetMessagesWithApplication)
 				tokenMessage.DELETE("", messageHandler.DeleteMessageWithApplication)
+				tokenMessage.POST("/archive", messageHandler.ArchiveMessageWithApplication)
+				tokenMessage.DELETE("/archive", messageHandler.UnarchiveMessageWithApplication)
 			}
 		}
 
@@ -236,7 +238,11 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		{
 			message.GET("", messageHandler.GetMessages)
 			message.DELETE("", messageHandler.DeleteMessages)
+			message.POST("/archive", messageHandler.ArchiveMessages)
+			message.DELETE("/archive", messageHandler.UnarchiveMessages)
 			message.DELETE("/:id", messageHandler.DeleteMessage)
+			message.POST("/:id/archive", messageHandler.ArchiveMessage)
+			message.DELETE("/:id/archive", messageHandler.UnarchiveMessage)
 		}
 
 		clientAuth.GET("/stream", streamHandler.Handle)
