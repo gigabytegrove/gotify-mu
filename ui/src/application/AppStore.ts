@@ -99,14 +99,14 @@ export class AppStore extends BaseStore<IApplication> {
         description: string,
         defaultPriority: number,
         autoAssign = false,
-        membersCanPost = false
+        allowMemberPost = false
     ): Promise<string> => {
         const response = await axios.post(`${config.get('url')}application`, {
             name,
             description,
             defaultPriority,
             autoAssign,
-            membersCanPost,
+            allowMemberPost,
         });
         await this.refresh();
         this.snack('Channel created');
@@ -147,8 +147,8 @@ export class AppStore extends BaseStore<IApplication> {
         );
     };
 
-    public setMembersCanPost = async (id: number, enabled: boolean): Promise<void> => {
-        await axios.put(`${config.get('url')}application/${id}/members-can-post`, {enabled});
+    public setMemberPosting = async (id: number, enabled: boolean): Promise<void> => {
+        await axios.put(`${config.get('url')}application/${id}/member-posting`, {enabled});
         await this.refresh();
         this.snack(enabled ? 'Chat posting enabled' : 'Chat posting disabled');
     };
