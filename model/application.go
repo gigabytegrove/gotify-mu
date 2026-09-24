@@ -44,6 +44,10 @@ type Application struct {
 	// read only: true
 	// example: false
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
+	// Whether channel members may publish messages using their normal user/client authentication.
+	//
+	// read only: true
+	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
 	// Whether the current requesting user receives realtime notifications from this Gotify MU channel.
 	//
 	// read only: true
