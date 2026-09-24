@@ -23,7 +23,7 @@ import (
 
 var (
 	// Version the version of Gotify MU.
-	Version = "unknown"
+	Version = "dev"
 	// Commit the git commit hash of this version.
 	Commit = "unknown"
 	// BuildDate the date on which this binary was build.
@@ -37,7 +37,7 @@ func main() {
 }
 
 func run(args []string, stdout, stderr io.Writer) int {
-	vInfo := &model.VersionInfo{Version: Version, Commit: Commit, BuildDate: BuildDate}
+	vInfo := resolveVersionInfo()
 	fs := flag.NewFlagSet("gotify-mu", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { printUsage(stderr) }
@@ -76,6 +76,63 @@ func run(args []string, stdout, stderr io.Writer) int {
 		}
 		printUsage(stderr)
 		return 2
+	}
+}
+
+func resolveVersionInfo() *model.VersionInfo {
+	version := Version
+	commit := Commit
+	buildDate := BuildDate
+
+	if version == "" || version == "unknown" {
+		version = "dev"
+	}
+
+	if info, ok := debug.ReadBuildInfo(); ok {
+		revision := ""
+		vcsTime := ""
+		modified := false
+
+		for _, setting := range info.Settings {
+			switch setting.Key {
+			case "vcs.revision":
+				revision = setting.Value
+			case "vcs.time":
+				vcsTime = setting.Value
+			case "vcs.modified":
+				modified = setting.Value == "true"
+			}
+		}
+
+		if (commit == "" || commit == "unknown") && revision != "" {
+			commit = revision
+		}
+		if (buildDate == "" || buildDate == "unknown") && vcsTime != "" {
+			buildDate = vcsTime
+		}
+		if version == "dev" && revision != "" {
+			shortRevision := revision
+			if len(shortRevision) > 12 {
+				shortRevision = shortRevision[:12]
+			}
+			version = "dev-" + shortRevision
+			if modified {
+				version += "-dirty"
+			}
+		}
+	}
+
+	if commit == "" || commit == "unknown" {
+		commit = "local"
+	}
+	if buildDate == "" || buildDate == "unknown" {
+		buildDate = "local"
+	}
+
+	return &model.VersionInfo{
+		Version:   version,
+		Commit:    commit,
+		BuildDate: buildDate,
 	}
 }
 
