@@ -231,6 +231,38 @@ const Message = ({
     );
 };
 
+const HeaderActions = ({
+    fDelete,
+    fArchive,
+    fRestore,
+}: Pick<IProps, 'fDelete' | 'fArchive' | 'fRestore'>) => {
+    const {classes} = useStyles();
+
+    return (
+        <div style={{display: 'flex'}}>
+            {fRestore && (
+                <IconButton onClick={fRestore} style={{padding: 14}} size="large">
+                    <Unarchive />
+                </IconButton>
+            )}
+            {fArchive && (
+                <IconButton onClick={fArchive} style={{padding: 14}} size="large">
+                    <Archive />
+                </IconButton>
+            )}
+            {fDelete && (
+                <IconButton
+                    onClick={fDelete}
+                    style={{padding: 14}}
+                    className={`${classes.trash} delete`}
+                    size="large">
+                    <Delete />
+                </IconButton>
+            )}
+        </div>
+    );
+};
+
 const HeaderWide = ({
     appName,
     image,
@@ -249,7 +281,7 @@ const HeaderWide = ({
     return (
         <div className={classes.header}>
             <div className={classes.imageWrapper}>
-                {image !== null ? (
+                {image ? (
                     <img
                         src={config.get('url') + image}
                         alt={`${appName} logo`}
@@ -270,42 +302,11 @@ const HeaderWide = ({
             <Typography variant="body1" className={classes.date}>
                 <TimeAgo date={date} formatter={TimeAgoFormatter.narrow} />
             </Typography>
-            {fRestore && (
-                <IconButton onClick={fRestore} style={{padding: 14}} size="large">
-                    <Unarchive />
-                </IconButton>
-            )}
-            {fArchive && (
-                <IconButton onClick={fArchive} style={{padding: 14}} size="large">
-                    <Archive />
-                </IconButton>
-            )}
-            {fDelete && (
-                <div style={{display: 'flex'}}>
-                    {fRestore && (
-                        <IconButton onClick={fRestore} style={{padding: 14}} size="large">
-                            <Unarchive />
-                        </IconButton>
-                    )}
-                    {fArchive && (
-                        <IconButton onClick={fArchive} style={{padding: 14}} size="large">
-                            <Archive />
-                        </IconButton>
-                    )}
-                    {fDelete && (
-                        <IconButton
-                            onClick={fDelete}
-                            style={{padding: 14}}
-                            className={`${classes.trash} delete`}
-                            size="large">
-                            <Delete />
-                        </IconButton>
-                    )}
-                </div>
-            )}
+            <HeaderActions fDelete={fDelete} fArchive={fArchive} fRestore={fRestore} />
         </div>
     );
 };
+
 const HeaderSmall = ({
     appName,
     image,
@@ -335,15 +336,9 @@ const HeaderSmall = ({
                 </Typography>
             </div>
             <div style={{display: 'flex', alignItems: 'end', flexDirection: 'column'}}>
-                <IconButton
-                    onClick={fDelete}
-                    style={{padding: 14}}
-                    className={`${classes.trash} delete`}
-                    size="large">
-                    <Delete />
-                </IconButton>
+                <HeaderActions fDelete={fDelete} fArchive={fArchive} fRestore={fRestore} />
                 <div style={{width: 30, height: 30}}>
-                    {image !== null ? (
+                    {image ? (
                         <img
                             src={config.get('url') + image}
                             alt={`${appName} logo`}
