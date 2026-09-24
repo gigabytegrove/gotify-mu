@@ -131,6 +131,6 @@ describe('Client', () => {
         await page.click(selector.$confirmDialog.button('.confirm'));
     });
     it('automatically logs out', async () => {
-        await waitForExists(page, selector.heading(), 'Login');
+        await waitForExists(page, selector.heading(), 'Sign in');
     });
 });
