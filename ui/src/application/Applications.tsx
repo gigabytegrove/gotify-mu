@@ -10,6 +10,7 @@ import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
 import Delete from '@mui/icons-material/Delete';
 import Edit from '@mui/icons-material/Edit';
+import Group from '@mui/icons-material/Group';
 import CloudUpload from '@mui/icons-material/CloudUpload';
 import DragIndicator from '@mui/icons-material/DragIndicator';
 import Button from '@mui/material/Button';
@@ -38,6 +39,7 @@ import {observer} from 'mobx-react-lite';
 import {makeStyles} from 'tss-react/mui';
 import {ButtonBase, Tooltip} from '@mui/material';
 import {TokenConfirmDialog} from '../common/TokenConfirmDialog';
+import ChannelMembersDialog from './ChannelMembersDialog';
 
 const useStyles = makeStyles()((theme) => ({
     imageContainer: {
@@ -61,7 +63,7 @@ const useStyles = makeStyles()((theme) => ({
 }));
 
 const Applications = observer(() => {
-    const {appStore} = useStores();
+    const {appStore, currentUser} = useStores();
     const apps = appStore.getItems();
     const [toDeleteApp, setToDeleteApp] = useState<IApplication>();
     const [toDeleteImage, setToDeleteImage] = useState<IApplication>();
@@ -69,6 +71,7 @@ const Applications = observer(() => {
     const [toRegenerateTokenApp, setToRegenerateTokenApp] = useState<IApplication>();
     const [toShowToken, setToShowToken] = useState<string>('');
     const [createDialog, setCreateDialog] = useState<boolean>(false);
+    const [toManageMembersApp, setToManageMembersApp] = useState<IApplication>();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadId = useRef(-1);
@@ -104,7 +107,7 @@ const Applications = observer(() => {
 
     return (
         <DefaultPage
-            title="Applications"
+            title="Channels"
             rightControl={
                 <Button
                     id="create-app"
@@ -113,7 +116,7 @@ const Applications = observer(() => {
                     onClick={() => {
                         setCreateDialog(true);
                     }}>
-                    Create Application
+                    Create Channel
                 </Button>
             }
             maxWidth={1000}>
@@ -148,6 +151,8 @@ const Applications = observer(() => {
                                             fDeleteImage={() => setToDeleteImage(app)}
                                             fDelete={() => setToDeleteApp(app)}
                                             fEdit={() => setToUpdateApp(app)}
+                                            fMembers={() => setToManageMembersApp(app)}
+                                            canManage={currentUser.user.admin || app.ownerId === currentUser.user.id}
                                         />
                                     ))}
                                 </TableBody>
@@ -212,6 +217,12 @@ const Applications = observer(() => {
                     requireElevated
                 />
             )}
+            {toManageMembersApp != null && (
+                <ChannelMembersDialog
+                    app={toManageMembersApp}
+                    fClose={() => setToManageMembersApp(undefined)}
+                />
+            )}
             {toDeleteImage != null && (
                 <ConfirmDialog
                     title="Confirm Delete Image"
@@ -231,14 +242,26 @@ interface IRowProps {
     fDeleteImage: VoidFunction;
     fDelete: VoidFunction;
     fEdit: VoidFunction;
+    fMembers: VoidFunction;
+    canManage: boolean;
 }
 
-const Row = ({app, fRegenerateToken, fDelete, fUpload, fDeleteImage, fEdit}: IRowProps) => {
+const Row = ({
+    app,
+    fRegenerateToken,
+    fDelete,
+    fUpload,
+    fDeleteImage,
+    fEdit,
+    fMembers,
+    canManage,
+}: IRowProps) => {
     const {classes} = useStyles();
     const isDefaultImage = app.image === 'static/defaultapp.png';
 
     const {attributes, listeners, setNodeRef, transform, transition, isDragging} = useSortable({
         id: app.id,
+        disabled: !canManage,
     });
 
     const style = {
@@ -269,7 +292,7 @@ const Row = ({app, fRegenerateToken, fDelete, fUpload, fDeleteImage, fEdit}: IRo
                         <ButtonBase
                             className={classes.imageContainer}
                             onClick={fDeleteImage}
-                            disabled={isDefaultImage}>
+                            disabled={isDefaultImage || !canManage}>
                             <img
                                 src={config.get('url') + app.image}
                                 alt="app logo"
@@ -278,12 +301,15 @@ const Row = ({app, fRegenerateToken, fDelete, fUpload, fDeleteImage, fEdit}: IRo
                             />
                         </ButtonBase>
                     </Tooltip>
-                    <IconButton onClick={fUpload} style={{height: 40}}>
+                    <IconButton onClick={fUpload} style={{height: 40}} disabled={!canManage}>
                         <CloudUpload />
                     </IconButton>
                 </div>
             </TableCell>
-            <TableCell>{app.name}</TableCell>
+            <TableCell>
+                {app.name}
+                {app.autoAssign ? ' · Global' : ''}
+            </TableCell>
             <TableCell>{app.description}</TableCell>
             <TableCell>{app.defaultPriority}</TableCell>
             <TableCell>
@@ -291,17 +317,30 @@ const Row = ({app, fRegenerateToken, fDelete, fUpload, fDeleteImage, fEdit}: IRo
             </TableCell>
             <TableCell title={app.createdAt}>{formatDate(app.createdAt)}</TableCell>
             <TableCell align="right" padding="none">
-                <IconButton onClick={fRegenerateToken} className="regenerate-token">
+                {canManage && (
+                    <IconButton onClick={fMembers} className="members">
+                        <Group />
+                    </IconButton>
+                )}
+            </TableCell>
+            <TableCell align="right" padding="none">
+                <IconButton
+                    onClick={fRegenerateToken}
+                    className="regenerate-token"
+                    disabled={!canManage}>
                     <Key />
                 </IconButton>
             </TableCell>
             <TableCell align="right" padding="none">
-                <IconButton onClick={fEdit} className="edit">
+                <IconButton onClick={fEdit} className="edit" disabled={!canManage}>
                     <Edit />
                 </IconButton>
             </TableCell>
             <TableCell align="right" padding="none">
-                <IconButton onClick={fDelete} className="delete" disabled={app.internal}>
+                <IconButton
+                    onClick={fDelete}
+                    className="delete"
+                    disabled={app.internal || !canManage}>
                     <Delete />
                 </IconButton>
             </TableCell>
