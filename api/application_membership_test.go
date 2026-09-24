@@ -82,3 +82,50 @@ func TestApplicationMembershipTransferOwnership(t *testing.T) {
 	require.NotNil(t, updated)
 	assert.Equal(t, nextOwner.ID, updated.UserID)
 }
+
+func TestApplicationMembershipSetMemberPostingAdminOnly(t *testing.T) {
+	db := testdb.NewDB(t)
+	defer db.Close()
+
+	admin := db.NewUser(1)
+	admin.Admin = true
+	require.NoError(t, db.UpdateUser(admin))
+	owner := db.NewUser(2)
+	app := &model.Application{UserID: owner.ID, Token: "MUAPI0000003", Name: "chat"}
+	require.NoError(t, db.CreateApplication(app))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	test.WithUser(ctx, owner.ID)
+	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	ctx.Request = httptest.NewRequest(
+		"PUT",
+		"/application/1/member-posting",
+		strings.NewReader(`{"enabled":true}`),
+	)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler := &ApplicationMembershipAPI{DB: db}
+	handler.SetMemberPosting(ctx)
+	assert.Equal(t, 404, recorder.Code)
+
+	recorder = httptest.NewRecorder()
+	ctx, _ = gin.CreateTestContext(recorder)
+	test.WithUser(ctx, admin.ID)
+	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	ctx.Request = httptest.NewRequest(
+		"PUT",
+		"/application/1/member-posting",
+		strings.NewReader(`{"enabled":true}`),
+	)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	handler.SetMemberPosting(ctx)
+	assert.Equal(t, 200, recorder.Code)
+
+	updated, err := db.GetApplicationByID(app.ID)
+	require.NoError(t, err)
+	require.NotNil(t, updated)
+	assert.True(t, updated.AllowMemberPost)
+}
+
