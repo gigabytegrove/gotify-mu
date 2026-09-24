@@ -154,7 +154,10 @@ const Applications = observer(() => {
                                             fDelete={() => setToDeleteApp(app)}
                                             fEdit={() => setToUpdateApp(app)}
                                             fMembers={() => setToManageMembersApp(app)}
-                                            canManage={currentUser.user.admin || app.ownerId === currentUser.user.id}
+                                            canManage={
+                                                currentUser.user.admin ||
+                                                app.ownerId === currentUser.user.id
+                                            }
                                         />
                                     ))}
                                 </TableBody>

@@ -20,6 +20,7 @@ import ListItemText from '@mui/material/ListItemText';
 import React, {CSSProperties} from 'react';
 import {Link} from 'react-router';
 import {useMediaQuery} from '@mui/material';
+import * as config from '../config';
 
 const useStyles = makeStyles()((theme: Theme) => ({
     appBar: {
@@ -59,6 +60,13 @@ const useStyles = makeStyles()((theme: Theme) => ({
     titleName: {
         paddingRight: 10,
     },
+    logo: {
+        width: 54,
+        height: 36,
+        objectFit: 'cover',
+        borderRadius: 4,
+        marginRight: 10,
+    },
     link: {
         color: 'inherit',
         textDecoration: 'none',
@@ -84,16 +92,24 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
             className={classes.appBar}>
             <Toolbar className={classes.toolbar}>
                 <div className={classes.title}>
-                    <Link to="/" className={classes.link}>
+                    <Link
+                        to="/"
+                        className={classes.link}
+                        style={{display: 'flex', alignItems: 'center'}}>
+                        <img
+                            src={config.get('url') + 'static/gotify-mu-logo.png'}
+                            alt="Gotify MU"
+                            className={classes.logo}
+                        />
                         <Typography variant="h5" className={classes.titleName} color="inherit">
-                            Gotify
+                            Gotify MU
                         </Typography>
                     </Link>
                     <a
                         href={
                             version.startsWith('master-')
-                                ? `https://github.com/gotify/server/commit/${version.replace('master-', '')}`
-                                : `https://github.com/gotify/server/releases/tag/v${version}`
+                                ? `https://github.com/gigabytegrove/gotify-mu/commit/${version.replace('master-', '')}`
+                                : 'https://github.com/gigabytegrove/gotify-mu/releases'
                         }
                         className={classes.link}>
                         <Typography variant="button" color="inherit">
@@ -139,7 +155,7 @@ const Buttons = ({
                 </Link>
             )}
             <Link className={classes.link} to="/applications" id="navigate-apps">
-                <ResponsiveButton icon={<Chat />} label="apps" color="inherit" />
+                <ResponsiveButton icon={<Chat />} label="channels" color="inherit" />
             </Link>
             <Link className={classes.link} to="/clients" id="navigate-clients">
                 <ResponsiveButton icon={<DevicesOther />} label="clients" color="inherit" />

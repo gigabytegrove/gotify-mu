@@ -43,7 +43,9 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
             id="app-dialog">
             <DialogTitle id="form-dialog-title">Create a channel</DialogTitle>
             <DialogContent>
-                <DialogContentText>A channel receives messages and can be shared with multiple users.</DialogContentText>
+                <DialogContentText>
+                    A channel receives messages and can be shared with multiple users.
+                </DialogContentText>
                 <TextField
                     autoFocus
                     margin="dense"

@@ -1,6 +1,6 @@
 ---
 name: Questions
-about: Having difficulties with gotify? Feel free to ask here
+about: Having difficulties with Gotify MU? Feel free to ask here
 title: ''
 labels: question
 assignees: ''
@@ -9,8 +9,8 @@ assignees: ''
 
 <!-- 
 Alternative ways to get help:
-Official documentation - https://gotify.net/
-Community chat - https://matrix.to/#/#gotify:matrix.org
+Gotify MU repository - https://github.com/gigabytegrove/gotify-mu
+Upstream Gotify documentation - https://gotify.net/
 -->
 
 **Have you read the documentation?**
@@ -18,7 +18,7 @@ Community chat - https://matrix.to/#/#gotify:matrix.org
 - [ ] Yes, but the steps described in the documentation do not work on my machine.
 - [ ] Yes, but I am having difficulty understanding it and want clarification.
 
-**You are setting up gotify in**
+**You are setting up Gotify MU in**
 - [ ] Docker
 - [ ] Linux native platform
 - [ ] Windows native platform

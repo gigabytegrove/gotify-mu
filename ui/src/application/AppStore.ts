@@ -140,8 +140,11 @@ export class AppStore extends BaseStore<IApplication> {
     public setAutoAssign = async (id: number, enabled: boolean): Promise<void> => {
         await axios.put(`${config.get('url')}application/${id}/auto-assign`, {enabled});
         await this.refresh();
-        this.snack(enabled ? 'Channel auto-assignment enabled' : 'Channel auto-assignment disabled');
+        this.snack(
+            enabled ? 'Channel auto-assignment enabled' : 'Channel auto-assignment disabled'
+        );
     };
+
     public getName = (id: number): string => {
         const app = this.getByIDOrUndefined(id);
         return id === -1 ? 'All Messages' : app !== undefined ? app.name : 'unknown';
