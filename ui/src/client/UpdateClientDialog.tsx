@@ -1,12 +1,15 @@
 import React, {useState} from 'react';
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
-import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
+import {
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    Stack,
+    TextField,
+    Tooltip,
+} from '@mui/material';
 import {NumberField} from '../common/NumberField';
 
 interface IProps {
@@ -19,58 +22,58 @@ interface IProps {
 const UpdateClientDialog = ({
     fClose,
     fOnSubmit,
-    initialName = '',
+    initialName,
     initialExpiresAfterInactivitySeconds,
 }: IProps) => {
     const [name, setName] = useState(initialName);
     const [expiresAfter, setExpiresAfter] = useState(initialExpiresAfterInactivitySeconds);
 
-    const submitEnabled = name.length !== 0;
+    const submitEnabled = name.trim().length !== 0;
+
     const submitAndClose = async () => {
-        await fOnSubmit(name, Math.max(0, expiresAfter));
+        await fOnSubmit(name.trim(), Math.max(0, expiresAfter));
         fClose();
     };
 
     return (
-        <Dialog open={true} onClose={fClose} aria-labelledby="form-dialog-title" id="client-dialog">
-            <DialogTitle id="form-dialog-title">Update a Client</DialogTitle>
+        <Dialog open onClose={fClose} fullWidth maxWidth="sm" id="client-dialog">
+            <DialogTitle>Edit Client</DialogTitle>
             <DialogContent>
-                <DialogContentText>
-                    A client manages messages, clients, applications and users (with admin
-                    permissions).
+                <DialogContentText sx={{mb: 2}}>
+                    Rename this client or change when it expires after inactivity.
                 </DialogContentText>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    className="name"
-                    label="Name *"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    fullWidth
-                />
-                <NumberField
-                    margin="dense"
-                    className="expires-after"
-                    label="Expires after inactivity (seconds, 0 = never)"
-                    value={expiresAfter}
-                    onChange={(value) => setExpiresAfter(value)}
-                    fullWidth
-                />
+                <Stack spacing={2}>
+                    <TextField
+                        autoFocus
+                        className="name"
+                        label="Client name"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        fullWidth
+                        required
+                    />
+                    <NumberField
+                        className="expires-after"
+                        label="Expire after inactivity (seconds)"
+                        value={expiresAfter}
+                        onChange={setExpiresAfter}
+                        fullWidth
+                        helperText="Use 0 to never expire automatically."
+                    />
+                </Stack>
             </DialogContent>
             <DialogActions>
                 <Button onClick={fClose}>Cancel</Button>
-                <Tooltip title={submitEnabled ? '' : 'name is required'}>
-                    <div>
+                <Tooltip title={submitEnabled ? '' : 'Client name is required'}>
+                    <span>
                         <Button
                             className="update"
                             disabled={!submitEnabled}
-                            onClick={submitAndClose}
-                            color="primary"
+                            onClick={() => void submitAndClose()}
                             variant="contained">
-                            Update
+                            Save Changes
                         </Button>
-                    </div>
+                    </span>
                 </Tooltip>
             </DialogActions>
         </Dialog>
