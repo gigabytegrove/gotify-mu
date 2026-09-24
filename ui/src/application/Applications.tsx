@@ -139,6 +139,7 @@ const Applications = observer(() => {
                                     <TableCell />
                                     <TableCell />
                                     <TableCell />
+                                    <TableCell />
                                 </TableRow>
                             </TableHead>
                             <SortableContext items={apps} strategy={verticalListSortingStrategy}>
