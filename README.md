@@ -22,7 +22,10 @@ Upstream Gotify applications are owned by a single user. Gotify MU keeps that mo
 - Automatic assignment to all current and future users
 - One stored message with WebSocket fan-out to every entitled user
 - Per-user dismissal of shared messages
+- Reversible per-user message archive and restore
 - Per-user mute/unmute of realtime delivery without losing channel history
+- Admin-controlled Chat Channels where assigned members can post
+- Sender identity on member-posted Chat Channel messages
 - Channel ownership transfer between users
 - Safe user deletion guard when shared channels still need an owner
 - Owner/admin action to permanently clear a channel's history for everyone
@@ -59,6 +62,13 @@ DELETE /application/:id/members/:userId
 PUT    /application/:id/auto-assign
 PUT    /application/:id/notifications
 PUT    /application/:id/owner
+PUT    /application/:id/member-posting
+POST   /application/:id/message/archive
+DELETE /application/:id/message/archive
+POST   /message/:id/archive
+DELETE /message/:id/archive
+POST   /message/archive
+DELETE /message/archive
 DELETE /application/:id/message/all
 ```
 
@@ -69,6 +79,20 @@ DELETE /application/:id/message/all
 `DELETE /application/:id/message/all` is an owner/admin action that physically removes that channel's messages for all members. Normal Gotify-compatible delete actions on shared channels remain per-user dismissals.
 
 A user who still owns a shared channel cannot be deleted until ownership of that channel has been transferred.
+
+### Global Channel deletion and archive behavior
+
+For a **Global** Channel, only an administrator may physically delete individual messages, clear the Channel's history, or delete the Channel itself.
+
+Non-admin users can archive messages instead. Archive is per-user and reversible, so archiving a message does not remove it for anyone else.
+
+### Chat Channels
+
+An administrator can enable **Allow channel members to post (Chat Channel)** on a Channel. When enabled, any assigned member may post using normal user/client authentication.
+
+Gotify MU records the sender's user ID and username. If a member leaves the title blank, the sender's username is used as the title so existing Gotify clients can still show who sent the message.
+
+The official Gotify Android app continues to receive Chat Channel messages as normal Gotify messages. The stock Android app does not gain a compose/chat interface from this server feature; sending is available in the Gotify MU Web UI or through compatible API clients.
 
 ## Deployment
 
@@ -252,10 +276,13 @@ For the current development build, verify these behaviors before treating an ins
 7. A user can mute and re-enable realtime delivery for a Channel without losing history.
 8. Channel ownership can be transferred to another member.
 9. A user who still owns a shared Channel cannot be deleted until ownership is transferred.
-10. An owner/admin can clear a Channel's history for everyone.
-11. The official Gotify Android app receives notifications normally.
-12. Deleting a shared message for one user does not remove it for other members.
-13. Private channels retain normal Gotify delete behavior.
+10. A non-admin can archive and restore messages without affecting other members.
+11. Only an administrator can delete or clear messages in a Global Channel.
+12. An administrator can enable Chat Channel posting and an assigned member can send a message.
+13. Chat Channel messages show the sender identity.
+14. The official Gotify Android app receives notifications normally.
+15. Deleting a shared message for one user does not remove it for other members.
+16. Private channels retain normal Gotify delete behavior.
 
 ### Future container namespace
 
