@@ -151,6 +151,24 @@ func (s *UserSuite) Test_DeleteUserByID() {
 	assert.True(s.T(), s.notifiedDelete)
 }
 
+func (s *UserSuite) Test_DeleteUserByID_SharedChannelOwnerRequiresTransfer() {
+	s.db.User(2).App(1)
+	s.db.User(3)
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        1,
+		UserID:               3,
+		ReceiveNotifications: true,
+	}))
+
+	s.ctx.Params = gin.Params{{Key: "id", Value: "2"}}
+	s.a.DeleteUserByID(s.ctx)
+
+	assert.Equal(s.T(), 400, s.recorder.Code)
+	s.db.AssertUserExist(2)
+	s.db.AssertAppExist(1)
+	assert.False(s.T(), s.notifiedDelete)
+}
+
 func (s *UserSuite) Test_DeleteUserByID_NotifyFail() {
 	s.db.User(5)
 	s.notifier.OnUserDeleted(func(id uint) error {
