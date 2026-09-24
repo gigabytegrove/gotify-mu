@@ -51,7 +51,6 @@ type ApplicationOwnerParams struct {
 	UserID uint `json:"userId" binding:"required"`
 }
 
-
 func (a *ApplicationMembershipAPI) authorizeOwnerOrAdmin(
 	userID uint,
 	app *model.Application,
