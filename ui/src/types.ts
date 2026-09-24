@@ -1,8 +1,8 @@
 export interface IApplication {
     id: number;
     token: string;
-    ownerId: number;
-    autoAssign: boolean;
+    ownerId?: number;
+    autoAssign?: boolean;
     name: string;
     sortKey: string;
     description: string;
