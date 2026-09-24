@@ -171,6 +171,9 @@ const Applications = observer(() => {
                                                 currentUser.user.admin ||
                                                 app.ownerId === currentUser.user.id
                                             }
+                                            canDeleteChannel={
+                                                currentUser.user.admin || !app.autoAssign
+                                            }
                                             canClearHistory={
                                                 currentUser.user.admin ||
                                                 (!app.autoAssign &&
@@ -282,6 +285,7 @@ interface IRowProps {
     fToggleNotifications: VoidFunction;
     fClearHistory: VoidFunction;
     canManage: boolean;
+    canDeleteChannel: boolean;
     canClearHistory: boolean;
 }
 
@@ -409,11 +413,7 @@ const Row = ({
                 <IconButton
                     onClick={fDelete}
                     className="delete"
-                    disabled={
-                        app.internal ||
-                        !canManage ||
-                        (Boolean(app.autoAssign) && !currentUser.user.admin)
-                    }>
+                    disabled={app.internal || !canManage || !canDeleteChannel}>
                     <Delete />
                 </IconButton>
             </TableCell>
