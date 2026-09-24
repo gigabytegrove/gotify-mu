@@ -2547,6 +2547,12 @@
         "sortKey"
       ],
       "properties": {
+        "allowMemberPost": {
+          "description": "Whether channel members may publish messages using their normal user/client authentication.",
+          "type": "boolean",
+          "x-go-name": "AllowMemberPost",
+          "readOnly": true
+        },
         "autoAssign": {
           "description": "Whether every user should automatically be a member of this Gotify MU channel.",
           "type": "boolean",
@@ -2648,6 +2654,11 @@
         "name"
       ],
       "properties": {
+        "allowMemberPost": {
+          "description": "Whether assigned users may publish messages to this Gotify MU channel.",
+          "type": "boolean",
+          "x-go-name": "AllowMemberPost"
+        },
         "autoAssign": {
           "description": "Whether this Gotify MU channel should be automatically assigned to every user.",
           "type": "boolean",
@@ -3101,6 +3112,19 @@
           "format": "int64",
           "x-go-name": "Priority",
           "example": 2
+        },
+        "senderName": {
+          "description": "The Gotify MU username that posted this message, when available.",
+          "type": "string",
+          "x-go-name": "SenderName",
+          "readOnly": true
+        },
+        "senderUserId": {
+          "description": "The Gotify MU user id that posted this message, when the message was sent by a user.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "SenderUserID",
+          "readOnly": true
         },
         "title": {
           "description": "The title of the message.",
