@@ -1,9 +1,20 @@
-import Grid from '@mui/material/Grid';
-import Typography from '@mui/material/Typography';
 import React from 'react';
+import {
+    Box,
+    Button,
+    ButtonGroup,
+    Chip,
+    Stack,
+    Tooltip,
+    Typography,
+} from '@mui/material';
+import Archive from '@mui/icons-material/Archive';
+import DeleteSweep from '@mui/icons-material/DeleteSweep';
+import Refresh from '@mui/icons-material/Refresh';
+import Restore from '@mui/icons-material/Restore';
+import Send from '@mui/icons-material/Send';
 import {useParams} from 'react-router';
 import DefaultPage from '../common/DefaultPage';
-import Button from '@mui/material/Button';
 import Message from './Message';
 import {observer} from 'mobx-react-lite';
 import {IMessage} from '../types';
@@ -19,7 +30,7 @@ const UndoAutoHideMs = 5000;
 
 const Messages = observer(() => {
     const {id} = useParams<{id: string}>();
-    const appId = id == null ? -1 : parseInt(id as string, 10);
+    const appId = id == null ? -1 : parseInt(id, 10);
 
     const [deleteAll, setDeleteAll] = React.useState(false);
     const [pushMessageOpen, setPushMessageOpen] = React.useState(false);
@@ -35,21 +46,15 @@ const Messages = observer(() => {
     const app = appId === -1 ? undefined : appStore.getByIDOrUndefined(appId);
 
     const canPost =
-        app != null &&
-        (app.ownerId === currentUser.user.id || Boolean(app.allowMemberPost));
+        app != null && (app.ownerId === currentUser.user.id || Boolean(app.allowMemberPost));
 
     const canDeleteAll =
         !archivedView &&
-        (appId === -1
-            ? currentUser.user.admin
-            : !app?.autoAssign || currentUser.user.admin);
+        (appId === -1 ? currentUser.user.admin : !app?.autoAssign || currentUser.user.admin);
 
     const canDeleteMessage = (message: IMessage): boolean => {
         const messageApp = appStore.getByIDOrUndefined(message.appid);
-        if (messageApp?.autoAssign) {
-            return currentUser.user.admin;
-        }
-        return true;
+        return !messageApp?.autoAssign || currentUser.user.admin;
     };
 
     const deleteMessage = (message: IMessage) => {
@@ -74,166 +79,198 @@ const Messages = observer(() => {
 
     React.useEffect(() => {
         if (!messagesStore.loaded(appId, archivedView)) {
-            messagesStore.loadMore(appId, archivedView);
+            void messagesStore.loadMore(appId, archivedView);
         }
-    }, [appId, archivedView]);
+    }, [appId, archivedView, messagesStore]);
 
-    const renderMessage = (_index: number, message: IMessage) => (
+    const renderMessage = (_index: number, item: IMessage) => (
         <Message
-            key={message.id}
+            key={item.id}
             fDelete={
-                !archivedView && canDeleteMessage(message)
-                    ? () => deleteMessage(message)
+                !archivedView && canDeleteMessage(item)
+                    ? () => deleteMessage(item)
                     : undefined
             }
             fArchive={
-                !archivedView ? () => void messagesStore.archiveSingle(message) : undefined
+                !archivedView ? () => void messagesStore.archiveSingle(item) : undefined
             }
             fRestore={
-                archivedView ? () => void messagesStore.restoreSingle(message) : undefined
+                archivedView ? () => void messagesStore.restoreSingle(item) : undefined
             }
-            senderName={message.senderName}
-            onExpand={(expanded) => (expandedState.current[message.id] = expanded)}
-            title={message.title}
-            date={message.date}
-            appName={appStore.getName(message.appid)}
-            expanded={expandedState.current[message.id] ?? false}
-            content={message.message}
-            image={message.image}
-            extras={message.extras}
-            priority={message.priority}
+            senderName={item.senderName}
+            onExpand={(expanded) => (expandedState.current[item.id] = expanded)}
+            title={item.title}
+            date={item.date}
+            appName={appStore.getName(item.appid)}
+            expanded={expandedState.current[item.id] ?? false}
+            content={item.message}
+            image={item.image}
+            extras={item.extras}
+            priority={item.priority}
         />
     );
 
     const checkIfLoadMore = () => {
         if (!isLoadingMore && messagesStore.canLoadMore(appId, archivedView)) {
             setLoadingMore(true);
-            messagesStore.loadMore(appId, archivedView).then(() => setLoadingMore(false));
+            messagesStore
+                .loadMore(appId, archivedView)
+                .finally(() => setLoadingMore(false));
         }
     };
 
-    const messageFooter = () => {
-        if (hasMore) {
-            return <LoadingSpinner />;
-        }
-        if (hasMessages) {
-            return label("You've reached the end");
-        }
-        return null;
-    };
-
-    const renderMessages = () => (
-        <Virtuoso
-            id="messages"
-            style={{width: '100%'}}
-            useWindowScroll
-            totalCount={messages.length}
-            endReached={checkIfLoadMore}
-            data={messages}
-            itemContent={renderMessage}
-            components={{
-                Footer: messageFooter,
-                EmptyPlaceholder: () =>
-                    label(archivedView ? 'No archived messages' : 'No messages'),
-            }}
-        />
-    );
-
-    const label = (text: string) => (
-        <Grid size={{xs: 12}}>
-            <Typography variant="caption" component="div" gutterBottom align="center">
-                {text}
+    const footer = () => {
+        if (hasMore) return <LoadingSpinner />;
+        if (!hasMessages) return null;
+        return (
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                component="div"
+                align="center"
+                sx={{py: 2}}>
+                End of messages
             </Typography>
-        </Grid>
+        );
+    };
+
+    const empty = () => (
+        <Box sx={{py: 8, textAlign: 'center'}}>
+            <Typography variant="h6">
+                {archivedView ? 'Archive is empty' : 'No messages'}
+            </Typography>
+            <Typography color="text.secondary">
+                {archivedView
+                    ? 'Messages you archive will appear here.'
+                    : 'New notifications will appear here when they arrive.'}
+            </Typography>
+        </Box>
     );
+
+    const title = appId === -1 ? 'Messages' : name;
+    const description =
+        appId === -1
+            ? 'Notifications from every Channel available to your account.'
+            : archivedView
+              ? 'Archived messages are private to your account and can be restored.'
+              : app?.autoAssign
+                ? 'Global Channel · available to all users.'
+                : 'Channel message history.';
 
     return (
         <DefaultPage
-            title={
-                app?.allowMemberPost
-                    ? `${name} · Chat${archivedView ? ' · Archived' : ''}`
-                    : `${name}${archivedView ? ' · Archived' : ''}`
-            }
+            title={title}
+            description={description}
             rightControl={
-                <div>
+                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
                     {!archivedView && canPost && app && !app.allowMemberPost && (
                         <Button
                             id="push-message"
                             variant="contained"
-                            color="primary"
-                            onClick={() => setPushMessageOpen(true)}
-                            style={{marginRight: 5}}>
-                            Push Message
+                            startIcon={<Send />}
+                            onClick={() => setPushMessageOpen(true)}>
+                            Send Notification
                         </Button>
                     )}
-                    <Button
-                        id="toggle-archive-view"
-                        variant="contained"
-                        color="primary"
-                        onClick={() => setArchivedView((current) => !current)}
-                        style={{marginRight: 5}}>
-                        {archivedView ? 'Active' : 'Archived'}
-                    </Button>
-                    <Button
-                        id="refresh-all"
-                        variant="contained"
-                        color="primary"
-                        onClick={() => messagesStore.refreshByApp(appId, archivedView)}
-                        style={{marginRight: 5}}>
-                        Refresh
-                    </Button>
+
+                    <ButtonGroup variant="outlined">
+                        <Button
+                            variant={!archivedView ? 'contained' : 'outlined'}
+                            onClick={() => setArchivedView(false)}>
+                            Active
+                        </Button>
+                        <Button
+                            variant={archivedView ? 'contained' : 'outlined'}
+                            onClick={() => setArchivedView(true)}>
+                            Archive
+                        </Button>
+                    </ButtonGroup>
+
+                    <Tooltip title="Refresh">
+                        <Button
+                            id="refresh-all"
+                            variant="outlined"
+                            onClick={() => messagesStore.refreshByApp(appId, archivedView)}>
+                            <Refresh />
+                        </Button>
+                    </Tooltip>
+
                     {!archivedView && (
                         <Button
                             id="archive-all"
-                            variant="contained"
+                            variant="outlined"
+                            startIcon={<Archive />}
                             disabled={!hasMessages}
-                            color="primary"
-                            onClick={() => void messagesStore.archiveByApp(appId)}
-                            style={{marginRight: 5}}>
+                            onClick={() => void messagesStore.archiveByApp(appId)}>
                             Archive All
                         </Button>
                     )}
+
                     {archivedView && (
                         <Button
                             id="restore-all"
-                            variant="contained"
+                            variant="outlined"
+                            startIcon={<Restore />}
                             disabled={!hasMessages}
-                            color="primary"
-                            onClick={() => void messagesStore.restoreByApp(appId)}
-                            style={{marginRight: 5}}>
+                            onClick={() => void messagesStore.restoreByApp(appId)}>
                             Restore All
                         </Button>
                     )}
+
                     {canDeleteAll && (
                         <Button
                             id="delete-all"
-                            variant="contained"
+                            variant="outlined"
+                            startIcon={<DeleteSweep />}
                             disabled={!hasMessages}
-                            color="primary"
                             onClick={() => setDeleteAll(true)}>
                             Delete All
                         </Button>
                     )}
-                </div>
+                </Stack>
             }>
+            <Stack direction="row" spacing={1}>
+                {app?.autoAssign && <Chip size="small" label="Global Channel" />}
+                {app?.receiveNotifications === false && (
+                    <Chip size="small" variant="outlined" label="Notifications Muted" />
+                )}
+                {archivedView && <Chip size="small" variant="outlined" label="My Archive" />}
+            </Stack>
+
             {!archivedView && app?.allowMemberPost && canPost && (
                 <ChatComposer
                     channelName={app.name}
-                    fOnSubmit={(message) =>
-                        messagesStore.sendMessage(app.id, message, '', app.defaultPriority)
+                    fOnSubmit={(text) =>
+                        messagesStore.sendMessage(app.id, text, '', app.defaultPriority)
                     }
                 />
             )}
 
-            {!messagesStore.loaded(appId, archivedView) ? <LoadingSpinner /> : renderMessages()}
+            {!messagesStore.loaded(appId, archivedView) ? (
+                <LoadingSpinner />
+            ) : (
+                <Virtuoso
+                    id="messages"
+                    style={{width: '100%'}}
+                    useWindowScroll
+                    totalCount={messages.length}
+                    endReached={checkIfLoadMore}
+                    data={messages}
+                    itemContent={renderMessage}
+                    components={{
+                        Footer: footer,
+                        EmptyPlaceholder: empty,
+                    }}
+                />
+            )}
 
             {deleteAll && (
                 <ConfirmDialog
-                    title="Confirm Delete"
+                    title="Delete Messages"
                     text={
                         app?.autoAssign
-                            ? 'Delete all messages from this Global Channel for everyone?'
-                            : 'Delete all messages?'
+                            ? 'Permanently delete all messages from this Global Channel for everyone?'
+                            : 'Delete all visible messages?'
                     }
                     fClose={() => setDeleteAll(false)}
                     fOnSubmit={() => messagesStore.removeByApp(appId)}
@@ -245,8 +282,8 @@ const Messages = observer(() => {
                     appName={app.name}
                     defaultPriority={app.defaultPriority}
                     fClose={() => setPushMessageOpen(false)}
-                    fOnSubmit={(message, title, priority) =>
-                        messagesStore.sendMessage(app.id, message, title, priority)
+                    fOnSubmit={(text, messageTitle, priority) =>
+                        messagesStore.sendMessage(app.id, text, messageTitle, priority)
                     }
                 />
             )}
