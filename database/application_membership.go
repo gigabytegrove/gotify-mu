@@ -1,0 +1,146 @@
+package database
+
+import (
+	"github.com/gotify/server/v3/model"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+func membershipConflict() clause.OnConflict {
+	return clause.OnConflict{
+		Columns:   []clause.Column{{Name: "application_id"}, {Name: "user_id"}},
+		DoNothing: true,
+	}
+}
+
+func assignApplicationToAllUsers(tx *gorm.DB, applicationID, ownerID uint) error {
+	var userIDs []uint
+	if err := tx.Model(&model.User{}).Pluck("id", &userIDs).Error; err != nil {
+		return err
+	}
+
+	memberships := make([]model.ApplicationMembership, 0, len(userIDs))
+	for _, userID := range userIDs {
+		if userID == ownerID {
+			continue
+		}
+		memberships = append(memberships, model.ApplicationMembership{
+			ApplicationID:        applicationID,
+			UserID:               userID,
+			ReceiveNotifications: true,
+			AutoAssigned:         true,
+		})
+	}
+	if len(memberships) == 0 {
+		return nil
+	}
+	return tx.Clauses(membershipConflict()).Create(&memberships).Error
+}
+
+func assignUserToAutoApplications(tx *gorm.DB, userID uint) error {
+	var apps []model.Application
+	if err := tx.Where("auto_assign = ?", true).Find(&apps).Error; err != nil {
+		return err
+	}
+	for _, app := range apps {
+		if app.UserID == userID {
+			continue
+		}
+		membership := model.ApplicationMembership{
+			ApplicationID:        app.ID,
+			UserID:               userID,
+			ReceiveNotifications: true,
+			AutoAssigned:         true,
+		}
+		if err := tx.Clauses(membershipConflict()).Create(&membership).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func backfillApplicationMemberships(tx *gorm.DB) error {
+	var apps []model.Application
+	if err := tx.Find(&apps).Error; err != nil {
+		return err
+	}
+	for _, app := range apps {
+		if app.UserID != 0 {
+			owner := model.ApplicationMembership{
+				ApplicationID:        app.ID,
+				UserID:               app.UserID,
+				ReceiveNotifications: true,
+			}
+			if err := tx.Clauses(membershipConflict()).Create(&owner).Error; err != nil {
+				return err
+			}
+		}
+		if app.AutoAssign {
+			if err := assignApplicationToAllUsers(tx, app.ID, app.UserID); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func (d *GormDatabase) GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error) {
+	membership := new(model.ApplicationMembership)
+	err := d.DB.Where("application_id = ? AND user_id = ?", applicationID, userID).Find(membership).Error
+	if err == gorm.ErrRecordNotFound {
+		err = nil
+	}
+	if membership.ApplicationID == applicationID && membership.UserID == userID {
+		return membership, err
+	}
+	return nil, err
+}
+
+func (d *GormDatabase) GetApplicationMemberships(applicationID uint) ([]*model.ApplicationMembership, error) {
+	var memberships []*model.ApplicationMembership
+	err := d.DB.Where("application_id = ?", applicationID).Order("user_id ASC").Find(&memberships).Error
+	return memberships, err
+}
+
+func (d *GormDatabase) UpsertApplicationMembership(membership *model.ApplicationMembership) error {
+	membership.AutoAssigned = false
+	return d.DB.Clauses(clause.OnConflict{
+		Columns:   []clause.Column{{Name: "application_id"}, {Name: "user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"receive_notifications", "auto_assigned", "updated_at"}),
+	}).Create(membership).Error
+}
+
+func (d *GormDatabase) DeleteApplicationMembership(applicationID, userID uint) error {
+	return d.DB.Where("application_id = ? AND user_id = ?", applicationID, userID).Delete(&model.ApplicationMembership{}).Error
+}
+
+func (d *GormDatabase) CountApplicationMemberships(applicationID uint) (int64, error) {
+	var count int64
+	err := d.DB.Model(&model.ApplicationMembership{}).Where("application_id = ?", applicationID).Count(&count).Error
+	return count, err
+}
+
+func (d *GormDatabase) GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error) {
+	var userIDs []uint
+	err := d.DB.Model(&model.ApplicationMembership{}).
+		Where("application_id = ? AND receive_notifications = ?", applicationID, true).
+		Order("user_id ASC").Pluck("user_id", &userIDs).Error
+	return userIDs, err
+}
+
+func (d *GormDatabase) SetApplicationAutoAssign(applicationID uint, enabled bool) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		var app model.Application
+		if err := tx.First(&app, applicationID).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.Application{}).Where("id = ?", applicationID).Update("auto_assign", enabled).Error; err != nil {
+			return err
+		}
+		if enabled {
+			return assignApplicationToAllUsers(tx, applicationID, app.UserID)
+		}
+		return tx.Where("application_id = ? AND auto_assigned = ?", applicationID, true).
+			Delete(&model.ApplicationMembership{}).Error
+	})
+}
