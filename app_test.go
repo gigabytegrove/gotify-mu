@@ -7,6 +7,14 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+func TestResolveVersionInfo(t *testing.T) {
+	info := resolveVersionInfo()
+	assert.NotEmpty(t, info.Version)
+	assert.NotEqual(t, "unknown", info.Version)
+	assert.NotEmpty(t, info.Commit)
+	assert.NotEmpty(t, info.BuildDate)
+}
+
 func TestRun(t *testing.T) {
 	cases := []struct {
 		name     string

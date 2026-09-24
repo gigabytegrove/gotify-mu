@@ -32,6 +32,9 @@ ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 ARG BUILD_JS=0
 ARG RUN_TESTS=0 # 0=never, 1=native only
+ARG GOTIFY_MU_VERSION=master-local
+ARG GOTIFY_MU_COMMIT=local
+ARG GOTIFY_MU_BUILD_DATE=local
 ARG LD_FLAGS=""
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -50,7 +53,11 @@ RUN cd /src/gotify && \
     if [ "$RUN_TESTS" = "1" ] && [ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]; then \
     go test -v ./...; \
     fi && \
-    LD_FLAGS=${LD_FLAGS} make OUTPUT=/target/app/gotify-app _build_within_docker
+    EFFECTIVE_LD_FLAGS="$LD_FLAGS" && \
+    if [ -z "$EFFECTIVE_LD_FLAGS" ]; then \
+    EFFECTIVE_LD_FLAGS="-w -s -X main.Version=${GOTIFY_MU_VERSION} -X main.Commit=${GOTIFY_MU_COMMIT} -X main.BuildDate=${GOTIFY_MU_BUILD_DATE} -X main.Mode=prod"; \
+    fi && \
+    LD_FLAGS="$EFFECTIVE_LD_FLAGS" make OUTPUT=/target/app/gotify-app _build_within_docker
 
 FROM debian:${DEBIAN}
 

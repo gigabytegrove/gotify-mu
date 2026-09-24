@@ -6,6 +6,8 @@ services:
       args:
         BUILD_JS: "1"
         GO_VERSION: "1.26.0"
+        GOTIFY_MU_VERSION: "${GOTIFY_MU_VERSION:-master-local}"
+        GOTIFY_MU_COMMIT: "${GOTIFY_MU_COMMIT:-local}"
     image: gotify-mu:master
     container_name: gotify-mu
     restart: unless-stopped
