@@ -18,6 +18,7 @@ type ApplicationMembershipDatabase interface {
 	UpsertApplicationMembership(membership *model.ApplicationMembership) error
 	DeleteApplicationMembership(applicationID, userID uint) error
 	SetApplicationAutoAssign(applicationID uint, enabled bool) error
+	SetApplicationMembersCanPost(applicationID uint, enabled bool) error
 	SetApplicationMembershipNotifications(applicationID, userID uint, enabled bool) error
 	TransferApplicationOwnership(applicationID, newOwnerID uint) error
 	SetApplicationMemberPosting(applicationID uint, enabled bool) error
@@ -47,6 +48,11 @@ type ApplicationAutoAssignParams struct {
 type ApplicationNotificationParams struct {
 	Enabled bool `json:"enabled"`
 }
+
+type ApplicationMembersCanPostParams struct {
+	Enabled bool `json:"enabled"`
+}
+
 
 type ApplicationOwnerParams struct {
 	UserID uint `json:"userId" binding:"required"`
@@ -266,6 +272,45 @@ func (a *ApplicationMembershipAPI) SetAutoAssign(ctx *gin.Context) {
 		}
 
 		ctx.JSON(http.StatusOK, ApplicationAutoAssignParams{Enabled: params.Enabled})
+	})
+}
+
+func (a *ApplicationMembershipAPI) SetMembersCanPost(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+
+		current, err := a.DB.GetUserByID(auth.GetUserID(ctx))
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if app == nil || current == nil || !current.Admin {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist"))
+			return
+		}
+		if app.Internal {
+			ctx.AbortWithError(
+				http.StatusBadRequest,
+				errors.New("internal applications cannot enable member posting"),
+			)
+			return
+		}
+
+		params := ApplicationMembersCanPostParams{}
+		if err := ctx.Bind(&params); err != nil {
+			return
+		}
+		if success := successOrAbort(
+			ctx,
+			http.StatusInternalServerError,
+			a.DB.SetApplicationMembersCanPost(id, params.Enabled),
+		); !success {
+			return
+		}
+
+		ctx.JSON(http.StatusOK, params)
 	})
 }
 
