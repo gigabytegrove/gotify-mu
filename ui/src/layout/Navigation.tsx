@@ -85,6 +85,20 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                         .map((item) => (
                             <ListItemButton
                                 key={item.to}
+                                id={
+                                    item.to === '/applications'
+                                        ? 'navigate-apps'
+                                        : item.to === '/users'
+                                          ? 'navigate-users'
+                                          : item.to === '/clients'
+                                            ? 'navigate-clients'
+                                            : item.to === '/plugins'
+                                              ? 'navigate-plugins'
+                                              : item.to === '/messages'
+                                                ? 'navigate-messages'
+                                                : undefined
+                                }
+                                className={item.to === '/messages' ? 'all' : undefined}
                                 component={Link}
                                 to={item.to}
                                 selected={selected(item)}
@@ -122,6 +136,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                             return (
                                 <ListItemButton
                                     key={app.id}
+                                    className="item channel-shortcut"
                                     component={Link}
                                     to={to}
                                     selected={location.pathname === to}
@@ -180,6 +195,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                 {drawerContent}
             </Drawer>
             <Drawer
+                id="message-navigation"
                 variant="permanent"
                 open
                 sx={{
