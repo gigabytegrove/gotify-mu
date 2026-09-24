@@ -17,17 +17,26 @@ import (
 // The MessageDatabase interface for encapsulating database access.
 type MessageDatabase interface {
 	GetMessagesByApplicationForUserSince(userID, appID uint, limit int, since uint) ([]*model.Message, error)
+	GetArchivedMessagesByApplicationForUserSince(userID, appID uint, limit int, since uint) ([]*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
+	GetUserByID(id uint) (*model.User, error)
 	GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error)
 	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	CountApplicationMemberships(applicationID uint) (int64, error)
 	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
 	GetMessagesByUserSince(userID uint, limit int, since uint) ([]*model.Message, error)
+	GetArchivedMessagesByUserSince(userID uint, limit int, since uint) ([]*model.Message, error)
 	DeleteMessageByID(id uint) error
 	GetMessageByID(id uint) (*model.Message, error)
 	DeleteMessagesByApplication(applicationID uint) error
 	DismissMessageForUser(userID, messageID uint) error
 	DismissMessagesByApplicationForUser(userID, applicationID uint) error
+	ArchiveMessageForUser(userID, messageID uint) error
+	UnarchiveMessageForUser(userID, messageID uint) error
+	ArchiveMessagesByUser(userID uint) error
+	ArchiveMessagesByApplicationForUser(userID, applicationID uint) error
+	UnarchiveMessagesByUser(userID uint) error
+	UnarchiveMessagesByApplicationForUser(userID, applicationID uint) error
 	CreateMessage(message *model.Message) error
 }
 
@@ -45,8 +54,9 @@ type MessageAPI struct {
 }
 
 type pagingParams struct {
-	Limit int  `form:"limit" binding:"min=1,max=200"`
-	Since uint `form:"since" binding:"min=0"`
+	Limit    int  `form:"limit" binding:"min=1,max=200"`
+	Since    uint `form:"since" binding:"min=0"`
+	Archived bool `form:"archived"`
 }
 
 // GetMessages returns all messages from a user.
@@ -94,7 +104,17 @@ func (a *MessageAPI) GetMessages(ctx *gin.Context) {
 	userID := auth.GetUserID(ctx)
 	withPaging(ctx, func(params *pagingParams) {
 		// the +1 is used to check if there are more messages and will be removed on buildWithPaging
-		messages, err := a.DB.GetMessagesByUserSince(userID, params.Limit+1, params.Since)
+		var messages []*model.Message
+		var err error
+		if params.Archived {
+			messages, err = a.DB.GetArchivedMessagesByUserSince(
+				userID,
+				params.Limit+1,
+				params.Since,
+			)
+		} else {
+			messages, err = a.DB.GetMessagesByUserSince(userID, params.Limit+1, params.Since)
+		}
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
@@ -112,6 +132,9 @@ func buildWithPaging(ctx *gin.Context, paging *pagingParams, messages []*model.M
 		query := url.Values{}
 		query.Add("limit", strconv.Itoa(paging.Limit))
 		query.Add("since", strconv.FormatUint(uint64(since), 10))
+		if paging.Archived {
+			query.Add("archived", "true")
+		}
 		next = ctx.Request.URL.Path + "?" + query.Encode()
 	}
 	return &model.PagedMessages{
@@ -192,7 +215,22 @@ func (a *MessageAPI) GetMessagesWithApplication(ctx *gin.Context) {
 			}
 			if app != nil && membership != nil {
 				// the +1 is used to check if there are more messages and will be removed on buildWithPaging
-				messages, err := a.DB.GetMessagesByApplicationForUserSince(userID, id, params.Limit+1, params.Since)
+				var messages []*model.Message
+				if params.Archived {
+					messages, err = a.DB.GetArchivedMessagesByApplicationForUserSince(
+						userID,
+						id,
+						params.Limit+1,
+						params.Since,
+					)
+				} else {
+					messages, err = a.DB.GetMessagesByApplicationForUserSince(
+						userID,
+						id,
+						params.Limit+1,
+						params.Since,
+					)
+				}
 				if success := successOrAbort(ctx, 500, err); !success {
 					return
 				}
@@ -201,6 +239,108 @@ func (a *MessageAPI) GetMessagesWithApplication(ctx *gin.Context) {
 				ctx.AbortWithError(404, errors.New("application does not exist"))
 			}
 		})
+	})
+}
+
+// ArchiveMessages archives all currently visible messages for the current user.
+func (a *MessageAPI) ArchiveMessages(ctx *gin.Context) {
+	userID := auth.GetUserID(ctx)
+	successOrAbort(ctx, 500, a.DB.ArchiveMessagesByUser(userID))
+}
+
+// UnarchiveMessages restores all archived messages for the current user.
+func (a *MessageAPI) UnarchiveMessages(ctx *gin.Context) {
+	userID := auth.GetUserID(ctx)
+	successOrAbort(ctx, 500, a.DB.UnarchiveMessagesByUser(userID))
+}
+
+// ArchiveMessageWithApplication archives all currently visible messages from one
+// channel for the current user without affecting any other member.
+func (a *MessageAPI) ArchiveMessageWithApplication(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		membership, err := a.DB.GetApplicationMembership(id, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app == nil || membership == nil {
+			ctx.AbortWithError(404, errors.New("application does not exist"))
+			return
+		}
+		successOrAbort(ctx, 500, a.DB.ArchiveMessagesByApplicationForUser(userID, id))
+	})
+}
+
+// UnarchiveMessageWithApplication restores all archived messages from one
+// channel for the current user.
+func (a *MessageAPI) UnarchiveMessageWithApplication(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		membership, err := a.DB.GetApplicationMembership(id, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app == nil || membership == nil {
+			ctx.AbortWithError(404, errors.New("application does not exist"))
+			return
+		}
+		successOrAbort(ctx, 500, a.DB.UnarchiveMessagesByApplicationForUser(userID, id))
+	})
+}
+
+// ArchiveMessage archives one message for the current user.
+func (a *MessageAPI) ArchiveMessage(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		msg, err := a.DB.GetMessageByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if msg == nil {
+			ctx.AbortWithError(404, errors.New("message does not exist"))
+			return
+		}
+		membership, err := a.DB.GetApplicationMembership(msg.ApplicationID, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if membership == nil {
+			ctx.AbortWithError(404, errors.New("message does not exist"))
+			return
+		}
+		successOrAbort(ctx, 500, a.DB.ArchiveMessageForUser(userID, id))
+	})
+}
+
+// UnarchiveMessage restores one archived message for the current user.
+func (a *MessageAPI) UnarchiveMessage(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		msg, err := a.DB.GetMessageByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if msg == nil {
+			ctx.AbortWithError(404, errors.New("message does not exist"))
+			return
+		}
+		membership, err := a.DB.GetApplicationMembership(msg.ApplicationID, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if membership == nil {
+			ctx.AbortWithError(404, errors.New("message does not exist"))
+			return
+		}
+		successOrAbort(ctx, 500, a.DB.UnarchiveMessageForUser(userID, id))
 	})
 }
 
@@ -229,7 +369,33 @@ func (a *MessageAPI) DeleteMessages(ctx *gin.Context) {
 	if success := successOrAbort(ctx, 500, err); !success {
 		return
 	}
+
+	user, err := a.DB.GetUserByID(userID)
+	if success := successOrAbort(ctx, 500, err); !success {
+		return
+	}
+	isAdmin := user != nil && user.Admin
+
+	if !isAdmin {
+		for _, app := range apps {
+			if app.AutoAssign {
+				ctx.AbortWithError(
+					403,
+					errors.New("global channel messages can only be deleted by an administrator; archive them instead"),
+				)
+				return
+			}
+		}
+	}
+
 	for _, app := range apps {
+		if app.AutoAssign && isAdmin {
+			if success := successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(app.ID)); !success {
+				return
+			}
+			continue
+		}
+
 		memberCount, err := a.DB.CountApplicationMemberships(app.ID)
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
@@ -238,7 +404,11 @@ func (a *MessageAPI) DeleteMessages(ctx *gin.Context) {
 			if success := successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(app.ID)); !success {
 				return
 			}
-		} else if success := successOrAbort(ctx, 500, a.DB.DismissMessagesByApplicationForUser(userID, app.ID)); !success {
+		} else if success := successOrAbort(
+			ctx,
+			500,
+			a.DB.DismissMessagesByApplicationForUser(userID, app.ID),
+		); !success {
 			return
 		}
 	}
@@ -290,6 +460,22 @@ func (a *MessageAPI) DeleteMessageWithApplication(ctx *gin.Context) {
 			return
 		}
 		if application != nil && membership != nil {
+			if application.AutoAssign {
+				user, err := a.DB.GetUserByID(userID)
+				if success := successOrAbort(ctx, 500, err); !success {
+					return
+				}
+				if user == nil || !user.Admin {
+					ctx.AbortWithError(
+						403,
+						errors.New("global channel messages can only be deleted by an administrator; archive them instead"),
+					)
+					return
+				}
+				successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id))
+				return
+			}
+
 			memberCount, err := a.DB.CountApplicationMemberships(id)
 			if success := successOrAbort(ctx, 500, err); !success {
 				return
@@ -359,6 +545,22 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 			return
 		}
 		if app != nil && membership != nil {
+			if app.AutoAssign {
+				user, err := a.DB.GetUserByID(userID)
+				if success := successOrAbort(ctx, 500, err); !success {
+					return
+				}
+				if user == nil || !user.Admin {
+					ctx.AbortWithError(
+						403,
+						errors.New("global channel messages can only be deleted by an administrator; archive them instead"),
+					)
+					return
+				}
+				successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id))
+				return
+			}
+
 			memberCount, err := a.DB.CountApplicationMemberships(msg.ApplicationID)
 			if success := successOrAbort(ctx, 500, err); !success {
 				return
@@ -374,13 +576,54 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 	})
 }
 
+// DeleteMessagesForEveryone permanently clears a channel's message history for all members.
+// This is a Gotify MU management action and requires the channel owner or an administrator.
+func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app == nil {
+			ctx.AbortWithError(404, errors.New("application does not exist"))
+			return
+		}
+
+		userID := auth.GetUserID(ctx)
+		user, err := a.DB.GetUserByID(userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		isAdmin := user != nil && user.Admin
+
+		allowed := app.UserID == userID || isAdmin
+		if app.AutoAssign {
+			allowed = isAdmin
+		}
+		if !allowed {
+			if app.AutoAssign {
+				ctx.AbortWithError(
+					403,
+					errors.New("global channel history can only be cleared by an administrator"),
+				)
+			} else {
+				ctx.AbortWithError(404, errors.New("application does not exist"))
+			}
+			return
+		}
+
+		successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id))
+	})
+}
+
 // CreateMessage creates a message, authentication via application token, client token, or basic auth is required.
 // swagger:operation POST /message message createMessage
 //
 // Create a message.
 //
 // __NOTE__: When authenticating with a client token or basic auth, the request body
-// must include "appid" referencing an application owned by the authenticated user.
+// must include "appid" referencing an application owned by the authenticated user,
+// or a Gotify MU channel where the authenticated user is a member and member posting is enabled.
 // When authenticating with an application token, the application is derived from the
 // token and any "appid" in the body is ignored.
 //
@@ -419,17 +662,44 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 	}
 
 	app := auth.GetApplication(ctx)
+	var postingUser *model.User
 	if app == nil {
 		if message.ApplicationID == 0 {
 			ctx.AbortWithError(400, errors.New("appid is required when not authenticating with an application token"))
 			return
 		}
+
+		userID := auth.GetUserID(ctx)
 		fetchedApp, err := a.DB.GetApplicationByID(message.ApplicationID)
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		if fetchedApp == nil || fetchedApp.UserID != auth.GetUserID(ctx) {
+		if fetchedApp == nil {
 			ctx.AbortWithError(400, errors.New("appid not found"))
+			return
+		}
+
+		if fetchedApp.UserID != userID {
+			if !fetchedApp.AllowMemberPost {
+				ctx.AbortWithError(400, errors.New("appid not found"))
+				return
+			}
+			membership, err := a.DB.GetApplicationMembership(fetchedApp.ID, userID)
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
+			if membership == nil {
+				ctx.AbortWithError(400, errors.New("appid not found"))
+				return
+			}
+		}
+
+		postingUser, err = a.DB.GetUserByID(userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if postingUser == nil {
+			ctx.AbortWithError(400, errors.New("user not found"))
 			return
 		}
 		app = fetchedApp
@@ -437,7 +707,11 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 
 	message.ApplicationID = app.ID
 	if strings.TrimSpace(message.Title) == "" {
-		message.Title = app.Name
+		if postingUser != nil && app.AllowMemberPost {
+			message.Title = postingUser.Name
+		} else {
+			message.Title = app.Name
+		}
 	}
 
 	if message.Priority == nil {
@@ -450,6 +724,10 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 	}
 
 	msgInternal := toInternalMessage(&message)
+	if postingUser != nil {
+		msgInternal.SenderUserID = postingUser.ID
+		msgInternal.SenderName = postingUser.Name
+	}
 	if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
 		return
 	}
@@ -485,6 +763,8 @@ func toExternalMessage(msg *model.Message) *model.MessageExternal {
 		Title:         msg.Title,
 		Priority:      &msg.Priority,
 		Date:          msg.Date,
+		SenderUserID:  msg.SenderUserID,
+		SenderName:    msg.SenderName,
 	}
 	if len(msg.Extras) != 0 {
 		res.Extras = make(map[string]any)

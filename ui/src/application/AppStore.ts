@@ -98,13 +98,15 @@ export class AppStore extends BaseStore<IApplication> {
         name: string,
         description: string,
         defaultPriority: number,
-        autoAssign = false
+        autoAssign = false,
+        allowMemberPost = false
     ): Promise<string> => {
         const response = await axios.post(`${config.get('url')}application`, {
             name,
             description,
             defaultPriority,
             autoAssign,
+            allowMemberPost,
         });
         await this.refresh();
         this.snack('Channel created');
@@ -143,6 +145,29 @@ export class AppStore extends BaseStore<IApplication> {
         this.snack(
             enabled ? 'Channel auto-assignment enabled' : 'Channel auto-assignment disabled'
         );
+    };
+
+    public setMemberPosting = async (id: number, enabled: boolean): Promise<void> => {
+        await axios.put(`${config.get('url')}application/${id}/member-posting`, {enabled});
+        await this.refresh();
+        this.snack(enabled ? 'Chat posting enabled' : 'Chat posting disabled');
+    };
+
+    public setNotifications = async (id: number, enabled: boolean): Promise<void> => {
+        await axios.put(`${config.get('url')}application/${id}/notifications`, {enabled});
+        await this.refresh();
+        this.snack(enabled ? 'Channel notifications enabled' : 'Channel notifications muted');
+    };
+
+    public transferOwnership = async (id: number, userId: number): Promise<void> => {
+        await axios.put(`${config.get('url')}application/${id}/owner`, {userId});
+        await this.refresh();
+        this.snack('Channel ownership transferred');
+    };
+
+    public clearHistoryForEveryone = async (id: number): Promise<void> => {
+        await axios.delete(`${config.get('url')}application/${id}/message/all`);
+        this.snack('Channel history cleared for everyone');
     };
 
     public getName = (id: number): string => {

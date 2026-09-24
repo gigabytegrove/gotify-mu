@@ -11,6 +11,9 @@ import TableRow from '@mui/material/TableRow';
 import Delete from '@mui/icons-material/Delete';
 import Edit from '@mui/icons-material/Edit';
 import Group from '@mui/icons-material/Group';
+import NotificationsActive from '@mui/icons-material/NotificationsActive';
+import NotificationsOff from '@mui/icons-material/NotificationsOff';
+import DeleteSweep from '@mui/icons-material/DeleteSweep';
 import CloudUpload from '@mui/icons-material/CloudUpload';
 import DragIndicator from '@mui/icons-material/DragIndicator';
 import Button from '@mui/material/Button';
@@ -72,6 +75,7 @@ const Applications = observer(() => {
     const [toShowToken, setToShowToken] = useState<string>('');
     const [createDialog, setCreateDialog] = useState<boolean>(false);
     const [toManageMembersApp, setToManageMembersApp] = useState<IApplication>();
+    const [toClearHistoryApp, setToClearHistoryApp] = useState<IApplication>();
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadId = useRef(-1);
@@ -140,6 +144,8 @@ const Applications = observer(() => {
                                     <TableCell />
                                     <TableCell />
                                     <TableCell />
+                                    <TableCell />
+                                    <TableCell />
                                 </TableRow>
                             </TableHead>
                             <SortableContext items={apps} strategy={verticalListSortingStrategy}>
@@ -154,9 +160,24 @@ const Applications = observer(() => {
                                             fDelete={() => setToDeleteApp(app)}
                                             fEdit={() => setToUpdateApp(app)}
                                             fMembers={() => setToManageMembersApp(app)}
+                                            fToggleNotifications={() =>
+                                                void appStore.setNotifications(
+                                                    app.id,
+                                                    app.receiveNotifications === false
+                                                )
+                                            }
+                                            fClearHistory={() => setToClearHistoryApp(app)}
                                             canManage={
                                                 currentUser.user.admin ||
                                                 app.ownerId === currentUser.user.id
+                                            }
+                                            canDeleteChannel={
+                                                currentUser.user.admin || !app.autoAssign
+                                            }
+                                            canClearHistory={
+                                                currentUser.user.admin ||
+                                                (!app.autoAssign &&
+                                                    app.ownerId === currentUser.user.id)
                                             }
                                         />
                                     ))}
@@ -228,6 +249,19 @@ const Applications = observer(() => {
                     fClose={() => setToManageMembersApp(undefined)}
                 />
             )}
+            {toClearHistoryApp != null && (
+                <ConfirmDialog
+                    title="Clear Channel History For Everyone"
+                    text={
+                        'Permanently delete all messages in ' +
+                        toClearHistoryApp.name +
+                        ' for every channel member? This cannot be undone.'
+                    }
+                    fClose={() => setToClearHistoryApp(undefined)}
+                    fOnSubmit={() => appStore.clearHistoryForEveryone(toClearHistoryApp.id)}
+                    requireElevated
+                />
+            )}
             {toDeleteImage != null && (
                 <ConfirmDialog
                     title="Confirm Delete Image"
@@ -248,7 +282,11 @@ interface IRowProps {
     fDelete: VoidFunction;
     fEdit: VoidFunction;
     fMembers: VoidFunction;
+    fToggleNotifications: VoidFunction;
+    fClearHistory: VoidFunction;
     canManage: boolean;
+    canDeleteChannel: boolean;
+    canClearHistory: boolean;
 }
 
 const Row = ({
@@ -259,7 +297,11 @@ const Row = ({
     fDeleteImage,
     fEdit,
     fMembers,
+    fToggleNotifications,
+    fClearHistory,
     canManage,
+    canDeleteChannel,
+    canClearHistory,
 }: IRowProps) => {
     const {classes} = useStyles();
     const isDefaultImage = app.image === 'static/defaultapp.png';
@@ -314,6 +356,7 @@ const Row = ({
             <TableCell>
                 {app.name}
                 {app.autoAssign ? ' · Global' : ''}
+                {app.allowMemberPost ? ' · Chat' : ''}
             </TableCell>
             <TableCell>{app.description}</TableCell>
             <TableCell>{app.defaultPriority}</TableCell>
@@ -321,6 +364,31 @@ const Row = ({
                 <LastUsedCell lastUsed={app.lastUsed} />
             </TableCell>
             <TableCell title={app.createdAt}>{formatDate(app.createdAt)}</TableCell>
+            <TableCell align="right" padding="none">
+                <Tooltip
+                    title={
+                        app.receiveNotifications === false
+                            ? 'Enable notifications'
+                            : 'Mute notifications'
+                    }>
+                    <IconButton onClick={fToggleNotifications} className="toggle-notifications">
+                        {app.receiveNotifications === false ? (
+                            <NotificationsOff />
+                        ) : (
+                            <NotificationsActive />
+                        )}
+                    </IconButton>
+                </Tooltip>
+            </TableCell>
+            <TableCell align="right" padding="none">
+                {canClearHistory && (
+                    <Tooltip title="Clear history for everyone">
+                        <IconButton onClick={fClearHistory} className="clear-history">
+                            <DeleteSweep />
+                        </IconButton>
+                    </Tooltip>
+                )}
+            </TableCell>
             <TableCell align="right" padding="none">
                 {canManage && (
                     <IconButton onClick={fMembers} className="members">
@@ -345,7 +413,7 @@ const Row = ({
                 <IconButton
                     onClick={fDelete}
                     className="delete"
-                    disabled={app.internal || !canManage}>
+                    disabled={app.internal || !canManage || !canDeleteChannel}>
                     <Delete />
                 </IconButton>
             </TableCell>

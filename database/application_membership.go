@@ -1,6 +1,7 @@
 package database
 
 import (
+	"github.com/gotify/server/v3/fracdex"
 	"github.com/gotify/server/v3/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -126,6 +127,106 @@ func (d *GormDatabase) GetApplicationRecipientUserIDs(applicationID uint) ([]uin
 		Where("application_id = ? AND receive_notifications = ?", applicationID, true).
 		Order("user_id ASC").Pluck("user_id", &userIDs).Error
 	return userIDs, err
+}
+
+// SetApplicationMembershipNotifications changes realtime delivery for one channel member
+// without changing their access to channel history.
+func (d *GormDatabase) SetApplicationMembershipNotifications(
+	applicationID, userID uint,
+	enabled bool,
+) error {
+	result := d.DB.Model(&model.ApplicationMembership{}).
+		Where("application_id = ? AND user_id = ?", applicationID, userID).
+		Update("receive_notifications", enabled)
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		var count int64
+		if err := d.DB.Model(&model.ApplicationMembership{}).
+			Where("application_id = ? AND user_id = ?", applicationID, userID).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return gorm.ErrRecordNotFound
+		}
+	}
+	return nil
+}
+
+// TransferApplicationOwnership changes the canonical Gotify application owner.
+// The new owner is guaranteed to have a manual membership so disabling
+// auto-assignment later cannot remove the owner from the channel.
+func (d *GormDatabase) TransferApplicationOwnership(applicationID, newOwnerID uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		var app model.Application
+		if err := tx.First(&app, applicationID).Error; err != nil {
+			return err
+		}
+
+		var user model.User
+		if err := tx.First(&user, newOwnerID).Error; err != nil {
+			return err
+		}
+
+		var membership model.ApplicationMembership
+		err := tx.Where(
+			"application_id = ? AND user_id = ?",
+			applicationID,
+			newOwnerID,
+		).First(&membership).Error
+		switch {
+		case err == nil:
+			if err := tx.Model(&model.ApplicationMembership{}).
+				Where("application_id = ? AND user_id = ?", applicationID, newOwnerID).
+				Update("auto_assigned", false).Error; err != nil {
+				return err
+			}
+		case err == gorm.ErrRecordNotFound:
+			membership = model.ApplicationMembership{
+				ApplicationID:        applicationID,
+				UserID:               newOwnerID,
+				ReceiveNotifications: true,
+				AutoAssigned:         false,
+			}
+			if err := tx.Create(&membership).Error; err != nil {
+				return err
+			}
+		default:
+			return err
+		}
+
+		lastSortKey := ""
+		err = tx.Model(&model.Application{}).
+			Select("sort_key").
+			Where("user_id = ? AND id <> ?", newOwnerID, applicationID).
+			Order("sort_key DESC").
+			Limit(1).
+			Find(&lastSortKey).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return err
+		}
+		newSortKey, err := fracdex.KeyBetween(lastSortKey, "")
+		if err != nil {
+			return err
+		}
+
+		return tx.Model(&model.Application{}).
+			Where("id = ?", applicationID).
+			Updates(map[string]any{
+				"user_id":  newOwnerID,
+				"sort_key": newSortKey,
+			}).Error
+	})
+}
+
+// SetApplicationMemberPosting controls whether channel members may publish
+// using their normal user/client authentication.
+func (d *GormDatabase) SetApplicationMemberPosting(applicationID uint, enabled bool) error {
+	return d.DB.Model(&model.Application{}).
+		Where("id = ?", applicationID).
+		Update("allow_member_post", enabled).Error
 }
 
 func (d *GormDatabase) SetApplicationAutoAssign(applicationID uint, enabled bool) error {

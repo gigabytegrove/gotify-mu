@@ -18,6 +18,9 @@ type ApplicationMembershipDatabase interface {
 	UpsertApplicationMembership(membership *model.ApplicationMembership) error
 	DeleteApplicationMembership(applicationID, userID uint) error
 	SetApplicationAutoAssign(applicationID uint, enabled bool) error
+	SetApplicationMembershipNotifications(applicationID, userID uint, enabled bool) error
+	TransferApplicationOwnership(applicationID, newOwnerID uint) error
+	SetApplicationMemberPosting(applicationID uint, enabled bool) error
 }
 
 type ApplicationMembershipAPI struct {
@@ -38,6 +41,19 @@ type ApplicationMemberExternal struct {
 }
 
 type ApplicationAutoAssignParams struct {
+	Enabled bool `json:"enabled"`
+}
+
+type ApplicationNotificationParams struct {
+	Enabled bool `json:"enabled"`
+}
+
+
+type ApplicationOwnerParams struct {
+	UserID uint `json:"userId" binding:"required"`
+}
+
+type ApplicationMemberPostingParams struct {
 	Enabled bool `json:"enabled"`
 }
 
@@ -272,3 +288,120 @@ func (a *ApplicationMembershipAPI) GetAssignableUsers(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, result)
 	})
 }
+
+func (a *ApplicationMembershipAPI) SetCurrentUserNotifications(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if app == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist"))
+			return
+		}
+
+		membership, err := a.DB.GetApplicationMembership(id, userID)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if membership == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("channel membership does not exist"))
+			return
+		}
+
+		params := ApplicationNotificationParams{}
+		if err := ctx.Bind(&params); err != nil {
+			return
+		}
+		if success := successOrAbort(
+			ctx,
+			http.StatusInternalServerError,
+			a.DB.SetApplicationMembershipNotifications(id, userID, params.Enabled),
+		); !success {
+			return
+		}
+		ctx.JSON(http.StatusOK, params)
+	})
+}
+
+func (a *ApplicationMembershipAPI) TransferOwnership(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, ok := a.getAuthorizedApplication(ctx, id)
+		if !ok {
+			return
+		}
+		if app.Internal {
+			ctx.AbortWithError(
+				http.StatusBadRequest,
+				errors.New("internal applications cannot transfer ownership"),
+			)
+			return
+		}
+
+		params := ApplicationOwnerParams{}
+		if err := ctx.Bind(&params); err != nil {
+			return
+		}
+		if params.UserID == app.UserID {
+			ctx.JSON(http.StatusOK, params)
+			return
+		}
+
+		user, err := a.DB.GetUserByID(params.UserID)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if user == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("new owner does not exist"))
+			return
+		}
+
+		if success := successOrAbort(
+			ctx,
+			http.StatusInternalServerError,
+			a.DB.TransferApplicationOwnership(id, params.UserID),
+		); !success {
+			return
+		}
+		ctx.JSON(http.StatusOK, params)
+	})
+}
+
+func (a *ApplicationMembershipAPI) SetMemberPosting(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		current, err := a.DB.GetUserByID(auth.GetUserID(ctx))
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if app == nil || current == nil || !current.Admin {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist"))
+			return
+		}
+		if app.Internal {
+			ctx.AbortWithError(
+				http.StatusBadRequest,
+				errors.New("internal applications cannot enable member posting"),
+			)
+			return
+		}
+
+		params := ApplicationMemberPostingParams{}
+		if err := ctx.Bind(&params); err != nil {
+			return
+		}
+		if success := successOrAbort(
+			ctx,
+			http.StatusInternalServerError,
+			a.DB.SetApplicationMemberPosting(id, params.Enabled),
+		); !success {
+			return
+		}
+		ctx.JSON(http.StatusOK, params)
+	})
+}
+

@@ -3,6 +3,8 @@ export interface IApplication {
     token: string;
     ownerId?: number;
     autoAssign?: boolean;
+    allowMemberPost?: boolean;
+    receiveNotifications?: boolean;
     name: string;
     sortKey: string;
     description: string;
@@ -44,6 +46,8 @@ export interface IMessage {
     title: string;
     priority: number;
     date: string;
+    senderUserId?: number;
+    senderName?: string;
     image?: string;
     extras?: IMessageExtras;
 }

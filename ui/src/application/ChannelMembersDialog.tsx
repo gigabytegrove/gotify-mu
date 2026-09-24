@@ -21,12 +21,21 @@ interface IProps {
     fClose: VoidFunction;
 }
 
+const memberStatus = (member: IApplicationMember | undefined, isOwner: boolean): string => {
+    if (isOwner) return 'Owner';
+    if (!member) return 'Not assigned';
+
+    const status = member.autoAssigned ? 'Automatically assigned' : 'Assigned';
+    return member.receiveNotifications ? status : `${status} · Muted`;
+};
+
 const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
     const {appStore, currentUser, elevateStore} = useStores();
     const [members, setMembers] = useState<IApplicationMember[]>([]);
     const [users, setUsers] = useState<IUser[]>([]);
     const [loading, setLoading] = useState(false);
     const [autoAssign, setAutoAssignState] = useState(Boolean(app.autoAssign));
+    const [allowMemberPost, setAllowMemberPost] = useState(Boolean(app.allowMemberPost));
 
     const load = useCallback(async () => {
         if (!elevateStore.elevated) return;
@@ -63,6 +72,16 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
         await load();
     };
 
+    const toggleMemberPosting = async (enabled: boolean) => {
+        await appStore.setMemberPosting(app.id, enabled);
+        setAllowMemberPost(enabled);
+    };
+
+    const transferOwnership = async (user: IUser) => {
+        await appStore.transferOwnership(app.id, user.id);
+        handleClose();
+    };
+
     const handleClose = () => {
         elevateStore.cleanupOidcElevate();
         fClose();
@@ -77,17 +96,30 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                 ) : (
                     <>
                         {currentUser.user.admin && (
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={autoAssign}
-                                        onChange={(event) =>
-                                            void toggleAutoAssign(event.target.checked)
-                                        }
-                                    />
-                                }
-                                label="Automatically assign this channel to all users"
-                            />
+                            <>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={autoAssign}
+                                            onChange={(event) =>
+                                                void toggleAutoAssign(event.target.checked)
+                                            }
+                                        />
+                                    }
+                                    label="Automatically assign this channel to all users"
+                                />
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={allowMemberPost}
+                                            onChange={(event) =>
+                                                void toggleMemberPosting(event.target.checked)
+                                            }
+                                        />
+                                    }
+                                    label="Allow channel members to post (Chat Channel)"
+                                />
+                            </>
                         )}
                         {autoAssign && (
                             <Typography variant="body2" sx={{mb: 1}}>
@@ -102,24 +134,31 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                     <ListItem
                                         key={user.id}
                                         secondaryAction={
-                                            <Checkbox
-                                                edge="end"
-                                                checked={memberIds.has(user.id)}
-                                                disabled={isOwner || autoAssign || loading}
-                                                onChange={() => void toggleUser(user)}
-                                            />
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 8,
+                                                }}>
+                                                {!isOwner && member && (
+                                                    <Button
+                                                        size="small"
+                                                        disabled={loading}
+                                                        onClick={() => void transferOwnership(user)}>
+                                                        Make owner
+                                                    </Button>
+                                                )}
+                                                <Checkbox
+                                                    edge="end"
+                                                    checked={memberIds.has(user.id)}
+                                                    disabled={isOwner || autoAssign || loading}
+                                                    onChange={() => void toggleUser(user)}
+                                                />
+                                            </div>
                                         }>
                                         <ListItemText
                                             primary={user.name}
-                                            secondary={
-                                                isOwner
-                                                    ? 'Owner'
-                                                    : member?.autoAssigned
-                                                      ? 'Automatically assigned'
-                                                      : member
-                                                        ? 'Assigned'
-                                                        : 'Not assigned'
-                                            }
+                                            secondary={memberStatus(member, isOwner)}
                                         />
                                     </ListItem>
                                 );

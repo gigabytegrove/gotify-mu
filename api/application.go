@@ -22,6 +22,7 @@ type ApplicationDatabase interface {
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationsByUser(userID uint) ([]*model.Application, error)
 	GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error)
+	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	DeleteApplicationByID(id uint) error
 	UpdateApplication(application *model.Application) error
 	GetUserByID(id uint) (*model.User, error)
@@ -56,9 +57,10 @@ type ApplicationParams struct {
 	//
 	// example: a1
 	SortKey string `form:"sortKey" query:"sortKey" json:"sortKey"`
-	// Whether this channel should be automatically assigned to every user.
-	// Only administrators may create auto-assigned channels.
+	// Whether this Gotify MU channel should be automatically assigned to every user.
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
+	// Whether assigned users may publish messages to this Gotify MU channel.
+	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
 }
 
 // CreateApplication creates an application and returns the access token.
@@ -97,13 +99,16 @@ type ApplicationParams struct {
 func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 	applicationParams := ApplicationParams{}
 	if err := ctx.Bind(&applicationParams); err == nil {
-		if applicationParams.AutoAssign {
+		if applicationParams.AutoAssign || applicationParams.AllowMemberPost {
 			current, err := a.DB.GetUserByID(auth.GetUserID(ctx))
 			if success := successOrAbort(ctx, 500, err); !success {
 				return
 			}
 			if current == nil || !current.Admin {
-				ctx.AbortWithError(http.StatusForbidden, errors.New("only administrators can create auto-assigned channels"))
+				ctx.AbortWithError(
+					http.StatusForbidden,
+					errors.New("only administrators can create global or member-posting channels"),
+				)
 				return
 			}
 		}
@@ -117,6 +122,7 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			UserID:          auth.GetUserID(ctx),
 			Internal:        false,
 			AutoAssign:      applicationParams.AutoAssign,
+			AllowMemberPost: applicationParams.AllowMemberPost,
 		}
 
 		if err := a.DB.CreateApplication(&app); err != nil {
@@ -159,6 +165,14 @@ func (a *ApplicationAPI) GetApplications(ctx *gin.Context) {
 		return
 	}
 	for _, app := range apps {
+		membership, err := a.DB.GetApplicationMembership(app.ID, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if membership != nil {
+			receiveNotifications := membership.ReceiveNotifications
+			app.ReceiveNotifications = &receiveNotifications
+		}
 		app.Token = ""
 		withResolvedImage(app)
 	}
@@ -216,6 +230,19 @@ func (a *ApplicationAPI) DeleteApplication(ctx *gin.Context) {
 			if app.Internal {
 				ctx.AbortWithError(400, errors.New("cannot delete internal application"))
 				return
+			}
+			if app.AutoAssign {
+				current, err := a.DB.GetUserByID(auth.GetUserID(ctx))
+				if success := successOrAbort(ctx, 500, err); !success {
+					return
+				}
+				if current == nil || !current.Admin {
+					ctx.AbortWithError(
+						http.StatusForbidden,
+						errors.New("global channels can only be deleted by an administrator"),
+					)
+					return
+				}
 			}
 			if success := successOrAbort(ctx, 500, a.DB.DeleteApplicationByID(id)); !success {
 				return

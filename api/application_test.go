@@ -87,7 +87,20 @@ func (s *ApplicationSuite) Test_ensureApplicationHasCorrectJsonRepresentation() 
 		SortKey:     "a1",
 		CreatedAt:   testdb.Now,
 	}
-	test.JSONEquals(s.T(), actual, `{"id":1,"token":"Aasdasfgeeg","name":"myapp","description":"mydesc", "image": "asd", "internal":true, "defaultPriority":0, "createdAt":"2020-01-01T00:00:00Z", "lastUsed":null, "sortKey":"a1"}`)
+	test.JSONEquals(s.T(), actual, `{"id":1,"token":"Aasdasfgeeg","ownerId":2,"name":"myapp","description":"mydesc", "internal":true, "autoAssign":false, "allowMemberPost":false, "image":"asd", "defaultPriority":0, "createdAt":"2020-01-01T00:00:00Z", "lastUsed":null, "sortKey":"a1"}`)
+}
+
+func (s *ApplicationSuite) Test_CreateApplication_nonAdminCannotCreateChatChannel() {
+	s.db.User(5)
+
+	test.WithUser(s.ctx, 5)
+	s.withJSON(&ApplicationParams{Name: "chat", AllowMemberPost: true})
+	s.a.CreateApplication(s.ctx)
+
+	assert.Equal(s.T(), 403, s.recorder.Code)
+	apps, err := s.db.GetApplicationsByUser(5)
+	require.NoError(s.T(), err)
+	assert.Empty(s.T(), apps)
 }
 
 func (s *ApplicationSuite) Test_CreateApplication_expectBadRequestOnEmptyName() {
@@ -121,6 +134,7 @@ func (s *ApplicationSuite) Test_CreateApplication_ignoresReadOnlyPropertiesInPar
 
 	expected := &model.Application{
 		ID:          1,
+		UserID:      5,
 		Name:        "name",
 		Description: "description",
 		Internal:    false,
@@ -225,7 +239,7 @@ func (s *ApplicationSuite) Test_CreateApplication_onlyRequiredParameters() {
 	s.withFormData("name=custom_name")
 	s.a.CreateApplication(s.ctx)
 
-	expected := &model.Application{ID: 1, Name: "custom_name", SortKey: "a0", CreatedAt: testdb.Now, Image: "static/defaultapp.png"}
+	expected := &model.Application{ID: 1, UserID: 5, Name: "custom_name", SortKey: "a0", CreatedAt: testdb.Now, Image: "static/defaultapp.png"}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	bodyBytes, err := io.ReadAll(s.recorder.Body)
 	assert.Nil(s.T(), err)
@@ -250,6 +264,7 @@ func (s *ApplicationSuite) Test_CreateApplication_returnsApplicationWithID() {
 
 	expected := &model.Application{
 		ID:        1,
+		UserID:    5,
 		Name:      "custom_name",
 		Image:     "static/defaultapp.png",
 		SortKey:   "a0",
@@ -341,6 +356,9 @@ func (s *ApplicationSuite) Test_GetApplications() {
 	second.Image = "static/defaultapp.png"
 	first.Token = ""
 	second.Token = ""
+	receiveNotifications := true
+	first.ReceiveNotifications = &receiveNotifications
+	second.ReceiveNotifications = &receiveNotifications
 	test.BodyEquals(s.T(), []*model.Application{first, second}, s.recorder)
 }
 
@@ -361,6 +379,9 @@ func (s *ApplicationSuite) Test_GetApplications_WithImage() {
 	second.Image = "static/defaultapp.png"
 	first.Token = ""
 	second.Token = ""
+	receiveNotifications := true
+	first.ReceiveNotifications = &receiveNotifications
+	second.ReceiveNotifications = &receiveNotifications
 	test.BodyEquals(s.T(), []*model.Application{first, second}, s.recorder)
 }
 

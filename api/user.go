@@ -21,6 +21,8 @@ type UserDatabase interface {
 	UpdateUser(user *model.User) error
 	CreateUser(user *model.User) error
 	CountUser(condition ...any) (int64, error)
+	GetApplicationsByUser(userID uint) ([]*model.Application, error)
+	CountApplicationMemberships(applicationID uint) (int64, error)
 }
 
 // UserChangeNotifier notifies listeners for user changes.
@@ -340,6 +342,28 @@ func (a *UserAPI) DeleteUserByID(ctx *gin.Context) {
 				ctx.AbortWithError(400, errors.New("cannot delete last admin"))
 				return
 			}
+
+			apps, err := a.DB.GetApplicationsByUser(id)
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
+			for _, app := range apps {
+				memberCount, err := a.DB.CountApplicationMemberships(app.ID)
+				if success := successOrAbort(ctx, 500, err); !success {
+					return
+				}
+				if memberCount > 1 {
+					ctx.AbortWithError(
+						http.StatusBadRequest,
+						fmt.Errorf(
+							"user owns shared channel %q; transfer channel ownership before deleting the user",
+							app.Name,
+						),
+					)
+					return
+				}
+			}
+
 			if err := a.UserChangeNotifier.fireUserDeleted(id); err != nil {
 				ctx.AbortWithError(500, err)
 				return

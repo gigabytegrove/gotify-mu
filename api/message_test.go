@@ -14,6 +14,7 @@ import (
 	"github.com/gotify/server/v3/test"
 	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -391,6 +392,144 @@ func (s *MessageSuite) Test_CreateMessage_failWhenNoMessage() {
 	}
 	assert.Equal(s.T(), 400, s.recorder.Code)
 	assert.Nil(s.T(), s.notifiedMessage)
+}
+
+func (s *MessageSuite) Test_DeleteMessagesForEveryone_OwnerClearsSharedHistory() {
+	s.db.User(1).App(1)
+	s.db.User(2)
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        1,
+		UserID:               2,
+		ReceiveNotifications: true,
+	}))
+	require.NoError(s.T(), s.db.CreateMessage(&model.Message{
+		ApplicationID: 1,
+		Message:       "shared",
+		Title:         "shared",
+	}))
+
+	test.WithUser(s.ctx, 1)
+	s.ctx.Request = httptest.NewRequest("DELETE", "/application/1/message/all", nil)
+	s.ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+
+	s.a.DeleteMessagesForEveryone(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	messages, err := s.db.GetMessagesByApplication(1)
+	require.NoError(s.T(), err)
+	assert.Empty(s.T(), messages)
+}
+
+func (s *MessageSuite) Test_CreateMessage_MemberCanPostToChatChannel() {
+	owner := s.db.NewUser(1)
+	member := s.db.NewUser(2)
+	app := &model.Application{
+		UserID:          owner.ID,
+		Token:           "MUCHAT000001",
+		Name:            "Team Chat",
+		AllowMemberPost: true,
+	}
+	require.NoError(s.T(), s.db.CreateApplication(app))
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               member.ID,
+		ReceiveNotifications: true,
+	}))
+
+	test.WithUser(s.ctx, member.ID)
+	s.ctx.Request = httptest.NewRequest(
+		"POST",
+		"/message",
+		strings.NewReader(`{"appid":1,"message":"hello team"}`),
+	)
+	s.ctx.Request.Header.Set("Content-Type", "application/json")
+
+	s.a.CreateMessage(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	messages, err := s.db.GetMessagesByApplication(app.ID)
+	require.NoError(s.T(), err)
+	require.Len(s.T(), messages, 1)
+	assert.Equal(s.T(), member.ID, messages[0].SenderUserID)
+	assert.Equal(s.T(), member.Name, messages[0].SenderName)
+	assert.Equal(s.T(), member.Name, messages[0].Title)
+}
+
+func (s *MessageSuite) Test_CreateMessage_MemberCannotPostWithoutChatMode() {
+	owner := s.db.NewUser(1)
+	member := s.db.NewUser(2)
+	app := &model.Application{
+		UserID: owner.ID,
+		Token:  "MUCHAT000002",
+		Name:   "Read Only",
+	}
+	require.NoError(s.T(), s.db.CreateApplication(app))
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               member.ID,
+		ReceiveNotifications: true,
+	}))
+
+	test.WithUser(s.ctx, member.ID)
+	s.ctx.Request = httptest.NewRequest(
+		"POST",
+		"/message",
+		strings.NewReader(`{"appid":1,"message":"should fail"}`),
+	)
+	s.ctx.Request.Header.Set("Content-Type", "application/json")
+
+	s.a.CreateMessage(s.ctx)
+
+	assert.Equal(s.T(), 400, s.recorder.Code)
+	messages, err := s.db.GetMessagesByApplication(app.ID)
+	require.NoError(s.T(), err)
+	assert.Empty(s.T(), messages)
+}
+
+func (s *MessageSuite) Test_GlobalChannelNonAdminCannotDeleteButCanArchive() {
+	admin := s.db.NewUser(1)
+	admin.Admin = true
+	require.NoError(s.T(), s.db.UpdateUser(admin))
+	member := s.db.NewUser(2)
+
+	app := &model.Application{
+		UserID:     admin.ID,
+		Token:      "MUGLOBAL001",
+		Name:       "Global",
+		AutoAssign: true,
+	}
+	require.NoError(s.T(), s.db.CreateApplication(app))
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               member.ID,
+		ReceiveNotifications: true,
+		AutoAssigned:         true,
+	}))
+	message := &model.Message{ApplicationID: app.ID, Message: "global", Title: "global"}
+	require.NoError(s.T(), s.db.CreateMessage(message))
+
+	test.WithUser(s.ctx, member.ID)
+	s.ctx.Request = httptest.NewRequest("DELETE", "/message/1", nil)
+	s.ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	s.a.DeleteMessage(s.ctx)
+
+	assert.Equal(s.T(), 403, s.recorder.Code)
+	stillThere, err := s.db.GetMessageByID(message.ID)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), stillThere)
+
+	s.recorder = httptest.NewRecorder()
+	s.ctx, _ = gin.CreateTestContext(s.recorder)
+	test.WithUser(s.ctx, member.ID)
+	s.ctx.Request = httptest.NewRequest("POST", "/message/1/archive", nil)
+	s.ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	s.a.ArchiveMessage(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	archived, err := s.db.GetArchivedMessagesByUserSince(member.ID, 100, 0)
+	require.NoError(s.T(), err)
+	require.Len(s.T(), archived, 1)
+	assert.Equal(s.T(), message.ID, archived[0].ID)
 }
 
 func (s *MessageSuite) Test_CreateMessage_WithoutTitle() {
