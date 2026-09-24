@@ -17,6 +17,7 @@ import (
 // The MessageDatabase interface for encapsulating database access.
 type MessageDatabase interface {
 	GetMessagesByApplicationForUserSince(userID, appID uint, limit int, since uint) ([]*model.Message, error)
+	GetArchivedMessagesByApplicationForUserSince(userID, appID uint, limit int, since uint) ([]*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetUserByID(id uint) (*model.User, error)
 	GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error)
@@ -24,11 +25,18 @@ type MessageDatabase interface {
 	CountApplicationMemberships(applicationID uint) (int64, error)
 	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
 	GetMessagesByUserSince(userID uint, limit int, since uint) ([]*model.Message, error)
+	GetArchivedMessagesByUserSince(userID uint, limit int, since uint) ([]*model.Message, error)
 	DeleteMessageByID(id uint) error
 	GetMessageByID(id uint) (*model.Message, error)
 	DeleteMessagesByApplication(applicationID uint) error
 	DismissMessageForUser(userID, messageID uint) error
 	DismissMessagesByApplicationForUser(userID, applicationID uint) error
+	ArchiveMessageForUser(userID, messageID uint) error
+	UnarchiveMessageForUser(userID, messageID uint) error
+	ArchiveMessagesByUser(userID uint) error
+	ArchiveMessagesByApplicationForUser(userID, applicationID uint) error
+	UnarchiveMessagesByUser(userID uint) error
+	UnarchiveMessagesByApplicationForUser(userID, applicationID uint) error
 	CreateMessage(message *model.Message) error
 }
 
@@ -46,8 +54,9 @@ type MessageAPI struct {
 }
 
 type pagingParams struct {
-	Limit int  `form:"limit" binding:"min=1,max=200"`
-	Since uint `form:"since" binding:"min=0"`
+	Limit    int  `form:"limit" binding:"min=1,max=200"`
+	Since    uint `form:"since" binding:"min=0"`
+	Archived bool `form:"archived"`
 }
 
 // GetMessages returns all messages from a user.
@@ -95,7 +104,17 @@ func (a *MessageAPI) GetMessages(ctx *gin.Context) {
 	userID := auth.GetUserID(ctx)
 	withPaging(ctx, func(params *pagingParams) {
 		// the +1 is used to check if there are more messages and will be removed on buildWithPaging
-		messages, err := a.DB.GetMessagesByUserSince(userID, params.Limit+1, params.Since)
+		var messages []*model.Message
+		var err error
+		if params.Archived {
+			messages, err = a.DB.GetArchivedMessagesByUserSince(
+				userID,
+				params.Limit+1,
+				params.Since,
+			)
+		} else {
+			messages, err = a.DB.GetMessagesByUserSince(userID, params.Limit+1, params.Since)
+		}
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
@@ -113,6 +132,9 @@ func buildWithPaging(ctx *gin.Context, paging *pagingParams, messages []*model.M
 		query := url.Values{}
 		query.Add("limit", strconv.Itoa(paging.Limit))
 		query.Add("since", strconv.FormatUint(uint64(since), 10))
+		if paging.Archived {
+			query.Add("archived", "true")
+		}
 		next = ctx.Request.URL.Path + "?" + query.Encode()
 	}
 	return &model.PagedMessages{
@@ -193,7 +215,22 @@ func (a *MessageAPI) GetMessagesWithApplication(ctx *gin.Context) {
 			}
 			if app != nil && membership != nil {
 				// the +1 is used to check if there are more messages and will be removed on buildWithPaging
-				messages, err := a.DB.GetMessagesByApplicationForUserSince(userID, id, params.Limit+1, params.Since)
+				var messages []*model.Message
+				if params.Archived {
+					messages, err = a.DB.GetArchivedMessagesByApplicationForUserSince(
+						userID,
+						id,
+						params.Limit+1,
+						params.Since,
+					)
+				} else {
+					messages, err = a.DB.GetMessagesByApplicationForUserSince(
+						userID,
+						id,
+						params.Limit+1,
+						params.Since,
+					)
+				}
 				if success := successOrAbort(ctx, 500, err); !success {
 					return
 				}
