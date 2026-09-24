@@ -171,6 +171,11 @@ const Applications = observer(() => {
                                                 currentUser.user.admin ||
                                                 app.ownerId === currentUser.user.id
                                             }
+                                            canClearHistory={
+                                                currentUser.user.admin ||
+                                                (!app.autoAssign &&
+                                                    app.ownerId === currentUser.user.id)
+                                            }
                                         />
                                     ))}
                                 </TableBody>
@@ -277,6 +282,7 @@ interface IRowProps {
     fToggleNotifications: VoidFunction;
     fClearHistory: VoidFunction;
     canManage: boolean;
+    canClearHistory: boolean;
 }
 
 const Row = ({
@@ -290,6 +296,7 @@ const Row = ({
     fToggleNotifications,
     fClearHistory,
     canManage,
+    canClearHistory,
 }: IRowProps) => {
     const {classes} = useStyles();
     const isDefaultImage = app.image === 'static/defaultapp.png';
@@ -344,6 +351,7 @@ const Row = ({
             <TableCell>
                 {app.name}
                 {app.autoAssign ? ' · Global' : ''}
+                {app.membersCanPost ? ' · Chat' : ''}
                 {app.allowMemberPost ? ' · Chat' : ''}
             </TableCell>
             <TableCell>{app.description}</TableCell>
@@ -369,7 +377,7 @@ const Row = ({
                 </Tooltip>
             </TableCell>
             <TableCell align="right" padding="none">
-                {canManage && (
+                {canClearHistory && (
                     <Tooltip title="Clear history for everyone">
                         <IconButton onClick={fClearHistory} className="clear-history">
                             <DeleteSweep />
