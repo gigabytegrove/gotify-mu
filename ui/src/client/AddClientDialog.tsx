@@ -1,11 +1,15 @@
 import React, {useState} from 'react';
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
+import {
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    Stack,
+    TextField,
+    Tooltip,
+} from '@mui/material';
 import {NumberField} from '../common/NumberField';
 
 interface IProps {
@@ -16,52 +20,58 @@ interface IProps {
 const AddClientDialog = ({fClose, fOnSubmit}: IProps) => {
     const [name, setName] = useState('');
     const [expiresAfter, setExpiresAfter] = useState(0);
-    const submitEnabled = name.length !== 0;
+    const submitEnabled = name.trim().length !== 0;
+
     const submitAndNext = async () => {
-        const token = await fOnSubmit(name, Math.max(0, expiresAfter));
+        const token = await fOnSubmit(name.trim(), Math.max(0, expiresAfter));
         fClose(token);
     };
 
     return (
         <Dialog
-            open={true}
+            open
             onClose={() => fClose(null)}
-            aria-labelledby="form-dialog-title"
+            fullWidth
+            maxWidth="sm"
+            aria-labelledby="create-client-title"
             id="client-dialog">
-            <DialogTitle id="form-dialog-title">Create a client</DialogTitle>
+            <DialogTitle id="create-client-title">Create Client</DialogTitle>
             <DialogContent>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    className="name"
-                    label="Name *"
-                    type="email"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    fullWidth
-                />
-                <NumberField
-                    margin="dense"
-                    className="expires-after"
-                    label="Expires after inactivity (seconds, 0 = never)"
-                    value={expiresAfter}
-                    onChange={(value) => setExpiresAfter(value)}
-                    fullWidth
-                />
+                <DialogContentText sx={{mb: 2}}>
+                    Clients authenticate browsers, mobile apps, and API tools as your user account.
+                </DialogContentText>
+                <Stack spacing={2}>
+                    <TextField
+                        autoFocus
+                        className="name"
+                        label="Client name"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        fullWidth
+                        required
+                    />
+                    <NumberField
+                        className="expires-after"
+                        label="Expire after inactivity (seconds)"
+                        value={expiresAfter}
+                        onChange={setExpiresAfter}
+                        fullWidth
+                        helperText="Use 0 to never expire automatically."
+                    />
+                </Stack>
             </DialogContent>
             <DialogActions>
                 <Button onClick={() => fClose(null)}>Cancel</Button>
-                <Tooltip placement={'bottom-start'} title={submitEnabled ? '' : 'name is required'}>
-                    <div>
+                <Tooltip title={submitEnabled ? '' : 'Client name is required'}>
+                    <span>
                         <Button
                             className="create"
                             disabled={!submitEnabled}
-                            onClick={submitAndNext}
-                            color="primary"
+                            onClick={() => void submitAndNext()}
                             variant="contained">
-                            Create
+                            Create Client
                         </Button>
-                    </div>
+                    </span>
                 </Tooltip>
             </DialogActions>
         </Dialog>
