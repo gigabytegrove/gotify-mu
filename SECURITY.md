@@ -2,28 +2,22 @@
 
 ## Supported Versions
 
-Only the latest released version.
-
-If you found a vulnerability that only applies to older versions but has been accidentally fixed recently, please open a private advisory to let us evaluate if a backdated advisory is necessary.
-
-If you found a vulnerability in unreleased code (Git trunk), please verify that the latest release is not affected and then use the public issue and pull request workflow to submit your research.
+Gotify MU is currently in active development. Security fixes target the latest release and the current `master` branch.
 
 ## Reporting a Vulnerability
 
-Please report (suspected) security vulnerabilities to
-[GitHub Advisory](https://github.com/gotify/server/security/advisories/new)
-or **[gotify@protonmail.com](mailto:gotify@protonmail.com)**.
-You will receive a response from us within a few days.
+Please report suspected vulnerabilities privately through this repository's GitHub Security Advisory page:
 
-To reduce paperwork and align with CVE key details phrasing,
-an executive summary containing the following elements is sufficient for most reports:
+https://github.com/gigabytegrove/gotify-mu/security/advisories/new
 
-- The affected component (package, file, function, etc)
-- The root cause (weakness in code, insecure default, misleading documentation, etc)
-- The attack model (precondition, vector, impact)
-- A PoC
+Please include, where possible:
 
-If the issue is confirmed, we will release a
-patch as soon as possible.
-Additionally, we will submit findings that demonstrate the necessity for
-user triage to the GitHub CNA Program.
+- the affected component, package, file, or function
+- the root cause or weakness
+- attack prerequisites and expected impact
+- reproduction steps or a proof of concept
+- whether the issue also reproduces on upstream Gotify
+
+Do not open a public issue for an unpatched vulnerability.
+
+If a problem is confirmed to originate in upstream Gotify rather than the MU-specific changes, we may coordinate disclosure with the upstream Gotify maintainers.
