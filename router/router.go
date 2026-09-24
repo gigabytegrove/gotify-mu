@@ -102,6 +102,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		DB:       db,
 		ImageDir: conf.UploadedImagesDir,
 	}
+	applicationMembershipHandler := api.ApplicationMembershipAPI{
+		DB: db,
+	}
 	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled}
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
@@ -246,6 +249,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.POST("/client/:id/elevate", clientHandler.ElevateClient)
 		clientElevated.DELETE("/application/:id", applicationHandler.DeleteApplication)
 		clientElevated.PUT("/application/:id/security", applicationHandler.UpdateApplicationSecurity)
+		clientElevated.GET("/application/:id/members", applicationMembershipHandler.GetMembers)
+		clientElevated.POST("/application/:id/members", applicationMembershipHandler.UpsertMember)
+		clientElevated.DELETE("/application/:id/members/:userId", applicationMembershipHandler.DeleteMember)
+		clientElevated.PUT("/application/:id/auto-assign", applicationMembershipHandler.SetAutoAssign)
 		clientElevated.DELETE("/client/:id", clientHandler.DeleteClient)
 		clientElevated.POST("/current/user/password", userHandler.ChangePassword)
 	}
