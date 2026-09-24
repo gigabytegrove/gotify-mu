@@ -145,6 +145,13 @@ func (s *DatabaseSuite) TestTransferApplicationOwnership() {
 	require.NoError(s.T(), s.db.CreateUser(nextOwner))
 	require.NoError(s.T(), s.db.CreateUser(member))
 
+	existingOwned := &model.Application{
+		UserID: nextOwner.ID,
+		Token:  "MUAPP0000005A",
+		Name:   "already-owned",
+	}
+	require.NoError(s.T(), s.db.CreateApplication(existingOwned))
+
 	app := &model.Application{
 		UserID:     owner.ID,
 		Token:      "MUAPP0000005",
@@ -164,6 +171,7 @@ func (s *DatabaseSuite) TestTransferApplicationOwnership() {
 	require.NoError(s.T(), err)
 	require.NotNil(s.T(), updated)
 	assert.Equal(s.T(), nextOwner.ID, updated.UserID)
+	assert.NotEqual(s.T(), existingOwned.SortKey, updated.SortKey)
 
 	nextMembership, err = s.db.GetApplicationMembership(app.ID, nextOwner.ID)
 	require.NoError(s.T(), err)
