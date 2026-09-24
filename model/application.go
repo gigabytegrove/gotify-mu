@@ -42,6 +42,9 @@ type Application struct {
 	// read only: true
 	// example: false
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
+	// Whether the current requesting user receives realtime notifications from this application.
+	// This field is populated per request and is not persisted on the application row.
+	ReceiveNotifications *bool `gorm:"-" json:"receiveNotifications,omitempty"`
 	// The image of the application.
 	//
 	// read only: true
