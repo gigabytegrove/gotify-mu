@@ -300,6 +300,7 @@ const Row = ({
     fToggleNotifications,
     fClearHistory,
     canManage,
+    canDeleteChannel,
     canClearHistory,
 }: IRowProps) => {
     const {classes} = useStyles();
@@ -355,7 +356,6 @@ const Row = ({
             <TableCell>
                 {app.name}
                 {app.autoAssign ? ' · Global' : ''}
-                {app.membersCanPost ? ' · Chat' : ''}
                 {app.allowMemberPost ? ' · Chat' : ''}
             </TableCell>
             <TableCell>{app.description}</TableCell>
