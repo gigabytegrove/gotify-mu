@@ -23,6 +23,7 @@ interface PendingDelete {
 
 export class MessagesStore {
     @observable private accessor state: Record<string, MessagesState> = {};
+    @observable private accessor archivedState: Record<string, MessagesState> = {};
     @observable private accessor pendingDeletes: Map<number, PendingDelete> = observable.map();
 
     private loading = false;
@@ -34,27 +35,30 @@ export class MessagesStore {
         reaction(() => appStore.getItems(), this.createEmptyStatesForApps);
     }
 
-    private stateOf = (appId: number, create = true) => {
-        if (!this.state[appId] && create) {
-            this.state[appId] = this.emptyState();
+    private stateOf = (appId: number, archived = false, create = true) => {
+        const states = archived ? this.archivedState : this.state;
+        if (!states[appId] && create) {
+            states[appId] = this.emptyState();
         }
-        return this.state[appId] || this.emptyState();
+        return states[appId] || this.emptyState();
     };
 
-    public loaded = (appId: number) => this.stateOf(appId, /*create*/ false).loaded;
+    public loaded = (appId: number, archived = false) =>
+        this.stateOf(appId, archived, /*create*/ false).loaded;
 
-    public canLoadMore = (appId: number) => this.stateOf(appId, /*create*/ false).hasMore;
+    public canLoadMore = (appId: number, archived = false) =>
+        this.stateOf(appId, archived, /*create*/ false).hasMore;
 
     @action
-    public loadMore = async (appId: number) => {
-        const state = this.stateOf(appId);
+    public loadMore = async (appId: number, archived = false) => {
+        const state = this.stateOf(appId, archived);
         if (!state.hasMore || this.loading) {
             return Promise.resolve();
         }
         this.loading = true;
 
         try {
-            const pagedResult = await this.fetchMessages(appId, state.nextSince).then(
+            const pagedResult = await this.fetchMessages(appId, state.nextSince, archived).then(
                 (resp) => resp.data
             );
             runInAction(() => {
@@ -73,11 +77,37 @@ export class MessagesStore {
     @action
     public publishSingleMessage = (message: IMessage) => {
         if (this.exists(AllMessages)) {
-            this.stateOf(AllMessages).messages.unshift(message);
+            this.stateOf(AllMessages, false).messages.unshift(message);
         }
         if (this.exists(message.appid)) {
-            this.stateOf(message.appid).messages.unshift(message);
+            this.stateOf(message.appid, false).messages.unshift(message);
         }
+    };
+
+    @action
+    public archiveByApp = async (appId: number) => {
+        if (appId === AllMessages) {
+            await axios.post(config.get('url') + 'message/archive');
+            this.snack('Archived all messages');
+        } else {
+            await axios.post(config.get('url') + 'application/' + appId + '/message/archive');
+            this.snack(`Archived all messages from ${this.appStore.getByID(appId).name}`);
+        }
+        this.clearAll();
+        await this.loadMore(appId, false);
+    };
+
+    @action
+    public restoreByApp = async (appId: number) => {
+        if (appId === AllMessages) {
+            await axios.delete(config.get('url') + 'message/archive');
+            this.snack('Restored all archived messages');
+        } else {
+            await axios.delete(config.get('url') + 'application/' + appId + '/message/archive');
+            this.snack(`Restored archived messages from ${this.appStore.getByID(appId).name}`);
+        }
+        this.clearAll();
+        await this.loadMore(appId, true);
     };
 
     @action
@@ -92,7 +122,35 @@ export class MessagesStore {
             this.clear(AllMessages);
             this.clear(appId);
         }
-        await this.loadMore(appId);
+        await this.loadMore(appId, false);
+    };
+
+    @action
+    public archiveSingle = async (message: IMessage) => {
+        await axios.post(config.get('url') + 'message/' + message.id + '/archive');
+        if (this.exists(AllMessages, false)) {
+            this.removeFromList(this.state[AllMessages].messages, message);
+        }
+        if (this.exists(message.appid, false)) {
+            this.removeFromList(this.state[message.appid].messages, message);
+        }
+        this.clear(AllMessages, true);
+        this.clear(message.appid, true);
+        this.snack('Message archived');
+    };
+
+    @action
+    public restoreSingle = async (message: IMessage) => {
+        await axios.delete(config.get('url') + 'message/' + message.id + '/archive');
+        if (this.exists(AllMessages, true)) {
+            this.removeFromList(this.archivedState[AllMessages].messages, message);
+        }
+        if (this.exists(message.appid, true)) {
+            this.removeFromList(this.archivedState[message.appid].messages, message);
+        }
+        this.clear(AllMessages, false);
+        this.clear(message.appid, false);
+        this.snack('Message restored');
     };
 
     @action
@@ -155,16 +213,18 @@ export class MessagesStore {
     @action
     public clearAll = () => {
         this.state = {};
+        this.archivedState = {};
         this.createEmptyStatesForApps(this.appStore.getItems());
     };
 
     @action
-    public refreshByApp = async (appId: number) => {
-        this.clearAll();
-        this.loadMore(appId);
+    public refreshByApp = async (appId: number, archived = false) => {
+        this.clear(appId, archived);
+        await this.loadMore(appId, archived);
     };
 
-    public exists = (id: number) => this.stateOf(id).loaded;
+    public exists = (id: number, archived = false) =>
+        this.stateOf(id, archived, /*create*/ false).loaded;
 
     @action
     private removeFromList(messages: IMessage[], messageToDelete: IMessage): false | number {
@@ -179,17 +239,30 @@ export class MessagesStore {
     }
 
     @action
-    private clear = (appId: number) => (this.state[appId] = this.emptyState());
+    private clear = (appId: number, archived = false) => {
+        if (archived) {
+            this.archivedState[appId] = this.emptyState();
+        } else {
+            this.state[appId] = this.emptyState();
+        }
+    };
 
     private fetchMessages = (
         appId: number,
-        since: number
+        since: number,
+        archived = false
     ): Promise<AxiosResponse<IPagedMessages>> => {
+        const archivedQuery = archived ? '&archived=true' : '';
         if (appId === AllMessages) {
-            return axios.get(config.get('url') + 'message?since=' + since);
+            return axios.get(config.get('url') + 'message?since=' + since + archivedQuery);
         } else {
             return axios.get(
-                config.get('url') + 'application/' + appId + '/message?since=' + since
+                config.get('url') +
+                    'application/' +
+                    appId +
+                    '/message?since=' +
+                    since +
+                    archivedQuery
             );
         }
     };
@@ -199,17 +272,36 @@ export class MessagesStore {
             .getItems()
             .reduce((all, app) => ({...all, [app.id]: app.image}), {});
 
-        return this.stateOf(appId, false)
+        return this.stateOf(appId, false, false)
             .messages.filter((message) => !this.pendingDeletes.has(message.id))
             .map((message: IMessage): IMessage => ({...message, image: appToImage[message.appid]}));
     };
 
-    public get = createTransformer(this.getUnCached);
+    private getArchivedUnCached = (appId: number): Array<IMessage> => {
+        const appToImage: Partial<Record<string, string>> = this.appStore
+            .getItems()
+            .reduce((all, app) => ({...all, [app.id]: app.image}), {});
 
-    private clearCache = () => (this.get = createTransformer(this.getUnCached));
+        return this.stateOf(appId, true, false).messages.map(
+            (message: IMessage): IMessage => ({...message, image: appToImage[message.appid]})
+        );
+    };
+
+    public get = createTransformer(this.getUnCached);
+    public getArchived = createTransformer(this.getArchivedUnCached);
+
+    private clearCache = () => {
+        this.get = createTransformer(this.getUnCached);
+        this.getArchived = createTransformer(this.getArchivedUnCached);
+    };
 
     private createEmptyStatesForApps = (apps: IApplication[]) => {
-        apps.map((app) => app.id).forEach((id) => this.stateOf(id, /*create*/ true));
+        apps.map((app) => app.id).forEach((id) => {
+            this.stateOf(id, false, /*create*/ true);
+            this.stateOf(id, true, /*create*/ true);
+        });
+        this.stateOf(AllMessages, false, /*create*/ true);
+        this.stateOf(AllMessages, true, /*create*/ true);
         this.clearCache();
     };
 
