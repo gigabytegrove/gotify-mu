@@ -1,6 +1,8 @@
 export interface IApplication {
     id: number;
     token: string;
+    ownerId: number;
+    autoAssign: boolean;
     name: string;
     sortKey: string;
     description: string;
@@ -78,4 +80,12 @@ export interface IVersion {
     version: string;
     commit: string;
     buildDate: string;
+}
+
+export interface IApplicationMember {
+    userId: number;
+    name: string;
+    owner: boolean;
+    receiveNotifications: boolean;
+    autoAssigned: boolean;
 }
