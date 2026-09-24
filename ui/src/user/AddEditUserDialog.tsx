@@ -1,13 +1,18 @@
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Switch from '@mui/material/Switch';
-import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
 import React from 'react';
+import {
+    Alert,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    FormControlLabel,
+    Stack,
+    Switch,
+    TextField,
+    Tooltip,
+} from '@mui/material';
 
 interface IProps {
     name?: string;
@@ -28,80 +33,100 @@ const AddEditUserDialog = ({
     const [pass, setPass] = React.useState('');
     const [admin, setAdmin] = React.useState(initialAdmin);
 
-    const namePresent = name.length !== 0;
-    const passPresent = pass.length !== 0 || isEdit;
+    const namePresent = name.trim().length !== 0;
+    const passPresent = pass.length !== 0 || Boolean(isEdit);
+
     const submitAndClose = async () => {
-        await fOnSubmit(name, pass, admin);
+        await fOnSubmit(name.trim(), pass, admin);
         fClose();
     };
+
+    const disabledReason = !namePresent
+        ? 'Username is required'
+        : !passPresent
+          ? 'Password is required'
+          : '';
+
     return (
         <Dialog
-            open={true}
+            open
             onClose={fClose}
-            aria-labelledby="form-dialog-title"
+            fullWidth
+            maxWidth="sm"
+            aria-labelledby="user-dialog-title"
             id="add-edit-user-dialog">
-            <DialogTitle id="form-dialog-title">
-                {isEdit ? 'Edit ' + name : 'Add a user'}
+            <DialogTitle id="user-dialog-title">
+                {isEdit ? `Edit User · ${initialName}` : 'Create User'}
             </DialogTitle>
             <DialogContent>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    className="name"
-                    label="Username *"
-                    value={name}
-                    name="username"
-                    id="username"
-                    onChange={(e) => setName(e.target.value)}
-                    fullWidth
-                />
-                <TextField
-                    margin="dense"
-                    className="password"
-                    type="password"
-                    value={pass}
-                    fullWidth
-                    label={isEdit ? 'Password (empty if no change)' : 'Password *'}
-                    name="password"
-                    id="password"
-                    onChange={(e) => setPass(e.target.value)}
-                />
-                <FormControlLabel
-                    control={
-                        <Switch
-                            checked={admin}
-                            className="admin-rights"
-                            onChange={(e) => setAdmin(e.target.checked)}
-                            value="admin"
-                        />
-                    }
-                    label="has administrator rights"
-                />
+                <DialogContentText sx={{mb: 2}}>
+                    {isEdit
+                        ? 'Update the local account. Leave the password blank to keep the current password.'
+                        : 'Create a local Gotify MU account.'}
+                </DialogContentText>
+
+                <Stack spacing={2}>
+                    <TextField
+                        autoFocus
+                        className="name"
+                        label="Username"
+                        value={name}
+                        name="username"
+                        id="username"
+                        autoComplete="username"
+                        onChange={(event) => setName(event.target.value)}
+                        fullWidth
+                        required
+                    />
+                    <TextField
+                        className="password"
+                        type="password"
+                        value={pass}
+                        fullWidth
+                        label={isEdit ? 'New password (optional)' : 'Password'}
+                        name="password"
+                        id="password"
+                        autoComplete={isEdit ? 'new-password' : 'new-password'}
+                        onChange={(event) => setPass(event.target.value)}
+                        required={!isEdit}
+                    />
+
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={admin}
+                                className="admin-rights"
+                                onChange={(event) => setAdmin(event.target.checked)}
+                                value="admin"
+                            />
+                        }
+                        label="Administrator"
+                    />
+
+                    {admin && (
+                        <Alert severity="warning">
+                            Administrators can manage users, Global Channels, and other
+                            security-sensitive server settings.
+                        </Alert>
+                    )}
+                </Stack>
             </DialogContent>
             <DialogActions>
                 <Button onClick={fClose}>Cancel</Button>
-                <Tooltip
-                    placement={'bottom-start'}
-                    title={
-                        namePresent
-                            ? passPresent
-                                ? ''
-                                : 'password is required'
-                            : 'username is required'
-                    }>
-                    <div>
+                <Tooltip title={disabledReason}>
+                    <span>
                         <Button
                             className="save-create"
                             disabled={!passPresent || !namePresent}
-                            onClick={submitAndClose}
-                            color="primary"
+                            onClick={() => void submitAndClose()}
                             variant="contained">
-                            {isEdit ? 'Save' : 'Create'}
+                            {isEdit ? 'Save Changes' : 'Create User'}
                         </Button>
-                    </div>
+                    </span>
                 </Tooltip>
             </DialogActions>
         </Dialog>
     );
 };
+
 export default AddEditUserDialog;
