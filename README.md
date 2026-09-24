@@ -79,6 +79,8 @@ services:
       args:
         BUILD_JS: "1"
         GO_VERSION: "1.26.0"
+        GOTIFY_MU_VERSION: "${GOTIFY_MU_VERSION:-master-local}"
+        GOTIFY_MU_COMMIT: "${GOTIFY_MU_COMMIT:-local}"
     image: gotify-mu:master
     container_name: gotify-mu
     restart: unless-stopped
@@ -94,6 +96,8 @@ services:
 Example `.env`:
 
 ```env
+GOTIFY_MU_VERSION=master-local
+GOTIFY_MU_COMMIT=local
 GOTIFY_MU_PORT=8080
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
@@ -120,6 +124,8 @@ admin
 ```
 
 The password is whatever you set in `.env`.
+
+Local Compose builds display `@master-local` in the Web UI instead of `@unknown`. Native source builds identify themselves as `dev` or `dev-<commit>` when Go can read VCS metadata. GitHub-built master images use `master-<commit>`.
 
 Persistent data is stored in:
 
