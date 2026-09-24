@@ -1,6 +1,7 @@
 package database
 
 import (
+	"github.com/gotify/server/v3/fracdex"
 	"github.com/gotify/server/v3/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -188,9 +189,27 @@ func (d *GormDatabase) TransferApplicationOwnership(applicationID, newOwnerID ui
 			return err
 		}
 
+		lastSortKey := ""
+		err = tx.Model(&model.Application{}).
+			Select("sort_key").
+			Where("user_id = ? AND id <> ?", newOwnerID, applicationID).
+			Order("sort_key DESC").
+			Limit(1).
+			Find(&lastSortKey).Error
+		if err != nil && err != gorm.ErrRecordNotFound {
+			return err
+		}
+		newSortKey, err := fracdex.KeyBetween(lastSortKey, "")
+		if err != nil {
+			return err
+		}
+
 		return tx.Model(&model.Application{}).
 			Where("id = ?", applicationID).
-			Update("user_id", newOwnerID).Error
+			Updates(map[string]any{
+				"user_id":  newOwnerID,
+				"sort_key": newSortKey,
+			}).Error
 	})
 }
 
