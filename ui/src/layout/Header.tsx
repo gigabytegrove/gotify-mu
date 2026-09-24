@@ -92,7 +92,10 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
             className={classes.appBar}>
             <Toolbar className={classes.toolbar}>
                 <div className={classes.title}>
-                    <Link to="/" className={classes.link} style={{display: 'flex', alignItems: 'center'}}>
+                    <Link
+                        to="/"
+                        className={classes.link}
+                        style={{display: 'flex', alignItems: 'center'}}>
                         <img
                             src={config.get('url') + 'static/gotify-mu-logo.png'}
                             alt="Gotify MU"
