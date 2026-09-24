@@ -22,6 +22,7 @@ type ApplicationDatabase interface {
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationsByUser(userID uint) ([]*model.Application, error)
 	GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error)
+	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	DeleteApplicationByID(id uint) error
 	UpdateApplication(application *model.Application) error
 	GetUserByID(id uint) (*model.User, error)
@@ -159,6 +160,14 @@ func (a *ApplicationAPI) GetApplications(ctx *gin.Context) {
 		return
 	}
 	for _, app := range apps {
+		membership, err := a.DB.GetApplicationMembership(app.ID, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if membership != nil {
+			receiveNotifications := membership.ReceiveNotifications
+			app.ReceiveNotifications = &receiveNotifications
+		}
 		app.Token = ""
 		withResolvedImage(app)
 	}
