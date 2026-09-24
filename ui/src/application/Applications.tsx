@@ -344,6 +344,7 @@ const Row = ({
             <TableCell>
                 {app.name}
                 {app.autoAssign ? ' · Global' : ''}
+                {app.allowMemberPost ? ' · Chat' : ''}
             </TableCell>
             <TableCell>{app.description}</TableCell>
             <TableCell>{app.defaultPriority}</TableCell>
