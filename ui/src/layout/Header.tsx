@@ -1,77 +1,26 @@
-import AppBar from '@mui/material/AppBar';
-import Button, {ButtonProps} from '@mui/material/Button';
-import IconButton from '@mui/material/IconButton';
-import {Theme} from '@mui/material/styles';
-import {makeStyles} from 'tss-react/mui';
-import Toolbar from '@mui/material/Toolbar';
-import Typography from '@mui/material/Typography';
+import React, {CSSProperties} from 'react';
+import {
+    AppBar,
+    Avatar,
+    Box,
+    Chip,
+    IconButton,
+    ListItemIcon,
+    ListItemText,
+    Menu,
+    MenuItem,
+    Stack,
+    Toolbar,
+    Tooltip,
+    Typography,
+} from '@mui/material';
 import AccountCircle from '@mui/icons-material/AccountCircle';
-import Chat from '@mui/icons-material/Chat';
-import DevicesOther from '@mui/icons-material/DevicesOther';
 import ExitToApp from '@mui/icons-material/ExitToApp';
 import MenuIcon from '@mui/icons-material/Menu';
-import Apps from '@mui/icons-material/Apps';
-import SupervisorAccount from '@mui/icons-material/SupervisorAccount';
-import SettingsIcon from '@mui/icons-material/Settings';
-import Menu from '@mui/material/Menu';
-import MenuItem from '@mui/material/MenuItem';
-import ListItemIcon from '@mui/material/ListItemIcon';
-import ListItemText from '@mui/material/ListItemText';
-import React, {CSSProperties} from 'react';
+import Settings from '@mui/icons-material/Settings';
+import Security from '@mui/icons-material/Security';
 import {Link} from 'react-router';
-import {useMediaQuery} from '@mui/material';
 import * as config from '../config';
-
-const useStyles = makeStyles()((theme: Theme) => ({
-    appBar: {
-        zIndex: theme.zIndex.drawer + 1,
-        [theme.breakpoints.down('sm')]: {
-            paddingBottom: 10,
-        },
-    },
-    toolbar: {
-        justifyContent: 'space-between',
-        [theme.breakpoints.down('sm')]: {
-            flexWrap: 'wrap',
-        },
-    },
-    menuButtons: {
-        display: 'flex',
-        [theme.breakpoints.down('md')]: {
-            flex: 1,
-        },
-        justifyContent: 'center',
-        [theme.breakpoints.down('sm')]: {
-            flexBasis: '100%',
-            marginTop: 5,
-            order: 1,
-            height: 50,
-            justifyContent: 'space-between',
-            alignItems: 'center',
-        },
-    },
-    title: {
-        [theme.breakpoints.up('md')]: {
-            flex: 1,
-        },
-        display: 'flex',
-        alignItems: 'center',
-    },
-    titleName: {
-        paddingRight: 10,
-    },
-    logo: {
-        width: 54,
-        height: 36,
-        objectFit: 'cover',
-        borderRadius: 4,
-        marginRight: 10,
-    },
-    link: {
-        color: 'inherit',
-        textDecoration: 'none',
-    },
-}));
 
 interface IProps {
     loggedIn: boolean;
@@ -84,144 +33,130 @@ interface IProps {
 }
 
 const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IProps) => {
-    const {classes} = useStyles();
+    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+
     return (
         <AppBar
-            sx={{position: {xs: 'sticky', sm: 'fixed'}}}
+            position="sticky"
+            elevation={0}
+            color="inherit"
             style={style}
-            className={classes.appBar}>
-            <Toolbar className={classes.toolbar}>
-                <div className={classes.title}>
-                    <Link
-                        to="/"
-                        className={classes.link}
-                        style={{display: 'flex', alignItems: 'center'}}>
-                        <img
-                            src={config.get('url') + 'static/gotify-mu-logo.png'}
-                            alt="Gotify MU"
-                            className={classes.logo}
-                        />
-                        <Typography variant="h5" className={classes.titleName} color="inherit">
+            sx={{
+                zIndex: (theme) => theme.zIndex.drawer + 1,
+                borderBottom: 1,
+                borderColor: 'divider',
+                backgroundColor: 'background.paper',
+            }}>
+            <Toolbar sx={{minHeight: 64, gap: 1.5}}>
+                {loggedIn && (
+                    <IconButton
+                        sx={{display: {xs: 'inline-flex', sm: 'none'}}}
+                        aria-label="Open navigation"
+                        onClick={() => setNavOpen(true)}>
+                        <MenuIcon />
+                    </IconButton>
+                )}
+
+                <Box
+                    component={Link}
+                    to="/"
+                    sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1.25,
+                        minWidth: 0,
+                        color: 'inherit',
+                        textDecoration: 'none',
+                    }}>
+                    <Box
+                        component="img"
+                        src={config.get('url') + 'static/gotify-mu-logo.png'}
+                        alt="Gotify MU"
+                        sx={{width: 44, height: 32, objectFit: 'contain', borderRadius: 1}}
+                    />
+                    <Box sx={{display: {xs: 'none', sm: 'block'}}}>
+                        <Typography variant="h6" sx={{lineHeight: 1.1}}>
                             Gotify MU
                         </Typography>
-                    </Link>
-                    <a
+                        <Typography variant="caption" color="text.secondary">
+                            Multi-user notifications
+                        </Typography>
+                    </Box>
+                </Box>
+
+                <Box sx={{flex: 1}} />
+
+                <Tooltip title="Build version">
+                    <Chip
+                        component="a"
+                        clickable
+                        size="small"
+                        variant="outlined"
+                        label={`@${version}`}
                         href={
                             version.startsWith('master-')
                                 ? `https://github.com/gigabytegrove/gotify-mu/commit/${version.replace('master-', '')}`
                                 : 'https://github.com/gigabytegrove/gotify-mu/releases'
                         }
-                        className={classes.link}>
-                        <Typography variant="button" color="inherit">
-                            @{version}
-                        </Typography>
-                    </a>
-                </div>
+                        target="_blank"
+                        rel="noreferrer"
+                    />
+                </Tooltip>
+
                 {loggedIn && (
-                    <Buttons admin={admin} name={name} logout={logout} setNavOpen={setNavOpen} />
+                    <>
+                        <IconButton
+                            id="user-menu-button"
+                            aria-label="Account menu"
+                            onClick={(event) => setAnchorEl(event.currentTarget)}>
+                            <Avatar sx={{width: 34, height: 34}}>
+                                {name.slice(0, 1).toUpperCase() || <AccountCircle />}
+                            </Avatar>
+                        </IconButton>
+                        <Menu
+                            id="user-menu"
+                            anchorEl={anchorEl}
+                            open={Boolean(anchorEl)}
+                            onClose={() => setAnchorEl(null)}
+                            anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
+                            transformOrigin={{vertical: 'top', horizontal: 'right'}}>
+                            <Box sx={{px: 2, py: 1.25}}>
+                                <Stack direction="row" spacing={1} alignItems="center">
+                                    <Typography fontWeight={700}>{name}</Typography>
+                                    {admin && (
+                                        <Chip
+                                            icon={<Security fontSize="small" />}
+                                            label="Admin"
+                                            size="small"
+                                        />
+                                    )}
+                                </Stack>
+                            </Box>
+                            <MenuItem
+                                component={Link}
+                                to="/settings"
+                                onClick={() => setAnchorEl(null)}>
+                                <ListItemIcon>
+                                    <Settings fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Settings</ListItemText>
+                            </MenuItem>
+                            <MenuItem
+                                id="logout"
+                                onClick={() => {
+                                    setAnchorEl(null);
+                                    logout();
+                                }}>
+                                <ListItemIcon>
+                                    <ExitToApp fontSize="small" />
+                                </ListItemIcon>
+                                <ListItemText>Sign out</ListItemText>
+                            </MenuItem>
+                        </Menu>
+                    </>
                 )}
             </Toolbar>
         </AppBar>
-    );
-};
-
-const Buttons = ({
-    name,
-    admin,
-    logout,
-    setNavOpen,
-}: {
-    name: string;
-    admin: boolean;
-    logout: VoidFunction;
-    setNavOpen: (open: boolean) => void;
-}) => {
-    const {classes} = useStyles();
-    const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-    const userDropDown = Boolean(anchorEl);
-
-    return (
-        <div className={classes.menuButtons}>
-            <ResponsiveButton
-                sx={{display: {sm: 'none', xs: 'block'}}}
-                icon={<MenuIcon />}
-                onClick={() => setNavOpen(true)}
-                label="menu"
-                color="inherit"
-            />
-            {admin && (
-                <Link className={classes.link} to="/users" id="navigate-users">
-                    <ResponsiveButton icon={<SupervisorAccount />} label="users" color="inherit" />
-                </Link>
-            )}
-            <Link className={classes.link} to="/applications" id="navigate-apps">
-                <ResponsiveButton icon={<Chat />} label="channels" color="inherit" />
-            </Link>
-            <Link className={classes.link} to="/clients" id="navigate-clients">
-                <ResponsiveButton icon={<DevicesOther />} label="clients" color="inherit" />
-            </Link>
-            <Link className={classes.link} to="/plugins" id="navigate-plugins">
-                <ResponsiveButton icon={<Apps />} label="plugins" color="inherit" />
-            </Link>
-            <ResponsiveButton
-                icon={<AccountCircle />}
-                label={name}
-                onClick={(e) => setAnchorEl(e.currentTarget)}
-                id="user-menu-button"
-                aria-controls={userDropDown ? 'user-menu' : undefined}
-                aria-haspopup="true"
-                aria-expanded={userDropDown ? 'true' : undefined}
-                color="inherit"
-            />
-            <Menu
-                id="user-menu"
-                anchorEl={anchorEl}
-                open={userDropDown}
-                onClose={() => setAnchorEl(null)}
-                anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
-                transformOrigin={{vertical: 'top', horizontal: 'right'}}>
-                <MenuItem component={Link} to="/settings" onClick={() => setAnchorEl(null)}>
-                    <ListItemIcon>
-                        <SettingsIcon fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Settings</ListItemText>
-                </MenuItem>
-                <MenuItem
-                    id="logout"
-                    onClick={() => {
-                        setAnchorEl(null);
-                        logout();
-                    }}>
-                    <ListItemIcon>
-                        <ExitToApp fontSize="small" />
-                    </ListItemIcon>
-                    <ListItemText>Logout</ListItemText>
-                </MenuItem>
-            </Menu>
-        </div>
-    );
-};
-
-const ResponsiveButton: React.FC<{
-    color: 'inherit';
-    sx?: ButtonProps['sx'];
-    label: string;
-    id?: string;
-    onClick?: (event: React.MouseEvent<HTMLElement>) => void;
-    icon: React.ReactNode;
-}> = ({icon, label, ...rest}) => {
-    const matches = useMediaQuery('(max-width:1000px)');
-    if (matches) {
-        return (
-            <IconButton {...rest} size="large">
-                {icon}
-            </IconButton>
-        );
-    }
-    return (
-        <Button startIcon={icon} {...rest}>
-            {label}
-        </Button>
     );
 };
 
