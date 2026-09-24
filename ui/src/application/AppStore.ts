@@ -22,7 +22,7 @@ export class AppStore extends BaseStore<IApplication> {
     protected requestDelete = (id: number): Promise<void> =>
         axios.delete(`${config.get('url')}application/${id}`).then(() => {
             this.onDelete();
-            return this.snack('Application deleted');
+            return this.snack('Channel deleted');
         });
 
     @action
@@ -33,7 +33,7 @@ export class AppStore extends BaseStore<IApplication> {
             headers: {'content-type': 'multipart/form-data'},
         });
         await this.refresh();
-        this.snack('Application image updated');
+        this.snack('Channel image updated');
     };
 
     public async regenerateToken(id: number): Promise<string> {
@@ -50,7 +50,7 @@ export class AppStore extends BaseStore<IApplication> {
         try {
             await axios.delete(`${config.get('url')}application/${id}/image`);
             await this.refresh();
-            this.snack('Application image deleted');
+            this.snack('Channel image deleted');
         } catch (error) {
             console.error('Error deleting application image:', error);
             throw error;
@@ -90,7 +90,7 @@ export class AppStore extends BaseStore<IApplication> {
     >): Promise<void> => {
         await axios.put(`${config.get('url')}application/${id}`, app);
         await this.refresh();
-        this.snack('Application updated');
+        this.snack('Channel updated');
     };
 
     @action
