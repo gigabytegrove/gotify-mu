@@ -36,8 +36,9 @@ const Plugins = observer(() => {
                 <Table id="plugin-table">
                     <TableHead>
                         <TableRow>
-                            <TableCell>Name</TableCell>
+                            <TableCell>ID</TableCell>
                             <TableCell>Status</TableCell>
+                            <TableCell>Name</TableCell>
                             <TableCell>Token</TableCell>
                             <TableCell>Created</TableCell>
                             <TableCell align="right">Configuration</TableCell>
@@ -63,11 +64,7 @@ const Plugins = observer(() => {
 const PluginRow = observer(
     ({plugin, fToggleStatus}: {plugin: IPlugin; fToggleStatus: VoidFunction}) => (
         <TableRow hover>
-            <TableCell>
-                <strong>{plugin.name}</strong>
-                <br />
-                <Chip size="small" variant="outlined" label={`ID ${plugin.id}`} sx={{mt: 0.5}} />
-            </TableCell>
+            <TableCell>{plugin.id}</TableCell>
             <TableCell>
                 <Switch
                     checked={plugin.enabled}
@@ -80,6 +77,9 @@ const PluginRow = observer(
                     label={plugin.enabled ? 'Enabled' : 'Disabled'}
                     variant={plugin.enabled ? 'filled' : 'outlined'}
                 />
+            </TableCell>
+            <TableCell>
+                <strong>{plugin.name}</strong>
             </TableCell>
             <TableCell>
                 <CopyableSecret
