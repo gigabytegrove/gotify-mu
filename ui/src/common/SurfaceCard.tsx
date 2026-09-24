@@ -12,7 +12,7 @@ interface IProps {
 }
 
 const SurfaceCard = ({title, subtitle, action, children}: IProps) => (
-    <Paper variant="outlined" sx={{p: 2.5, borderRadius: 3}}>
+    <Paper variant="outlined" sx={{p: 2.5, borderRadius: 3, overflowX: 'auto'}}>
         {(title || subtitle || action) && (
             <Stack
                 direction="row"
