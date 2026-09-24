@@ -1,16 +1,27 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import Button from '@mui/material/Button';
-import Checkbox from '@mui/material/Checkbox';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import List from '@mui/material/List';
-import ListItem from '@mui/material/ListItem';
-import ListItemText from '@mui/material/ListItemText';
-import Switch from '@mui/material/Switch';
-import Typography from '@mui/material/Typography';
+import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
+    Alert,
+    Button,
+    Checkbox,
+    Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    FormControlLabel,
+    List,
+    ListItem,
+    ListItemText,
+    Stack,
+    Switch,
+    Typography,
+} from '@mui/material';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import Public from '@mui/icons-material/Public';
+import Science from '@mui/icons-material/Science';
 import {observer} from 'mobx-react-lite';
 import {IApplication, IApplicationMember, IUser} from '../types';
 import {useStores} from '../stores';
@@ -21,12 +32,22 @@ interface IProps {
     fClose: VoidFunction;
 }
 
-const memberStatus = (member: IApplicationMember | undefined, isOwner: boolean): string => {
-    if (isOwner) return 'Owner';
-    if (!member) return 'Not assigned';
+const memberStatus = (member: IApplicationMember | undefined, isOwner: boolean) => {
+    if (isOwner) return <Chip size="small" label="Owner" />;
+    if (!member) return <Chip size="small" variant="outlined" label="Not assigned" />;
 
-    const status = member.autoAssigned ? 'Automatically assigned' : 'Assigned';
-    return member.receiveNotifications ? status : `${status} · Muted`;
+    return (
+        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+            <Chip
+                size="small"
+                variant="outlined"
+                label={member.autoAssigned ? 'Global' : 'Member'}
+            />
+            {!member.receiveNotifications && (
+                <Chip size="small" variant="outlined" label="Muted" />
+            )}
+        </Stack>
+    );
 };
 
 const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
@@ -58,6 +79,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
 
     const toggleUser = async (user: IUser) => {
         if (user.id === app.ownerId || autoAssign) return;
+
         if (memberIds.has(user.id)) {
             await appStore.removeMember(app.id, user.id);
         } else {
@@ -88,15 +110,20 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
     };
 
     return (
-        <Dialog open={true} onClose={handleClose} fullWidth maxWidth="sm">
-            <DialogTitle>Channel members: {app.name}</DialogTitle>
+        <Dialog open onClose={handleClose} fullWidth maxWidth="md">
+            <DialogTitle>Manage Channel · {app.name}</DialogTitle>
             <DialogContent>
                 {!elevateStore.elevated ? (
-                    <ElevationForm />
+                    <Stack spacing={2} sx={{pt: 1}}>
+                        <Typography color="text.secondary">
+                            Confirm your identity to manage Channel membership and ownership.
+                        </Typography>
+                        <ElevationForm />
+                    </Stack>
                 ) : (
-                    <>
+                    <Stack spacing={2} sx={{pt: 1}}>
                         {currentUser.user.admin && (
-                            <>
+                            <Stack spacing={1}>
                                 <FormControlLabel
                                     control={
                                         <Switch
@@ -106,65 +133,132 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                             }
                                         />
                                     }
-                                    label="Automatically assign this channel to all users"
-                                />
-                                <FormControlLabel
-                                    control={
-                                        <Switch
-                                            checked={allowMemberPost}
-                                            onChange={(event) =>
-                                                void toggleMemberPosting(event.target.checked)
-                                            }
-                                        />
+                                    label={
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <span>Global Channel</span>
+                                            <Chip
+                                                size="small"
+                                                icon={<Public fontSize="small" />}
+                                                label="All users"
+                                                variant="outlined"
+                                            />
+                                        </Stack>
                                     }
-                                    label="Allow channel members to post (Chat Channel)"
                                 />
-                            </>
+                                {autoAssign && (
+                                    <Alert severity="info">
+                                        Every current and future user is assigned automatically.
+                                        Individual membership cannot be removed while Global is
+                                        enabled.
+                                    </Alert>
+                                )}
+
+                                <Accordion
+                                    elevation={0}
+                                    disableGutters
+                                    sx={{border: 1, borderColor: 'divider'}}>
+                                    <AccordionSummary expandIcon={<ExpandMore />}>
+                                        <Stack direction="row" spacing={1} alignItems="center">
+                                            <Typography fontWeight={600}>Advanced</Typography>
+                                            <Chip
+                                                size="small"
+                                                icon={<Science fontSize="small" />}
+                                                label="Experimental"
+                                                variant="outlined"
+                                            />
+                                        </Stack>
+                                    </AccordionSummary>
+                                    <AccordionDetails>
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={allowMemberPost}
+                                                    onChange={(event) =>
+                                                        void toggleMemberPosting(
+                                                            event.target.checked
+                                                        )
+                                                    }
+                                                />
+                                            }
+                                            label="Allow assigned members to post"
+                                        />
+                                        <Typography variant="body2" color="text.secondary">
+                                            Experimental. Official Gotify Android clients receive
+                                            these messages but do not provide a compose interface.
+                                        </Typography>
+                                    </AccordionDetails>
+                                </Accordion>
+                            </Stack>
                         )}
-                        {autoAssign && (
-                            <Typography variant="body2" sx={{mb: 1}}>
-                                This channel is assigned to every current and future user.
+
+                        <Stack spacing={0.25}>
+                            <Typography variant="h6">Membership</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Assignment controls access to this Channel. Notification mute is a
+                                separate per-user preference.
                             </Typography>
-                        )}
-                        <List dense>
+                        </Stack>
+
+                        <List disablePadding>
                             {users.map((user) => {
                                 const member = members.find((item) => item.userId === user.id);
                                 const isOwner = user.id === app.ownerId;
+                                const assigned = memberIds.has(user.id);
+
                                 return (
                                     <ListItem
                                         key={user.id}
+                                        divider
                                         secondaryAction={
-                                            <div
-                                                style={{
-                                                    display: 'flex',
-                                                    alignItems: 'center',
-                                                    gap: 8,
-                                                }}>
+                                            <Stack
+                                                direction="row"
+                                                spacing={1}
+                                                alignItems="center">
                                                 {!isOwner && member && (
                                                     <Button
                                                         size="small"
                                                         disabled={loading}
-                                                        onClick={() => void transferOwnership(user)}>
-                                                        Make owner
+                                                        onClick={() =>
+                                                            void transferOwnership(user)
+                                                        }>
+                                                        Make Owner
                                                     </Button>
                                                 )}
                                                 <Checkbox
                                                     edge="end"
-                                                    checked={memberIds.has(user.id)}
+                                                    checked={assigned}
                                                     disabled={isOwner || autoAssign || loading}
                                                     onChange={() => void toggleUser(user)}
                                                 />
-                                            </div>
+                                            </Stack>
                                         }>
                                         <ListItemText
-                                            primary={user.name}
+                                            primary={
+                                                <Stack
+                                                    direction="row"
+                                                    spacing={1}
+                                                    alignItems="center"
+                                                    flexWrap="wrap"
+                                                    useFlexGap>
+                                                    <Typography fontWeight={600}>
+                                                        {user.name}
+                                                    </Typography>
+                                                    {user.admin && (
+                                                        <Chip
+                                                            size="small"
+                                                            label="Admin"
+                                                            variant="outlined"
+                                                        />
+                                                    )}
+                                                </Stack>
+                                            }
                                             secondary={memberStatus(member, isOwner)}
                                         />
                                     </ListItem>
                                 );
                             })}
                         </List>
-                    </>
+                    </Stack>
                 )}
             </DialogContent>
             <DialogActions>
