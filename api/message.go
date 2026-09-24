@@ -18,6 +18,7 @@ import (
 type MessageDatabase interface {
 	GetMessagesByApplicationForUserSince(userID, appID uint, limit int, since uint) ([]*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
+	GetUserByID(id uint) (*model.User, error)
 	GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error)
 	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	CountApplicationMemberships(applicationID uint) (int64, error)
@@ -371,6 +372,37 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 		} else {
 			ctx.AbortWithError(404, errors.New("message does not exist"))
 		}
+	})
+}
+
+// DeleteMessagesForEveryone permanently clears a channel's message history for all members.
+// This is a Gotify MU management action and requires the channel owner or an administrator.
+func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app == nil {
+			ctx.AbortWithError(404, errors.New("application does not exist"))
+			return
+		}
+
+		userID := auth.GetUserID(ctx)
+		allowed := app.UserID == userID
+		if !allowed {
+			user, err := a.DB.GetUserByID(userID)
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
+			allowed = user != nil && user.Admin
+		}
+		if !allowed {
+			ctx.AbortWithError(404, errors.New("application does not exist"))
+			return
+		}
+
+		successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id))
 	})
 }
 
