@@ -232,6 +232,19 @@ func (a *ApplicationAPI) DeleteApplication(ctx *gin.Context) {
 				ctx.AbortWithError(400, errors.New("cannot delete internal application"))
 				return
 			}
+			if app.AutoAssign {
+				current, err := a.DB.GetUserByID(auth.GetUserID(ctx))
+				if success := successOrAbort(ctx, 500, err); !success {
+					return
+				}
+				if current == nil || !current.Admin {
+					ctx.AbortWithError(
+						http.StatusForbidden,
+						errors.New("global channels can only be deleted by an administrator"),
+					)
+					return
+				}
+			}
 			if success := successOrAbort(ctx, 500, a.DB.DeleteApplicationByID(id)); !success {
 				return
 			}
