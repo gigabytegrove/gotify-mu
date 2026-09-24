@@ -14,6 +14,7 @@ import (
 	"github.com/gotify/server/v3/test"
 	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -391,6 +392,32 @@ func (s *MessageSuite) Test_CreateMessage_failWhenNoMessage() {
 	}
 	assert.Equal(s.T(), 400, s.recorder.Code)
 	assert.Nil(s.T(), s.notifiedMessage)
+}
+
+func (s *MessageSuite) Test_DeleteMessagesForEveryone_OwnerClearsSharedHistory() {
+	s.db.User(1).App(1)
+	s.db.User(2)
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        1,
+		UserID:               2,
+		ReceiveNotifications: true,
+	}))
+	require.NoError(s.T(), s.db.CreateMessage(&model.Message{
+		ApplicationID: 1,
+		Message:       "shared",
+		Title:         "shared",
+	}))
+
+	test.WithUser(s.ctx, 1)
+	s.ctx.Request = httptest.NewRequest("DELETE", "/application/1/message/all", nil)
+	s.ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+
+	s.a.DeleteMessagesForEveryone(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	messages, err := s.db.GetMessagesByApplication(1)
+	require.NoError(s.T(), err)
+	assert.Empty(s.T(), messages)
 }
 
 func (s *MessageSuite) Test_CreateMessage_WithoutTitle() {
