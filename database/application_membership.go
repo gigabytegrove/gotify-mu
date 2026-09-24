@@ -142,7 +142,15 @@ func (d *GormDatabase) SetApplicationMembershipNotifications(
 		return result.Error
 	}
 	if result.RowsAffected == 0 {
-		return gorm.ErrRecordNotFound
+		var count int64
+		if err := d.DB.Model(&model.ApplicationMembership{}).
+			Where("application_id = ? AND user_id = ?", applicationID, userID).
+			Count(&count).Error; err != nil {
+			return err
+		}
+		if count == 0 {
+			return gorm.ErrRecordNotFound
+		}
 	}
 	return nil
 }
