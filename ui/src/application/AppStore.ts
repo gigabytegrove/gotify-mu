@@ -145,6 +145,23 @@ export class AppStore extends BaseStore<IApplication> {
         );
     };
 
+    public setNotifications = async (id: number, enabled: boolean): Promise<void> => {
+        await axios.put(`${config.get('url')}application/${id}/notifications`, {enabled});
+        await this.refresh();
+        this.snack(enabled ? 'Channel notifications enabled' : 'Channel notifications muted');
+    };
+
+    public transferOwnership = async (id: number, userId: number): Promise<void> => {
+        await axios.put(`${config.get('url')}application/${id}/owner`, {userId});
+        await this.refresh();
+        this.snack('Channel ownership transferred');
+    };
+
+    public clearHistoryForEveryone = async (id: number): Promise<void> => {
+        await axios.delete(`${config.get('url')}application/${id}/message/all`);
+        this.snack('Channel history cleared for everyone');
+    };
+
     public getName = (id: number): string => {
         const app = this.getByIDOrUndefined(id);
         return id === -1 ? 'All Messages' : app !== undefined ? app.name : 'unknown';
