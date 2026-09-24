@@ -1,55 +1,61 @@
-# Contributing
+# Contributing to Gotify MU
 
-Thanks for your interest in Gotify!
+Thanks for your interest in Gotify MU.
 
-First of all, please note that we have a [code of conduct](CODE_OF_CONDUCT.md), please follow it in all your interactions with the project. 
+Gotify MU is a compatibility-focused fork of [Gotify Server](https://github.com/gotify/server) that adds real multi-user notification channels.
 
-If you have any questions you can join the chat on [#gotify:matrix.org](https://matrix.to/#/#gotify:matrix.org).
+## Where to contribute
 
-## Where to Contribute
+For MU-specific bugs, features, documentation, and Web UI changes, use this repository:
 
-|                                                         Repository|                                   Description|               Technology|
-|                                                                ---|                                           ---|                      ---|
-|[gotify/server](https://github.com/gotify/server)                  |server implementation and WebUI code          |`Go` `Typescript` `React`|
-|[gotify/android](https://github.com/gotify/android)                |android client implementation                 |`Java` `Android`         |
-|[gotify/plugin-template](https://github.com/gotify/plugin-template)|official gotify plugin template               |`Go`                     |
-|[gotify/cli](https://github.com/gotify/cli)                        |official CLI client                           |`Go`                     |
-|[gotify/website](https://github.com/gotify/website)                |documentaion [gotify.net](https://gotify.net/)|`Markdown` `Docusaurus`  |
-|[gotify/contrib](https://github.com/gotify/contrib)                |community-contributed projects                |`misc`                   |    
+https://github.com/gigabytegrove/gotify-mu
 
-## Ways to Contribute
+If a problem also exists unchanged in upstream Gotify, please say so in the issue. That helps us decide whether the fix belongs only here or should also be proposed upstream.
 
-### Document Refinements
+## Compatibility rules
 
-_Keywords: **Documentation**, **Writing**_
+Changes should preserve normal Gotify clients and integrations whenever practical.
 
-Documents are residing in the [gotify/website](https://github.com/gotify/website) repository. Open an issue or PR and indicate the part of the document you are working on or the information you want to add to the document.
+In particular:
 
-### Feature Request and implementation
+- do not casually change the `github.com/gotify/server/v3` Go module path
+- preserve existing Gotify API routes such as `/application`, `/message`, and `/stream`
+- keep existing application-token and client-token behavior compatible
+- treat new MU response fields as additive
+- do not grant publish permission simply because a user can receive/read a channel
+- migrations must preserve existing users, applications, tokens, and messages
 
-_Keywords: **Features**, **Coding**_
+Visible UI terminology may use **Channels** even where the compatibility API still uses **Application** internally.
 
-When proposing features to gotify/\*, please first discuss the change you wish to make via issue, chat or any other method with the maintainers.
+## Pull requests
 
-After the feature request is approved, file an issue or comment under the existing one indicating whether you want to submit the implementation yourself. If you decided not to, the maintainers would evaluate the necessity and urgency of the feature and decide whether to wait for another contributor to claim the request or commit an implementation himself/herself.
+Use a branch and open a pull request against `master`.
 
-### Bug Reports and Fixes
+Please include:
 
-_Keywords: **Bug Hunt**, **Coding**_
+- what changed
+- why it changed
+- compatibility impact
+- migration impact, if any
+- tests performed
+- screenshots for meaningful Web UI changes
 
-If you are not sure if the problem you are facing is indeed a bug, we recommend discussing it in the [community chat]((https://matrix.to/#/#gotify:matrix.org)) first, opening an issue is also welcome.
+## Development
 
-After the bug is confirmed, please file a new or comment under the existing issue describing the bug and indicate whether you want to sumbit the fix yourself.
+Server code is Go.  
+The Web UI is TypeScript/React.
 
-If you want to submit a fix to an already confirmed issue, please indicate that you wish to submit a PR in a comment before starting your work.
+Common checks:
 
-### Community Contribution Projects
+```bash
+go test ./...
+cd ui
+yarn
+yarn lint
+yarn test
+yarn build
+```
 
-_Keywords:_ **Features**, **Coding**, **Writing**
+## Upstream credit
 
-Make gotify more powerful and easy-to-use than ever by:
- - writing a [plugin](https://gotify.net/docs/plugin)
- - writing a client (smartphones, Windows, Linux, Browser Add-on, etc.)
- - writing about how you have used gotify for your applications
- 
-Also, after you have finished, consider submitting your hard work to the community contributions [repository](https://github.com/gotify/contrib) so that more users can make a use of it.
+Gotify MU is derived from Gotify and remains under the MIT License. Keep applicable upstream copyright and license notices intact.
