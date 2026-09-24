@@ -33,7 +33,7 @@ export const PushMessageDialog = ({appName, defaultPriority, fClose, fOnSubmit}:
     };
 
     return (
-        <Dialog open onClose={fClose} fullWidth maxWidth="sm">
+        <Dialog id="push-message-dialog" open onClose={fClose} fullWidth maxWidth="sm">
             <DialogTitle>Send Notification</DialogTitle>
             <DialogContent>
                 <DialogContentText sx={{mb: 2}}>
