@@ -13,6 +13,8 @@ type Message struct {
 	Priority      int
 	Extras        []byte
 	Date          time.Time
+	SenderUserID  uint `gorm:"index"`
+	SenderName    string `gorm:"type:text"`
 }
 
 // MessageExternal Model
@@ -63,6 +65,10 @@ type MessageExternal struct {
 	// required: true
 	// example: 2018-02-27T19:36:10.5045044+01:00
 	Date time.Time `json:"date"`
+	// The Gotify MU user id that posted this message, when the message was sent by a user.
+	SenderUserID uint `json:"senderUserId,omitempty"`
+	// The Gotify MU username that posted this message, when available.
+	SenderName string `json:"senderName,omitempty"`
 }
 
 // CreateMessage Model
