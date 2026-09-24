@@ -22,6 +22,10 @@ Upstream Gotify applications are owned by a single user. Gotify MU keeps that mo
 - Automatic assignment to all current and future users
 - One stored message with WebSocket fan-out to every entitled user
 - Per-user dismissal of shared messages
+- Per-user mute/unmute of realtime delivery without losing channel history
+- Channel ownership transfer between users
+- Safe user deletion guard when shared channels still need an owner
+- Owner/admin action to permanently clear a channel's history for everyone
 - Original physical-delete behavior retained for private channels
 - Owner/admin member management in the Web UI
 - Shared users can read and receive without automatically gaining publish authority
@@ -42,6 +46,29 @@ The existing Gotify CLI and API integrations should continue to work against the
 The MU Web UI presents Gotify applications as **Channels** and adds member management and global auto-assignment controls.
 
 The underlying `/application` API naming remains in place to avoid breaking existing clients and integrations.
+
+### Gotify MU channel-management API
+
+The compatibility API remains unchanged, and MU adds these management endpoints:
+
+```text
+GET    /application/:id/members
+GET    /application/:id/assignable-users
+POST   /application/:id/members
+DELETE /application/:id/members/:userId
+PUT    /application/:id/auto-assign
+PUT    /application/:id/notifications
+PUT    /application/:id/owner
+DELETE /application/:id/message/all
+```
+
+`PUT /application/:id/notifications` changes only the current user's realtime delivery preference. The user remains a channel member and can still read history.
+
+`PUT /application/:id/owner` transfers canonical ownership while preserving channel membership and the existing application token.
+
+`DELETE /application/:id/message/all` is an owner/admin action that physically removes that channel's messages for all members. Normal Gotify-compatible delete actions on shared channels remain per-user dismissals.
+
+A user who still owns a shared channel cannot be deleted until ownership of that channel has been transferred.
 
 ## Deployment
 
@@ -222,9 +249,13 @@ For the current development build, verify these behaviors before treating an ins
 4. A Channel can be created.
 5. Multiple users can be assigned to the Channel.
 6. All assigned users receive the same notification.
-7. The official Gotify Android app receives notifications normally.
-8. Deleting a shared message for one user does not remove it for other members.
-9. Private channels retain normal Gotify delete behavior.
+7. A user can mute and re-enable realtime delivery for a Channel without losing history.
+8. Channel ownership can be transferred to another member.
+9. A user who still owns a shared Channel cannot be deleted until ownership is transferred.
+10. An owner/admin can clear a Channel's history for everyone.
+11. The official Gotify Android app receives notifications normally.
+12. Deleting a shared message for one user does not remove it for other members.
+13. Private channels retain normal Gotify delete behavior.
 
 ### Future container namespace
 
