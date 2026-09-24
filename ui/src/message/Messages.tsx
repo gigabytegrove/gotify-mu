@@ -4,6 +4,8 @@ import React from 'react';
 import {useParams} from 'react-router';
 import DefaultPage from '../common/DefaultPage';
 import Button from '@mui/material/Button';
+import Paper from '@mui/material/Paper';
+import TextField from '@mui/material/TextField';
 import Message from './Message';
 import {observer} from 'mobx-react-lite';
 import {IMessage} from '../types';
@@ -23,13 +25,24 @@ const Messages = observer(() => {
     const [deleteAll, setDeleteAll] = React.useState(false);
     const [pushMessageOpen, setPushMessageOpen] = React.useState(false);
     const [isLoadingMore, setLoadingMore] = React.useState(false);
-    const {messagesStore, appStore} = useStores();
-    const messages = messagesStore.get(appId);
-    const hasMore = messagesStore.canLoadMore(appId);
+    const [showArchived, setShowArchived] = React.useState(false);
+    const [chatDraft, setChatDraft] = React.useState('');
+    const {messagesStore, appStore, currentUser} = useStores();
+
+    const app = appId === -1 ? undefined : appStore.getByIDOrUndefined(appId);
+    const messages = showArchived ? messagesStore.getArchived(appId) : messagesStore.get(appId);
+    const hasMore = messagesStore.canLoadMore(appId, showArchived);
     const name = appStore.getName(appId);
     const hasMessages = messages.length !== 0;
     const expandedState = React.useRef<Record<number, boolean>>({});
-    const app = appId === -1 ? undefined : appStore.getByIDOrUndefined(appId);
+
+    const isGlobalNonAdmin = Boolean(app?.autoAssign && !currentUser.user.admin);
+    const isChatChannel = Boolean(app?.membersCanPost);
+    const canPost = Boolean(
+        app &&
+            (app.ownerId === currentUser.user.id ||
+                (app.membersCanPost && !showArchived))
+    );
 
     const deleteMessage = (message: IMessage) => {
         const key = enqueueSnackbar({
@@ -51,16 +64,37 @@ const Messages = observer(() => {
         messagesStore.addPendingDelete({message, key});
     };
 
-    React.useEffect(() => {
-        if (!messagesStore.loaded(appId)) {
-            messagesStore.loadMore(appId);
+    const messageAction = (message: IMessage) => {
+        if (showArchived) {
+            return void messagesStore.restoreSingle(message);
         }
-    }, [appId]);
+        if (isGlobalNonAdmin) {
+            return void messagesStore.archiveSingle(message);
+        }
+        deleteMessage(message);
+    };
+
+    React.useEffect(() => {
+        if (!messagesStore.loaded(appId, showArchived)) {
+            void messagesStore.loadMore(appId, showArchived);
+        }
+    }, [appId, showArchived]);
+
+    const sendChatMessage = async () => {
+        const text = chatDraft.trim();
+        if (!app || !text) return;
+        await messagesStore.sendMessage(app.id, text, '', app.defaultPriority);
+        setChatDraft('');
+    };
 
     const renderMessage = (_index: number, message: IMessage) => (
         <Message
             key={message.id}
-            fDelete={() => deleteMessage(message)}
+            fDelete={() => messageAction(message)}
+            action={showArchived ? 'restore' : isGlobalNonAdmin ? 'archive' : 'delete'}
+            chatMode={isChatChannel}
+            ownMessage={message.senderUserId === currentUser.user.id}
+            senderName={message.senderName}
             onExpand={(expanded) => (expandedState.current[message.id] = expanded)}
             title={message.title}
             date={message.date}
@@ -74,9 +108,11 @@ const Messages = observer(() => {
     );
 
     const checkIfLoadMore = () => {
-        if (!isLoadingMore && messagesStore.canLoadMore(appId)) {
+        if (!isLoadingMore && messagesStore.canLoadMore(appId, showArchived)) {
             setLoadingMore(true);
-            messagesStore.loadMore(appId).then(() => setLoadingMore(false));
+            messagesStore
+                .loadMore(appId, showArchived)
+                .then(() => setLoadingMore(false));
         }
     };
 
@@ -101,10 +137,11 @@ const Messages = observer(() => {
             itemContent={renderMessage}
             components={{
                 Footer: messageFooter,
-                EmptyPlaceholder: () => label('No messages'),
+                EmptyPlaceholder: () => label(showArchived ? 'No archived messages' : 'No messages'),
             }}
         />
     );
+
     const label = (text: string) => (
         <Grid size={{xs: 12}}>
             <Typography variant="caption" component="div" gutterBottom align="center">
@@ -112,12 +149,43 @@ const Messages = observer(() => {
             </Typography>
         </Grid>
     );
+
+    const bulkActionLabel = showArchived
+        ? 'Restore All'
+        : isGlobalNonAdmin
+          ? 'Archive All'
+          : 'Delete All';
+
+    const performBulkAction = async () => {
+        if (showArchived) {
+            await messagesStore.restoreByApp(appId);
+        } else if (isGlobalNonAdmin) {
+            await messagesStore.archiveByApp(appId);
+        } else {
+            await messagesStore.removeByApp(appId);
+        }
+    };
+
     return (
         <DefaultPage
-            title={name}
+            title={name + (isChatChannel ? ' · Chat' : '')}
             rightControl={
                 <div>
-                    {app && (
+                    <Button
+                        variant={showArchived ? 'outlined' : 'contained'}
+                        color="primary"
+                        onClick={() => setShowArchived(false)}
+                        style={{marginRight: 5}}>
+                        Active
+                    </Button>
+                    <Button
+                        variant={showArchived ? 'contained' : 'outlined'}
+                        color="primary"
+                        onClick={() => setShowArchived(true)}
+                        style={{marginRight: 5}}>
+                        Archived
+                    </Button>
+                    {app && canPost && !isChatChannel && !showArchived && (
                         <Button
                             id="push-message"
                             variant="contained"
@@ -131,7 +199,7 @@ const Messages = observer(() => {
                         id="refresh-all"
                         variant="contained"
                         color="primary"
-                        onClick={() => messagesStore.refreshByApp(appId)}
+                        onClick={() => messagesStore.refreshByApp(appId, showArchived)}
                         style={{marginRight: 5}}>
                         Refresh
                     </Button>
@@ -140,21 +208,68 @@ const Messages = observer(() => {
                         variant="contained"
                         disabled={!hasMessages}
                         color="primary"
-                        onClick={() => {
-                            setDeleteAll(true);
-                        }}>
-                        Delete All
+                        onClick={() => setDeleteAll(true)}>
+                        {bulkActionLabel}
                     </Button>
                 </div>
             }>
-            {!messagesStore.loaded(appId) ? <LoadingSpinner /> : renderMessages()}
+            {isChatChannel && canPost && !showArchived && (
+                <Paper
+                    elevation={4}
+                    sx={{
+                        p: 1.5,
+                        mb: 2,
+                        display: 'flex',
+                        gap: 1,
+                        alignItems: 'flex-end',
+                        position: 'sticky',
+                        top: 64,
+                        zIndex: 2,
+                    }}>
+                    <TextField
+                        fullWidth
+                        multiline
+                        maxRows={5}
+                        label="Message"
+                        placeholder={'Message ' + name}
+                        value={chatDraft}
+                        onChange={(event) => setChatDraft(event.target.value)}
+                        onKeyDown={(event) => {
+                            if (event.key === 'Enter' && !event.shiftKey) {
+                                event.preventDefault();
+                                void sendChatMessage();
+                            }
+                        }}
+                    />
+                    <Button
+                        variant="contained"
+                        disabled={!chatDraft.trim()}
+                        onClick={() => void sendChatMessage()}>
+                        Send
+                    </Button>
+                </Paper>
+            )}
+
+            {!messagesStore.loaded(appId, showArchived) ? <LoadingSpinner /> : renderMessages()}
 
             {deleteAll && (
                 <ConfirmDialog
-                    title="Confirm Delete"
-                    text={'Delete all messages?'}
+                    title={
+                        showArchived
+                            ? 'Restore Archived Messages'
+                            : isGlobalNonAdmin
+                              ? 'Archive Messages'
+                              : 'Confirm Delete'
+                    }
+                    text={
+                        showArchived
+                            ? 'Restore all archived messages?'
+                            : isGlobalNonAdmin
+                              ? 'Archive all messages from your view? Other users will not be affected.'
+                              : 'Delete all messages?'
+                    }
                     fClose={() => setDeleteAll(false)}
-                    fOnSubmit={() => messagesStore.removeByApp(appId)}
+                    fOnSubmit={performBulkAction}
                 />
             )}
             {pushMessageOpen && app && (
