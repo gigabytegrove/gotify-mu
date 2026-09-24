@@ -12,8 +12,6 @@ type Message struct {
 	Title         string `gorm:"type:text"`
 	Priority      int
 	Extras        []byte
-	SenderUserID  *uint
-	SenderName    string `gorm:"type:text"`
 	Date          time.Time
 	SenderUserID  uint `gorm:"index"`
 	SenderName    string `gorm:"type:text"`
@@ -61,14 +59,6 @@ type MessageExternal struct {
 	//
 	// example: {"home::appliances::thermostat::change_temperature":{"temperature":23},"home::appliances::lighting::on":{"brightness":15}}
 	Extras map[string]any `form:"-" query:"-" json:"extras,omitempty"`
-	// The Gotify MU user that posted this message, when it was posted with a client token.
-	//
-	// read only: true
-	SenderUserID *uint `json:"senderUserId,omitempty"`
-	// The sender name captured when the message was posted.
-	//
-	// read only: true
-	SenderName string `json:"senderName,omitempty"`
 	// The date the message was created.
 	//
 	// read only: true
@@ -76,8 +66,12 @@ type MessageExternal struct {
 	// example: 2018-02-27T19:36:10.5045044+01:00
 	Date time.Time `json:"date"`
 	// The Gotify MU user id that posted this message, when the message was sent by a user.
+	//
+	// read only: true
 	SenderUserID uint `json:"senderUserId,omitempty"`
 	// The Gotify MU username that posted this message, when available.
+	//
+	// read only: true
 	SenderName string `json:"senderName,omitempty"`
 }
 
