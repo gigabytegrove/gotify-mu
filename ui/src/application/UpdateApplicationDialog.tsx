@@ -1,13 +1,16 @@
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
-import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
-import {NumberField} from '../common/NumberField';
 import React, {useState} from 'react';
+import {
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    Stack,
+    TextField,
+    Tooltip,
+} from '@mui/material';
+import {NumberField} from '../common/NumberField';
 
 interface IProps {
     fClose: VoidFunction;
@@ -28,58 +31,60 @@ export const UpdateApplicationDialog = ({
     const [description, setDescription] = useState(initialDescription);
     const [defaultPriority, setDefaultPriority] = useState(initialDefaultPriority);
 
-    const submitEnabled = name.length !== 0;
+    const submitEnabled = name.trim().length !== 0;
+
     const submitAndClose = async () => {
-        await fOnSubmit(name, description, defaultPriority);
+        await fOnSubmit(name.trim(), description, defaultPriority);
         fClose();
     };
 
     return (
-        <Dialog open={true} onClose={fClose} aria-labelledby="form-dialog-title" id="app-dialog">
-            <DialogTitle id="form-dialog-title">Update an application</DialogTitle>
+        <Dialog open onClose={fClose} fullWidth maxWidth="sm">
+            <DialogTitle>Edit Channel</DialogTitle>
             <DialogContent>
-                <DialogContentText>An application is allowed to send messages.</DialogContentText>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    className="name"
-                    label="Name *"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    fullWidth
-                />
-                <TextField
-                    margin="dense"
-                    className="description"
-                    label="Short Description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    fullWidth
-                    multiline
-                />
-                <NumberField
-                    margin="dense"
-                    className="priority"
-                    label="Default Priority"
-                    value={defaultPriority}
-                    onChange={(e) => setDefaultPriority(e)}
-                    fullWidth
-                />
+                <DialogContentText sx={{mb: 2}}>
+                    Update the Channel identity and default delivery priority.
+                </DialogContentText>
+                <Stack spacing={2}>
+                    <TextField
+                        autoFocus
+                        className="name"
+                        label="Channel name"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        fullWidth
+                        required
+                    />
+                    <TextField
+                        className="description"
+                        label="Description"
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        fullWidth
+                        multiline
+                        minRows={2}
+                    />
+                    <NumberField
+                        className="priority"
+                        label="Default priority"
+                        value={defaultPriority}
+                        onChange={setDefaultPriority}
+                        fullWidth
+                    />
+                </Stack>
             </DialogContent>
             <DialogActions>
                 <Button onClick={fClose}>Cancel</Button>
-                <Tooltip title={submitEnabled ? '' : 'name is required'}>
-                    <div>
+                <Tooltip title={submitEnabled ? '' : 'Channel name is required'}>
+                    <span>
                         <Button
                             className="update"
                             disabled={!submitEnabled}
-                            onClick={submitAndClose}
-                            color="primary"
+                            onClick={() => void submitAndClose()}
                             variant="contained">
-                            Update
+                            Save Changes
                         </Button>
-                    </div>
+                    </span>
                 </Tooltip>
             </DialogActions>
         </Dialog>
