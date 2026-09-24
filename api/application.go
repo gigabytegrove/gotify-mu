@@ -57,8 +57,7 @@ type ApplicationParams struct {
 	//
 	// example: a1
 	SortKey string `form:"sortKey" query:"sortKey" json:"sortKey"`
-	// Whether this channel should be automatically assigned to every user.
-	// Only administrators may create auto-assigned channels.
+	// Whether this Gotify MU channel should be automatically assigned to every user.
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
 }
 
