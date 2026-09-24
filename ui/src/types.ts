@@ -3,7 +3,7 @@ export interface IApplication {
     token: string;
     ownerId?: number;
     autoAssign?: boolean;
-    allowMemberPost?: boolean;
+    membersCanPost?: boolean;
     receiveNotifications?: boolean;
     name: string;
     sortKey: string;
