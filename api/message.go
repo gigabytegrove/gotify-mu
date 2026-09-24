@@ -267,7 +267,33 @@ func (a *MessageAPI) DeleteMessages(ctx *gin.Context) {
 	if success := successOrAbort(ctx, 500, err); !success {
 		return
 	}
+
+	user, err := a.DB.GetUserByID(userID)
+	if success := successOrAbort(ctx, 500, err); !success {
+		return
+	}
+	isAdmin := user != nil && user.Admin
+
+	if !isAdmin {
+		for _, app := range apps {
+			if app.AutoAssign {
+				ctx.AbortWithError(
+					403,
+					errors.New("global channel messages can only be deleted by an administrator; archive them instead"),
+				)
+				return
+			}
+		}
+	}
+
 	for _, app := range apps {
+		if app.AutoAssign && isAdmin {
+			if success := successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(app.ID)); !success {
+				return
+			}
+			continue
+		}
+
 		memberCount, err := a.DB.CountApplicationMemberships(app.ID)
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
@@ -276,7 +302,11 @@ func (a *MessageAPI) DeleteMessages(ctx *gin.Context) {
 			if success := successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(app.ID)); !success {
 				return
 			}
-		} else if success := successOrAbort(ctx, 500, a.DB.DismissMessagesByApplicationForUser(userID, app.ID)); !success {
+		} else if success := successOrAbort(
+			ctx,
+			500,
+			a.DB.DismissMessagesByApplicationForUser(userID, app.ID),
+		); !success {
 			return
 		}
 	}
@@ -328,6 +358,22 @@ func (a *MessageAPI) DeleteMessageWithApplication(ctx *gin.Context) {
 			return
 		}
 		if application != nil && membership != nil {
+			if application.AutoAssign {
+				user, err := a.DB.GetUserByID(userID)
+				if success := successOrAbort(ctx, 500, err); !success {
+					return
+				}
+				if user == nil || !user.Admin {
+					ctx.AbortWithError(
+						403,
+						errors.New("global channel messages can only be deleted by an administrator; archive them instead"),
+					)
+					return
+				}
+				successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id))
+				return
+			}
+
 			memberCount, err := a.DB.CountApplicationMemberships(id)
 			if success := successOrAbort(ctx, 500, err); !success {
 				return
@@ -397,6 +443,22 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 			return
 		}
 		if app != nil && membership != nil {
+			if app.AutoAssign {
+				user, err := a.DB.GetUserByID(userID)
+				if success := successOrAbort(ctx, 500, err); !success {
+					return
+				}
+				if user == nil || !user.Admin {
+					ctx.AbortWithError(
+						403,
+						errors.New("global channel messages can only be deleted by an administrator; archive them instead"),
+					)
+					return
+				}
+				successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id))
+				return
+			}
+
 			memberCount, err := a.DB.CountApplicationMemberships(msg.ApplicationID)
 			if success := successOrAbort(ctx, 500, err); !success {
 				return
@@ -426,16 +488,25 @@ func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
 		}
 
 		userID := auth.GetUserID(ctx)
-		allowed := app.UserID == userID
-		if !allowed {
-			user, err := a.DB.GetUserByID(userID)
-			if success := successOrAbort(ctx, 500, err); !success {
-				return
-			}
-			allowed = user != nil && user.Admin
+		user, err := a.DB.GetUserByID(userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		isAdmin := user != nil && user.Admin
+
+		allowed := app.UserID == userID || isAdmin
+		if app.AutoAssign {
+			allowed = isAdmin
 		}
 		if !allowed {
-			ctx.AbortWithError(404, errors.New("application does not exist"))
+			if app.AutoAssign {
+				ctx.AbortWithError(
+					403,
+					errors.New("global channel history can only be cleared by an administrator"),
+				)
+			} else {
+				ctx.AbortWithError(404, errors.New("application does not exist"))
+			}
 			return
 		}
 
