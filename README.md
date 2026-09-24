@@ -68,6 +68,37 @@ At minimum, change:
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
 ```
 
+The included `docker-compose.yml` is:
+
+```yaml
+services:
+  gotify-mu:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        BUILD_JS: "1"
+        GO_VERSION: "1.26.0"
+    image: gotify-mu:master
+    container_name: gotify-mu
+    restart: unless-stopped
+    ports:
+      - "${GOTIFY_MU_PORT:-8080}:80"
+    environment:
+      GOTIFY_DEFAULTUSER_NAME: "${GOTIFY_DEFAULTUSER_NAME:-admin}"
+      GOTIFY_DEFAULTUSER_PASS: "${GOTIFY_DEFAULTUSER_PASS:?Set GOTIFY_DEFAULTUSER_PASS in .env}"
+    volumes:
+      - "./data:/app/data"
+```
+
+Example `.env`:
+
+```env
+GOTIFY_MU_PORT=8080
+GOTIFY_DEFAULTUSER_NAME=admin
+GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
+```
+
 Then build and start Gotify MU:
 
 ```bash
