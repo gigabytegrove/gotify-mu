@@ -1,13 +1,18 @@
 import React, {useState} from 'react';
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
-import MenuItem from '@mui/material/MenuItem';
-import Select from '@mui/material/Select';
-import FormControl from '@mui/material/FormControl';
-import InputLabel from '@mui/material/InputLabel';
+import {
+    Alert,
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    Stack,
+} from '@mui/material';
 import {observer} from 'mobx-react-lite';
 import {useStores} from '../stores';
 import ElevationForm from '../common/ElevationForm';
@@ -29,13 +34,12 @@ const durationOptions = [
 const ElevateClientDialog = observer(({clientName, clientId, fClose}: IProps) => {
     const {elevateStore, clientStore, currentUser} = useStores();
     const [durationSeconds, setDurationSeconds] = useState(durationOptions[1].seconds);
-
     const needsElevation = !elevateStore.elevated;
 
     const handleConfirm = async () => {
         await clientStore.elevate(clientId, durationSeconds);
         if (clientId === currentUser.user.clientId) {
-            currentUser.tryAuthenticate();
+            void currentUser.tryAuthenticate();
         }
         fClose();
     };
@@ -46,27 +50,43 @@ const ElevateClientDialog = observer(({clientName, clientId, fClose}: IProps) =>
     };
 
     return (
-        <Dialog open={true} onClose={handleClose} className="elevate-client-dialog">
-            <DialogTitle>Elevate Client: {clientName}</DialogTitle>
+        <Dialog
+            open
+            onClose={handleClose}
+            fullWidth
+            maxWidth="sm"
+            className="elevate-client-dialog">
+            <DialogTitle>Elevate Client · {clientName}</DialogTitle>
             <DialogContent>
+                <DialogContentText sx={{mb: 2}}>
+                    Elevation temporarily allows this client to perform security-sensitive actions.
+                </DialogContentText>
+
                 {needsElevation ? (
                     <ElevationForm />
                 ) : (
-                    <FormControl fullWidth style={{marginTop: 8}}>
-                        <InputLabel id="elevate-duration-label">Duration</InputLabel>
-                        <Select
-                            className="elevate-duration"
-                            labelId="elevate-duration-label"
-                            label="Duration"
-                            value={durationSeconds}
-                            onChange={(e) => setDurationSeconds(e.target.value as number)}>
-                            {durationOptions.map((opt) => (
-                                <MenuItem key={opt.seconds} value={opt.seconds}>
-                                    {opt.label}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
+                    <Stack spacing={2}>
+                        <Alert severity="warning">
+                            Only elevate trusted clients for as long as necessary.
+                        </Alert>
+                        <FormControl fullWidth>
+                            <InputLabel id="elevate-duration-label">Duration</InputLabel>
+                            <Select
+                                className="elevate-duration"
+                                labelId="elevate-duration-label"
+                                label="Duration"
+                                value={durationSeconds}
+                                onChange={(event) =>
+                                    setDurationSeconds(event.target.value as number)
+                                }>
+                                {durationOptions.map((option) => (
+                                    <MenuItem key={option.seconds} value={option.seconds}>
+                                        {option.label}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                    </Stack>
                 )}
             </DialogContent>
             <DialogActions>
@@ -76,11 +96,9 @@ const ElevateClientDialog = observer(({clientName, clientId, fClose}: IProps) =>
                 {!needsElevation && (
                     <Button
                         className="elevate-confirm"
-                        onClick={handleConfirm}
-                        autoFocus
-                        color="primary"
+                        onClick={() => void handleConfirm()}
                         variant="contained">
-                        Elevate
+                        Apply
                     </Button>
                 )}
             </DialogActions>
