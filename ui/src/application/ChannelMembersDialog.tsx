@@ -26,6 +26,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
     const [members, setMembers] = useState<IApplicationMember[]>([]);
     const [users, setUsers] = useState<IUser[]>([]);
     const [loading, setLoading] = useState(false);
+    const [autoAssign, setAutoAssignState] = useState(Boolean(app.autoAssign));
 
     const load = useCallback(async () => {
         if (!elevateStore.elevated) return;
@@ -47,7 +48,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
     const memberIds = useMemo(() => new Set(members.map((member) => member.userId)), [members]);
 
     const toggleUser = async (user: IUser) => {
-        if (user.id === app.ownerId || app.autoAssign) return;
+        if (user.id === app.ownerId || autoAssign) return;
         if (memberIds.has(user.id)) {
             await appStore.removeMember(app.id, user.id);
         } else {
@@ -58,6 +59,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
 
     const toggleAutoAssign = async (enabled: boolean) => {
         await appStore.setAutoAssign(app.id, enabled);
+        setAutoAssignState(enabled);
         await load();
     };
 
@@ -78,14 +80,14 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                             <FormControlLabel
                                 control={
                                     <Switch
-                                        checked={app.autoAssign}
+                                        checked={autoAssign}
                                         onChange={(event) => void toggleAutoAssign(event.target.checked)}
                                     />
                                 }
                                 label="Automatically assign this channel to all users"
                             />
                         )}
-                        {app.autoAssign && (
+                        {autoAssign && (
                             <Typography variant="body2" sx={{mb: 1}}>
                                 This channel is assigned to every current and future user.
                             </Typography>
@@ -101,7 +103,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                             <Checkbox
                                                 edge="end"
                                                 checked={memberIds.has(user.id)}
-                                                disabled={isOwner || app.autoAssign || loading}
+                                                disabled={isOwner || autoAssign || loading}
                                                 onChange={() => void toggleUser(user)}
                                             />
                                         }>
