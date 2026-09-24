@@ -4,6 +4,8 @@ import {makeStyles} from 'tss-react/mui';
 import Typography from '@mui/material/Typography';
 import {ExpandLess, ExpandMore} from '@mui/icons-material';
 import Delete from '@mui/icons-material/Delete';
+import Archive from '@mui/icons-material/Archive';
+import Unarchive from '@mui/icons-material/Unarchive';
 import React from 'react';
 import TimeAgo from 'react-timeago';
 import Container from '../common/Container';
@@ -98,7 +100,10 @@ interface IProps {
     content: string;
     priority: number;
     appName: string;
-    fDelete: VoidFunction;
+    fDelete?: VoidFunction;
+    fArchive?: VoidFunction;
+    fRestore?: VoidFunction;
+    senderName?: string;
     extras?: IMessageExtras;
     expanded: boolean;
     onExpand: (expand: boolean) => void;
@@ -116,6 +121,9 @@ const priorityColor = (priority: number) => {
 
 const Message = ({
     fDelete,
+    fArchive,
+    fRestore,
+    senderName,
     title,
     date,
     image,
@@ -175,6 +183,9 @@ const Message = ({
                 {smallHeader ? (
                     <HeaderSmall
                         fDelete={fDelete}
+                        fArchive={fArchive}
+                        fRestore={fRestore}
+                        senderName={senderName}
                         title={title}
                         appName={appName}
                         image={image}
@@ -183,6 +194,9 @@ const Message = ({
                 ) : (
                     <HeaderWide
                         fDelete={fDelete}
+                        fArchive={fArchive}
+                        fRestore={fRestore}
+                        senderName={senderName}
                         title={title}
                         appName={appName}
                         image={image}
@@ -222,8 +236,14 @@ const HeaderWide = ({
     image,
     date,
     fDelete,
+    fArchive,
+    fRestore,
+    senderName,
     title,
-}: Pick<IProps, 'appName' | 'image' | 'fDelete' | 'date' | 'title'>) => {
+}: Pick<
+    IProps,
+    'appName' | 'image' | 'fDelete' | 'fArchive' | 'fRestore' | 'senderName' | 'date' | 'title'
+>) => {
     const {classes} = useStyles();
 
     return (
@@ -244,19 +264,45 @@ const HeaderWide = ({
                     {title}
                 </Typography>
                 <Typography variant="subtitle1" sx={{fontSize: 12, opacity: 0.7}}>
-                    {appName}
+                    {senderName ? `${senderName} · ${appName}` : appName}
                 </Typography>
             </div>
             <Typography variant="body1" className={classes.date}>
                 <TimeAgo date={date} formatter={TimeAgoFormatter.narrow} />
             </Typography>
-            <IconButton
-                onClick={fDelete}
-                style={{padding: 14}}
-                className={`${classes.trash} delete`}
-                size="large">
-                <Delete />
-            </IconButton>
+            {fRestore && (
+                <IconButton onClick={fRestore} style={{padding: 14}} size="large">
+                    <Unarchive />
+                </IconButton>
+            )}
+            {fArchive && (
+                <IconButton onClick={fArchive} style={{padding: 14}} size="large">
+                    <Archive />
+                </IconButton>
+            )}
+            {fDelete && (
+                <div style={{display: 'flex'}}>
+                    {fRestore && (
+                        <IconButton onClick={fRestore} style={{padding: 14}} size="large">
+                            <Unarchive />
+                        </IconButton>
+                    )}
+                    {fArchive && (
+                        <IconButton onClick={fArchive} style={{padding: 14}} size="large">
+                            <Archive />
+                        </IconButton>
+                    )}
+                    {fDelete && (
+                        <IconButton
+                            onClick={fDelete}
+                            style={{padding: 14}}
+                            className={`${classes.trash} delete`}
+                            size="large">
+                            <Delete />
+                        </IconButton>
+                    )}
+                </div>
+            )}
         </div>
     );
 };
@@ -265,8 +311,14 @@ const HeaderSmall = ({
     image,
     date,
     fDelete,
+    fArchive,
+    fRestore,
+    senderName,
     title,
-}: Pick<IProps, 'appName' | 'image' | 'fDelete' | 'date' | 'title'>) => {
+}: Pick<
+    IProps,
+    'appName' | 'image' | 'fDelete' | 'fArchive' | 'fRestore' | 'senderName' | 'date' | 'title'
+>) => {
     const {classes} = useStyles();
 
     return (
@@ -276,7 +328,7 @@ const HeaderSmall = ({
                     {title}
                 </Typography>
                 <Typography variant="subtitle1" sx={{fontSize: 12, opacity: 0.7}}>
-                    {appName}
+                    {senderName ? `${senderName} · ${appName}` : appName}
                 </Typography>
                 <Typography variant="body1" className={classes.date}>
                     <TimeAgo date={date} formatter={TimeAgoFormatter.long} />
