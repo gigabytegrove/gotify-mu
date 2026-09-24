@@ -21,8 +21,10 @@ type ApplicationDatabase interface {
 	GetApplicationByToken(token string) (*model.Application, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationsByUser(userID uint) ([]*model.Application, error)
+	GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error)
 	DeleteApplicationByID(id uint) error
 	UpdateApplication(application *model.Application) error
+	GetUserByID(id uint) (*model.User, error)
 }
 
 // The ApplicationAPI provides handlers for managing applications.
@@ -138,7 +140,7 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 //	        $ref: "#/definitions/Error"
 func (a *ApplicationAPI) GetApplications(ctx *gin.Context) {
 	userID := auth.GetUserID(ctx)
-	apps, err := a.DB.GetApplicationsByUser(userID)
+	apps, err := a.DB.GetAccessibleApplicationsByUser(userID)
 	if success := successOrAbort(ctx, 500, err); !success {
 		return
 	}
@@ -192,7 +194,11 @@ func (a *ApplicationAPI) DeleteApplication(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		if app != nil && app.UserID == auth.GetUserID(ctx) {
+		allowed, err := a.isOwnerOrAdmin(auth.GetUserID(ctx), app)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app != nil && allowed {
 			if app.Internal {
 				ctx.AbortWithError(400, errors.New("cannot delete internal application"))
 				return
@@ -258,7 +264,11 @@ func (a *ApplicationAPI) UpdateApplication(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		if app != nil && app.UserID == auth.GetUserID(ctx) {
+		allowed, err := a.isOwnerOrAdmin(auth.GetUserID(ctx), app)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app != nil && allowed {
 			applicationParams := ApplicationParams{}
 			if err := ctx.Bind(&applicationParams); err == nil {
 				app.Description = applicationParams.Description
@@ -335,7 +345,11 @@ func (a *ApplicationAPI) UpdateApplicationSecurity(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		if app == nil || app.UserID != auth.GetUserID(ctx) {
+		allowed, err := a.isOwnerOrAdmin(auth.GetUserID(ctx), app)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app == nil || !allowed {
 			ctx.AbortWithError(404, fmt.Errorf("app with id %d doesn't exists", id))
 			return
 		}
@@ -411,7 +425,11 @@ func (a *ApplicationAPI) UploadApplicationImage(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		if app != nil && app.UserID == auth.GetUserID(ctx) {
+		allowed, err := a.isOwnerOrAdmin(auth.GetUserID(ctx), app)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app != nil && allowed {
 			file, err := ctx.FormFile("file")
 			if err == http.ErrMissingFile {
 				ctx.AbortWithError(400, errors.New("file with key 'file' must be present"))
@@ -504,7 +522,11 @@ func (a *ApplicationAPI) RemoveApplicationImage(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		if app != nil && app.UserID == auth.GetUserID(ctx) {
+		allowed, err := a.isOwnerOrAdmin(auth.GetUserID(ctx), app)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app != nil && allowed {
 			if app.Image == "" {
 				ctx.AbortWithError(400, fmt.Errorf("app with id %d does not have a customized image", id))
 				return
@@ -564,4 +586,18 @@ func handleApplicationError(ctx *gin.Context, err error) {
 	} else {
 		ctx.AbortWithError(500, err)
 	}
+}
+
+func (a *ApplicationAPI) isOwnerOrAdmin(userID uint, app *model.Application) (bool, error) {
+	if app == nil {
+		return false, nil
+	}
+	if app.UserID == userID {
+		return true, nil
+	}
+	user, err := a.DB.GetUserByID(userID)
+	if err != nil {
+		return false, err
+	}
+	return user != nil && user.Admin, nil
 }
