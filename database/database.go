@@ -87,7 +87,15 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		sqldb.SetConnMaxLifetime(9 * time.Minute)
 	}
 
-	if err := db.AutoMigrate(new(model.User), new(model.Application), new(model.Message), new(model.Client), new(model.PluginConf)); err != nil {
+	if err := db.AutoMigrate(
+		new(model.User),
+		new(model.Application),
+		new(model.Message),
+		new(model.Client),
+		new(model.PluginConf),
+		new(model.ApplicationMembership),
+		new(model.MessageDismissal),
+	); err != nil {
 		return nil, err
 	}
 
@@ -99,6 +107,10 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 			return nil, err
 		}
 		db.Create(&model.User{Name: defaultUser, Pass: pass, Admin: true})
+	}
+
+	if err := db.Transaction(backfillApplicationMemberships, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {
+		return nil, err
 	}
 
 	if err := db.Transaction(fillMissingSortKeys, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {

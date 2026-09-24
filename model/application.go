@@ -19,7 +19,7 @@ type Application struct {
 	// read only: true
 	// example: AWH0wZ5r0Mbac.r
 	Token  string `gorm:"type:varchar(180);uniqueIndex:uix_applications_token" json:"token,omitempty"`
-	UserID uint   `gorm:"index;uniqueIndex:uix_application_user_id_sort_key,priority:1" json:"-"`
+	UserID uint   `gorm:"index;uniqueIndex:uix_application_user_id_sort_key,priority:1" json:"ownerId"`
 	// The application name. This is how the application should be displayed to the user.
 	//
 	// required: true
@@ -36,6 +36,12 @@ type Application struct {
 	// required: true
 	// example: false
 	Internal bool `form:"internal" query:"internal" json:"internal"`
+	// Whether every user should automatically be a member of this application.
+	// This is a Gotify MU extension. Existing Gotify clients safely ignore it.
+	//
+	// read only: true
+	// example: false
+	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
 	// The image of the application.
 	//
 	// read only: true

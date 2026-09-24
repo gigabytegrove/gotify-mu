@@ -78,6 +78,12 @@ func (d *GormDatabase) DeleteUserByID(id uint) error {
 	for _, conf := range pluginConfs {
 		d.DeletePluginConfByID(conf.ID)
 	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.MessageDismissal{}).Error; err != nil {
+		return err
+	}
 	return d.DB.Where("id = ?", id).Delete(&model.User{}).Error
 }
 
@@ -88,5 +94,10 @@ func (d *GormDatabase) UpdateUser(user *model.User) error {
 
 // CreateUser creates a user.
 func (d *GormDatabase) CreateUser(user *model.User) error {
-	return d.DB.Create(user).Error
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Create(user).Error; err != nil {
+			return err
+		}
+		return assignUserToAutoApplications(tx, user.ID)
+	})
 }
