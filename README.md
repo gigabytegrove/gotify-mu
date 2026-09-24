@@ -43,11 +43,129 @@ The MU Web UI presents Gotify applications as **Channels** and adds member manag
 
 The underlying `/application` API naming remains in place to avoid breaking existing clients and integrations.
 
-## Installation
+## Deployment
 
 Gotify MU currently follows the upstream Gotify configuration model. Existing `GOTIFY_*` environment variables are intentionally retained for compatibility.
 
-Until formal Gotify MU releases are published, build and test from this repository:
+> **Testing status:** there is not yet a published Gotify MU container image. For now, deploy by building directly from this repository.
+
+### Recommended: Docker Compose
+
+On a Linux system with Git and Docker Compose installed:
+
+```bash
+cd /opt
+git clone https://github.com/gigabytegrove/gotify-mu.git
+cd gotify-mu
+
+cp .env.example .env
+nano .env
+```
+
+At minimum, change:
+
+```text
+GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
+```
+
+Then build and start Gotify MU:
+
+```bash
+docker compose up -d --build
+```
+
+The default deployment publishes Gotify MU on port `8080`.
+
+Open:
+
+```text
+http://SERVER-IP:8080
+```
+
+Default username:
+
+```text
+admin
+```
+
+The password is whatever you set in `.env`.
+
+Persistent data is stored in:
+
+```text
+./data
+```
+
+That directory contains the SQLite database and other persistent Gotify data. Rebuilding or replacing the container does not remove it.
+
+### Verify the deployment
+
+Watch startup logs:
+
+```bash
+docker logs -f gotify-mu
+```
+
+Check the health endpoint:
+
+```bash
+curl http://127.0.0.1:8080/health
+```
+
+Inspect the running container:
+
+```bash
+docker ps --filter name=gotify-mu
+```
+
+### Updating a test installation
+
+After new changes are merged into `master`:
+
+```bash
+cd /opt/gotify-mu
+git pull origin master
+docker compose up -d --build
+```
+
+Your `./data` directory remains in place.
+
+### Manual Docker deployment
+
+If you do not want to use Compose:
+
+```bash
+cd /opt
+
+git clone https://github.com/gigabytegrove/gotify-mu.git
+cd gotify-mu
+
+docker build \
+  --build-arg BUILD_JS=1 \
+  --build-arg GO_VERSION=1.26.0 \
+  -f docker/Dockerfile \
+  -t gotify-mu:master \
+  .
+
+mkdir -p /opt/gotify-mu-data
+
+docker rm -f gotify-mu 2>/dev/null || true
+
+docker run -d \
+  --name gotify-mu \
+  --restart unless-stopped \
+  -p 8080:80 \
+  -e GOTIFY_DEFAULTUSER_NAME=admin \
+  -e GOTIFY_DEFAULTUSER_PASS='CHANGE-THIS-PASSWORD' \
+  -v /opt/gotify-mu-data:/app/data \
+  gotify-mu:master
+```
+
+The `BUILD_JS=1` build argument is required for the Docker build to include the Web UI.
+
+### Native development/test build
+
+You can also run Gotify MU without Docker:
 
 ```bash
 git clone https://github.com/gigabytegrove/gotify-mu.git
@@ -57,11 +175,29 @@ go build -o gotify-mu .
 ./gotify-mu serve
 ```
 
-A Gotify MU container build is defined in `docker/Dockerfile`. The project container namespace is:
+### First-test checklist
+
+For the current development build, verify these behaviors before treating an installation as production-ready:
+
+1. The Gotify MU Web UI loads.
+2. The administrator can sign in.
+3. Multiple users can be created.
+4. A Channel can be created.
+5. Multiple users can be assigned to the Channel.
+6. All assigned users receive the same notification.
+7. The official Gotify Android app receives notifications normally.
+8. Deleting a shared message for one user does not remove it for other members.
+9. Private channels retain normal Gotify delete behavior.
+
+### Future container namespace
+
+The project container namespace is reserved as:
 
 ```text
 ghcr.io/gigabytegrove/gotify-mu
 ```
+
+Once automated builds/releases are active, deployment will be able to use published images instead of compiling locally.
 
 ## Upgrading an existing Gotify installation
 
