@@ -81,7 +81,9 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                 control={
                                     <Switch
                                         checked={autoAssign}
-                                        onChange={(event) => void toggleAutoAssign(event.target.checked)}
+                                        onChange={(event) =>
+                                            void toggleAutoAssign(event.target.checked)
+                                        }
                                     />
                                 }
                                 label="Automatically assign this channel to all users"
