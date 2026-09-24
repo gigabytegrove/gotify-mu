@@ -229,14 +229,6 @@ func (d *GormDatabase) SetApplicationMemberPosting(applicationID uint, enabled b
 		Update("allow_member_post", enabled).Error
 }
 
-// SetApplicationMembersCanPost controls whether any channel member may
-// publish using client-token authentication.
-func (d *GormDatabase) SetApplicationMembersCanPost(applicationID uint, enabled bool) error {
-	return d.DB.Model(&model.Application{}).
-		Where("id = ?", applicationID).
-		Update("members_can_post", enabled).Error
-}
-
 func (d *GormDatabase) SetApplicationAutoAssign(applicationID uint, enabled bool) error {
 	return d.DB.Transaction(func(tx *gorm.DB) error {
 		var app model.Application
