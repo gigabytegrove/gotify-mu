@@ -4,7 +4,7 @@ import {action, runInAction} from 'mobx';
 import {BaseStore} from '../common/BaseStore';
 import * as config from '../config';
 import {SnackReporter} from '../snack/SnackManager';
-import {IApplication} from '../types';
+import {IApplication, IApplicationMember, IUser} from '../types';
 import {arrayMove} from '@dnd-kit/sortable';
 
 export class AppStore extends BaseStore<IApplication> {
@@ -97,18 +97,51 @@ export class AppStore extends BaseStore<IApplication> {
     public create = async (
         name: string,
         description: string,
-        defaultPriority: number
+        defaultPriority: number,
+        autoAssign = false
     ): Promise<string> => {
         const response = await axios.post(`${config.get('url')}application`, {
             name,
             description,
             defaultPriority,
+            autoAssign,
         });
         await this.refresh();
-        this.snack('Application created');
+        this.snack('Channel created');
         return response.data.token;
     };
 
+    public getMembers = async (id: number): Promise<IApplicationMember[]> =>
+        axios
+            .get<IApplicationMember[]>(`${config.get('url')}application/${id}/members`)
+            .then((response) => response.data);
+
+    public getAssignableUsers = async (id: number): Promise<IUser[]> =>
+        axios
+            .get<IUser[]>(`${config.get('url')}application/${id}/assignable-users`)
+            .then((response) => response.data);
+
+    public setMember = async (
+        id: number,
+        userId: number,
+        receiveNotifications = true
+    ): Promise<IApplicationMember> =>
+        axios
+            .post<IApplicationMember>(`${config.get('url')}application/${id}/members`, {
+                userId,
+                receiveNotifications,
+            })
+            .then((response) => response.data);
+
+    public removeMember = async (id: number, userId: number): Promise<void> => {
+        await axios.delete(`${config.get('url')}application/${id}/members/${userId}`);
+    };
+
+    public setAutoAssign = async (id: number, enabled: boolean): Promise<void> => {
+        await axios.put(`${config.get('url')}application/${id}/auto-assign`, {enabled});
+        await this.refresh();
+        this.snack(enabled ? 'Channel auto-assignment enabled' : 'Channel auto-assignment disabled');
+    };
     public getName = (id: number): string => {
         const app = this.getByIDOrUndefined(id);
         return id === -1 ? 'All Messages' : app !== undefined ? app.name : 'unknown';
