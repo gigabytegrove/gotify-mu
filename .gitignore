@@ -11,3 +11,5 @@ config.yml
 data/
 images/
 /gotify-server.env
+
+.env
