@@ -39,7 +39,7 @@ export const UpdateApplicationDialog = ({
     };
 
     return (
-        <Dialog open onClose={fClose} fullWidth maxWidth="sm">
+        <Dialog id="app-dialog" open onClose={fClose} fullWidth maxWidth="sm">
             <DialogTitle>Edit Channel</DialogTitle>
             <DialogContent>
                 <DialogContentText sx={{mb: 2}}>
