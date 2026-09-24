@@ -18,7 +18,8 @@ interface IProps {
         name: string,
         description: string,
         defaultPriority: number,
-        autoAssign?: boolean
+        autoAssign?: boolean,
+        allowMemberPost?: boolean
     ) => Promise<string>;
 }
 
@@ -27,11 +28,18 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
     const [description, setDescription] = useState('');
     const [defaultPriority, setDefaultPriority] = useState(0);
     const [autoAssign, setAutoAssign] = useState(false);
+    const [allowMemberPost, setAllowMemberPost] = useState(false);
     const {currentUser} = useStores();
 
     const submitEnabled = name.length !== 0;
     const submitAndNext = async () => {
-        const token = await fOnSubmit(name, description, defaultPriority, autoAssign);
+        const token = await fOnSubmit(
+            name,
+            description,
+            defaultPriority,
+            autoAssign,
+            allowMemberPost
+        );
         fClose(token);
     };
 
@@ -74,15 +82,28 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                     fullWidth
                 />
                 {currentUser.user.admin && (
-                    <FormControlLabel
-                        control={
-                            <Switch
-                                checked={autoAssign}
-                                onChange={(event) => setAutoAssign(event.target.checked)}
-                            />
-                        }
-                        label="Automatically assign this channel to all users"
-                    />
+                    <>
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={autoAssign}
+                                    onChange={(event) => setAutoAssign(event.target.checked)}
+                                />
+                            }
+                            label="Automatically assign this channel to all users"
+                        />
+                        <FormControlLabel
+                            control={
+                                <Switch
+                                    checked={allowMemberPost}
+                                    onChange={(event) =>
+                                        setAllowMemberPost(event.target.checked)
+                                    }
+                                />
+                            }
+                            label="Allow channel members to post (Chat Channel)"
+                        />
+                    </>
                 )}
             </DialogContent>
             <DialogActions>
