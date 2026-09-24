@@ -409,7 +409,11 @@ const Row = ({
                 <IconButton
                     onClick={fDelete}
                     className="delete"
-                    disabled={app.internal || !canManage}>
+                    disabled={
+                        app.internal ||
+                        !canManage ||
+                        (Boolean(app.autoAssign) && !currentUser.user.admin)
+                    }>
                     <Delete />
                 </IconButton>
             </TableCell>
