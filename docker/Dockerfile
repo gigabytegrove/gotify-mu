@@ -54,8 +54,10 @@ RUN cd /src/gotify && \
 
 FROM debian:${DEBIAN}
 
-LABEL org.opencontainers.image.documentation=https://gotify.net/
-LABEL org.opencontainers.image.source=https://github.com/gotify/server
+LABEL org.opencontainers.image.documentation=https://github.com/gigabytegrove/gotify-mu
+LABEL org.opencontainers.image.source=https://github.com/gigabytegrove/gotify-mu
+LABEL org.opencontainers.image.title="Gotify MU"
+LABEL org.opencontainers.image.description="Gotify-compatible multi-user notification server"
 
 # Build-time configurables
 ARG GOTIFY_SERVER_EXPOSE=80
