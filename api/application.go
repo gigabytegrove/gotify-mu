@@ -122,7 +122,6 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			UserID:          auth.GetUserID(ctx),
 			Internal:        false,
 			AutoAssign:      applicationParams.AutoAssign,
-			MembersCanPost:  applicationParams.MembersCanPost,
 			AllowMemberPost: applicationParams.AllowMemberPost,
 		}
 
