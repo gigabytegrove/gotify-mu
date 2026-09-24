@@ -153,7 +153,7 @@ const Row = ({
 }: IRowProps) => (
     <TableRow hover selected={current} aria-current={current ? 'true' : undefined}>
         <TableCell>
-            <strong>{name}</strong>
+            <strong className="name">{name}</strong>
         </TableCell>
         <TableCell>
             <Chip size="small" label={current ? 'Current' : 'Authorized'} variant="outlined" />
