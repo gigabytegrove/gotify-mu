@@ -18,8 +18,12 @@ type Application struct {
 	//
 	// read only: true
 	// example: AWH0wZ5r0Mbac.r
-	Token  string `gorm:"type:varchar(180);uniqueIndex:uix_applications_token" json:"token,omitempty"`
-	UserID uint   `gorm:"index;uniqueIndex:uix_application_user_id_sort_key,priority:1" json:"ownerId"`
+	Token string `gorm:"type:varchar(180);uniqueIndex:uix_applications_token" json:"token,omitempty"`
+	// The canonical owner user id. Gotify MU keeps a single owner for compatibility
+	// while channel memberships grant access to additional users.
+	//
+	// read only: true
+	UserID uint `gorm:"index;uniqueIndex:uix_application_user_id_sort_key,priority:1" json:"ownerId"`
 	// The application name. This is how the application should be displayed to the user.
 	//
 	// required: true
@@ -44,6 +48,8 @@ type Application struct {
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
 	// Whether the current requesting user receives realtime notifications from this application.
 	// This field is populated per request and is not persisted on the application row.
+	//
+	// read only: true
 	ReceiveNotifications *bool `gorm:"-" json:"receiveNotifications,omitempty"`
 	// The image of the application.
 	//
