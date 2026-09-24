@@ -2551,7 +2551,8 @@
           "description": "Whether every user should automatically be a member of this Gotify MU channel.",
           "type": "boolean",
           "x-go-name": "AutoAssign",
-          "readOnly": true
+          "readOnly": true,
+          "example": false
         },
         "createdAt": {
           "description": "The date the application was created.",
