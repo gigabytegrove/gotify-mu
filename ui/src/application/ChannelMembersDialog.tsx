@@ -63,6 +63,11 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
         await load();
     };
 
+    const transferOwnership = async (user: IUser) => {
+        await appStore.transferOwnership(app.id, user.id);
+        handleClose();
+    };
+
     const handleClose = () => {
         elevateStore.cleanupOidcElevate();
         fClose();
@@ -102,12 +107,27 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                     <ListItem
                                         key={user.id}
                                         secondaryAction={
-                                            <Checkbox
-                                                edge="end"
-                                                checked={memberIds.has(user.id)}
-                                                disabled={isOwner || autoAssign || loading}
-                                                onChange={() => void toggleUser(user)}
-                                            />
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    gap: 8,
+                                                }}>
+                                                {!isOwner && member && (
+                                                    <Button
+                                                        size="small"
+                                                        disabled={loading}
+                                                        onClick={() => void transferOwnership(user)}>
+                                                        Make owner
+                                                    </Button>
+                                                )}
+                                                <Checkbox
+                                                    edge="end"
+                                                    checked={memberIds.has(user.id)}
+                                                    disabled={isOwner || autoAssign || loading}
+                                                    onChange={() => void toggleUser(user)}
+                                                />
+                                            </div>
                                         }>
                                         <ListItemText
                                             primary={user.name}
@@ -115,9 +135,13 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                                 isOwner
                                                     ? 'Owner'
                                                     : member?.autoAssigned
-                                                      ? 'Automatically assigned'
+                                                      ? member.receiveNotifications
+                                                          ? 'Automatically assigned'
+                                                          : 'Automatically assigned · Muted'
                                                       : member
-                                                        ? 'Assigned'
+                                                        ? member.receiveNotifications
+                                                            ? 'Assigned'
+                                                            : 'Assigned · Muted'
                                                         : 'Not assigned'
                                             }
                                         />
