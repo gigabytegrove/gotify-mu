@@ -27,6 +27,7 @@ import {Link, useLocation} from 'react-router';
 import {observer} from 'mobx-react-lite';
 import {mayAllowPermission, requestPermission} from '../snack/browserNotification';
 import {useStores} from '../stores';
+import * as config from '../config';
 
 export const navigationWidth = 276;
 
@@ -144,7 +145,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                                     sx={{borderRadius: 2, my: 0.25}}>
                                     <ListItemAvatar sx={{minWidth: 42}}>
                                         <Avatar
-                                            src={app.image}
+                                            src={config.get('url') + app.image}
                                             variant="rounded"
                                             sx={{width: 30, height: 30}}
                                         />
