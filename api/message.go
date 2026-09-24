@@ -680,7 +680,7 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		}
 
 		if fetchedApp.UserID != userID {
-			if !fetchedApp.MembersCanPost {
+			if !fetchedApp.AllowMemberPost {
 				ctx.AbortWithError(400, errors.New("appid not found"))
 				return
 			}
@@ -707,7 +707,7 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 
 	message.ApplicationID = app.ID
 	if strings.TrimSpace(message.Title) == "" {
-		if postingUser != nil && app.MembersCanPost {
+		if postingUser != nil && app.AllowMemberPost {
 			message.Title = postingUser.Name
 		} else {
 			message.Title = app.Name
@@ -725,8 +725,7 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 
 	msgInternal := toInternalMessage(&message)
 	if postingUser != nil {
-		senderUserID := postingUser.ID
-		msgInternal.SenderUserID = &senderUserID
+		msgInternal.SenderUserID = postingUser.ID
 		msgInternal.SenderName = postingUser.Name
 	}
 	if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
