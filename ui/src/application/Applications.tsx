@@ -278,6 +278,8 @@ const ChannelCard = ({
     return (
         <Box
             ref={setNodeRef}
+            className="channel-card"
+            data-channel-id={app.id}
             sx={{
                 height: '100%',
                 transform: CSS.Transform.toString(transform),
@@ -303,10 +305,11 @@ const ChannelCard = ({
                         />
 
                         <Box sx={{flex: 1, minWidth: 0}}>
-                            <Typography variant="h6" noWrap>
+                            <Typography className="channel-name" variant="h6" noWrap>
                                 {app.name}
                             </Typography>
                             <Typography
+                                className="channel-description"
                                 variant="body2"
                                 color="text.secondary"
                                 sx={{minHeight: 20}}>
@@ -380,18 +383,18 @@ const ChannelCard = ({
                         flexWrap="wrap"
                         useFlexGap>
                         {canManage && (
-                            <Button size="small" startIcon={<Group />} onClick={fOpenMembers}>
+                            <Button className="members" size="small" startIcon={<Group />} onClick={fOpenMembers}>
                                 Members
                             </Button>
                         )}
                         {canManage && (
-                            <Button size="small" startIcon={<Edit />} onClick={fEdit}>
+                            <Button className="edit" size="small" startIcon={<Edit />} onClick={fEdit}>
                                 Edit
                             </Button>
                         )}
                         {canManage && (
                             <Tooltip title="Regenerate publishing token">
-                                <IconButton onClick={fToken} size="small">
+                                <IconButton className="regenerate-token" onClick={fToken} size="small">
                                     <Key />
                                 </IconButton>
                             </Tooltip>
@@ -429,6 +432,7 @@ const ChannelCard = ({
                                 }>
                                 <span>
                                     <IconButton
+                                        className="delete"
                                         onClick={fDelete}
                                         disabled={app.internal || !canDeleteChannel}
                                         size="small">
