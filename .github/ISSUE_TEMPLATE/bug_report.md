@@ -7,9 +7,11 @@ assignees: ''
 
 ---
 
-**Can the issue be reproduced with the latest available release? (y/n)**
+**Can the issue be reproduced with the latest Gotify MU master/release? (y/n)**
 
-**Which one is the environment gotify server is running in?**
+**Does the same issue also reproduce on upstream Gotify? (yes/no/not tested)**
+
+**Which one is the environment Gotify MU server is running in?**
 - [ ] Docker
 - [ ] Linux machine
 - [ ] Windows machine
@@ -20,7 +22,7 @@ assignees: ''
 ```
 </details>
 
-**Do you have an reverse proxy installed in front of gotify server? (Please select None if the problem can be reproduced without the presense of a reverse proxy)**
+**Do you have an reverse proxy installed in front of Gotify MU? (Please select None if the problem can be reproduced without the presense of a reverse proxy)**
 - [ ] None
 - [ ] Nginx
 - [ ] Apache
@@ -34,8 +36,8 @@ assignees: ''
 
 **On which client do you experience problems? (Select as many as you can see)**
 - [ ] WebUI
-- [ ] gotify-cli
-- [ ] Android Client <!-- (Please open the issue in gotify/android instead if it is only related to the android client) -->
+- [ ] Gotify CLI
+- [ ] Official Gotify Android app
 - [ ] 3rd-party API call (Please include your code)
 
 
