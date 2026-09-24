@@ -69,38 +69,10 @@ build-docker-multiarch: require-version
 		--label org.opencontainers.image.revision=$(shell git rev-parse HEAD) \
 		--label org.opencontainers.image.version=$(VERSION) \
 		--label org.opencontainers.image.created=$(shell date -u +%Y-%m-%dT%H:%M:%SZ) \
-		-t gotify/server:latest \
-		-t gotify/server:${VERSION} \
-		-t gotify/server:$(shell echo $(VERSION) | cut -d '.' -f -2) \
-		-t gotify/server:$(shell echo $(VERSION) | cut -d '.' -f -1) \
-	    -t ghcr.io/gotify/server:latest \
-		-t ghcr.io/gotify/server:${VERSION} \
-		-t ghcr.io/gotify/server:$(shell echo $(VERSION) | cut -d '.' -f -2) \
-		-t ghcr.io/gotify/server:$(shell echo $(VERSION) | cut -d '.' -f -1) \
-		-t gotify/server-arm64:latest \
-		-t gotify/server-arm64:${VERSION} \
-		-t gotify/server-arm64:$(shell echo $(VERSION) | cut -d '.' -f -2) \
-		-t gotify/server-arm64:$(shell echo $(VERSION) | cut -d '.' -f -1) \
-		-t ghcr.io/gotify/server-arm64:latest \
-		-t ghcr.io/gotify/server-arm64:${VERSION} \
-		-t ghcr.io/gotify/server-arm64:$(shell echo $(VERSION) | cut -d '.' -f -2) \
-		-t ghcr.io/gotify/server-arm64:$(shell echo $(VERSION) | cut -d '.' -f -1) \
-		-t gotify/server-arm7:latest \
-		-t gotify/server-arm7:${VERSION} \
-		-t gotify/server-arm7:$(shell echo $(VERSION) | cut -d '.' -f -2) \
-		-t gotify/server-arm7:$(shell echo $(VERSION) | cut -d '.' -f -1) \
-		-t ghcr.io/gotify/server-arm7:latest \
-		-t ghcr.io/gotify/server-arm7:${VERSION} \
-		-t ghcr.io/gotify/server-arm7:$(shell echo $(VERSION) | cut -d '.' -f -2) \
-		-t ghcr.io/gotify/server-arm7:$(shell echo $(VERSION) | cut -d '.' -f -1) \
-		-t gotify/server-riscv64:latest \
-		-t gotify/server-riscv64:${VERSION} \
-		-t gotify/server-riscv64:$(shell echo $(VERSION) | cut -d '.' -f -2) \
-		-t gotify/server-riscv64:$(shell echo $(VERSION) | cut -d '.' -f -1) \
-		-t ghcr.io/gotify/server-riscv64:latest \
-		-t ghcr.io/gotify/server-riscv64:${VERSION} \
-		-t ghcr.io/gotify/server-riscv64:$(shell echo $(VERSION) | cut -d '.' -f -2) \
-		-t ghcr.io/gotify/server-riscv64:$(shell echo $(VERSION) | cut -d '.' -f -1) \
+		-t ghcr.io/gigabytegrove/gotify-mu:latest \
+		-t ghcr.io/gigabytegrove/gotify-mu:${VERSION} \
+		-t ghcr.io/gigabytegrove/gotify-mu:$(shell echo $(VERSION) | cut -d '.' -f -2) \
+		-t ghcr.io/gigabytegrove/gotify-mu:$(shell echo $(VERSION) | cut -d '.' -f -1) \
 		--build-arg RUN_TESTS=$(DOCKER_TEST_LEVEL) \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg LD_FLAGS="$$LD_FLAGS" \
@@ -113,17 +85,15 @@ build-docker-multiarch-master:
 		--label org.opencontainers.image.revision=$(shell git rev-parse HEAD) \
 		--label org.opencontainers.image.version=master-$(shell git rev-parse --short HEAD) \
 		--label org.opencontainers.image.created=$(shell date -u +%Y-%m-%dT%H:%M:%SZ) \
-		-t gotify/server:master \
-		-t ghcr.io/gotify/server:master \
+		-t ghcr.io/gigabytegrove/gotify-mu:master \
 		--build-arg RUN_TESTS=$(DOCKER_TEST_LEVEL) \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg LD_FLAGS="-w -s -X main.Version=master-$(shell git rev-parse --short HEAD) -X main.BuildDate=$(shell date "+%F-%T") -X main.Commit=$(shell git rev-parse --verify HEAD) -X main.Mode=prod" \
 		--platform linux/amd64,linux/arm64,linux/386,linux/arm/v7,linux/riscv64 \
 		-f docker/Dockerfile .
-
 build-docker: build-docker-multiarch
 
-_build_within_docker: OUTPUT = gotify-app
+_build_within_docker: OUTPUT = gotify-mu
 _build_within_docker:
 	${DOCKER_GO_BUILD} -o ${OUTPUT}
 
@@ -131,25 +101,25 @@ build-js:
 	(cd ui && yarn build)
 
 build-linux-amd64:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-amd64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-linux-amd64
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-amd64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-amd64
 
 build-linux-386:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-386 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-linux-386
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-386 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-386
 
 build-linux-arm-7:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-arm-7 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-linux-arm-7
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-arm-7 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-arm-7
 
 build-linux-arm64:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-arm64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-linux-arm64
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-arm64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-arm64
 
 build-linux-riscv64:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-riscv64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-linux-riscv64
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-riscv64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-riscv64
 
 build-windows-amd64:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-windows-amd64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-windows-amd64.exe
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-windows-amd64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-windows-amd64.exe
 
 build-windows-386:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-windows-386 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-windows-386.exe
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-windows-386 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-windows-386.exe
 
 build: build-linux-arm-7 build-linux-amd64 build-linux-386 build-linux-arm64 build-linux-riscv64 build-windows-amd64 build-windows-386
 
