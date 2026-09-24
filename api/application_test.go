@@ -87,7 +87,20 @@ func (s *ApplicationSuite) Test_ensureApplicationHasCorrectJsonRepresentation() 
 		SortKey:     "a1",
 		CreatedAt:   testdb.Now,
 	}
-	test.JSONEquals(s.T(), actual, `{"id":1,"token":"Aasdasfgeeg","ownerId":2,"name":"myapp","description":"mydesc", "internal":true, "autoAssign":false, "image":"asd", "defaultPriority":0, "createdAt":"2020-01-01T00:00:00Z", "lastUsed":null, "sortKey":"a1"}`)
+	test.JSONEquals(s.T(), actual, `{"id":1,"token":"Aasdasfgeeg","ownerId":2,"name":"myapp","description":"mydesc", "internal":true, "autoAssign":false, "allowMemberPost":false, "image":"asd", "defaultPriority":0, "createdAt":"2020-01-01T00:00:00Z", "lastUsed":null, "sortKey":"a1"}`)
+}
+
+func (s *ApplicationSuite) Test_CreateApplication_nonAdminCannotCreateChatChannel() {
+	s.db.User(5)
+
+	test.WithUser(s.ctx, 5)
+	s.withJSON(&ApplicationParams{Name: "chat", AllowMemberPost: true})
+	s.a.CreateApplication(s.ctx)
+
+	assert.Equal(s.T(), 403, s.recorder.Code)
+	apps, err := s.db.GetApplicationsByUser(5)
+	require.NoError(s.T(), err)
+	assert.Empty(s.T(), apps)
 }
 
 func (s *ApplicationSuite) Test_CreateApplication_expectBadRequestOnEmptyName() {
