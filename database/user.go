@@ -1,6 +1,8 @@
 package database
 
 import (
+	"fmt"
+
 	"github.com/gotify/server/v3/model"
 	"gorm.io/gorm"
 )
@@ -66,9 +68,27 @@ func (d *GormDatabase) GetUsers() ([]*model.User, error) {
 
 // DeleteUserByID deletes a user by its id.
 func (d *GormDatabase) DeleteUserByID(id uint) error {
-	apps, _ := d.GetApplicationsByUser(id)
+	apps, err := d.GetApplicationsByUser(id)
+	if err != nil {
+		return err
+	}
 	for _, app := range apps {
-		d.DeleteApplicationByID(app.ID)
+		memberCount, err := d.CountApplicationMemberships(app.ID)
+		if err != nil {
+			return err
+		}
+		if memberCount > 1 {
+			return fmt.Errorf(
+				"cannot delete user %d: shared channel %q must be transferred first",
+				id,
+				app.Name,
+			)
+		}
+	}
+	for _, app := range apps {
+		if err := d.DeleteApplicationByID(app.ID); err != nil {
+			return err
+		}
 	}
 	clients, _ := d.GetClientsByUser(id)
 	for _, client := range clients {
