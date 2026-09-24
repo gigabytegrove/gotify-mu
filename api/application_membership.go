@@ -20,6 +20,7 @@ type ApplicationMembershipDatabase interface {
 	SetApplicationAutoAssign(applicationID uint, enabled bool) error
 	SetApplicationMembershipNotifications(applicationID, userID uint, enabled bool) error
 	TransferApplicationOwnership(applicationID, newOwnerID uint) error
+	SetApplicationMemberPosting(applicationID uint, enabled bool) error
 }
 
 type ApplicationMembershipAPI struct {
@@ -49,6 +50,10 @@ type ApplicationNotificationParams struct {
 
 type ApplicationOwnerParams struct {
 	UserID uint `json:"userId" binding:"required"`
+}
+
+type ApplicationMemberPostingParams struct {
+	Enabled bool `json:"enabled"`
 }
 
 func (a *ApplicationMembershipAPI) authorizeOwnerOrAdmin(
@@ -355,6 +360,43 @@ func (a *ApplicationMembershipAPI) TransferOwnership(ctx *gin.Context) {
 			ctx,
 			http.StatusInternalServerError,
 			a.DB.TransferApplicationOwnership(id, params.UserID),
+		); !success {
+			return
+		}
+		ctx.JSON(http.StatusOK, params)
+	})
+}
+
+func (a *ApplicationMembershipAPI) SetMemberPosting(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		current, err := a.DB.GetUserByID(auth.GetUserID(ctx))
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if app == nil || current == nil || !current.Admin {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist"))
+			return
+		}
+		if app.Internal {
+			ctx.AbortWithError(
+				http.StatusBadRequest,
+				errors.New("internal applications cannot enable member posting"),
+			)
+			return
+		}
+
+		params := ApplicationMemberPostingParams{}
+		if err := ctx.Bind(&params); err != nil {
+			return
+		}
+		if success := successOrAbort(
+			ctx,
+			http.StatusInternalServerError,
+			a.DB.SetApplicationMemberPosting(id, params.Enabled),
 		); !success {
 			return
 		}
