@@ -39,14 +39,16 @@ interface Msg {
 }
 
 const navigate = async (appName: string) => {
-    await clickByText(page, 'a', appName);
-    await waitForExists(page, selector.heading(), appName);
+    const label = appName === 'All Messages' ? 'Messages' : appName;
+    await clickByText(page, 'a', label);
+    await waitForExists(page, selector.heading(), label);
 };
 
 describe('Messages', () => {
     it('does login', async () => await auth.login(page));
-    it('is on messages', async () => {
-        await waitForExists(page, selector.heading(), 'All Messages');
+    it('navigates to messages', async () => {
+        await page.click('#navigate-messages');
+        await waitForExists(page, selector.heading(), 'Messages');
     });
     it('has url', async () => {
         expect(page.url()).toContain('/');
