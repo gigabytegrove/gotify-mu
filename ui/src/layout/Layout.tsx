@@ -1,14 +1,11 @@
 import {
-    createTheme,
-    ThemeProvider,
-    StyledEngineProvider,
-    Theme,
-    useMediaQuery,
-    Paper,
     Box,
+    CssBaseline,
+    Paper,
+    StyledEngineProvider,
+    ThemeProvider,
+    useMediaQuery,
 } from '@mui/material';
-import {makeStyles} from 'tss-react/mui';
-import CssBaseline from '@mui/material/CssBaseline';
 import * as React from 'react';
 import {HashRouter, Navigate, Route, Routes} from 'react-router';
 import Header from './Header';
@@ -16,6 +13,7 @@ import Navigation from './Navigation';
 import ScrollUpButton from '../common/ScrollUpButton';
 import ElevationForm from '../common/ElevationForm';
 import * as config from '../config';
+import Dashboard from '../dashboard/Dashboard';
 import Applications from '../application/Applications';
 import Clients from '../client/Clients';
 import Plugins from '../plugin/Plugins';
@@ -28,21 +26,8 @@ import {ConnectionErrorBanner} from '../common/ConnectionErrorBanner';
 import {useStores} from '../stores';
 import {SnackbarProvider} from 'notistack';
 import LoadingSpinner from '../common/LoadingSpinner';
-import {isThemeKey, ThemeKey} from './theme';
+import {createGotifyMuTheme, isThemeKey, ThemeKey} from './theme';
 import DefaultPage from '../common/DefaultPage';
-
-const useStyles = makeStyles()((theme: Theme) => ({
-    content: {
-        margin: '0 auto',
-        marginTop: 64,
-        padding: theme.spacing(3),
-        width: '100%',
-        [theme.breakpoints.down('sm')]: {
-            marginTop: 0,
-            padding: theme.spacing(1),
-        },
-    },
-}));
 
 const localStorageThemeKey = 'gotify-theme';
 
@@ -58,22 +43,14 @@ const Layout = observer(() => {
             refreshKey,
         },
     } = useStores();
-    const {classes} = useStyles();
+
     const [currentTheme, setCurrentTheme] = React.useState<ThemeKey>(() => {
         const stored = window.localStorage.getItem(localStorageThemeKey);
         return isThemeKey(stored) ? stored : 'system';
     });
     const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
     const paletteMode = currentTheme === 'system' ? (prefersDark ? 'dark' : 'light') : currentTheme;
-    const theme = React.useMemo(
-        () =>
-            createTheme({
-                palette: {
-                    mode: paletteMode,
-                },
-            }),
-        [paletteMode]
-    );
+    const theme = React.useMemo(() => createGotifyMuTheme(paletteMode), [paletteMode]);
     const {version} = config.get('version');
     const [navOpen, setNavOpen] = React.useState(false);
 
@@ -94,76 +71,87 @@ const Layout = observer(() => {
         <StyledEngineProvider injectFirst>
             <ThemeProvider theme={theme}>
                 <HashRouter>
-                    {/* This forces all components to fully rerender including useEffects.
-                        The refreshKey is updated when store data was cleaned and pages should refetch their data. */}
+                    <CssBaseline />
                     <div key={refreshKey}>
-                        {!connectionErrorMessage ? null : (
+                        {connectionErrorMessage && (
                             <ConnectionErrorBanner
                                 height={64}
                                 retry={() => tryReconnect()}
                                 message={connectionErrorMessage}
                             />
                         )}
-                        <div style={{display: 'flex', flexDirection: 'column'}}>
-                            <CssBaseline />
-                            <Header
-                                admin={admin}
-                                name={name}
-                                style={{top: !connectionErrorMessage ? 0 : 64}}
-                                version={version}
-                                loggedIn={loggedIn}
-                                logout={logout}
-                                setNavOpen={setNavOpen}
-                            />
-                            <div style={{display: 'flex'}}>
+
+                        <Header
+                            admin={admin}
+                            name={name}
+                            style={{top: 0}}
+                            version={version}
+                            loggedIn={loggedIn}
+                            logout={logout}
+                            setNavOpen={setNavOpen}
+                        />
+
+                        <Box sx={{display: 'flex', minHeight: 'calc(100vh - 64px)'}}>
+                            {loggedIn && (
                                 <Navigation
                                     loggedIn={loggedIn}
                                     navOpen={navOpen}
                                     setNavOpen={setNavOpen}
                                 />
-                                <main className={classes.content}>
-                                    <Routes>
-                                        <Route path="/login" element={<Login />} />
-                                        <Route path="/" element={authed(<Messages />)} />
-                                        <Route
-                                            path="/messages/:id"
-                                            element={authed(<Messages />)}
-                                        />
-                                        <Route
-                                            path="/applications"
-                                            element={authed(<Applications />)}
-                                        />
-                                        <Route path="/clients" element={authed(<Clients />)} />
-                                        <Route
-                                            path="/users"
-                                            element={authed(elevated(<Users />))}
-                                        />
-                                        <Route
-                                            path="/settings"
-                                            element={authed(
-                                                <Settings
-                                                    themeMode={currentTheme}
-                                                    setTheme={setTheme}
-                                                />
-                                            )}
-                                        />
-                                        <Route path="/plugins" element={authed(<Plugins />)} />
-                                        <Route
-                                            path="/plugins/:id"
-                                            element={authed(
-                                                <Lazy
-                                                    component={() =>
-                                                        import('../plugin/PluginDetailView')
-                                                    }
-                                                />
-                                            )}
-                                        />
-                                    </Routes>
-                                </main>
-                            </div>
-                            <ScrollUpButton />
-                            <SnackbarProvider />
-                        </div>
+                            )}
+
+                            <Box
+                                component="main"
+                                sx={{
+                                    flex: 1,
+                                    minWidth: 0,
+                                    px: {xs: 1.5, sm: 2.5, lg: 4},
+                                    py: {xs: 2, sm: 3.5},
+                                    overflowX: 'hidden',
+                                }}>
+                                <Routes>
+                                    <Route path="/login" element={<Login />} />
+                                    <Route path="/" element={authed(<Dashboard />)} />
+                                    <Route path="/messages" element={authed(<Messages />)} />
+                                    <Route
+                                        path="/messages/:id"
+                                        element={authed(<Messages />)}
+                                    />
+                                    <Route
+                                        path="/applications"
+                                        element={authed(<Applications />)}
+                                    />
+                                    <Route path="/clients" element={authed(<Clients />)} />
+                                    <Route
+                                        path="/users"
+                                        element={authed(elevated(<Users />))}
+                                    />
+                                    <Route
+                                        path="/settings"
+                                        element={authed(
+                                            <Settings
+                                                themeMode={currentTheme}
+                                                setTheme={setTheme}
+                                            />
+                                        )}
+                                    />
+                                    <Route path="/plugins" element={authed(<Plugins />)} />
+                                    <Route
+                                        path="/plugins/:id"
+                                        element={authed(
+                                            <Lazy
+                                                component={() =>
+                                                    import('../plugin/PluginDetailView')
+                                                }
+                                            />
+                                        )}
+                                    />
+                                </Routes>
+                            </Box>
+                        </Box>
+
+                        <ScrollUpButton />
+                        <SnackbarProvider />
                     </div>
                 </HashRouter>
             </ThemeProvider>
@@ -202,11 +190,12 @@ export const RequireElevation = observer(({children}: React.PropsWithChildren) =
     }
 
     return (
-        <DefaultPage title="Authentication Required" maxWidth={400}>
-            <Paper elevation={6}>
-                <Box sx={{padding: 2}}>
-                    <ElevationForm />
-                </Box>
+        <DefaultPage
+            title="Authentication Required"
+            description="Confirm your identity before accessing this administrative area."
+            maxWidth={520}>
+            <Paper variant="outlined" sx={{p: 2.5, borderRadius: 3}}>
+                <ElevationForm />
             </Paper>
         </DefaultPage>
     );

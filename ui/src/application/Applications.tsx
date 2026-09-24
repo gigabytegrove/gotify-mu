@@ -1,13 +1,16 @@
 import React, {ChangeEvent, useEffect, useRef, useState} from 'react';
+import {
+    Avatar,
+    Box,
+    Button,
+    Chip,
+    Grid,
+    IconButton,
+    Stack,
+    Tooltip,
+    Typography,
+} from '@mui/material';
 import Key from '@mui/icons-material/Key';
-import Grid from '@mui/material/Grid';
-import IconButton from '@mui/material/IconButton';
-import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
 import Delete from '@mui/icons-material/Delete';
 import Edit from '@mui/icons-material/Edit';
 import Group from '@mui/icons-material/Group';
@@ -15,8 +18,10 @@ import NotificationsActive from '@mui/icons-material/NotificationsActive';
 import NotificationsOff from '@mui/icons-material/NotificationsOff';
 import DeleteSweep from '@mui/icons-material/DeleteSweep';
 import CloudUpload from '@mui/icons-material/CloudUpload';
+import ImageNotSupported from '@mui/icons-material/ImageNotSupported';
 import DragIndicator from '@mui/icons-material/DragIndicator';
-import Button from '@mui/material/Button';
+import Public from '@mui/icons-material/Public';
+import Forum from '@mui/icons-material/Forum';
 import {
     DndContext,
     closestCenter,
@@ -26,11 +31,12 @@ import {
     useSensors,
     DragEndEvent,
 } from '@dnd-kit/core';
-import {SortableContext, useSortable, verticalListSortingStrategy} from '@dnd-kit/sortable';
+import {SortableContext, useSortable, rectSortingStrategy} from '@dnd-kit/sortable';
 import {CSS} from '@dnd-kit/utilities';
 
 import ConfirmDialog from '../common/ConfirmDialog';
 import DefaultPage from '../common/DefaultPage';
+import SurfaceCard from '../common/SurfaceCard';
 import {AddApplicationDialog} from './AddApplicationDialog';
 import * as config from '../config';
 import {UpdateApplicationDialog} from './UpdateApplicationDialog';
@@ -39,31 +45,8 @@ import {LastUsedCell} from '../common/LastUsedCell';
 import {formatDate} from '../common/TimeAgoFormatter';
 import {useStores} from '../stores';
 import {observer} from 'mobx-react-lite';
-import {makeStyles} from 'tss-react/mui';
-import {ButtonBase, Tooltip} from '@mui/material';
 import {TokenConfirmDialog} from '../common/TokenConfirmDialog';
 import ChannelMembersDialog from './ChannelMembersDialog';
-
-const useStyles = makeStyles()((theme) => ({
-    imageContainer: {
-        '&::after': {
-            content: '"×"',
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            width: 40,
-            height: 40,
-            background: theme.palette.error.main,
-            color: theme.palette.getContrastText(theme.palette.error.main),
-            fontSize: 40,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            opacity: 0,
-        },
-        '&:hover::after': {opacity: 1},
-    },
-}));
 
 const Applications = observer(() => {
     const {appStore, currentUser} = useStores();
@@ -72,8 +55,8 @@ const Applications = observer(() => {
     const [toDeleteImage, setToDeleteImage] = useState<IApplication>();
     const [toUpdateApp, setToUpdateApp] = useState<IApplication>();
     const [toRegenerateTokenApp, setToRegenerateTokenApp] = useState<IApplication>();
-    const [toShowToken, setToShowToken] = useState<string>('');
-    const [createDialog, setCreateDialog] = useState<boolean>(false);
+    const [toShowToken, setToShowToken] = useState('');
+    const [createDialog, setCreateDialog] = useState(false);
     const [toManageMembersApp, setToManageMembersApp] = useState<IApplication>();
     const [toClearHistoryApp, setToClearHistoryApp] = useState<IApplication>();
 
@@ -84,119 +67,103 @@ const Applications = observer(() => {
 
     useEffect(() => void appStore.refresh(), []);
 
-    const validExtensions = ['.gif', '.png', '.jpg', '.jpeg'];
-
     const handleImageUploadClick = (id: number) => {
         uploadId.current = id;
-        if (fileInputRef.current) {
-            fileInputRef.current.click();
-        }
+        fileInputRef.current?.click();
     };
 
-    const onUploadImage = (e: ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (!file) {
-            return;
-        }
-        appStore.uploadImage(uploadId.current, file);
+    const onUploadImage = (event: ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        void appStore.uploadImage(uploadId.current, file);
+        event.target.value = '';
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
         const {active, over} = event;
-
         if (over && active.id !== over.id) {
-            appStore.reorder(active.id as number, over.id as number);
+            void appStore.reorder(active.id as number, over.id as number);
         }
     };
 
     return (
         <DefaultPage
             title="Channels"
+            description="Create shared notification destinations, control membership, and manage delivery."
             rightControl={
-                <Button
-                    id="create-app"
-                    variant="contained"
-                    color="primary"
-                    onClick={() => {
-                        setCreateDialog(true);
-                    }}>
+                <Button variant="contained" id="create-app" onClick={() => setCreateDialog(true)}>
                     Create Channel
                 </Button>
-            }
-            maxWidth={1000}>
-            <Grid size={12}>
-                <Paper elevation={6} style={{overflowX: 'auto'}}>
-                    <DndContext
-                        sensors={sensors}
-                        collisionDetection={closestCenter}
-                        onDragEnd={handleDragEnd}>
-                        <Table id="app-table">
-                            <TableHead>
-                                <TableRow>
-                                    <TableCell padding="none" style={{width: 0}} />
-                                    <TableCell padding="checkbox" style={{width: 80}} />
-                                    <TableCell>Name</TableCell>
-                                    <TableCell>Description</TableCell>
-                                    <TableCell>Priority</TableCell>
-                                    <TableCell>Last Used</TableCell>
-                                    <TableCell>Created</TableCell>
-                                    <TableCell />
-                                    <TableCell />
-                                    <TableCell />
-                                    <TableCell />
-                                    <TableCell />
-                                    <TableCell />
-                                </TableRow>
-                            </TableHead>
-                            <SortableContext items={apps} strategy={verticalListSortingStrategy}>
-                                <TableBody>
-                                    {apps.map((app: IApplication) => (
-                                        <Row
-                                            key={app.id}
+            }>
+            {apps.length === 0 ? (
+                <SurfaceCard>
+                    <Stack spacing={1} alignItems="flex-start">
+                        <Typography variant="h6">No Channels yet</Typography>
+                        <Typography color="text.secondary">
+                            Create a Channel to start receiving notifications.
+                        </Typography>
+                        <Button variant="contained" onClick={() => setCreateDialog(true)}>
+                            Create Channel
+                        </Button>
+                    </Stack>
+                </SurfaceCard>
+            ) : (
+                <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}>
+                    <SortableContext items={apps.map((app) => app.id)} strategy={rectSortingStrategy}>
+                        <Grid container spacing={2}>
+                            {apps.map((app) => {
+                                const canManage =
+                                    currentUser.user.admin || app.ownerId === currentUser.user.id;
+                                const canDeleteChannel =
+                                    currentUser.user.admin || !Boolean(app.autoAssign);
+                                const canClearHistory =
+                                    currentUser.user.admin ||
+                                    (!app.autoAssign && app.ownerId === currentUser.user.id);
+
+                                return (
+                                    <Grid key={app.id} size={{xs: 12, lg: 6}}>
+                                        <ChannelCard
                                             app={app}
-                                            fRegenerateToken={() => setToRegenerateTokenApp(app)}
+                                            canManage={canManage}
+                                            canDeleteChannel={canDeleteChannel}
+                                            canClearHistory={canClearHistory}
+                                            fOpenMembers={() => setToManageMembersApp(app)}
+                                            fEdit={() => setToUpdateApp(app)}
+                                            fToken={() => setToRegenerateTokenApp(app)}
                                             fUpload={() => handleImageUploadClick(app.id)}
                                             fDeleteImage={() => setToDeleteImage(app)}
                                             fDelete={() => setToDeleteApp(app)}
-                                            fEdit={() => setToUpdateApp(app)}
-                                            fMembers={() => setToManageMembersApp(app)}
+                                            fClearHistory={() => setToClearHistoryApp(app)}
                                             fToggleNotifications={() =>
                                                 void appStore.setNotifications(
                                                     app.id,
                                                     app.receiveNotifications === false
                                                 )
                                             }
-                                            fClearHistory={() => setToClearHistoryApp(app)}
-                                            canManage={
-                                                currentUser.user.admin ||
-                                                app.ownerId === currentUser.user.id
-                                            }
-                                            canDeleteChannel={
-                                                currentUser.user.admin || !app.autoAssign
-                                            }
-                                            canClearHistory={
-                                                currentUser.user.admin ||
-                                                (!app.autoAssign &&
-                                                    app.ownerId === currentUser.user.id)
-                                            }
                                         />
-                                    ))}
-                                </TableBody>
-                            </SortableContext>
-                        </Table>
-                    </DndContext>
-                    <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept={validExtensions.join(',')}
-                        style={{display: 'none'}}
-                        onChange={onUploadImage}
-                    />
-                </Paper>
-            </Grid>
+                                    </Grid>
+                                );
+                            })}
+                        </Grid>
+                    </SortableContext>
+                </DndContext>
+            )}
+
+            <input
+                ref={fileInputRef}
+                type="file"
+                accept=".gif,.png,.jpg,.jpeg"
+                style={{display: 'none'}}
+                onChange={onUploadImage}
+            />
+
             {toShowToken && (
                 <TokenConfirmDialog token={toShowToken} fClose={() => setToShowToken('')} />
             )}
+
             {createDialog && (
                 <AddApplicationDialog
                     fClose={(token) => {
@@ -206,25 +173,23 @@ const Applications = observer(() => {
                     fOnSubmit={appStore.create}
                 />
             )}
-            {toUpdateApp != null && (
+
+            {toUpdateApp && (
                 <UpdateApplicationDialog
                     fClose={() => setToUpdateApp(undefined)}
                     fOnSubmit={(name, description, defaultPriority) =>
                         appStore.update({...toUpdateApp, name, description, defaultPriority})
                     }
-                    initialDescription={toUpdateApp?.description}
-                    initialName={toUpdateApp?.name}
-                    initialDefaultPriority={toUpdateApp?.defaultPriority}
+                    initialDescription={toUpdateApp.description}
+                    initialName={toUpdateApp.name}
+                    initialDefaultPriority={toUpdateApp.defaultPriority}
                 />
             )}
-            {toRegenerateTokenApp != null && (
+
+            {toRegenerateTokenApp && (
                 <ConfirmDialog
-                    title="Confirm Token Regeneration"
-                    text={
-                        'Regenerate token for ' +
-                        toRegenerateTokenApp.name +
-                        '? The current token will be invalidated.'
-                    }
+                    title="Regenerate Channel Token"
+                    text={`Regenerate the publishing token for ${toRegenerateTokenApp.name}? Existing integrations using the current token will stop working.`}
                     fClose={() => setToRegenerateTokenApp(undefined)}
                     fOnSubmit={() =>
                         appStore.regenerateToken(toRegenerateTokenApp.id).then((token) => {
@@ -234,38 +199,38 @@ const Applications = observer(() => {
                     requireElevated
                 />
             )}
-            {toDeleteApp != null && (
+
+            {toDeleteApp && (
                 <ConfirmDialog
-                    title="Confirm Delete"
-                    text={'Delete ' + toDeleteApp.name + '?'}
+                    title="Delete Channel"
+                    text={`Delete ${toDeleteApp.name}? The Channel and its stored messages will be removed.`}
                     fClose={() => setToDeleteApp(undefined)}
                     fOnSubmit={() => appStore.remove(toDeleteApp.id)}
                     requireElevated
                 />
             )}
-            {toManageMembersApp != null && (
+
+            {toManageMembersApp && (
                 <ChannelMembersDialog
                     app={toManageMembersApp}
                     fClose={() => setToManageMembersApp(undefined)}
                 />
             )}
-            {toClearHistoryApp != null && (
+
+            {toClearHistoryApp && (
                 <ConfirmDialog
-                    title="Clear Channel History For Everyone"
-                    text={
-                        'Permanently delete all messages in ' +
-                        toClearHistoryApp.name +
-                        ' for every channel member? This cannot be undone.'
-                    }
+                    title="Clear History For Everyone"
+                    text={`Permanently delete every message in ${toClearHistoryApp.name} for every member? This cannot be undone.`}
                     fClose={() => setToClearHistoryApp(undefined)}
                     fOnSubmit={() => appStore.clearHistoryForEveryone(toClearHistoryApp.id)}
                     requireElevated
                 />
             )}
-            {toDeleteImage != null && (
+
+            {toDeleteImage && (
                 <ConfirmDialog
-                    title="Confirm Delete Image"
-                    text={'Delete image for ' + toDeleteImage.name + '?'}
+                    title="Remove Channel Image"
+                    text={`Remove the custom image from ${toDeleteImage.name}?`}
                     fClose={() => setToDeleteImage(undefined)}
                     fOnSubmit={() => appStore.deleteImage(toDeleteImage.id)}
                 />
@@ -274,150 +239,212 @@ const Applications = observer(() => {
     );
 });
 
-interface IRowProps {
+interface IChannelCardProps {
     app: IApplication;
-    fRegenerateToken: VoidFunction;
-    fUpload: VoidFunction;
-    fDeleteImage: VoidFunction;
-    fDelete: VoidFunction;
-    fEdit: VoidFunction;
-    fMembers: VoidFunction;
-    fToggleNotifications: VoidFunction;
-    fClearHistory: VoidFunction;
     canManage: boolean;
     canDeleteChannel: boolean;
     canClearHistory: boolean;
+    fOpenMembers: VoidFunction;
+    fEdit: VoidFunction;
+    fToken: VoidFunction;
+    fUpload: VoidFunction;
+    fDeleteImage: VoidFunction;
+    fDelete: VoidFunction;
+    fClearHistory: VoidFunction;
+    fToggleNotifications: VoidFunction;
 }
 
-const Row = ({
+const ChannelCard = ({
     app,
-    fRegenerateToken,
-    fDelete,
-    fUpload,
-    fDeleteImage,
-    fEdit,
-    fMembers,
-    fToggleNotifications,
-    fClearHistory,
     canManage,
     canDeleteChannel,
     canClearHistory,
-}: IRowProps) => {
-    const {classes} = useStyles();
-    const isDefaultImage = app.image === 'static/defaultapp.png';
-
+    fOpenMembers,
+    fEdit,
+    fToken,
+    fUpload,
+    fDeleteImage,
+    fDelete,
+    fClearHistory,
+    fToggleNotifications,
+}: IChannelCardProps) => {
     const {attributes, listeners, setNodeRef, transform, transition, isDragging} = useSortable({
         id: app.id,
         disabled: !canManage,
     });
 
-    const style = {
-        transform: CSS.Transform.toString(transform),
-        transition,
-        opacity: isDragging ? 0.5 : 1,
-        backgroundColor: isDragging ? '#f5f5f5' : 'transparent',
-    };
+    const isDefaultImage = app.image === 'static/defaultapp.png';
 
     return (
-        <TableRow ref={setNodeRef} style={style}>
-            <TableCell padding="none" style={{paddingLeft: 5}}>
-                <div
-                    {...attributes}
-                    {...listeners}
-                    style={{
-                        cursor: 'grab',
-                        display: 'flex',
-                        alignItems: 'center',
-                        touchAction: 'none',
-                    }}>
-                    <DragIndicator style={{color: '#999'}} />
-                </div>
-            </TableCell>
-            <TableCell padding="normal">
-                <div style={{display: 'flex'}}>
-                    <Tooltip title="Delete image" placement="top" arrow>
-                        <ButtonBase
-                            className={classes.imageContainer}
-                            onClick={fDeleteImage}
-                            disabled={isDefaultImage || !canManage}>
-                            <img
-                                src={config.get('url') + app.image}
-                                alt="app logo"
-                                width="40"
-                                height="40"
-                            />
-                        </ButtonBase>
-                    </Tooltip>
-                    <IconButton onClick={fUpload} style={{height: 40}} disabled={!canManage}>
-                        <CloudUpload />
-                    </IconButton>
-                </div>
-            </TableCell>
-            <TableCell>
-                {app.name}
-                {app.autoAssign ? ' · Global' : ''}
-                {app.allowMemberPost ? ' · Chat' : ''}
-            </TableCell>
-            <TableCell>{app.description}</TableCell>
-            <TableCell>{app.defaultPriority}</TableCell>
-            <TableCell>
-                <LastUsedCell lastUsed={app.lastUsed} />
-            </TableCell>
-            <TableCell title={app.createdAt}>{formatDate(app.createdAt)}</TableCell>
-            <TableCell align="right" padding="none">
-                <Tooltip
-                    title={
-                        app.receiveNotifications === false
-                            ? 'Enable notifications'
-                            : 'Mute notifications'
-                    }>
-                    <IconButton onClick={fToggleNotifications} className="toggle-notifications">
-                        {app.receiveNotifications === false ? (
-                            <NotificationsOff />
-                        ) : (
-                            <NotificationsActive />
-                        )}
-                    </IconButton>
-                </Tooltip>
-            </TableCell>
-            <TableCell align="right" padding="none">
-                {canClearHistory && (
-                    <Tooltip title="Clear history for everyone">
-                        <IconButton onClick={fClearHistory} className="clear-history">
-                            <DeleteSweep />
+        <Box
+            ref={setNodeRef}
+            className="channel-card"
+            data-channel-id={app.id}
+            sx={{
+                height: '100%',
+                transform: CSS.Transform.toString(transform),
+                transition,
+                opacity: isDragging ? 0.6 : 1,
+            }}>
+            <SurfaceCard>
+                <Stack spacing={2}>
+                    <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                        <IconButton
+                            {...attributes}
+                            {...listeners}
+                            disabled={!canManage}
+                            aria-label="Reorder Channel"
+                            sx={{cursor: canManage ? 'grab' : 'default', mt: 0.25}}>
+                            <DragIndicator />
                         </IconButton>
-                    </Tooltip>
-                )}
-            </TableCell>
-            <TableCell align="right" padding="none">
-                {canManage && (
-                    <IconButton onClick={fMembers} className="members">
-                        <Group />
-                    </IconButton>
-                )}
-            </TableCell>
-            <TableCell align="right" padding="none">
-                <IconButton
-                    onClick={fRegenerateToken}
-                    className="regenerate-token"
-                    disabled={!canManage}>
-                    <Key />
-                </IconButton>
-            </TableCell>
-            <TableCell align="right" padding="none">
-                <IconButton onClick={fEdit} className="edit" disabled={!canManage}>
-                    <Edit />
-                </IconButton>
-            </TableCell>
-            <TableCell align="right" padding="none">
-                <IconButton
-                    onClick={fDelete}
-                    className="delete"
-                    disabled={app.internal || !canManage || !canDeleteChannel}>
-                    <Delete />
-                </IconButton>
-            </TableCell>
-        </TableRow>
+
+                        <Avatar
+                            src={config.get('url') + app.image}
+                            variant="rounded"
+                            sx={{width: 52, height: 52}}
+                        />
+
+                        <Box sx={{flex: 1, minWidth: 0}}>
+                            <Typography className="channel-name" variant="h6" noWrap>
+                                {app.name}
+                            </Typography>
+                            <Typography
+                                className="channel-description"
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{minHeight: 20}}>
+                                {app.description || 'No description'}
+                            </Typography>
+                            <Stack direction="row" spacing={0.75} flexWrap="wrap" sx={{mt: 1}}>
+                                {app.autoAssign && (
+                                    <Chip
+                                        size="small"
+                                        icon={<Public fontSize="small" />}
+                                        label="Global"
+                                    />
+                                )}
+                                {app.allowMemberPost && (
+                                    <Chip
+                                        size="small"
+                                        icon={<Forum fontSize="small" />}
+                                        label="Chat"
+                                        variant="outlined"
+                                    />
+                                )}
+                                {app.receiveNotifications === false && (
+                                    <Chip size="small" label="Muted" variant="outlined" />
+                                )}
+                            </Stack>
+                        </Box>
+
+                        <Tooltip
+                            title={
+                                app.receiveNotifications === false
+                                    ? 'Enable notifications'
+                                    : 'Mute notifications'
+                            }>
+                            <IconButton onClick={fToggleNotifications}>
+                                {app.receiveNotifications === false ? (
+                                    <NotificationsOff />
+                                ) : (
+                                    <NotificationsActive />
+                                )}
+                            </IconButton>
+                        </Tooltip>
+                    </Stack>
+
+                    <Grid container spacing={1.5}>
+                        <Grid size={{xs: 4}}>
+                            <Typography variant="caption" color="text.secondary">
+                                Priority
+                            </Typography>
+                            <Typography>{app.defaultPriority}</Typography>
+                        </Grid>
+                        <Grid size={{xs: 4}}>
+                            <Typography variant="caption" color="text.secondary">
+                                Last Used
+                            </Typography>
+                            <Box>
+                                <LastUsedCell lastUsed={app.lastUsed} />
+                            </Box>
+                        </Grid>
+                        <Grid size={{xs: 4}}>
+                            <Typography variant="caption" color="text.secondary">
+                                Created
+                            </Typography>
+                            <Typography>{formatDate(app.createdAt)}</Typography>
+                        </Grid>
+                    </Grid>
+
+                    <Stack
+                        direction="row"
+                        spacing={0.75}
+                        alignItems="center"
+                        flexWrap="wrap"
+                        useFlexGap>
+                        {canManage && (
+                            <Button className="members" size="small" startIcon={<Group />} onClick={fOpenMembers}>
+                                Members
+                            </Button>
+                        )}
+                        {canManage && (
+                            <Button className="edit" size="small" startIcon={<Edit />} onClick={fEdit}>
+                                Edit
+                            </Button>
+                        )}
+                        {canManage && (
+                            <Tooltip title="Regenerate publishing token">
+                                <IconButton className="regenerate-token" onClick={fToken} size="small">
+                                    <Key />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        {canManage && (
+                            <Tooltip title="Upload Channel image">
+                                <IconButton onClick={fUpload} size="small">
+                                    <CloudUpload />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        {canManage && !isDefaultImage && (
+                            <Tooltip title="Remove custom Channel image">
+                                <IconButton onClick={fDeleteImage} size="small">
+                                    <ImageNotSupported />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        {canClearHistory && (
+                            <Tooltip title="Clear history for everyone">
+                                <IconButton onClick={fClearHistory} size="small">
+                                    <DeleteSweep />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        {canManage && (
+                            <Box sx={{flex: 1}} />
+                        )}
+                        {canManage && (
+                            <Tooltip
+                                title={
+                                    canDeleteChannel
+                                        ? 'Delete Channel'
+                                        : 'Only an administrator can delete a Global Channel'
+                                }>
+                                <span>
+                                    <IconButton
+                                        className="delete"
+                                        onClick={fDelete}
+                                        disabled={app.internal || !canDeleteChannel}
+                                        size="small">
+                                        <Delete />
+                                    </IconButton>
+                                </span>
+                            </Tooltip>
+                        )}
+                    </Stack>
+                </Stack>
+            </SurfaceCard>
+        </Box>
     );
 };
 

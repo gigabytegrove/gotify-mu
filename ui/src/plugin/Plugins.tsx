@@ -1,15 +1,18 @@
 import React from 'react';
 import {Link} from 'react-router';
-import Grid from '@mui/material/Grid';
-import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
+import {
+    Button,
+    Chip,
+    Switch,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableRow,
+} from '@mui/material';
 import Settings from '@mui/icons-material/Settings';
-import {Switch, Button} from '@mui/material';
 import DefaultPage from '../common/DefaultPage';
+import SurfaceCard from '../common/SurfaceCard';
 import CopyableSecret from '../common/CopyableSecret';
 import {formatDate} from '../common/TimeAgoFormatter';
 import {observer} from 'mobx-react-lite';
@@ -18,77 +21,80 @@ import {useStores} from '../stores';
 
 const Plugins = observer(() => {
     const {pluginStore} = useStores();
+
     React.useEffect(() => void pluginStore.refresh(), []);
+
     const plugins = pluginStore.getItems();
+
     return (
-        <DefaultPage title="Plugins" maxWidth={1000}>
-            <Grid size={{xs: 12}}>
-                <Paper elevation={6} style={{overflowX: 'auto'}}>
-                    <Table id="plugin-table">
-                        <TableHead>
-                            <TableRow>
-                                <TableCell>ID</TableCell>
-                                <TableCell>Enabled</TableCell>
-                                <TableCell>Name</TableCell>
-                                <TableCell>Token</TableCell>
-                                <TableCell>Created</TableCell>
-                                <TableCell>Details</TableCell>
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {plugins.map((plugin: IPlugin) => (
-                                <Row
-                                    key={plugin.token}
-                                    id={plugin.id}
-                                    token={plugin.token}
-                                    name={plugin.name}
-                                    enabled={plugin.enabled}
-                                    createdAt={plugin.createdAt}
-                                    fToggleStatus={() =>
-                                        pluginStore.changeEnabledState(plugin.id, !plugin.enabled)
-                                    }
-                                />
-                            ))}
-                        </TableBody>
-                    </Table>
-                </Paper>
-            </Grid>
+        <DefaultPage
+            title="Plugins"
+            description="Manage server-side Gotify plugins and their configuration.">
+            <SurfaceCard
+                title="Installed Plugins"
+                subtitle={`${plugins.length} plugin${plugins.length === 1 ? '' : 's'} installed`}>
+                <Table id="plugin-table">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>ID</TableCell>
+                            <TableCell>Status</TableCell>
+                            <TableCell>Name</TableCell>
+                            <TableCell>Token</TableCell>
+                            <TableCell>Created</TableCell>
+                            <TableCell align="right">Configuration</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {plugins.map((plugin: IPlugin) => (
+                            <PluginRow
+                                key={plugin.token}
+                                plugin={plugin}
+                                fToggleStatus={() =>
+                                    pluginStore.changeEnabledState(plugin.id, !plugin.enabled)
+                                }
+                            />
+                        ))}
+                    </TableBody>
+                </Table>
+            </SurfaceCard>
         </DefaultPage>
     );
 });
 
-interface IRowProps {
-    id: number;
-    name: string;
-    token: string;
-    enabled: boolean;
-    createdAt: string;
-    fToggleStatus: VoidFunction;
-}
-
-const Row: React.FC<IRowProps> = observer(
-    ({name, id, token, enabled, createdAt, fToggleStatus}) => (
-        <TableRow>
-            <TableCell>{id}</TableCell>
+const PluginRow = observer(
+    ({plugin, fToggleStatus}: {plugin: IPlugin; fToggleStatus: VoidFunction}) => (
+        <TableRow hover>
+            <TableCell>{plugin.id}</TableCell>
             <TableCell>
                 <Switch
-                    checked={enabled}
+                    checked={plugin.enabled}
                     onClick={fToggleStatus}
                     className="switch"
-                    data-enabled={enabled}
+                    data-enabled={plugin.enabled}
+                />
+                <Chip
+                    size="small"
+                    label={plugin.enabled ? 'Enabled' : 'Disabled'}
+                    variant={plugin.enabled ? 'filled' : 'outlined'}
                 />
             </TableCell>
-            <TableCell>{name}</TableCell>
             <TableCell>
-                <CopyableSecret value={token} style={{display: 'flex', alignItems: 'center'}} />
+                <strong>{plugin.name}</strong>
             </TableCell>
-            <TableCell title={createdAt}>{formatDate(createdAt)}</TableCell>
-            <TableCell align="right" padding="none">
-                <Link to={'/plugins/' + id}>
-                    <Button>
-                        <Settings />
-                    </Button>
-                </Link>
+            <TableCell>
+                <CopyableSecret
+                    value={plugin.token}
+                    style={{display: 'flex', alignItems: 'center'}}
+                />
+            </TableCell>
+            <TableCell title={plugin.createdAt}>{formatDate(plugin.createdAt)}</TableCell>
+            <TableCell align="right">
+                <Button
+                    component={Link}
+                    to={`/plugins/${plugin.id}`}
+                    startIcon={<Settings />}>
+                    Configure
+                </Button>
             </TableCell>
         </TableRow>
     )

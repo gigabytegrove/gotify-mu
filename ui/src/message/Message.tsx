@@ -1,97 +1,26 @@
-import {Button, Theme, useMediaQuery, useTheme} from '@mui/material';
-import IconButton from '@mui/material/IconButton';
-import {makeStyles} from 'tss-react/mui';
-import Typography from '@mui/material/Typography';
+import React from 'react';
+import {
+    Avatar,
+    Box,
+    Button,
+    IconButton,
+    Paper,
+    Stack,
+    Tooltip,
+    Typography,
+} from '@mui/material';
 import {ExpandLess, ExpandMore} from '@mui/icons-material';
 import Delete from '@mui/icons-material/Delete';
 import Archive from '@mui/icons-material/Archive';
 import Unarchive from '@mui/icons-material/Unarchive';
-import React from 'react';
 import TimeAgo from 'react-timeago';
-import Container from '../common/Container';
 import {Markdown} from '../common/Markdown';
 import * as config from '../config';
 import {IMessageExtras} from '../types';
 import {contentType, RenderMode} from './extras';
 import {TimeAgoFormatter} from '../common/TimeAgoFormatter';
 
-const PREVIEW_LENGTH = 500;
-
-const useStyles = makeStyles()((theme: Theme) => ({
-    header: {
-        display: 'flex',
-        width: '100%',
-        alignItems: 'start',
-        alignContent: 'center',
-        paddingBottom: 5,
-        wordBreak: 'break-all',
-    },
-    headerTitle: {
-        flex: 1,
-    },
-    trash: {
-        marginTop: -15,
-        marginRight: -15,
-    },
-    wrapperPadding: {
-        marginBottom: theme.spacing(2),
-        [theme.breakpoints.down('sm')]: {
-            marginBottom: theme.spacing(1),
-        },
-    },
-    messageContentWrapper: {
-        minWidth: 200,
-        width: '100%',
-    },
-    image: {
-        width: 50,
-        height: 50,
-        [theme.breakpoints.down('md')]: {
-            width: 30,
-            height: 30,
-        },
-    },
-    date: {
-        [theme.breakpoints.down('md')]: {
-            order: 1,
-            flexBasis: '100%',
-            opacity: 0.7,
-        },
-    },
-    imageWrapper: {
-        marginRight: 15,
-        width: 50,
-        height: 50,
-    },
-    plainContent: {
-        whiteSpace: 'pre-wrap',
-    },
-    content: {
-        maxHeight: PREVIEW_LENGTH,
-        wordBreak: 'break-all',
-        overflowY: 'hidden',
-        '&.expanded': {
-            maxHeight: 'none',
-        },
-        '& p': {
-            margin: 0,
-            wordBreak: 'break-word',
-        },
-        '& a': {
-            color: '#ff7f50',
-        },
-        '& pre': {
-            overflow: 'auto',
-            borderRadius: '0.25em',
-            backgroundColor:
-                theme.palette.mode === 'dark' ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)',
-            padding: theme.spacing(1),
-        },
-        '& img': {
-            maxWidth: '100%',
-        },
-    },
-}));
+const PREVIEW_HEIGHT = 360;
 
 interface IProps {
     title: string;
@@ -109,16 +38,6 @@ interface IProps {
     onExpand: (expand: boolean) => void;
 }
 
-const priorityColor = (priority: number) => {
-    if (priority >= 4 && priority <= 7) {
-        return 'rgba(230, 126, 34, 0.7)';
-    } else if (priority > 7) {
-        return '#e74c3c';
-    } else {
-        return 'transparent';
-    }
-};
-
 const Message = ({
     fDelete,
     fArchive,
@@ -134,32 +53,18 @@ const Message = ({
     onExpand,
     expanded: initialExpanded,
 }: IProps) => {
-    const theme = useTheme();
     const contentRef = React.useRef<HTMLDivElement | null>(null);
-    const {classes} = useStyles();
     const [expanded, setExpanded] = React.useState(initialExpanded);
     const [isOverflowing, setOverflowing] = React.useState(false);
-    const smallHeader = useMediaQuery(theme.breakpoints.down('md'));
 
     const refreshOverflowing = React.useCallback(() => {
         const ref = contentRef.current;
-        if (!ref) {
-            return;
-        }
-        setOverflowing((overflowing) => overflowing || ref.scrollHeight > ref.clientHeight);
-    }, [contentRef, setOverflowing]);
+        if (!ref) return;
+        setOverflowing(ref.scrollHeight > PREVIEW_HEIGHT);
+    }, []);
 
-    const onContentRef = React.useCallback(
-        (ref: HTMLDivElement | null) => {
-            contentRef.current = ref;
-            refreshOverflowing();
-        },
-        [contentRef, refreshOverflowing]
-    );
-
-    React.useEffect(() => void onExpand(expanded), [expanded]);
-
-    const togglePreviewHeight = () => setExpanded((b) => !b);
+    React.useEffect(() => void onExpand(expanded), [expanded, onExpand]);
+    React.useEffect(() => refreshOverflowing(), [content, refreshOverflowing]);
 
     const renderContent = () => {
         switch (contentType(extras)) {
@@ -167,187 +72,100 @@ const Message = ({
                 return <Markdown onImageLoaded={refreshOverflowing}>{content}</Markdown>;
             case RenderMode.Plain:
             default:
-                return <span className={classes.plainContent}>{content}</span>;
+                return <Box sx={{whiteSpace: 'pre-wrap'}}>{content}</Box>;
         }
     };
-    return (
-        <div className={`${classes.wrapperPadding} message`}>
-            <Container
-                style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    borderLeftColor: priorityColor(priority),
-                    borderLeftWidth: 6,
-                    borderLeftStyle: 'solid',
-                }}>
-                {smallHeader ? (
-                    <HeaderSmall
-                        fDelete={fDelete}
-                        fArchive={fArchive}
-                        fRestore={fRestore}
-                        senderName={senderName}
-                        title={title}
-                        appName={appName}
-                        image={image}
-                        date={date}
-                    />
-                ) : (
-                    <HeaderWide
-                        fDelete={fDelete}
-                        fArchive={fArchive}
-                        fRestore={fRestore}
-                        senderName={senderName}
-                        title={title}
-                        appName={appName}
-                        image={image}
-                        date={date}
-                    />
-                )}
-
-                <div className={classes.messageContentWrapper}>
-                    <Typography
-                        component="div"
-                        ref={onContentRef}
-                        className={`${classes.content} content ${
-                            isOverflowing && expanded ? 'expanded' : ''
-                        }`}>
-                        {renderContent()}
-                    </Typography>
-                </div>
-                {isOverflowing && (
-                    <Button
-                        style={{marginTop: 16}}
-                        onClick={togglePreviewHeight}
-                        variant="contained"
-                        color="primary"
-                        size="large"
-                        fullWidth={true}
-                        startIcon={expanded ? <ExpandLess /> : <ExpandMore />}>
-                        {expanded ? 'Read Less' : 'Read More'}
-                    </Button>
-                )}
-            </Container>
-        </div>
-    );
-};
-
-const HeaderActions = ({
-    fDelete,
-    fArchive,
-    fRestore,
-}: Pick<IProps, 'fDelete' | 'fArchive' | 'fRestore'>) => {
-    const {classes} = useStyles();
 
     return (
-        <div style={{display: 'flex'}}>
-            {fRestore && (
-                <IconButton onClick={fRestore} style={{padding: 14}} size="large">
-                    <Unarchive />
-                </IconButton>
-            )}
-            {fArchive && (
-                <IconButton onClick={fArchive} style={{padding: 14}} size="large">
-                    <Archive />
-                </IconButton>
-            )}
-            {fDelete && (
-                <IconButton
-                    onClick={fDelete}
-                    style={{padding: 14}}
-                    className={`${classes.trash} delete`}
-                    size="large">
-                    <Delete />
-                </IconButton>
-            )}
-        </div>
-    );
-};
-
-const HeaderWide = ({
-    appName,
-    image,
-    date,
-    fDelete,
-    fArchive,
-    fRestore,
-    senderName,
-    title,
-}: Pick<
-    IProps,
-    'appName' | 'image' | 'fDelete' | 'fArchive' | 'fRestore' | 'senderName' | 'date' | 'title'
->) => {
-    const {classes} = useStyles();
-
-    return (
-        <div className={classes.header}>
-            <div className={classes.imageWrapper}>
-                {image ? (
-                    <img
-                        src={config.get('url') + image}
-                        alt={`${appName} logo`}
-                        width="50"
-                        height="50"
-                        className={classes.image}
-                    />
-                ) : null}
-            </div>
-            <div className={classes.headerTitle}>
-                <Typography className="title" variant="h5" sx={{lineHeight: 1.2}}>
-                    {title}
-                </Typography>
-                <Typography variant="subtitle1" sx={{fontSize: 12, opacity: 0.7}}>
-                    {senderName ? `${senderName} · ${appName}` : appName}
-                </Typography>
-            </div>
-            <Typography variant="body1" className={classes.date}>
-                <TimeAgo date={date} formatter={TimeAgoFormatter.narrow} />
-            </Typography>
-            <HeaderActions fDelete={fDelete} fArchive={fArchive} fRestore={fRestore} />
-        </div>
-    );
-};
-
-const HeaderSmall = ({
-    appName,
-    image,
-    date,
-    fDelete,
-    fArchive,
-    fRestore,
-    senderName,
-    title,
-}: Pick<
-    IProps,
-    'appName' | 'image' | 'fDelete' | 'fArchive' | 'fRestore' | 'senderName' | 'date' | 'title'
->) => {
-    const {classes} = useStyles();
-
-    return (
-        <div className={classes.header}>
-            <div className={classes.headerTitle}>
-                <Typography className="title" variant="h5" sx={{lineHeight: 1.2}}>
-                    {title}
-                </Typography>
-                <Typography variant="subtitle1" sx={{fontSize: 12, opacity: 0.7}}>
-                    {senderName ? `${senderName} · ${appName}` : appName}
-                </Typography>
-                <Typography variant="body1" className={classes.date}>
-                    <TimeAgo date={date} formatter={TimeAgoFormatter.long} />
-                </Typography>
-            </div>
-            <div style={{display: 'flex', alignItems: 'end', flexDirection: 'column'}}>
-                <HeaderActions fDelete={fDelete} fArchive={fArchive} fRestore={fRestore} />
-                <div style={{width: 30, height: 30}}>
-                    {image ? (
-                        <img
+        <Paper
+            className="message"
+            variant="outlined"
+            sx={{
+                p: {xs: 1.5, sm: 2},
+                mb: 1.5,
+                borderRadius: 3,
+                borderLeftWidth: 4,
+                borderLeftColor:
+                    priority >= 8 ? 'error.main' : priority >= 4 ? 'warning.main' : 'divider',
+            }}>
+            <Stack spacing={1.5}>
+                <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                    {image && (
+                        <Avatar
                             src={config.get('url') + image}
                             alt={`${appName} logo`}
-                            className={classes.image}
+                            variant="rounded"
+                            sx={{width: 42, height: 42}}
                         />
-                    ) : null}
-                </div>
-            </div>
-        </div>
+                    )}
+
+                    <Box sx={{flex: 1, minWidth: 0}}>
+                        <Typography className="title" variant="h6" sx={{lineHeight: 1.25}}>
+                            {title}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {senderName ? `${senderName} · ${appName}` : appName}
+                            {' · '}
+                            <TimeAgo date={date} formatter={TimeAgoFormatter.long} />
+                        </Typography>
+                    </Box>
+
+                    <Stack direction="row" spacing={0.25}>
+                        {fRestore && (
+                            <Tooltip title="Restore from Archive">
+                                <IconButton onClick={fRestore} size="small">
+                                    <Unarchive />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        {fArchive && (
+                            <Tooltip title="Archive for me">
+                                <IconButton onClick={fArchive} size="small">
+                                    <Archive />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                        {fDelete && (
+                            <Tooltip title="Delete">
+                                <IconButton onClick={fDelete} className="delete" size="small">
+                                    <Delete />
+                                </IconButton>
+                            </Tooltip>
+                        )}
+                    </Stack>
+                </Stack>
+
+                <Box
+                    ref={contentRef}
+                    className="content"
+                    sx={{
+                        maxHeight: expanded ? 'none' : PREVIEW_HEIGHT,
+                        overflow: 'hidden',
+                        wordBreak: 'break-word',
+                        '& p': {my: 0.75},
+                        '& p:first-of-type': {mt: 0},
+                        '& p:last-of-type': {mb: 0},
+                        '& pre': {
+                            overflow: 'auto',
+                            borderRadius: 2,
+                            bgcolor: 'action.hover',
+                            p: 1.5,
+                        },
+                        '& img': {maxWidth: '100%'},
+                    }}>
+                    {renderContent()}
+                </Box>
+
+                {isOverflowing && (
+                    <Button
+                        onClick={() => setExpanded((current) => !current)}
+                        size="small"
+                        startIcon={expanded ? <ExpandLess /> : <ExpandMore />}>
+                        {expanded ? 'Show less' : 'Show full message'}
+                    </Button>
+                )}
+            </Stack>
+        </Paper>
     );
 };
 

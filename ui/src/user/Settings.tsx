@@ -1,16 +1,22 @@
 import React, {useState} from 'react';
-import Button from '@mui/material/Button';
-import FormControl from '@mui/material/FormControl';
-import Grid from '@mui/material/Grid';
-import InputLabel from '@mui/material/InputLabel';
-import MenuItem from '@mui/material/MenuItem';
-import Paper from '@mui/material/Paper';
-import Select from '@mui/material/Select';
-import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
-import Typography from '@mui/material/Typography';
-import {observer} from 'mobx-react-lite';
+import {
+    Alert,
+    Button,
+    Chip,
+    FormControl,
+    InputLabel,
+    MenuItem,
+    Select,
+    Stack,
+    TextField,
+    Tooltip,
+    Typography,
+} from '@mui/material';
+import DarkMode from '@mui/icons-material/DarkMode';
+import Security from '@mui/icons-material/Security';
+import Key from '@mui/icons-material/Key';
 import DefaultPage from '../common/DefaultPage';
+import SurfaceCard from '../common/SurfaceCard';
 import ElevationForm from '../common/ElevationForm';
 import {ThemeKey} from '../layout/theme';
 import {useStores} from '../stores';
@@ -21,40 +27,67 @@ interface IProps {
     setTheme: (theme: ThemeKey) => void;
 }
 
-const Settings = observer(({themeMode, setTheme}: IProps) => {
-    return (
-        <DefaultPage title="Settings" maxWidth={400}>
-            <Grid size={{xs: 12}}>
-                <Paper elevation={6} sx={{padding: 2}}>
-                    <Typography variant="h6" sx={{marginBottom: 2}}>
-                        Appearance
-                    </Typography>
-                    <FormControl fullWidth>
-                        <InputLabel id="theme-select-label">Theme</InputLabel>
-                        <Select
-                            labelId="theme-select-label"
-                            className="theme-select"
-                            label="Theme"
-                            value={themeMode}
-                            onChange={(e) => setTheme(e.target.value)}>
-                            <MenuItem value="light">Light</MenuItem>
-                            <MenuItem value="dark">Dark</MenuItem>
-                            <MenuItem value="system">System</MenuItem>
-                        </Select>
-                    </FormControl>
-                </Paper>
-            </Grid>
-            <Grid size={{xs: 12}}>
-                <Paper elevation={6} sx={{padding: 2}}>
-                    <Typography variant="h6" sx={{marginBottom: 2}}>
-                        Change Password
-                    </Typography>
-                    <ChangePasswordForm />
-                </Paper>
-            </Grid>
-        </DefaultPage>
-    );
-});
+const Settings = ({themeMode, setTheme}: IProps) => (
+    <DefaultPage
+        title="Settings"
+        description="Account preferences, authentication, and server security information."
+        maxWidth={900}>
+        <SurfaceCard
+            title="Appearance"
+            subtitle="Choose how the Gotify MU Web UI is displayed."
+            action={<DarkMode color="action" />}>
+            <FormControl fullWidth>
+                <InputLabel id="theme-select-label">Theme</InputLabel>
+                <Select
+                    labelId="theme-select-label"
+                    className="theme-select"
+                    label="Theme"
+                    value={themeMode}
+                    onChange={(e) => setTheme(e.target.value as ThemeKey)}>
+                    <MenuItem value="light">Light</MenuItem>
+                    <MenuItem value="dark">Dark</MenuItem>
+                    <MenuItem value="system">System</MenuItem>
+                </Select>
+            </FormControl>
+        </SurfaceCard>
+
+        <SurfaceCard
+            title="Account Security"
+            subtitle="Security controls for your local Gotify MU account."
+            action={<Security color="action" />}>
+            <Stack spacing={2}>
+                <Stack
+                    direction={{xs: 'column', sm: 'row'}}
+                    justifyContent="space-between"
+                    spacing={1}>
+                    <Typography>Local password authentication</Typography>
+                    <Chip
+                        size="small"
+                        label={config.get('localAuth') ? 'Enabled' : 'Disabled'}
+                    />
+                </Stack>
+                <Stack
+                    direction={{xs: 'column', sm: 'row'}}
+                    justifyContent="space-between"
+                    spacing={1}>
+                    <Typography>OIDC authentication</Typography>
+                    <Chip size="small" label={config.get('oidc') ? 'Enabled' : 'Disabled'} />
+                </Stack>
+                <Alert severity="info">
+                    MFA/2FA and LDAP/Active Directory authentication are planned security
+                    features. They are not enabled by this UI rewrite.
+                </Alert>
+            </Stack>
+        </SurfaceCard>
+
+        <SurfaceCard
+            title="Change Password"
+            subtitle="Update the password used for local authentication."
+            action={<Key color="action" />}>
+            <ChangePasswordForm />
+        </SurfaceCard>
+    </DefaultPage>
+);
 
 const ChangePasswordForm = () => {
     const [pass, setPass] = useState('');
@@ -67,7 +100,7 @@ const ChangePasswordForm = () => {
     };
 
     if (!localAuthEnabled) {
-        return <Typography>Password login is disabled on this server.</Typography>;
+        return <Typography color="text.secondary">Password login is disabled on this server.</Typography>;
     }
 
     if (!elevateStore.elevated) {
@@ -81,29 +114,28 @@ const ChangePasswordForm = () => {
                 e.preventDefault();
                 submit();
             }}>
-            <TextField
-                className="newpass"
-                margin="dense"
-                type="password"
-                label="New Password *"
-                value={pass}
-                disabled={!localAuthEnabled}
-                onChange={(e) => setPass(e.target.value)}
-                fullWidth
-            />
-            <Tooltip title={pass.length !== 0 ? '' : 'Password is required'}>
-                <div>
-                    <Button
-                        className="change"
-                        type="submit"
-                        disabled={!localAuthEnabled || pass.length === 0}
-                        color="primary"
-                        variant="contained"
-                        fullWidth>
-                        Change
-                    </Button>
-                </div>
-            </Tooltip>
+            <Stack spacing={2}>
+                <TextField
+                    className="newpass"
+                    type="password"
+                    label="New Password"
+                    value={pass}
+                    disabled={!localAuthEnabled}
+                    onChange={(e) => setPass(e.target.value)}
+                    fullWidth
+                />
+                <Tooltip title={pass.length !== 0 ? '' : 'Password is required'}>
+                    <span>
+                        <Button
+                            className="change"
+                            type="submit"
+                            disabled={!localAuthEnabled || pass.length === 0}
+                            variant="contained">
+                            Change Password
+                        </Button>
+                    </span>
+                </Tooltip>
+            </Stack>
         </form>
     );
 };

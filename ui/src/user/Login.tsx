@@ -1,10 +1,14 @@
-import Button from '@mui/material/Button';
-import Divider from '@mui/material/Divider';
-import Grid from '@mui/material/Grid';
-import TextField from '@mui/material/TextField';
 import React from 'react';
-import Container from '../common/Container';
+import {
+    Box,
+    Button,
+    Divider,
+    Stack,
+    TextField,
+    Typography,
+} from '@mui/material';
 import DefaultPage from '../common/DefaultPage';
+import SurfaceCard from '../common/SurfaceCard';
 import * as config from '../config';
 import RegistrationDialog from './Register';
 import {useStores} from '../stores';
@@ -18,6 +22,7 @@ const Login = observer(() => {
     const {currentUser} = useStores();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
+
     const localAuthEnabled = config.get('localAuth');
     const oidcEnabled = config.get('oidc');
     const oidcIdpName = config.get('oidcIdpName');
@@ -27,10 +32,12 @@ const Login = observer(() => {
         config.get('oidcAutoRedirect') &&
         searchParams.get('redirect') !== 'false' &&
         !currentUser.connectionErrorMessage;
+
     const oidcLoginUrl =
         config.get('url') +
         'auth/oidc/login?name=' +
         encodeURIComponent(currentUser.createClientName());
+
     React.useEffect(() => {
         if (currentUser.loggedIn) {
             navigate('/');
@@ -39,89 +46,104 @@ const Login = observer(() => {
         if (!currentUser.authenticating && oidcAutoRedirect) {
             window.location.href = oidcLoginUrl;
         }
-    }, [currentUser.loggedIn, currentUser.authenticating, oidcAutoRedirect]);
+    }, [
+        currentUser.loggedIn,
+        currentUser.authenticating,
+        navigate,
+        oidcAutoRedirect,
+        oidcLoginUrl,
+    ]);
 
-    const registerButton = () => {
-        if (localAuthEnabled && config.get('register'))
-            return (
-                <Button
-                    id="register"
-                    variant="contained"
-                    color="primary"
-                    onClick={() => setRegisterDialog(true)}>
-                    Register
-                </Button>
-            );
-        else return null;
+    const login = (event: React.FormEvent) => {
+        event.preventDefault();
+        void currentUser.login(username, password);
     };
-    const login = (e: React.MouseEvent<HTMLButtonElement>) => {
-        e.preventDefault();
-        currentUser.login(username, password);
-    };
+
     return (
-        <DefaultPage title="Login" rightControl={registerButton()} maxWidth={250}>
-            <Grid size={{xs: 12}} style={{textAlign: 'center'}}>
-                <Container>
+        <DefaultPage title="Sign in" maxWidth={460}>
+            <SurfaceCard>
+                <Stack spacing={2.5}>
+                    <Box sx={{textAlign: 'center'}}>
+                        <Box
+                            component="img"
+                            src={config.get('url') + 'static/gotify-mu-logo.png'}
+                            alt="Gotify MU"
+                            sx={{width: 180, maxWidth: '70%', mb: 1}}
+                        />
+                        <Typography variant="h5">Welcome to Gotify MU</Typography>
+                        <Typography color="text.secondary">
+                            Sign in to access your Channels and notifications.
+                        </Typography>
+                    </Box>
+
                     {localAuthEnabled && (
-                        <form onSubmit={(e) => e.preventDefault()} id="login-form">
-                            <TextField
-                                autoFocus
-                                id="username"
-                                className="name"
-                                label="Username"
-                                name="username"
-                                margin="dense"
-                                autoComplete="username"
-                                value={username}
-                                onChange={(e) => setUsername(e.target.value)}
-                            />
-                            <TextField
-                                id="password"
-                                type="password"
-                                className="password"
-                                label="Password"
-                                name="password"
-                                margin="normal"
-                                autoComplete="current-password"
-                                value={password}
-                                onChange={(e) => setPassword(e.target.value)}
-                            />
-                            <Button
-                                type="submit"
-                                variant="contained"
-                                size="large"
-                                className="login"
-                                color="primary"
-                                disabled={
-                                    !!currentUser.connectionErrorMessage ||
-                                    currentUser.authenticating
-                                }
-                                style={{marginTop: 15, marginBottom: 5}}
-                                loading={currentUser.authenticating}
-                                onClick={login}>
-                                Login
-                            </Button>
-                        </form>
+                        <Box component="form" id="login-form" onSubmit={login}>
+                            <Stack spacing={2}>
+                                <TextField
+                                    autoFocus
+                                    id="username"
+                                    className="name"
+                                    label="Username"
+                                    name="username"
+                                    autoComplete="username"
+                                    value={username}
+                                    onChange={(event) => setUsername(event.target.value)}
+                                    fullWidth
+                                />
+                                <TextField
+                                    id="password"
+                                    type="password"
+                                    className="password"
+                                    label="Password"
+                                    name="password"
+                                    autoComplete="current-password"
+                                    value={password}
+                                    onChange={(event) => setPassword(event.target.value)}
+                                    fullWidth
+                                />
+                                <Button
+                                    type="submit"
+                                    variant="contained"
+                                    size="large"
+                                    className="login"
+                                    disabled={
+                                        Boolean(currentUser.connectionErrorMessage) ||
+                                        currentUser.authenticating
+                                    }
+                                    loading={currentUser.authenticating}
+                                    fullWidth>
+                                    Sign In
+                                </Button>
+                            </Stack>
+                        </Box>
                     )}
+
                     {oidcEnabled && (
                         <>
-                            {localAuthEnabled && (
-                                <Divider style={{marginTop: 15, marginBottom: 15}}>or</Divider>
-                            )}
+                            {localAuthEnabled && <Divider>or</Divider>}
                             <Button
                                 id="oidc-login"
                                 component="a"
                                 href={oidcLoginUrl}
                                 variant="outlined"
                                 size="large"
-                                color="primary"
-                                style={{marginBottom: 5}}>
-                                Login with {oidcIdpName}
+                                fullWidth>
+                                Sign in with {oidcIdpName}
                             </Button>
                         </>
                     )}
-                </Container>
-            </Grid>
+
+                    {localAuthEnabled && config.get('register') && (
+                        <Button
+                            id="register"
+                            onClick={() => setRegisterDialog(true)}
+                            fullWidth>
+                            Create an account
+                        </Button>
+                    )}
+                </Stack>
+            </SurfaceCard>
+
             {registerDialog && (
                 <RegistrationDialog
                     fClose={() => setRegisterDialog(false)}

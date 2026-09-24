@@ -46,9 +46,24 @@ The existing Gotify CLI and API integrations should continue to work against the
 
 ## Web UI
 
-The MU Web UI presents Gotify applications as **Channels** and adds member management and global auto-assignment controls.
+Gotify MU includes a redesigned Web UI built around a consistent multi-user administration model instead of the inherited upstream Gotify screen layout.
+
+The Web UI uses **Channels** as the user-facing term and provides:
+
+- Dashboard overview
+- Unified Messages and per-user Archive views
+- Channel status cards and membership management
+- Global Channel administration
+- User, Client, and Plugin administration
+- Standardized light, dark, and system themes
+- Responsive desktop and mobile-web navigation
+- Consistent dialogs, tables, cards, status indicators, and destructive-action language
 
 The underlying `/application` API naming remains in place to avoid breaking existing clients and integrations.
+
+The official Gotify Android app is not modified by the Web UI rewrite.
+
+Authentication/security work such as MFA/2FA, passkeys, and LDAP/Active Directory is tracked separately in [docs/ROADMAP.md](docs/ROADMAP.md). Those features are planned and are not implied to be active by the redesigned UI.
 
 ### Gotify MU channel-management API
 

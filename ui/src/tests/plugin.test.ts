@@ -56,8 +56,8 @@ const pluginInfo = async (className: string) =>
 const getDisplayer = async () => await innerText(page, '.displayer');
 
 const hasReceivedMessage = async (title: RegExp, content: RegExp) => {
-    await page.click('#message-navigation a');
-    await waitForExists(page, selector.heading(), 'All Messages');
+    await page.click('#navigate-messages');
+    await waitForExists(page, selector.heading(), 'Messages');
     await waitForCount(page, '#messages .message', 1);
 
     expect(await innerText(page, '.title')).toMatch(title);

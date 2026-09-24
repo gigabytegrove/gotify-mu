@@ -1,16 +1,28 @@
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
-import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
-import FormControlLabel from '@mui/material/FormControlLabel';
-import Switch from '@mui/material/Switch';
+import React, {useState} from 'react';
+import {
+    Accordion,
+    AccordionDetails,
+    AccordionSummary,
+    Button,
+    Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    Divider,
+    FormControlLabel,
+    Stack,
+    Switch,
+    TextField,
+    Tooltip,
+    Typography,
+} from '@mui/material';
+import ExpandMore from '@mui/icons-material/ExpandMore';
+import Public from '@mui/icons-material/Public';
+import Science from '@mui/icons-material/Science';
 import {useStores} from '../stores';
 import {NumberField} from '../common/NumberField';
-import React, {useState} from 'react';
 
 interface IProps {
     fClose: (token: string | null) => void;
@@ -31,10 +43,11 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
     const [allowMemberPost, setAllowMemberPost] = useState(false);
     const {currentUser} = useStores();
 
-    const submitEnabled = name.length !== 0;
+    const submitEnabled = name.trim().length !== 0;
+
     const submitAndNext = async () => {
         const token = await fOnSubmit(
-            name,
+            name.trim(),
             description,
             defaultPriority,
             autoAssign,
@@ -45,80 +58,125 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
 
     return (
         <Dialog
-            open={true}
+            id="app-dialog"
+            open
             onClose={() => fClose(null)}
-            aria-labelledby="form-dialog-title"
-            id="app-dialog">
-            <DialogTitle id="form-dialog-title">Create a channel</DialogTitle>
+            fullWidth
+            maxWidth="sm"
+            aria-labelledby="create-channel-title">
+            <DialogTitle id="create-channel-title">Create Channel</DialogTitle>
             <DialogContent>
-                <DialogContentText>
-                    A channel receives messages and can be shared with multiple users.
+                <DialogContentText sx={{mb: 2}}>
+                    Channels are notification destinations. They can stay private, be shared with
+                    selected users, or be made Global by an administrator.
                 </DialogContentText>
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    className="name"
-                    label="Name *"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    fullWidth
-                />
-                <TextField
-                    margin="dense"
-                    className="description"
-                    label="Short Description"
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    fullWidth
-                    multiline
-                />
-                <NumberField
-                    margin="dense"
-                    className="priority"
-                    label="Default Priority"
-                    value={defaultPriority}
-                    onChange={(value) => setDefaultPriority(value)}
-                    fullWidth
-                />
-                {currentUser.user.admin && (
-                    <>
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={autoAssign}
-                                    onChange={(event) => setAutoAssign(event.target.checked)}
-                                />
-                            }
-                            label="Automatically assign this channel to all users"
-                        />
-                        <FormControlLabel
-                            control={
-                                <Switch
-                                    checked={allowMemberPost}
-                                    onChange={(event) =>
-                                        setAllowMemberPost(event.target.checked)
-                                    }
-                                />
-                            }
-                            label="Allow channel members to post (Chat Channel)"
-                        />
-                    </>
-                )}
+
+                <Stack spacing={2}>
+                    <TextField
+                        autoFocus
+                        className="name"
+                        label="Channel name"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        fullWidth
+                        required
+                    />
+                    <TextField
+                        className="description"
+                        label="Description"
+                        value={description}
+                        onChange={(event) => setDescription(event.target.value)}
+                        fullWidth
+                        multiline
+                        minRows={2}
+                    />
+                    <NumberField
+                        className="priority"
+                        label="Default priority"
+                        value={defaultPriority}
+                        onChange={setDefaultPriority}
+                        fullWidth
+                    />
+
+                    {currentUser.user.admin && (
+                        <>
+                            <Divider />
+                            <Stack spacing={0.5}>
+                                <Typography variant="subtitle1" fontWeight={700}>
+                                    Membership
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    Global Channels are automatically assigned to every current and
+                                    future user.
+                                </Typography>
+                            </Stack>
+                            <FormControlLabel
+                                control={
+                                    <Switch
+                                        checked={autoAssign}
+                                        onChange={(event) => setAutoAssign(event.target.checked)}
+                                    />
+                                }
+                                label={
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <span>Global Channel</span>
+                                        <Chip
+                                            size="small"
+                                            icon={<Public fontSize="small" />}
+                                            label="All users"
+                                            variant="outlined"
+                                        />
+                                    </Stack>
+                                }
+                            />
+
+                            <Accordion elevation={0} disableGutters sx={{border: 1, borderColor: 'divider'}}>
+                                <AccordionSummary expandIcon={<ExpandMore />}>
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <Typography fontWeight={600}>Advanced</Typography>
+                                        <Chip
+                                            size="small"
+                                            icon={<Science fontSize="small" />}
+                                            label="Experimental"
+                                            variant="outlined"
+                                        />
+                                    </Stack>
+                                </AccordionSummary>
+                                <AccordionDetails>
+                                    <FormControlLabel
+                                        control={
+                                            <Switch
+                                                checked={allowMemberPost}
+                                                onChange={(event) =>
+                                                    setAllowMemberPost(event.target.checked)
+                                                }
+                                            />
+                                        }
+                                        label="Allow assigned members to post"
+                                    />
+                                    <Typography variant="body2" color="text.secondary">
+                                        Experimental server-side chat capability. Official Gotify
+                                        Android clients can receive these messages but do not
+                                        provide a compose interface.
+                                    </Typography>
+                                </AccordionDetails>
+                            </Accordion>
+                        </>
+                    )}
+                </Stack>
             </DialogContent>
             <DialogActions>
                 <Button onClick={() => fClose(null)}>Cancel</Button>
-                <Tooltip title={submitEnabled ? '' : 'name is required'}>
-                    <div>
+                <Tooltip title={submitEnabled ? '' : 'Channel name is required'}>
+                    <span>
                         <Button
                             className="create"
                             disabled={!submitEnabled}
-                            onClick={submitAndNext}
-                            color="primary"
+                            onClick={() => void submitAndNext()}
                             variant="contained">
-                            Create
+                            Create Channel
                         </Button>
-                    </div>
+                    </span>
                 </Tooltip>
             </DialogActions>
         </Dialog>

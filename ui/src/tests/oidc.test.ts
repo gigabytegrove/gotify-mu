@@ -19,7 +19,7 @@ const createLocalUser = async (url: string, name: string, pass: string): Promise
     );
 
 const loginWithOIDC = async (page: Page, user: DexUser): Promise<void> => {
-    await waitForExists(page, selector.heading(), 'Login');
+    await waitForExists(page, selector.heading(), 'Sign in');
     const href = await page.$eval('#oidc-login', (a) => (a as HTMLAnchorElement).href);
     await page.goto(href);
 
@@ -30,7 +30,7 @@ const loginWithOIDC = async (page: Page, user: DexUser): Promise<void> => {
 };
 
 const expectLoggedIn = async (page: Page): Promise<void> => {
-    await waitForExists(page, selector.heading(), 'All Messages');
+    await waitForExists(page, selector.heading(), 'Dashboard');
 };
 
 const oidcError = async (page: Page): Promise<string> => {

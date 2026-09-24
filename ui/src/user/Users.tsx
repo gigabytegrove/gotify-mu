@@ -1,17 +1,20 @@
-import Grid from '@mui/material/Grid';
-import IconButton from '@mui/material/IconButton';
-import Paper from '@mui/material/Paper';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell from '@mui/material/TableCell';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
+import React from 'react';
+import {
+    Button,
+    Chip,
+    IconButton,
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableRow,
+    Tooltip,
+} from '@mui/material';
 import Delete from '@mui/icons-material/Delete';
 import Edit from '@mui/icons-material/Edit';
-import React from 'react';
 import ConfirmDialog from '../common/ConfirmDialog';
 import DefaultPage from '../common/DefaultPage';
-import Button from '@mui/material/Button';
+import SurfaceCard from '../common/SurfaceCard';
 import AddEditDialog from './AddEditUserDialog';
 import {IUser} from '../types';
 import {useStores} from '../stores';
@@ -27,17 +30,29 @@ interface IRowProps {
 }
 
 const UserRow: React.FC<IRowProps> = ({name, admin, createdAt, fDelete, fEdit}) => (
-    <TableRow>
-        <TableCell>{name}</TableCell>
-        <TableCell>{admin ? 'Yes' : 'No'}</TableCell>
+    <TableRow hover>
+        <TableCell>
+            <strong>{name}</strong>
+        </TableCell>
+        <TableCell>
+            <Chip
+                size="small"
+                variant={admin ? 'filled' : 'outlined'}
+                label={admin ? 'Administrator' : 'User'}
+            />
+        </TableCell>
         <TableCell title={createdAt}>{formatDate(createdAt)}</TableCell>
-        <TableCell align="right" padding="none">
-            <IconButton onClick={fEdit} className="edit" size="large">
-                <Edit />
-            </IconButton>
-            <IconButton onClick={fDelete} className="delete" size="large">
-                <Delete />
-            </IconButton>
+        <TableCell align="right">
+            <Tooltip title="Edit user">
+                <IconButton onClick={fEdit} className="edit">
+                    <Edit />
+                </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete user">
+                <IconButton onClick={fDelete} className="delete">
+                    <Delete />
+                </IconButton>
+            </Tooltip>
         </TableCell>
     </TableRow>
 );
@@ -47,46 +62,50 @@ const Users = observer(() => {
     const [editUser, setEditUser] = React.useState<IUser>();
     const [createDialog, setCreateDialog] = React.useState(false);
     const {userStore} = useStores();
+
     React.useEffect(() => void userStore.refresh(), []);
+
     const users = userStore.getItems();
+
     return (
         <DefaultPage
             title="Users"
+            description="Manage local accounts and administrative access."
             rightControl={
                 <Button
                     id="create-user"
                     variant="contained"
-                    color="primary"
                     onClick={() => setCreateDialog(true)}>
                     Create User
                 </Button>
             }>
-            <Grid size={{xs: 12}}>
-                <Paper elevation={6} style={{overflowX: 'auto'}}>
-                    <Table id="user-table">
-                        <TableHead>
-                            <TableRow style={{textAlign: 'center'}}>
-                                <TableCell>Username</TableCell>
-                                <TableCell>Admin</TableCell>
-                                <TableCell>Created</TableCell>
-                                <TableCell />
-                            </TableRow>
-                        </TableHead>
-                        <TableBody>
-                            {users.map((user: IUser) => (
-                                <UserRow
-                                    key={user.id}
-                                    name={user.name}
-                                    admin={user.admin}
-                                    createdAt={user.createdAt}
-                                    fDelete={() => setDeleteUser(user)}
-                                    fEdit={() => setEditUser(user)}
-                                />
-                            ))}
-                        </TableBody>
-                    </Table>
-                </Paper>
-            </Grid>
+            <SurfaceCard
+                title="Accounts"
+                subtitle={`${users.length} local account${users.length === 1 ? '' : 's'}`}>
+                <Table id="user-table">
+                    <TableHead>
+                        <TableRow>
+                            <TableCell>Username</TableCell>
+                            <TableCell>Role</TableCell>
+                            <TableCell>Created</TableCell>
+                            <TableCell align="right">Actions</TableCell>
+                        </TableRow>
+                    </TableHead>
+                    <TableBody>
+                        {users.map((user: IUser) => (
+                            <UserRow
+                                key={user.id}
+                                name={user.name}
+                                admin={user.admin}
+                                createdAt={user.createdAt}
+                                fDelete={() => setDeleteUser(user)}
+                                fEdit={() => setEditUser(user)}
+                            />
+                        ))}
+                    </TableBody>
+                </Table>
+            </SurfaceCard>
+
             {createDialog && (
                 <AddEditDialog fClose={() => setCreateDialog(false)} fOnSubmit={userStore.create} />
             )}
@@ -101,8 +120,8 @@ const Users = observer(() => {
             )}
             {deleteUser && (
                 <ConfirmDialog
-                    title="Confirm Delete"
-                    text={'Delete ' + deleteUser.name + '?'}
+                    title="Delete User"
+                    text={`Delete ${deleteUser.name}? This cannot be undone.`}
                     fClose={() => setDeleteUser(undefined)}
                     fOnSubmit={() => userStore.remove(deleteUser.id)}
                 />

@@ -1,29 +1,44 @@
-import Grid from '@mui/material/Grid';
+import Box from '@mui/material/Box';
+import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import React, {FC} from 'react';
 
 interface IProps {
     title: string;
+    description?: string;
     rightControl?: React.ReactNode;
     maxWidth?: number;
 }
 
 const DefaultPage: FC<React.PropsWithChildren<IProps>> = ({
     title,
+    description,
     rightControl,
-    maxWidth = 700,
+    maxWidth = 1280,
     children,
 }) => (
-    <main style={{margin: '0 auto', maxWidth}}>
-        <Grid container spacing={4}>
-            <Grid size={{xs: 12}} style={{display: 'flex', flexWrap: 'wrap'}}>
-                <Typography variant="h4" style={{flex: 1, minWidth: 300}}>
-                    {title}
-                </Typography>
-                {rightControl}
-            </Grid>
+    <Box component="main" sx={{width: '100%', maxWidth, mx: 'auto'}}>
+        <Stack spacing={3}>
+            <Stack
+                direction={{xs: 'column', sm: 'row'}}
+                spacing={2}
+                alignItems={{xs: 'stretch', sm: 'center'}}
+                justifyContent="space-between">
+                <Box sx={{minWidth: 0}}>
+                    <Typography variant="h4" component="h1">
+                        {title}
+                    </Typography>
+                    {description && (
+                        <Typography color="text.secondary" sx={{mt: 0.5}}>
+                            {description}
+                        </Typography>
+                    )}
+                </Box>
+                {rightControl && <Box sx={{flexShrink: 0}}>{rightControl}</Box>}
+            </Stack>
             {children}
-        </Grid>
-    </main>
+        </Stack>
+    </Box>
 );
+
 export default DefaultPage;

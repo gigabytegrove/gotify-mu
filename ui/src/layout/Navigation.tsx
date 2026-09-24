@@ -1,40 +1,35 @@
-import Divider from '@mui/material/Divider';
-import Drawer, {DrawerProps} from '@mui/material/Drawer';
-import {Theme} from '@mui/material/styles';
 import React from 'react';
-import {Link} from 'react-router';
+import {
+    Avatar,
+    Box,
+    Button,
+    Divider,
+    Drawer,
+    IconButton,
+    List,
+    ListItemAvatar,
+    ListItemButton,
+    ListItemIcon,
+    ListItemText,
+    Stack,
+    Typography,
+} from '@mui/material';
+import Close from '@mui/icons-material/Close';
+import Dashboard from '@mui/icons-material/Dashboard';
+import Inbox from '@mui/icons-material/Inbox';
+import Forum from '@mui/icons-material/Forum';
+import People from '@mui/icons-material/People';
+import DevicesOther from '@mui/icons-material/DevicesOther';
+import Extension from '@mui/icons-material/Extension';
+import Settings from '@mui/icons-material/Settings';
+import Public from '@mui/icons-material/Public';
+import {Link, useLocation} from 'react-router';
 import {observer} from 'mobx-react-lite';
 import {mayAllowPermission, requestPermission} from '../snack/browserNotification';
-import {
-    Button,
-    IconButton,
-    Typography,
-    ListItemText,
-    ListItemAvatar,
-    Avatar,
-    ListItemButton,
-} from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import {makeStyles} from 'tss-react/mui';
 import {useStores} from '../stores';
+import * as config from '../config';
 
-const useStyles = makeStyles()((theme: Theme) => ({
-    root: {
-        height: '100%',
-    },
-    drawerPaper: {
-        position: 'relative',
-        width: 250,
-        minHeight: '100%',
-        height: '100vh',
-    },
-    // eslint-disable-next-line
-    toolbar: theme.mixins.toolbar as any,
-    link: {
-        color: 'inherit',
-        textDecoration: 'none',
-    },
-}));
+export const navigationWidth = 276;
 
 interface IProps {
     loggedIn: boolean;
@@ -42,92 +37,184 @@ interface IProps {
     setNavOpen: (open: boolean) => void;
 }
 
+interface NavItem {
+    label: string;
+    to: string;
+    icon: React.ReactNode;
+    exact?: boolean;
+    adminOnly?: boolean;
+}
+
 const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
+    const location = useLocation();
+    const {appStore, currentUser} = useStores();
+    const apps = appStore.getItems();
     const [showRequestNotification, setShowRequestNotification] =
         React.useState(mayAllowPermission);
-    const {classes} = useStyles();
-    const {appStore} = useStores();
-    const apps = appStore.getItems();
 
-    const userApps =
-        apps.length === 0
-            ? null
-            : apps.map((app) => (
-                  <Link
-                      onClick={() => setNavOpen(false)}
-                      className={`${classes.link} item`}
-                      to={'/messages/' + app.id}
-                      key={app.id}>
-                      <ListItemButton>
-                          <ListItemAvatar style={{minWidth: 42}}>
-                              <Avatar
-                                  style={{width: 32, height: 32}}
-                                  src={app.image}
-                                  variant="square"
-                              />
-                          </ListItemAvatar>
-                          <ListItemText primary={app.name} />
-                      </ListItemButton>
-                  </Link>
-              ));
-
-    const placeholderItems = [
-        <ListItemButton disabled key={-1}>
-            <ListItemText primary="Some Server" />
-        </ListItemButton>,
-        <ListItemButton disabled key={-2}>
-            <ListItemText primary="A Raspberry PI" />
-        </ListItemButton>,
+    const items: NavItem[] = [
+        {label: 'Dashboard', to: '/', icon: <Dashboard />, exact: true},
+        {label: 'Messages', to: '/messages', icon: <Inbox />},
+        {label: 'Channels', to: '/applications', icon: <Forum />},
+        {label: 'Users', to: '/users', icon: <People />, adminOnly: true},
+        {label: 'Clients', to: '/clients', icon: <DevicesOther />},
+        {label: 'Plugins', to: '/plugins', icon: <Extension />},
+        {label: 'Settings', to: '/settings', icon: <Settings />},
     ];
 
+    const selected = (item: NavItem) =>
+        item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
+
+    const drawerContent = (
+        <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
+            <Box sx={{display: {xs: 'flex', sm: 'none'}, justifyContent: 'flex-end', p: 1}}>
+                <IconButton aria-label="Close navigation" onClick={() => setNavOpen(false)}>
+                    <Close />
+                </IconButton>
+            </Box>
+
+            <Box sx={{px: 1.5, py: 2}}>
+                <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{px: 1.5, letterSpacing: 1}}>
+                    Workspace
+                </Typography>
+                <List disablePadding>
+                    {items
+                        .filter((item) => !item.adminOnly || currentUser.user.admin)
+                        .map((item) => (
+                            <ListItemButton
+                                key={item.to}
+                                id={
+                                    item.to === '/applications'
+                                        ? 'navigate-apps'
+                                        : item.to === '/users'
+                                          ? 'navigate-users'
+                                          : item.to === '/clients'
+                                            ? 'navigate-clients'
+                                            : item.to === '/plugins'
+                                              ? 'navigate-plugins'
+                                              : item.to === '/messages'
+                                                ? 'navigate-messages'
+                                                : undefined
+                                }
+                                className={item.to === '/messages' ? 'all' : undefined}
+                                component={Link}
+                                to={item.to}
+                                selected={selected(item)}
+                                disabled={!loggedIn}
+                                onClick={() => setNavOpen(false)}
+                                sx={{borderRadius: 2, my: 0.25}}>
+                                <ListItemIcon sx={{minWidth: 40}}>{item.icon}</ListItemIcon>
+                                <ListItemText primary={item.label} />
+                            </ListItemButton>
+                        ))}
+                </List>
+            </Box>
+
+            <Divider />
+
+            <Box sx={{px: 1.5, py: 2, flex: 1, minHeight: 0, overflowY: 'auto'}}>
+                <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{px: 1.5, letterSpacing: 1}}>
+                    Your Channels
+                </Typography>
+                <List disablePadding>
+                    {loggedIn && apps.length === 0 && (
+                        <ListItemButton disabled sx={{borderRadius: 2}}>
+                            <ListItemText
+                                primary="No channels"
+                                secondary="Create or join a Channel to see it here."
+                            />
+                        </ListItemButton>
+                    )}
+                    {loggedIn &&
+                        apps.map((app) => {
+                            const to = `/messages/${app.id}`;
+                            return (
+                                <ListItemButton
+                                    key={app.id}
+                                    className="item channel-shortcut"
+                                    component={Link}
+                                    to={to}
+                                    selected={location.pathname === to}
+                                    onClick={() => setNavOpen(false)}
+                                    sx={{borderRadius: 2, my: 0.25}}>
+                                    <ListItemAvatar sx={{minWidth: 42}}>
+                                        <Avatar
+                                            src={config.get('url') + app.image}
+                                            variant="rounded"
+                                            sx={{width: 30, height: 30}}
+                                        />
+                                    </ListItemAvatar>
+                                    <ListItemText
+                                        primary={app.name}
+                                        primaryTypographyProps={{noWrap: true}}
+                                    />
+                                    {app.autoAssign && (
+                                        <Public
+                                            sx={{fontSize: 16, color: 'text.secondary', ml: 1}}
+                                        />
+                                    )}
+                                </ListItemButton>
+                            );
+                        })}
+                </List>
+            </Box>
+
+            {showRequestNotification && (
+                <>
+                    <Divider />
+                    <Stack sx={{p: 2}}>
+                        <Button
+                            variant="outlined"
+                            onClick={() => {
+                                requestPermission();
+                                setShowRequestNotification(false);
+                            }}>
+                            Enable Browser Notifications
+                        </Button>
+                    </Stack>
+                </>
+            )}
+        </Box>
+    );
+
     return (
-        <ResponsiveDrawer
-            classes={{root: classes.root, paper: classes.drawerPaper}}
-            navOpen={navOpen}
-            setNavOpen={setNavOpen}
-            id="message-navigation">
-            <div className={classes.toolbar} />
-            <Link className={classes.link} to="/" onClick={() => setNavOpen(false)}>
-                <ListItemButton disabled={!loggedIn} className="all">
-                    <ListItemText primary="All Messages" />
-                </ListItemButton>
-            </Link>
-            <Divider />
-            <div>{loggedIn ? userApps : placeholderItems}</div>
-            <Divider />
-            <Typography align="center" style={{marginTop: 10}}>
-                {showRequestNotification ? (
-                    <Button
-                        onClick={() => {
-                            requestPermission();
-                            setShowRequestNotification(false);
-                        }}>
-                        Enable Notifications
-                    </Button>
-                ) : null}
-            </Typography>
-        </ResponsiveDrawer>
+        <>
+            <Drawer
+                open={navOpen}
+                onClose={() => setNavOpen(false)}
+                variant="temporary"
+                sx={{
+                    display: {xs: 'block', sm: 'none'},
+                    '& .MuiDrawer-paper': {width: navigationWidth},
+                }}>
+                {drawerContent}
+            </Drawer>
+            <Drawer
+                id="message-navigation"
+                variant="permanent"
+                open
+                sx={{
+                    display: {xs: 'none', sm: 'block'},
+                    width: navigationWidth,
+                    flexShrink: 0,
+                    '& .MuiDrawer-paper': {
+                        width: navigationWidth,
+                        boxSizing: 'border-box',
+                        position: 'relative',
+                        height: '100%',
+                        borderRightStyle: 'solid',
+                    },
+                }}>
+                {drawerContent}
+            </Drawer>
+        </>
     );
 });
-
-const ResponsiveDrawer: React.FC<
-    DrawerProps & {navOpen: boolean; setNavOpen: (open: boolean) => void}
-> = ({navOpen, setNavOpen, children, ...rest}) => (
-    <>
-        <Drawer
-            sx={{display: {sm: 'none', xs: 'block'}}}
-            variant="temporary"
-            open={navOpen}
-            {...rest}>
-            <IconButton onClick={() => setNavOpen(false)} size="large">
-                <CloseIcon />
-            </IconButton>
-            {children}
-        </Drawer>
-        <Drawer sx={{display: {xs: 'none', sm: 'block'}}} variant="permanent" {...rest}>
-            {children}
-        </Drawer>
-    </>
-);
 
 export default Navigation;

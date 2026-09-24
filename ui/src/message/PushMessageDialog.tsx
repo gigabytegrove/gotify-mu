@@ -1,12 +1,16 @@
-import Button from '@mui/material/Button';
-import Dialog from '@mui/material/Dialog';
-import DialogActions from '@mui/material/DialogActions';
-import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
-import DialogTitle from '@mui/material/DialogTitle';
-import TextField from '@mui/material/TextField';
-import Tooltip from '@mui/material/Tooltip';
 import React, {useState} from 'react';
+import {
+    Button,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogContentText,
+    DialogTitle,
+    Stack,
+    TextField,
+    Tooltip,
+} from '@mui/material';
+import Send from '@mui/icons-material/Send';
 import {NumberField} from '../common/NumberField';
 
 interface IProps {
@@ -22,66 +26,61 @@ export const PushMessageDialog = ({appName, defaultPriority, fClose, fOnSubmit}:
     const [priority, setPriority] = useState(defaultPriority);
 
     const submitEnabled = message.trim().length !== 0;
+
     const submitAndClose = async () => {
         await fOnSubmit(message, title, priority);
         fClose();
     };
 
     return (
-        <Dialog
-            open={true}
-            onClose={fClose}
-            aria-labelledby="push-message-title"
-            id="push-message-dialog">
-            <DialogTitle id="push-message-title">Push message</DialogTitle>
+        <Dialog id="push-message-dialog" open onClose={fClose} fullWidth maxWidth="sm">
+            <DialogTitle>Send Notification</DialogTitle>
             <DialogContent>
-                <DialogContentText>
-                    Send a push message via {appName}. Leave the title empty to use the application
+                <DialogContentText sx={{mb: 2}}>
+                    Send a notification to {appName}. Leave the title blank to use the Channel
                     name.
                 </DialogContentText>
-                <TextField
-                    margin="dense"
-                    className="title"
-                    label="Title"
-                    type="text"
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    fullWidth
-                />
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    className="message"
-                    label="Message *"
-                    type="text"
-                    value={message}
-                    onChange={(e) => setMessage(e.target.value)}
-                    fullWidth
-                    multiline
-                    minRows={4}
-                />
-                <NumberField
-                    margin="dense"
-                    className="priority"
-                    label="Priority"
-                    value={priority}
-                    onChange={(value) => setPriority(value)}
-                    fullWidth
-                />
+                <Stack spacing={2}>
+                    <TextField
+                        className="title"
+                        label="Title"
+                        value={title}
+                        onChange={(event) => setTitle(event.target.value)}
+                        fullWidth
+                    />
+                    <TextField
+                        autoFocus
+                        className="message"
+                        label="Message"
+                        value={message}
+                        onChange={(event) => setMessage(event.target.value)}
+                        fullWidth
+                        required
+                        multiline
+                        minRows={5}
+                    />
+                    <NumberField
+                        className="priority"
+                        label="Priority"
+                        value={priority}
+                        onChange={setPriority}
+                        fullWidth
+                    />
+                </Stack>
             </DialogContent>
             <DialogActions>
                 <Button onClick={fClose}>Cancel</Button>
-                <Tooltip title={submitEnabled ? '' : 'message is required'}>
-                    <div>
+                <Tooltip title={submitEnabled ? '' : 'Message is required'}>
+                    <span>
                         <Button
                             className="send"
                             disabled={!submitEnabled}
-                            onClick={submitAndClose}
-                            color="primary"
-                            variant="contained">
+                            onClick={() => void submitAndClose()}
+                            variant="contained"
+                            startIcon={<Send />}>
                             Send
                         </Button>
-                    </div>
+                    </span>
                 </Tooltip>
             </DialogActions>
         </Dialog>
