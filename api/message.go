@@ -242,6 +242,108 @@ func (a *MessageAPI) GetMessagesWithApplication(ctx *gin.Context) {
 	})
 }
 
+// ArchiveMessages archives all currently visible messages for the current user.
+func (a *MessageAPI) ArchiveMessages(ctx *gin.Context) {
+	userID := auth.GetUserID(ctx)
+	successOrAbort(ctx, 500, a.DB.ArchiveMessagesByUser(userID))
+}
+
+// UnarchiveMessages restores all archived messages for the current user.
+func (a *MessageAPI) UnarchiveMessages(ctx *gin.Context) {
+	userID := auth.GetUserID(ctx)
+	successOrAbort(ctx, 500, a.DB.UnarchiveMessagesByUser(userID))
+}
+
+// ArchiveMessageWithApplication archives all currently visible messages from one
+// channel for the current user without affecting any other member.
+func (a *MessageAPI) ArchiveMessageWithApplication(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		membership, err := a.DB.GetApplicationMembership(id, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app == nil || membership == nil {
+			ctx.AbortWithError(404, errors.New("application does not exist"))
+			return
+		}
+		successOrAbort(ctx, 500, a.DB.ArchiveMessagesByApplicationForUser(userID, id))
+	})
+}
+
+// UnarchiveMessageWithApplication restores all archived messages from one
+// channel for the current user.
+func (a *MessageAPI) UnarchiveMessageWithApplication(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		membership, err := a.DB.GetApplicationMembership(id, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if app == nil || membership == nil {
+			ctx.AbortWithError(404, errors.New("application does not exist"))
+			return
+		}
+		successOrAbort(ctx, 500, a.DB.UnarchiveMessagesByApplicationForUser(userID, id))
+	})
+}
+
+// ArchiveMessage archives one message for the current user.
+func (a *MessageAPI) ArchiveMessage(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		msg, err := a.DB.GetMessageByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if msg == nil {
+			ctx.AbortWithError(404, errors.New("message does not exist"))
+			return
+		}
+		membership, err := a.DB.GetApplicationMembership(msg.ApplicationID, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if membership == nil {
+			ctx.AbortWithError(404, errors.New("message does not exist"))
+			return
+		}
+		successOrAbort(ctx, 500, a.DB.ArchiveMessageForUser(userID, id))
+	})
+}
+
+// UnarchiveMessage restores one archived message for the current user.
+func (a *MessageAPI) UnarchiveMessage(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		msg, err := a.DB.GetMessageByID(id)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if msg == nil {
+			ctx.AbortWithError(404, errors.New("message does not exist"))
+			return
+		}
+		membership, err := a.DB.GetApplicationMembership(msg.ApplicationID, userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if membership == nil {
+			ctx.AbortWithError(404, errors.New("message does not exist"))
+			return
+		}
+		successOrAbort(ctx, 500, a.DB.UnarchiveMessageForUser(userID, id))
+	})
+}
+
 // DeleteMessages delete all messages from a user.
 // swagger:operation DELETE /message message deleteMessages
 //
