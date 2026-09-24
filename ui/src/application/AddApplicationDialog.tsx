@@ -58,6 +58,7 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
 
     return (
         <Dialog
+            id="app-dialog"
             open
             onClose={() => fClose(null)}
             fullWidth
