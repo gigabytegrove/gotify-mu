@@ -21,6 +21,14 @@ interface IProps {
     fClose: VoidFunction;
 }
 
+const memberStatus = (member: IApplicationMember | undefined, isOwner: boolean): string => {
+    if (isOwner) return 'Owner';
+    if (!member) return 'Not assigned';
+
+    const status = member.autoAssigned ? 'Automatically assigned' : 'Assigned';
+    return member.receiveNotifications ? status : `${status} · Muted`;
+};
+
 const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
     const {appStore, currentUser, elevateStore} = useStores();
     const [members, setMembers] = useState<IApplicationMember[]>([]);
@@ -131,19 +139,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                         }>
                                         <ListItemText
                                             primary={user.name}
-                                            secondary={
-                                                isOwner
-                                                    ? 'Owner'
-                                                    : member?.autoAssigned
-                                                      ? member.receiveNotifications
-                                                          ? 'Automatically assigned'
-                                                          : 'Automatically assigned · Muted'
-                                                      : member
-                                                        ? member.receiveNotifications
-                                                            ? 'Assigned'
-                                                            : 'Assigned · Muted'
-                                                        : 'Not assigned'
-                                            }
+                                            secondary={memberStatus(member, isOwner)}
                                         />
                                     </ListItem>
                                 );
