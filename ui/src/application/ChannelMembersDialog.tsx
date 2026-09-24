@@ -35,6 +35,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
     const [users, setUsers] = useState<IUser[]>([]);
     const [loading, setLoading] = useState(false);
     const [autoAssign, setAutoAssignState] = useState(Boolean(app.autoAssign));
+    const [allowMemberPost, setAllowMemberPost] = useState(Boolean(app.allowMemberPost));
 
     const load = useCallback(async () => {
         if (!elevateStore.elevated) return;
@@ -71,6 +72,11 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
         await load();
     };
 
+    const toggleMemberPosting = async (enabled: boolean) => {
+        await appStore.setMemberPosting(app.id, enabled);
+        setAllowMemberPost(enabled);
+    };
+
     const transferOwnership = async (user: IUser) => {
         await appStore.transferOwnership(app.id, user.id);
         handleClose();
@@ -90,17 +96,30 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                 ) : (
                     <>
                         {currentUser.user.admin && (
-                            <FormControlLabel
-                                control={
-                                    <Switch
-                                        checked={autoAssign}
-                                        onChange={(event) =>
-                                            void toggleAutoAssign(event.target.checked)
-                                        }
-                                    />
-                                }
-                                label="Automatically assign this channel to all users"
-                            />
+                            <>
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={autoAssign}
+                                            onChange={(event) =>
+                                                void toggleAutoAssign(event.target.checked)
+                                            }
+                                        />
+                                    }
+                                    label="Automatically assign this channel to all users"
+                                />
+                                <FormControlLabel
+                                    control={
+                                        <Switch
+                                            checked={allowMemberPost}
+                                            onChange={(event) =>
+                                                void toggleMemberPosting(event.target.checked)
+                                            }
+                                        />
+                                    }
+                                    label="Allow channel members to post (Chat Channel)"
+                                />
+                            </>
                         )}
                         {autoAssign && (
                             <Typography variant="body2" sx={{mb: 1}}>
