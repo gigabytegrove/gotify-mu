@@ -12,6 +12,7 @@ import (
 type ApplicationMembershipDatabase interface {
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetUserByID(id uint) (*model.User, error)
+	GetUsers() ([]*model.User, error)
 	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	GetApplicationMemberships(applicationID uint) ([]*model.ApplicationMembership, error)
 	UpsertApplicationMembership(membership *model.ApplicationMembership) error
@@ -120,5 +121,22 @@ func (a *ApplicationMembershipAPI) SetAutoAssign(ctx *gin.Context) {
 		params := ApplicationAutoAssignParams{}; if err := ctx.Bind(&params); err != nil { return }
 		if success := successOrAbort(ctx, http.StatusInternalServerError, a.DB.SetApplicationAutoAssign(id, params.Enabled)); !success { return }
 		ctx.JSON(http.StatusOK, ApplicationAutoAssignParams{Enabled: params.Enabled})
+	})
+}
+
+func (a *ApplicationMembershipAPI) GetAssignableUsers(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if _, ok := a.getAuthorizedApplication(ctx, id); !ok {
+			return
+		}
+		users, err := a.DB.GetUsers()
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		result := make([]*model.UserExternal, 0, len(users))
+		for _, user := range users {
+			result = append(result, toExternalUser(user))
+		}
+		ctx.JSON(http.StatusOK, result)
 	})
 }
