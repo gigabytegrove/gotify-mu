@@ -16,6 +16,10 @@ type Message struct {
 	SenderUserID  uint `gorm:"index"`
 	SenderName       string     `gorm:"type:text"`
 	DeduplicationKey string     `gorm:"type:varchar(220);uniqueIndex" json:"-"`
+	ParentMessageID  uint       `gorm:"index" json:"-"`
+	RootMessageID    uint       `gorm:"index" json:"-"`
+	EscalationRuleID uint       `gorm:"index" json:"-"`
+	EscalationDepth  int        `json:"-"`
 	Acknowledged     bool       `gorm:"-" json:"-"`
 	AcknowledgedByAnyone bool   `gorm:"-" json:"-"`
 	AcknowledgementCount int    `gorm:"-" json:"-"`
@@ -79,6 +83,14 @@ type MessageExternal struct {
 	//
 	// read only: true
 	SenderName string `json:"senderName,omitempty"`
+	// The message this notification was escalated from, when applicable.
+	ParentMessageID uint `json:"parentMessageId,omitempty"`
+	// The root message for an escalation chain, when applicable.
+	RootMessageID uint `json:"rootMessageId,omitempty"`
+	// The escalation rule that generated this message.
+	EscalationRuleID uint `json:"escalationRuleId,omitempty"`
+	// The escalation stage depth.
+	EscalationDepth int `json:"escalationDepth,omitempty"`
 	// Whether the current requesting user has acknowledged this message.
 	Acknowledged bool `json:"acknowledged,omitempty"`
 	// Whether anyone with access to the Channel has acknowledged this message.
