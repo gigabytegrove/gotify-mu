@@ -3,6 +3,7 @@ import {
     Avatar,
     Box,
     Button,
+    Chip,
     IconButton,
     Paper,
     Stack,
@@ -81,36 +82,59 @@ const Message = ({
             className="message"
             variant="outlined"
             sx={{
-                p: {xs: 1.5, sm: 2},
-                mb: 1.5,
-                borderRadius: 3,
+                p: {xs: 1.25, sm: 1.5},
+                mb: 1,
+                borderRadius: 2.25,
+                transition: 'box-shadow 140ms ease, border-color 140ms ease',
+                '&:hover': {
+                    boxShadow: 1,
+                    borderColor: 'action.selected',
+                },
                 borderLeftWidth: 4,
                 borderLeftColor:
                     priority >= 8 ? 'error.main' : priority >= 4 ? 'warning.main' : 'divider',
             }}>
-            <Stack spacing={1.5}>
-                <Stack direction="row" spacing={1.5} sx={{alignItems: 'flex-start'}}>
+            <Stack spacing={1.15}>
+                <Stack direction="row" spacing={1.25} sx={{alignItems: 'flex-start'}}> 
                     {image && (
                         <Avatar
                             src={config.get('url') + image}
                             alt={`${appName} logo`}
                             variant="rounded"
-                            sx={{width: 42, height: 42}}
+                            sx={{width: 38, height: 38}}
                         />
                     )}
 
                     <Box sx={{flex: 1, minWidth: 0}}>
-                        <Typography className="title" variant="h6" sx={{lineHeight: 1.25}}>
-                            {title}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
+                        <Stack
+                            direction="row"
+                            spacing={0.75}
+                            useFlexGap
+                            sx={{alignItems: 'center', flexWrap: 'wrap'}}>
+                            <Typography
+                                className="title"
+                                variant="h6"
+                                sx={{fontSize: '0.98rem', lineHeight: 1.25}}>
+                                {title}
+                            </Typography>
+                            {priority >= 8 && (
+                                <Chip size="small" color="error" label="Critical" />
+                            )}
+                            {priority >= 4 && priority < 8 && (
+                                <Chip size="small" color="warning" variant="outlined" label="High" />
+                            )}
+                        </Stack>
+                        <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            title={date}>
                             {senderName ? `${senderName} · ${appName}` : appName}
                             {' · '}
                             <TimeAgo date={date} formatter={TimeAgoFormatter.long} />
                         </Typography>
                     </Box>
 
-                    <Stack direction="row" spacing={0.25}>
+                    <Stack direction="row" spacing={0.1}>
                         {fRestore && (
                             <Tooltip title="Restore from Archive">
                                 <IconButton onClick={fRestore} size="small">
@@ -140,6 +164,8 @@ const Message = ({
                     className="content"
                     sx={{
                         maxHeight: expanded ? 'none' : PREVIEW_HEIGHT,
+                        fontSize: '0.92rem',
+                        lineHeight: 1.55,
                         overflow: 'hidden',
                         wordBreak: 'break-word',
                         '& p': {my: 0.75},

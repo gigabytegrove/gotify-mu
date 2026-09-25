@@ -3,16 +3,21 @@ import {
     Button,
     Chip,
     IconButton,
+    InputAdornment,
+    Stack,
     Table,
     TableBody,
     TableCell,
     TableHead,
     TableRow,
+    TextField,
     Tooltip,
+    Typography,
 } from '@mui/material';
 import Delete from '@mui/icons-material/Delete';
 import Edit from '@mui/icons-material/Edit';
 import Security from '@mui/icons-material/Security';
+import Search from '@mui/icons-material/Search';
 import ConfirmDialog from '../common/ConfirmDialog';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
@@ -34,7 +39,12 @@ const Clients = observer(() => {
     const [toElevateClient, setToElevateClient] = useState<IClient>();
     const [createDialog, setCreateDialog] = useState(false);
     const [toShowToken, setToShowToken] = useState('');
+    const [query, setQuery] = useState('');
     const clients = clientStore.getItems();
+    const normalizedQuery = query.trim().toLowerCase();
+    const filteredClients = normalizedQuery
+        ? clients.filter((client) => client.name.toLowerCase().includes(normalizedQuery))
+        : clients;
 
     useEffect(() => void clientStore.refresh(), []);
 
@@ -53,6 +63,30 @@ const Clients = observer(() => {
             <SurfaceCard
                 title="Authorized Clients"
                 subtitle={`${clients.length} client${clients.length === 1 ? '' : 's'}`}>
+                <Stack
+                    direction={{xs: 'column', sm: 'row'}}
+                    spacing={1}
+                    sx={{mb: 1.5, alignItems: {sm: 'center'}, justifyContent: 'space-between'}}>
+                    <TextField
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Search clients"
+                        aria-label="Search clients"
+                        sx={{width: {xs: '100%', sm: 320}}}
+                        slotProps={{
+                            input: {
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search fontSize="small" />
+                                    </InputAdornment>
+                                ),
+                            },
+                        }}
+                    />
+                    <Typography variant="caption" color="text.secondary">
+                        {filteredClients.length} shown
+                    </Typography>
+                </Stack>
                 <Table id="client-table">
                     <TableHead>
                         <TableRow>
@@ -66,7 +100,7 @@ const Clients = observer(() => {
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {clients.map((client: IClient) => (
+                        {filteredClients.map((client: IClient) => (
                             <Row
                                 key={client.id}
                                 name={client.name}
@@ -176,17 +210,17 @@ const Row = ({
         <TableCell title={createdAt}>{formatDate(createdAt)}</TableCell>
         <TableCell align="right">
             <Tooltip title="Elevate client">
-                <IconButton onClick={fElevate} className="elevate">
+                <IconButton size="small" onClick={fElevate} className="elevate">
                     <Security />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Edit client">
-                <IconButton onClick={fEdit} className="edit">
+                <IconButton size="small" onClick={fEdit} className="edit">
                     <Edit />
                 </IconButton>
             </Tooltip>
             <Tooltip title="Delete client">
-                <IconButton onClick={fDelete} className="delete">
+                <IconButton size="small" onClick={fDelete} className="delete">
                     <Delete />
                 </IconButton>
             </Tooltip>

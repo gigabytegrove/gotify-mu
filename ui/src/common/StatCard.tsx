@@ -12,7 +12,18 @@ interface IProps {
 }
 
 const StatCard = ({label, value, icon, helper}: IProps) => (
-    <Paper variant="outlined" sx={{p: 2.5, height: '100%', borderRadius: 3}}>
+    <Paper
+        variant="outlined"
+        sx={{
+            p: 2,
+            height: '100%',
+            borderRadius: 2.5,
+            transition: 'transform 140ms ease, box-shadow 140ms ease',
+            '&:hover': {
+                transform: 'translateY(-1px)',
+                boxShadow: 2,
+            },
+        }}>
         <Stack
             direction="row"
             spacing={2}
@@ -21,7 +32,7 @@ const StatCard = ({label, value, icon, helper}: IProps) => (
                 <Typography variant="body2" color="text.secondary">
                     {label}
                 </Typography>
-                <Typography variant="h4" sx={{mt: 0.5}}>
+                <Typography variant="h4" sx={{mt: 0.25, lineHeight: 1.1}}>
                     {value}
                 </Typography>
                 {helper && (

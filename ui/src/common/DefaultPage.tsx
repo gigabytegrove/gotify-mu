@@ -18,16 +18,16 @@ const DefaultPage: FC<React.PropsWithChildren<IProps>> = ({
     children,
 }) => (
     <Box component="main" sx={{width: '100%', maxWidth, mx: 'auto'}}>
-        <Stack spacing={3}>
+        <Stack spacing={2.25}>
             <Stack
                 direction={{xs: 'column', sm: 'row'}}
-                spacing={2}
+                spacing={1.5}
                 sx={{
                     alignItems: {xs: 'stretch', sm: 'center'},
                     justifyContent: 'space-between',
                 }}>
                 <Box sx={{minWidth: 0}}>
-                    <Typography variant="h4" component="h1">
+                    <Typography variant="h4" component="h1" sx={{fontSize: {xs: '1.65rem', sm: '2rem'}}}>
                         {title}
                     </Typography>
                     {description && (

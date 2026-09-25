@@ -3,6 +3,7 @@ import {
     Avatar,
     Box,
     Button,
+    Chip,
     Divider,
     Drawer,
     IconButton,
@@ -23,6 +24,7 @@ import DevicesOther from '@mui/icons-material/DevicesOther';
 import Extension from '@mui/icons-material/Extension';
 import Settings from '@mui/icons-material/Settings';
 import Public from '@mui/icons-material/Public';
+import NotificationsOff from '@mui/icons-material/NotificationsOff';
 import {Link, useLocation} from 'react-router';
 import {observer} from 'mobx-react-lite';
 import {mayAllowPermission, requestPermission} from '../snack/browserNotification';
@@ -105,7 +107,16 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                                 selected={selected(item)}
                                 disabled={!loggedIn}
                                 onClick={() => setNavOpen(false)}
-                                sx={{borderRadius: 2, my: 0.25}}>
+                                sx={{
+                                    borderRadius: 1.75,
+                                    my: 0.15,
+                                    py: 0.7,
+                                    '&.Mui-selected': {
+                                        bgcolor: 'action.selected',
+                                        '& .MuiListItemIcon-root': {color: 'primary.main'},
+                                        '& .MuiListItemText-primary': {fontWeight: 700},
+                                    },
+                                }}>
                                 <ListItemIcon sx={{minWidth: 40}}>{item.icon}</ListItemIcon>
                                 <ListItemText primary={item.label} />
                             </ListItemButton>
@@ -115,13 +126,18 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
 
             <Divider />
 
-            <Box sx={{px: 1.5, py: 2, flex: 1, minHeight: 0, overflowY: 'auto'}}>
-                <Typography
-                    variant="overline"
-                    color="text.secondary"
-                    sx={{px: 1.5, letterSpacing: 1}}>
-                    Your Channels
-                </Typography>
+            <Box sx={{px: 1.5, py: 1.5, flex: 1, minHeight: 0, overflowY: 'auto'}}>
+                <Stack
+                    direction="row"
+                    sx={{px: 1.25, mb: 0.5, alignItems: 'center', justifyContent: 'space-between'}}>
+                    <Typography
+                        variant="overline"
+                        color="text.secondary"
+                        sx={{letterSpacing: 1}}>
+                        Your Channels
+                    </Typography>
+                    <Chip size="small" variant="outlined" label={apps.length} />
+                </Stack>
                 <List disablePadding>
                     {loggedIn && apps.length === 0 && (
                         <ListItemButton disabled sx={{borderRadius: 2}}>
@@ -142,7 +158,14 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                                     to={to}
                                     selected={location.pathname === to}
                                     onClick={() => setNavOpen(false)}
-                                    sx={{borderRadius: 2, my: 0.25}}>
+                                    sx={{
+                                        borderRadius: 1.75,
+                                        my: 0.15,
+                                        py: 0.55,
+                                        '&.Mui-selected': {
+                                            bgcolor: 'action.selected',
+                                        },
+                                    }}>
                                     <ListItemAvatar sx={{minWidth: 42}}>
                                         <Avatar
                                             src={config.get('url') + app.image}
@@ -153,11 +176,18 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                                     <ListItemText
                                         primary={<Typography noWrap>{app.name}</Typography>}
                                     />
-                                    {app.autoAssign && (
-                                        <Public
-                                            sx={{fontSize: 16, color: 'text.secondary', ml: 1}}
-                                        />
-                                    )}
+                                    <Stack direction="row" spacing={0.5} sx={{alignItems: 'center'}}>
+                                        {app.receiveNotifications === false && (
+                                            <NotificationsOff
+                                                sx={{fontSize: 15, color: 'text.disabled'}}
+                                            />
+                                        )}
+                                        {app.autoAssign && (
+                                            <Public
+                                                sx={{fontSize: 15, color: 'text.secondary'}}
+                                            />
+                                        )}
+                                    </Stack>
                                 </ListItemButton>
                             );
                         })}
@@ -167,7 +197,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
             {showRequestNotification && (
                 <>
                     <Divider />
-                    <Stack sx={{p: 2}}>
+                    <Stack sx={{p: 1.5}}> 
                         <Button
                             variant="outlined"
                             onClick={() => {
