@@ -311,8 +311,7 @@ func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 		if path == "" {
 			path = ctx.Request.URL.Path
 		}
-		// High-volume message ingestion is operational traffic, not an administrative audit event.
-		if path == "/message" || path == "/auth/local/login" {
+		if !shouldAuditMutation(path) {
 			return
 		}
 
@@ -335,6 +334,29 @@ func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 		if err := db.CreateAuditEvent(event); err != nil {
 			log.Error().Err(err).Str("path", path).Msg("Could not persist audit event")
 		}
+	}
+}
+
+func shouldAuditMutation(path string) bool {
+	switch {
+	case path == "/auth/logout":
+		return true
+	case path == "/current/user/password":
+		return true
+	case strings.HasPrefix(path, "/user"):
+		return true
+	case strings.HasPrefix(path, "/client"):
+		return true
+	case strings.HasPrefix(path, "/group"):
+		return true
+	case path == "/plugin/install":
+		return true
+	case strings.HasPrefix(path, "/plugin/") && !strings.Contains(path, "/custom/"):
+		return true
+	case strings.HasPrefix(path, "/application") && !strings.Contains(path, "/message"):
+		return true
+	default:
+		return false
 	}
 }
 
