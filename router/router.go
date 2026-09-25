@@ -320,6 +320,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/update/status", updateHandler.Status)
 		adminPlatform.POST("/update/install", updateHandler.Install)
 
+		adminPlatform.GET("/integration/status", automationHandler.GetIntegrationStatuses)
+		adminPlatform.GET("/automation/run", automationHandler.GetAutomationRuns)
+		adminPlatform.DELETE("/automation/run", automationHandler.CleanupAutomationRuns)
+
 		adminPlatform.GET("/integration/webhook", automationHandler.GetWebhookRoutes)
 		adminPlatform.POST("/integration/webhook", automationHandler.CreateWebhookRoute)
 		adminPlatform.PUT("/integration/webhook/:id", automationHandler.UpdateWebhookRoute)
