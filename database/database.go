@@ -158,6 +158,12 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
+	if err := db.Model(&model.ApplicationMembership{}).
+		Where("(role IS NULL OR role = '') AND auto_assigned = ? AND group_assigned = ?", false, false).
+		Update("role", model.ChannelRoleMember).Error; err != nil {
+		return nil, err
+	}
+
 	if err := db.Transaction(fillMissingSortKeys, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {
 		return nil, err
 	}
