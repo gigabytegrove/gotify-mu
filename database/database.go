@@ -116,6 +116,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.AuditSettings),
 		new(model.ApplicationGroupGrant),
 		new(model.ApplicationNotificationPreference),
+		new(model.ServiceCredential),
 	); err != nil {
 		return nil, err
 	}
