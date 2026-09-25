@@ -114,6 +114,12 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.IntegrationStatus),
 		new(model.SecurityPolicy),
 		new(model.UserMFA),
+		new(model.RSSIntegration),
+		new(model.CalendarIntegration),
+		new(model.EmailGateway),
+		new(model.SMTPReceiver),
+		new(model.SMTPRoute),
+		new(model.SyslogReceiver),
 	); err != nil {
 		return nil, err
 	}
