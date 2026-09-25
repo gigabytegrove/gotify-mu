@@ -13,3 +13,5 @@ images/
 /gotify-server.env
 
 .env
+
+.updater-token

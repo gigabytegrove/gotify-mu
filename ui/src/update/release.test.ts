@@ -29,6 +29,7 @@ describe('release update helpers', () => {
         const release = latestPublishedRelease([
             {
                 tag_name: 'v0.3.0',
+                target_commitish: 'draftsha',
                 name: 'draft',
                 html_url: 'https://example.invalid/draft',
                 draft: true,
@@ -38,6 +39,7 @@ describe('release update helpers', () => {
             },
             {
                 tag_name: 'v0.2.0',
+                target_commitish: 'releasesha',
                 name: 'Gotify MU v0.2.0',
                 html_url: 'https://example.invalid/release',
                 draft: false,

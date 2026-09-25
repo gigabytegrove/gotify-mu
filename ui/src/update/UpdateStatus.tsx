@@ -1,4 +1,5 @@
 import React from 'react';
+import axios from 'axios';
 import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
@@ -8,6 +9,8 @@ import Typography from '@mui/material/Typography';
 import Download from '@mui/icons-material/Download';
 import NewReleases from '@mui/icons-material/NewReleases';
 import OpenInNew from '@mui/icons-material/OpenInNew';
+import SystemUpdateAlt from '@mui/icons-material/SystemUpdateAlt';
+import {Link} from 'react-router';
 import SurfaceCard from '../common/SurfaceCard';
 import * as config from '../config';
 import {
@@ -24,8 +27,18 @@ type ReleaseState =
     | {status: 'error'; message: string}
     | {status: 'ready'; release: PublishedRelease; classification: UpdateClassification};
 
+interface UpdaterStatus {
+    ready: boolean;
+    state: string;
+    version?: string;
+    message?: string;
+    startedAt?: string;
+    finishedAt?: string;
+}
+
 const releaseLabel = (release: PublishedRelease) => release.name || release.tag_name;
 const normalizeTag = (tag: string) => tag.replace(/^v/i, '');
+const activeUpdaterStates = new Set(['downloading', 'building', 'replacing', 'verifying']);
 
 export const useReleaseUpdate = (): ReleaseState => {
     const [state, setState] = React.useState<ReleaseState>({status: 'loading'});
@@ -89,12 +102,10 @@ export const UpdateAvailableBanner = () => {
                 <Button
                     color="inherit"
                     size="small"
-                    component="a"
-                    href={state.release.html_url}
-                    target="_blank"
-                    rel="noreferrer"
-                    endIcon={<OpenInNew fontSize="small" />}>
-                    View / Download
+                    component={Link}
+                    to="/settings"
+                    endIcon={<SystemUpdateAlt fontSize="small" />}>
+                    Review Update
                 </Button>
             }>
             {development
@@ -108,11 +119,62 @@ export const UpdateStatusCard = () => {
     const state = useReleaseUpdate();
     const current = config.get('version');
     const currentVersion = current.version;
+    const [updater, setUpdater] = React.useState<UpdaterStatus>();
+    const [installing, setInstalling] = React.useState(false);
+    const reloadScheduled = React.useRef(false);
+
+    const loadUpdaterStatus = React.useCallback(async () => {
+        try {
+            const response = await fetch(`${config.get('url')}update/status`, {
+                credentials: 'same-origin',
+                headers: {Accept: 'application/json'},
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}`);
+            }
+            const next = (await response.json()) as UpdaterStatus;
+            setUpdater(next);
+
+            if (next.state === 'completed' && !reloadScheduled.current) {
+                reloadScheduled.current = true;
+                window.setTimeout(() => window.location.reload(), 1500);
+            }
+        } catch {
+            if (!updater || activeUpdaterStates.has(updater.state) || installing) {
+                return;
+            }
+            setUpdater({
+                ready: false,
+                state: 'unavailable',
+                message: 'Managed updater helper is unavailable.',
+            });
+        }
+    }, [installing, updater]);
+
+    React.useEffect(() => {
+        void loadUpdaterStatus();
+        const interval = window.setInterval(() => void loadUpdaterStatus(), 2500);
+        return () => window.clearInterval(interval);
+    }, [loadUpdaterStatus]);
+
+    const installRelease = async (release: PublishedRelease) => {
+        setInstalling(true);
+        try {
+            await axios.post(`${config.get('url')}update/install`, {
+                version: normalizeTag(release.tag_name),
+            });
+            await loadUpdaterStatus();
+        } finally {
+            setInstalling(false);
+        }
+    };
+
+    const updaterBusy = Boolean(updater && activeUpdaterStates.has(updater.state));
 
     return (
         <SurfaceCard
             title="Software Update"
-            subtitle="Check the official Gotify MU GitHub releases and download published builds."
+            subtitle="Install Gotify MU releases directly from the Web UI with automatic health verification and rollback."
             action={<NewReleases color="action" />}>
             {state.status === 'loading' && (
                 <Stack direction="row" spacing={1.25} sx={{alignItems: 'center'}}>
@@ -132,92 +194,189 @@ export const UpdateStatusCard = () => {
             )}
 
             {state.status === 'ready' && (
-                <Stack spacing={2}>
-                    <Stack
-                        direction={{xs: 'column', sm: 'row'}}
-                        spacing={1}
-                        sx={{alignItems: {sm: 'center'}, justifyContent: 'space-between'}}>
-                        <Stack spacing={0.35}>
-                            <Typography variant="body2" color="text.secondary">
-                                Installed
-                            </Typography>
-                            <Typography sx={{fontWeight: 700}}>{currentVersion}</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                                Commit {current.commit || 'unknown'}
-                            </Typography>
-                        </Stack>
-                        <Stack spacing={0.35} sx={{alignItems: {sm: 'flex-end'}}}>
-                            <Typography variant="body2" color="text.secondary">
-                                Latest published release
-                            </Typography>
-                            <Stack direction="row" spacing={0.75} sx={{alignItems: 'center'}}>
-                                <Typography sx={{fontWeight: 700}}>
-                                    {releaseLabel(state.release)}
-                                </Typography>
-                                {state.release.prerelease && (
-                                    <Chip size="small" variant="outlined" label="Pre-release" />
-                                )}
-                            </Stack>
-                        </Stack>
-                    </Stack>
-
-                    {state.classification === 'available' && (
-                        <Alert severity="success">
-                            An update is available: {currentVersion} → {state.release.tag_name}
-                        </Alert>
-                    )}
-                    {state.classification === 'current' && (
-                        <Alert severity="success">
-                            This server is running the latest published release.
-                        </Alert>
-                    )}
-                    {state.classification === 'newer' && (
-                        <Alert severity="info">
-                            This server is newer than the latest published release.
-                        </Alert>
-                    )}
-                    {state.classification === 'development' && (
-                        <Alert severity="info">
-                            This server is running a development build. The latest published release
-                            is {state.release.tag_name}.
-                        </Alert>
-                    )}
-
-                    {state.release.assets.length > 0 ? (
-                        <Stack spacing={1}>
-                            <Typography variant="subtitle2">Release downloads</Typography>
-                            <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
-                                {state.release.assets.map((asset) => (
-                                    <Button
-                                        key={asset.name}
-                                        component="a"
-                                        href={asset.browser_download_url}
-                                        variant="outlined"
-                                        size="small"
-                                        startIcon={<Download />}>
-                                        {asset.name}
-                                    </Button>
-                                ))}
-                            </Stack>
-                        </Stack>
-                    ) : (
-                        <Alert severity="warning">
-                            This release does not currently have downloadable build assets.
-                        </Alert>
-                    )}
-
-                    <Button
-                        component="a"
-                        href={state.release.html_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        variant="contained"
-                        sx={{alignSelf: 'flex-start'}}
-                        endIcon={<OpenInNew />}>
-                        Open Release Page
-                    </Button>
-                </Stack>
+                <ReleaseUpdateDetails
+                    state={state}
+                    updater={updater}
+                    installing={installing}
+                    updaterBusy={updaterBusy}
+                    currentVersion={currentVersion}
+                    currentCommit={current.commit}
+                    installRelease={installRelease}
+                />
             )}
         </SurfaceCard>
+    );
+};
+
+const ReleaseUpdateDetails = ({
+    state,
+    updater,
+    installing,
+    updaterBusy,
+    currentVersion,
+    currentCommit,
+    installRelease,
+}: {
+    state: Extract<ReleaseState, {status: 'ready'}>;
+    updater?: UpdaterStatus;
+    installing: boolean;
+    updaterBusy: boolean;
+    currentVersion: string;
+    currentCommit: string;
+    installRelease: (release: PublishedRelease) => Promise<void>;
+}) => {
+    const sameCommit =
+        Boolean(currentCommit) &&
+        Boolean(state.release.target_commitish) &&
+        currentCommit === state.release.target_commitish;
+    const safeAutomaticInstall =
+        state.classification === 'available' ||
+        (state.classification === 'development' && sameCommit);
+    const updaterReady = updater?.ready === true;
+
+    return (
+        <Stack spacing={2}>
+            <Stack
+                direction={{xs: 'column', sm: 'row'}}
+                spacing={1}
+                sx={{alignItems: {sm: 'center'}, justifyContent: 'space-between'}}>
+                <Stack spacing={0.35}>
+                    <Typography variant="body2" color="text.secondary">
+                        Installed
+                    </Typography>
+                    <Typography sx={{fontWeight: 700}}>{currentVersion}</Typography>
+                    <Typography variant="caption" color="text.secondary">
+                        Commit {currentCommit || 'unknown'}
+                    </Typography>
+                </Stack>
+                <Stack spacing={0.35} sx={{alignItems: {sm: 'flex-end'}}}>
+                    <Typography variant="body2" color="text.secondary">
+                        Latest published release
+                    </Typography>
+                    <Stack direction="row" spacing={0.75} sx={{alignItems: 'center'}}>
+                        <Typography sx={{fontWeight: 700}}>
+                            {releaseLabel(state.release)}
+                        </Typography>
+                        {state.release.prerelease && (
+                            <Chip size="small" variant="outlined" label="Pre-release" />
+                        )}
+                    </Stack>
+                </Stack>
+            </Stack>
+
+            {state.classification === 'available' && (
+                <Alert severity="success">
+                    An update is available: {currentVersion} → {state.release.tag_name}
+                </Alert>
+            )}
+            {state.classification === 'current' && (
+                <Alert severity="success">
+                    This server is running the latest published release.
+                </Alert>
+            )}
+            {state.classification === 'newer' && (
+                <Alert severity="info">
+                    This server is newer than the latest published release.
+                </Alert>
+            )}
+            {state.classification === 'development' && sameCommit && (
+                <Alert severity="success">
+                    This development build is the exact commit published as {state.release.tag_name}.
+                    You can switch it to the official release build without changing application
+                    data.
+                </Alert>
+            )}
+            {state.classification === 'development' && !sameCommit && (
+                <Alert severity="info">
+                    This server is running a development build that differs from{' '}
+                    {state.release.tag_name}. Automatic installation of that older release is
+                    disabled to prevent an accidental downgrade.
+                </Alert>
+            )}
+
+            <Stack
+                direction={{xs: 'column', sm: 'row'}}
+                spacing={1}
+                sx={{alignItems: {sm: 'center'}, justifyContent: 'space-between'}}>
+                <Stack direction="row" spacing={0.75} sx={{alignItems: 'center'}}>
+                    <Typography variant="body2" color="text.secondary">
+                        Managed updater
+                    </Typography>
+                    <Chip
+                        size="small"
+                        color={updaterReady ? 'success' : 'default'}
+                        variant={updaterReady ? 'filled' : 'outlined'}
+                        label={updaterReady ? 'Ready' : 'Unavailable'}
+                    />
+                </Stack>
+
+                <Button
+                    variant="contained"
+                    startIcon={
+                        updaterBusy || installing ? (
+                            <CircularProgress size={16} color="inherit" />
+                        ) : (
+                            <SystemUpdateAlt />
+                        )
+                    }
+                    disabled={!safeAutomaticInstall || !updaterReady || updaterBusy || installing}
+                    onClick={() => void installRelease(state.release)}>
+                    {updaterBusy
+                        ? 'Updating…'
+                        : sameCommit && state.classification === 'development'
+                          ? `Install ${state.release.tag_name} Release Build`
+                          : `Install ${state.release.tag_name}`}
+                </Button>
+            </Stack>
+
+            {updater?.message && (
+                <Alert
+                    severity={
+                        updater.state === 'failed' || updater.state === 'rolled_back'
+                            ? 'warning'
+                            : 'info'
+                    }>
+                    {updater.message}
+                    {updater.version ? ` (v${updater.version})` : ''}
+                </Alert>
+            )}
+
+            {!updaterReady && (
+                <Typography variant="body2" color="text.secondary">
+                    Direct installation requires the Gotify MU updater helper. Existing installations
+                    can enable it once; future releases can then be installed here without SSH.
+                </Typography>
+            )}
+
+            {state.release.assets.length > 0 && (
+                <Stack spacing={1}>
+                    <Typography variant="subtitle2">Manual recovery downloads</Typography>
+                    <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
+                        {state.release.assets.map((asset) => (
+                            <Button
+                                key={asset.name}
+                                component="a"
+                                href={asset.browser_download_url}
+                                variant="outlined"
+                                size="small"
+                                startIcon={<Download />}>
+                                {asset.name}
+                            </Button>
+                        ))}
+                    </Stack>
+                </Stack>
+            )}
+
+            <Button
+                component="a"
+                href={state.release.html_url}
+                target="_blank"
+                rel="noreferrer"
+                variant="text"
+                sx={{alignSelf: 'flex-start'}}
+                endIcon={<OpenInNew />}>
+                Release Notes
+            </Button>
+        </Stack>
     );
 };

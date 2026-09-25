@@ -9,6 +9,7 @@ export interface ReleaseAsset {
 
 export interface PublishedRelease {
     tag_name: string;
+    target_commitish: string;
     name: string | null;
     html_url: string;
     draft: boolean;
