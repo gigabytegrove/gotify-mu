@@ -40,7 +40,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		}
 	})
 
-	g.Use(accessLogger(), gin.Recovery(), gerror.Handler(), location.Default())
+	g.Use(accessLogger(), auditMutations(db), gin.Recovery(), gerror.Handler(), location.Default())
 	g.NoRoute(gerror.NotFound())
 
 	if conf.Server.SSL.Enabled && conf.Server.SSL.RedirectToHTTPS {
@@ -108,6 +108,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled}
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
+	auditHandler := api.AuditAPI{DB: db}
+	groupHandler := api.UserGroupAPI{DB: db}
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
@@ -277,7 +279,58 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		authAdmin.GET("/:id", userHandler.GetUserByID)
 		authAdmin.POST("/:id", userHandler.UpdateUserByID)
 	}
+
+	adminPlatform := g.Group("")
+	{
+		adminPlatform.Use(authentication.RequireAdmin)
+		adminPlatform.GET("/audit", auditHandler.GetAuditEvents)
+		adminPlatform.GET("/group", groupHandler.GetGroups)
+		adminPlatform.POST("/group", groupHandler.CreateGroup)
+		adminPlatform.PUT("/group/:id", groupHandler.UpdateGroup)
+		adminPlatform.DELETE("/group/:id", groupHandler.DeleteGroup)
+		adminPlatform.GET("/group/:id/members", groupHandler.GetMembers)
+		adminPlatform.POST("/group/:id/members", groupHandler.AddMember)
+		adminPlatform.DELETE("/group/:id/members/:userId", groupHandler.RemoveMember)
+	}
 	return g, streamHandler.Close
+}
+
+func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		ctx.Next()
+
+		method := ctx.Request.Method
+		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
+			return
+		}
+		if ctx.Writer.Status() >= 400 {
+			return
+		}
+
+		path := ctx.FullPath()
+		if path == "" {
+			path = ctx.Request.URL.Path
+		}
+		// High-volume message ingestion is operational traffic, not an administrative audit event.
+		if path == "/message" || path == "/auth/local/login" {
+			return
+		}
+
+		event := &model.AuditEvent{
+			Action:    strings.ToLower(method),
+			Target:    path,
+			IPAddress: ctx.ClientIP(),
+		}
+		if userID := auth.TryGetUserID(ctx); userID != nil {
+			event.UserID = *userID
+			if user, err := db.GetUserByID(*userID); err == nil && user != nil {
+				event.Username = user.Name
+			}
+		}
+		if err := db.CreateAuditEvent(event); err != nil {
+			log.Error().Err(err).Str("path", path).Msg("Could not persist audit event")
+		}
+	}
 }
 
 var tokenRegexp = regexp.MustCompile("token=[^&]+")
