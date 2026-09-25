@@ -325,3 +325,73 @@ export interface IAdminSession {
     elevatedUntil?: string;
     expiresAt?: string;
 }
+
+
+export interface IEmailGateway {
+    id: number;
+    name: string;
+    sourceApplicationId: number;
+    smtpHost: string;
+    smtpPort: number;
+    tlsMode: 'none' | 'starttls' | 'tls';
+    username: string;
+    passwordConfigured: boolean;
+    fromAddress: string;
+    toAddresses: string;
+    minPriority: number;
+    enabled: boolean;
+    status: string;
+    lastSentAt?: string;
+    lastError?: string;
+    lastErrorAt?: string;
+}
+
+export interface ISMTPRoute {
+    id: number;
+    name: string;
+    applicationId: number;
+    recipient: string;
+    allowedCidrs: string;
+    username: string;
+    passwordConfigured: boolean;
+    enabled: boolean;
+}
+
+export interface IRSSMonitor {
+    id: number;
+    name: string;
+    applicationId: number;
+    url: string;
+    intervalMinutes: number;
+    enabled: boolean;
+    status: string;
+    lastCheckedAt?: string;
+    lastItemAt?: string;
+    lastError?: string;
+    lastErrorAt?: string;
+}
+
+export interface ISyslogRoute {
+    id: number;
+    name: string;
+    applicationId: number;
+    facility: number;
+    maxSeverity: number;
+    allowedCidrs: string;
+    enabled: boolean;
+}
+
+export interface ICalendarMonitor {
+    id: number;
+    name: string;
+    applicationId: number;
+    url: string;
+    intervalMinutes: number;
+    notifyBeforeMinutes: number;
+    enabled: boolean;
+    status: string;
+    lastCheckedAt?: string;
+    lastEventAt?: string;
+    lastError?: string;
+    lastErrorAt?: string;
+}
