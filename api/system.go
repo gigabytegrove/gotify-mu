@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -32,7 +35,8 @@ type SystemAPI struct {
 	DataDir       string
 	DatabaseFile  string
 	VersionInfo   *model.VersionInfo
-	NotifyDeleted func(uint, string)
+	NotifyDeleted     func(uint, string)
+	ConnectedClients func() int
 }
 
 type sessionView struct {
@@ -82,6 +86,25 @@ func (a *SystemAPI) SaveSecurityPolicy(ctx *gin.Context) {
 func (a *SystemAPI) GetOperations(ctx *gin.Context) {
 	summary, err := a.DB.GetOperationsSummary(a.Dialect)
 	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	if a.ConnectedClients != nil {
+		summary.ConnectedClients = a.ConnectedClients()
+	}
+	if a.DataDir != "" {
+		attachmentDir := filepath.Join(a.DataDir, "attachments")
+		_ = filepath.Walk(a.DataDir, func(path string, info os.FileInfo, walkErr error) error {
+			if walkErr != nil || info == nil {
+				return nil
+			}
+			if info.Mode().IsRegular() {
+				summary.StorageFiles++
+				summary.StorageBytes += info.Size()
+				if strings.HasPrefix(filepath.Clean(path), filepath.Clean(attachmentDir)+string(os.PathSeparator)) {
+					summary.AttachmentFiles++
+				}
+			}
+			return nil
+		})
+	}
 	ctx.JSON(http.StatusOK, summary)
 }
 
