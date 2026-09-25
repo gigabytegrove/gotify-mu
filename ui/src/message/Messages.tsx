@@ -31,6 +31,7 @@ import {IMessage} from '../types';
 import {useStores} from '../stores';
 import {PushMessageDialog} from './PushMessageDialog';
 import ChatComposer from './ChatComposer';
+import MessageSearchDialog from './MessageSearchDialog';
 
 const UndoAutoHideMs = 5000;
 
@@ -43,6 +44,7 @@ const Messages = observer(() => {
     const [archivedView, setArchivedView] = React.useState(false);
     const [isLoadingMore, setLoadingMore] = React.useState(false);
     const [query, setQuery] = React.useState('');
+    const [advancedSearchOpen, setAdvancedSearchOpen] = React.useState(false);
 
     const {messagesStore, appStore, currentUser} = useStores();
     const messages = archivedView ? messagesStore.getArchived(appId) : messagesStore.get(appId);
@@ -206,6 +208,12 @@ const Messages = observer(() => {
                             </Button>
                         )}
                         <Button
+                            variant="outlined"
+                            startIcon={<Search />}
+                            onClick={() => setAdvancedSearchOpen(true)}>
+                            Advanced Search
+                        </Button>
+                        <Button
                             id="toggle-archive-view"
                             variant="outlined"
                             startIcon={archivedView ? <Restore /> : <Archive />}
@@ -326,6 +334,12 @@ const Messages = observer(() => {
                     />
                 )}
             </SurfaceCard>
+
+            <MessageSearchDialog
+                open={advancedSearchOpen}
+                onClose={() => setAdvancedSearchOpen(false)}
+                initialApplicationId={appId > 0 ? appId : undefined}
+            />
 
             {deleteAll && (
                 <ConfirmDialog
