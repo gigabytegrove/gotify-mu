@@ -23,6 +23,7 @@ type UserDatabase interface {
 	CountUser(condition ...any) (int64, error)
 	GetApplicationsByUser(userID uint) ([]*model.Application, error)
 	CountApplicationMemberships(applicationID uint) (int64, error)
+	GetSecurityPolicy() (model.SecurityPolicy, error)
 }
 
 // UserChangeNotifier notifies listeners for user changes.
@@ -65,6 +66,17 @@ type UserAPI struct {
 	PasswordStrength   int
 	UserChangeNotifier *UserChangeNotifier
 	Registration       bool
+}
+
+
+func (a *UserAPI) validatePassword(value string) error {
+	if err := password.ValidateNewPassword(value); err != nil { return err }
+	policy, err := a.DB.GetSecurityPolicy()
+	if err != nil { return err }
+	if len([]rune(value)) < policy.MinimumPasswordLength {
+		return fmt.Errorf("password must be at least %d characters", policy.MinimumPasswordLength)
+	}
+	return nil
 }
 
 // GetUsers returns all the users
@@ -191,7 +203,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 func (a *UserAPI) CreateUser(ctx *gin.Context) {
 	user := model.CreateUserExternal{}
 	if err := ctx.Bind(&user); err == nil {
-		if err := password.ValidateNewPassword(user.Pass); err != nil {
+		if err := a.validatePassword(user.Pass); err != nil {
 			ctx.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
@@ -413,7 +425,7 @@ func (a *UserAPI) DeleteUserByID(ctx *gin.Context) {
 func (a *UserAPI) ChangePassword(ctx *gin.Context) {
 	pw := model.UserExternalPass{}
 	if err := ctx.Bind(&pw); err == nil {
-		if err := password.ValidateNewPassword(pw.Pass); err != nil {
+		if err := a.validatePassword(pw.Pass); err != nil {
 			ctx.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
@@ -499,7 +511,7 @@ func (a *UserAPI) UpdateUserByID(ctx *gin.Context) {
 				dbUser.Admin = updatedUser.Admin
 
 				if updatedUser.Pass != "" {
-					if err := password.ValidateNewPassword(updatedUser.Pass); err != nil {
+					if err := a.validatePassword(updatedUser.Pass); err != nil {
 						ctx.AbortWithError(http.StatusBadRequest, err)
 						return
 					}
