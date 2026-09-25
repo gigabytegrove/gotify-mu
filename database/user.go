@@ -33,6 +33,15 @@ func (d *GormDatabase) GetUserByOIDC(oidcID string) (*model.User, error) {
 	return nil, err
 }
 
+// GetUserByLDAP returns the user linked to a normalized LDAP/Active Directory DN.
+func (d *GormDatabase) GetUserByLDAP(ldapID string) (*model.User, error) {
+	user := new(model.User)
+	err := d.DB.Where("ldap_id = ?", ldapID).Find(user).Error
+	if err == gorm.ErrRecordNotFound { err = nil }
+	if user.LDAPID != nil && *user.LDAPID == ldapID { return user, err }
+	return nil, err
+}
+
 // GetUserByID returns the user by the given id or nil.
 func (d *GormDatabase) GetUserByID(id uint) (*model.User, error) {
 	user := new(model.User)
