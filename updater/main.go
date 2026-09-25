@@ -58,6 +58,23 @@ type restartPolicy struct {
 	MaximumRetryCount int    `json:"MaximumRetryCount"`
 }
 
+type deviceMapping struct {
+	PathOnHost        string `json:"PathOnHost"`
+	PathInContainer   string `json:"PathInContainer"`
+	CgroupPermissions string `json:"CgroupPermissions"`
+}
+
+type logConfig struct {
+	Type   string            `json:"Type"`
+	Config map[string]string `json:"Config"`
+}
+
+type ulimit struct {
+	Name string `json:"Name"`
+	Hard int64  `json:"Hard"`
+	Soft int64  `json:"Soft"`
+}
+
 type mountInfo struct {
 	Type        string `json:"Type"`
 	Name        string `json:"Name"`
@@ -76,6 +93,9 @@ type inspectedContainer struct {
 		User       string            `json:"User"`
 		WorkingDir string            `json:"WorkingDir"`
 		Labels     map[string]string `json:"Labels"`
+		Hostname   string            `json:"Hostname"`
+		Cmd        []string          `json:"Cmd"`
+		Entrypoint []string          `json:"Entrypoint"`
 	} `json:"Config"`
 	HostConfig struct {
 		Binds         []string                 `json:"Binds"`
@@ -85,6 +105,19 @@ type inspectedContainer struct {
 		ExtraHosts    []string                 `json:"ExtraHosts"`
 		DNS           []string                 `json:"Dns"`
 		DNSSearch     []string                 `json:"DnsSearch"`
+		Memory        int64                    `json:"Memory"`
+		NanoCPUs      int64                    `json:"NanoCpus"`
+		PidsLimit     int64                    `json:"PidsLimit"`
+		CapAdd        []string                 `json:"CapAdd"`
+		CapDrop       []string                 `json:"CapDrop"`
+		ReadonlyRootfs bool                    `json:"ReadonlyRootfs"`
+		Privileged    bool                     `json:"Privileged"`
+		SecurityOpt   []string                 `json:"SecurityOpt"`
+		ShmSize       int64                    `json:"ShmSize"`
+		Tmpfs         map[string]string        `json:"Tmpfs"`
+		Devices       []deviceMapping          `json:"Devices"`
+		LogConfig     logConfig                `json:"LogConfig"`
+		Ulimits       []ulimit                 `json:"Ulimits"`
 	} `json:"HostConfig"`
 	Mounts []mountInfo `json:"Mounts"`
 	NetworkSettings struct {
@@ -485,6 +518,64 @@ func createArgs(name, image string, inspected *inspectedContainer) []string {
 	for _, env := range inspected.Config.Env {
 		args = append(args, "--env", env)
 	}
+	for key, value := range inspected.Config.Labels {
+		args = append(args, "--label", key+"="+value)
+	}
+	if inspected.Config.Hostname != "" {
+		args = append(args, "--hostname", inspected.Config.Hostname)
+	}
+	if len(inspected.Config.Entrypoint) > 0 && inspected.Config.Entrypoint[0] != "" {
+		args = append(args, "--entrypoint", inspected.Config.Entrypoint[0])
+	}
+
+	if inspected.HostConfig.Memory > 0 {
+		args = append(args, "--memory", strconv.FormatInt(inspected.HostConfig.Memory, 10))
+	}
+	if inspected.HostConfig.NanoCPUs > 0 {
+		args = append(args, "--cpus", strconv.FormatFloat(float64(inspected.HostConfig.NanoCPUs)/1e9, 'f', -1, 64))
+	}
+	if inspected.HostConfig.PidsLimit > 0 {
+		args = append(args, "--pids-limit", strconv.FormatInt(inspected.HostConfig.PidsLimit, 10))
+	}
+	for _, capability := range inspected.HostConfig.CapAdd {
+		args = append(args, "--cap-add", capability)
+	}
+	for _, capability := range inspected.HostConfig.CapDrop {
+		args = append(args, "--cap-drop", capability)
+	}
+	if inspected.HostConfig.ReadonlyRootfs {
+		args = append(args, "--read-only")
+	}
+	if inspected.HostConfig.Privileged {
+		args = append(args, "--privileged")
+	}
+	for _, option := range inspected.HostConfig.SecurityOpt {
+		args = append(args, "--security-opt", option)
+	}
+	if inspected.HostConfig.ShmSize > 0 {
+		args = append(args, "--shm-size", strconv.FormatInt(inspected.HostConfig.ShmSize, 10))
+	}
+	for target, options := range inspected.HostConfig.Tmpfs {
+		value := target
+		if options != "" { value += ":" + options }
+		args = append(args, "--tmpfs", value)
+	}
+	for _, device := range inspected.HostConfig.Devices {
+		value := device.PathOnHost
+		if device.PathInContainer != "" { value += ":" + device.PathInContainer }
+		if device.CgroupPermissions != "" { value += ":" + device.CgroupPermissions }
+		args = append(args, "--device", value)
+	}
+	if inspected.HostConfig.LogConfig.Type != "" && inspected.HostConfig.LogConfig.Type != "json-file" {
+		args = append(args, "--log-driver", inspected.HostConfig.LogConfig.Type)
+	}
+	for key, value := range inspected.HostConfig.LogConfig.Config {
+		args = append(args, "--log-opt", key+"="+value)
+	}
+	for _, limit := range inspected.HostConfig.Ulimits {
+		if limit.Name == "" { continue }
+		args = append(args, "--ulimit", fmt.Sprintf("%s=%d:%d", limit.Name, limit.Soft, limit.Hard))
+	}
 
 	binds := inspected.HostConfig.Binds
 	if len(binds) == 0 {
@@ -547,6 +638,9 @@ func createArgs(name, image string, inspected *inspectedContainer) []string {
 	}
 
 	args = append(args, image)
+	if len(inspected.Config.Cmd) > 0 {
+		args = append(args, inspected.Config.Cmd...)
+	}
 	return args
 }
 
