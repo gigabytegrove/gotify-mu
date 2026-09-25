@@ -95,7 +95,17 @@ func (d *GormDatabase) DeleteApplicationByID(id uint) error {
 		if err := tx.Where("application_id = ?", id).Delete(&model.WebhookRoute{}).Error; err != nil { return err }
 		if err := tx.Where("application_id = ?", id).Delete(&model.MQTTIntegration{}).Error; err != nil { return err }
 		if err := tx.Where("application_id = ?", id).Delete(&model.HomeAssistantIntegration{}).Error; err != nil { return err }
+		var scheduleIDs []uint
+		if err := tx.Model(&model.ScheduledNotification{}).Where("application_id = ?", id).Pluck("id", &scheduleIDs).Error; err != nil { return err }
+		if len(scheduleIDs) > 0 {
+			if err := tx.Where("schedule_id IN ?", scheduleIDs).Delete(&model.ScheduledNotificationRun{}).Error; err != nil { return err }
+		}
 		if err := tx.Where("application_id = ?", id).Delete(&model.ScheduledNotification{}).Error; err != nil { return err }
+		if err := tx.Where("source_application_id = ?", id).Delete(&model.EmailGateway{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.SMTPRoute{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.RSSMonitor{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.SyslogRoute{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.CalendarMonitor{}).Error; err != nil { return err }
 		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationGroupAssignment{}).Error; err != nil { return err }
 		if err := tx.Where("application_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
 		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil { return err }
