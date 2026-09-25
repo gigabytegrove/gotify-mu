@@ -337,6 +337,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/automation/schedule", automationHandler.GetSchedules)
 		adminPlatform.POST("/automation/schedule", automationHandler.CreateSchedule)
 		adminPlatform.PUT("/automation/schedule/:id", automationHandler.UpdateSchedule)
+		adminPlatform.GET("/automation/schedule/:id/runs", automationHandler.GetScheduleRuns)
 		adminPlatform.DELETE("/automation/schedule/:id", automationHandler.DeleteSchedule)
 
 		adminPlatform.GET("/automation/escalation", automationHandler.GetEscalations)
