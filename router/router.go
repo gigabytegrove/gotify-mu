@@ -125,7 +125,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	applicationMembershipHandler := api.ApplicationMembershipAPI{
 		DB: db,
 	}
-	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled, Policy: policyProvider}
+	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled, Policy: policyProvider, LoginLimiter: loginLimiter}
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration, Policy: policyProvider}
 	auditHandler := api.AuditAPI{DB: db}
@@ -133,6 +133,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
 	securityPolicyHandler := api.SecurityPolicyAPI{DB: db}
+	mfaHandler := api.MFAAPI{DB: db}
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
@@ -315,6 +316,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientAuth.PUT("/automation/quiet-hours", automationHandler.SaveQuietHours)
 		clientAuth.GET("/automation/digest", automationHandler.GetDigest)
 		clientAuth.PUT("/automation/digest", automationHandler.SaveDigest)
+		clientAuth.GET("/security/mfa", mfaHandler.Status)
 	}
 
 	clientElevated := g.Group("")
@@ -336,6 +338,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.DELETE("/application/:id/message/all", messageHandler.DeleteMessagesForEveryone)
 		clientElevated.DELETE("/client/:id", clientHandler.DeleteClient)
 		clientElevated.POST("/current/user/password", userHandler.ChangePassword)
+		clientElevated.POST("/security/mfa/start", mfaHandler.Start)
+		clientElevated.POST("/security/mfa/enable", mfaHandler.Enable)
+		clientElevated.POST("/security/mfa/disable", mfaHandler.Disable)
 	}
 
 	authAdmin := g.Group("/user")
