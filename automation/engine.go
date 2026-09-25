@@ -639,7 +639,6 @@ func (e *Engine) restartIntegrations() {
 			e.runHomeAssistantLoop(ctx, &integration)
 		}(runtimeItem)
 	}
-}
 	for _, item := range rssItems {
 		if !item.Enabled { continue }
 		ctx, cancel := context.WithCancel(e.ctx)
