@@ -14,6 +14,7 @@ import (
 	"github.com/gotify/server/v3/api"
 	"github.com/gotify/server/v3/api/stream"
 	"github.com/gotify/server/v3/auth"
+	"github.com/gotify/server/v3/automation"
 	"github.com/gotify/server/v3/config"
 	"github.com/gotify/server/v3/database"
 	"github.com/gotify/server/v3/docs"
@@ -91,7 +92,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		LocalAuthEnabled: conf.LocalAuthEnabled,
 		CrossOrigin:      http.NewCrossOriginProtection(),
 	}
-	messageHandler := api.MessageAPI{Notifier: streamHandler, DB: db}
+	automationEngine := automation.New(db, streamHandler)
+	messageHandler := api.MessageAPI{Notifier: streamHandler, DB: db, Dispatcher: automationEngine}
 	healthHandler := api.HealthAPI{DB: db}
 	clientHandler := api.ClientAPI{
 		DB:            db,
@@ -111,6 +113,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	auditHandler := api.AuditAPI{DB: db}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
+	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
@@ -139,6 +142,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}
 
 	g.Match([]string{"GET", "HEAD"}, "/health", healthHandler.Health)
+	g.POST("/integrations/webhook/:secret", automationHandler.ReceiveWebhook)
 	g.GET("/swagger", docs.Serve)
 	g.StaticFS("/image", &onlyImageFS{inner: gin.Dir(conf.UploadedImagesDir, false)})
 
@@ -247,11 +251,18 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			message.DELETE("/:id", messageHandler.DeleteMessage)
 			message.POST("/:id/archive", messageHandler.ArchiveMessage)
 			message.DELETE("/:id/archive", messageHandler.UnarchiveMessage)
+		message.GET("/:id/acknowledgement", automationHandler.GetAcknowledgement)
+		message.POST("/:id/acknowledgement", automationHandler.AcknowledgeMessage)
+		message.DELETE("/:id/acknowledgement", automationHandler.UnacknowledgeMessage)
 		}
 
 		clientAuth.GET("/stream", streamHandler.Handle)
 		clientAuth.GET("current/user", userHandler.GetCurrentUser)
 		clientAuth.POST("/auth/logout", sessionHandler.Logout)
+		clientAuth.GET("/automation/quiet-hours", automationHandler.GetQuietHours)
+		clientAuth.PUT("/automation/quiet-hours", automationHandler.SaveQuietHours)
+		clientAuth.GET("/automation/digest", automationHandler.GetDigest)
+		clientAuth.PUT("/automation/digest", automationHandler.SaveDigest)
 	}
 
 	clientElevated := g.Group("")
@@ -294,8 +305,37 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.DELETE("/group/:id/members/:userId", groupHandler.RemoveMember)
 		adminPlatform.GET("/update/status", updateHandler.Status)
 		adminPlatform.POST("/update/install", updateHandler.Install)
+
+		adminPlatform.GET("/integration/webhook", automationHandler.GetWebhookRoutes)
+		adminPlatform.POST("/integration/webhook", automationHandler.CreateWebhookRoute)
+		adminPlatform.PUT("/integration/webhook/:id", automationHandler.UpdateWebhookRoute)
+		adminPlatform.POST("/integration/webhook/:id/regenerate", automationHandler.RegenerateWebhookSecret)
+		adminPlatform.DELETE("/integration/webhook/:id", automationHandler.DeleteWebhookRoute)
+
+		adminPlatform.GET("/integration/mqtt", automationHandler.GetMQTT)
+		adminPlatform.POST("/integration/mqtt", automationHandler.CreateMQTT)
+		adminPlatform.PUT("/integration/mqtt/:id", automationHandler.UpdateMQTT)
+		adminPlatform.DELETE("/integration/mqtt/:id", automationHandler.DeleteMQTT)
+
+		adminPlatform.GET("/integration/home-assistant", automationHandler.GetHomeAssistant)
+		adminPlatform.POST("/integration/home-assistant", automationHandler.CreateHomeAssistant)
+		adminPlatform.PUT("/integration/home-assistant/:id", automationHandler.UpdateHomeAssistant)
+		adminPlatform.DELETE("/integration/home-assistant/:id", automationHandler.DeleteHomeAssistant)
+
+		adminPlatform.GET("/automation/schedule", automationHandler.GetSchedules)
+		adminPlatform.POST("/automation/schedule", automationHandler.CreateSchedule)
+		adminPlatform.PUT("/automation/schedule/:id", automationHandler.UpdateSchedule)
+		adminPlatform.DELETE("/automation/schedule/:id", automationHandler.DeleteSchedule)
+
+		adminPlatform.GET("/automation/escalation", automationHandler.GetEscalations)
+		adminPlatform.POST("/automation/escalation", automationHandler.CreateEscalation)
+		adminPlatform.PUT("/automation/escalation/:id", automationHandler.UpdateEscalation)
+		adminPlatform.DELETE("/automation/escalation/:id", automationHandler.DeleteEscalation)
 	}
-	return g, streamHandler.Close
+	return g, func() {
+		automationEngine.Close()
+		streamHandler.Close()
+	}
 }
 
 func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
@@ -359,6 +399,12 @@ func shouldAuditMutation(path string) bool {
 	case strings.HasPrefix(path, "/application") && !strings.Contains(path, "/message"):
 		return true
 	case strings.HasPrefix(path, "/update"):
+		return true
+	case strings.HasPrefix(path, "/integration"):
+		return true
+	case strings.HasPrefix(path, "/automation"):
+		return true
+	case strings.Contains(path, "/acknowledgement"):
 		return true
 	default:
 		return false
