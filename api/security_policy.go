@@ -11,6 +11,7 @@ import (
 type SecurityPolicyDatabase interface {
 	GetSecurityPolicy() (*model.SecurityPolicy, error)
 	SaveSecurityPolicy(item *model.SecurityPolicy) error
+	CountUsersWithoutMFA(adminOnly bool) (int64, error)
 }
 
 type SecurityPolicyAPI struct {
@@ -46,6 +47,21 @@ func (a *SecurityPolicyAPI) Save(ctx *gin.Context) {
 		return
 	}
 
+	if item.RequireMFAAll {
+		count, err := a.DB.CountUsersWithoutMFA(false)
+		if !successOrAbort(ctx, 500, err) { return }
+		if count > 0 {
+			ctx.AbortWithError(400, errors.New("MFA cannot be required for all users until every user is enrolled"))
+			return
+		}
+	} else if item.RequireMFAAdmins {
+		count, err := a.DB.CountUsersWithoutMFA(true)
+		if !successOrAbort(ctx, 500, err) { return }
+		if count > 0 {
+			ctx.AbortWithError(400, errors.New("MFA cannot be required for administrators until every administrator is enrolled"))
+			return
+		}
+	}
 	if !successOrAbort(ctx, 500, a.DB.SaveSecurityPolicy(item)) { return }
 	ctx.JSON(200, item)
 }
