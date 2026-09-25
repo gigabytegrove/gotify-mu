@@ -33,6 +33,7 @@ var timeNow = time.Now
 // The Database interface for encapsulating database access.
 type Database interface {
 	GetApplicationByToken(token string) (*model.Application, error)
+	GetApplicationByID(id uint) (*model.Application, error)
 	GetClientByToken(token string) (*model.Client, error)
 	GetUserByName(name string) (*model.User, error)
 	GetUserByID(id uint) (*model.User, error)
