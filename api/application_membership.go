@@ -15,6 +15,7 @@ type ApplicationMembershipDatabase interface {
 	GetUserByID(id uint) (*model.User, error)
 	GetUsers() ([]*model.User, error)
 	GetUserGroupByID(id uint) (*model.UserGroup, error)
+	GetUserGroups() ([]*model.UserGroup, error)
 	CountUserGroupMembers(groupID uint) (int64, error)
 	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	GetApplicationMemberships(applicationID uint) ([]*model.ApplicationMembership, error)
@@ -301,6 +302,28 @@ func (a *ApplicationMembershipAPI) GetAssignableUsers(ctx *gin.Context) {
 		result := make([]*model.UserExternal, 0, len(users))
 		for _, user := range users {
 			result = append(result, toExternalUser(user))
+		}
+		ctx.JSON(http.StatusOK, result)
+	})
+}
+
+func (a *ApplicationMembershipAPI) GetAssignableGroups(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if _, ok := a.getAuthorizedApplication(ctx, id); !ok { return }
+		groups, err := a.DB.GetUserGroups()
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		result := make([]model.UserGroupExternal, 0, len(groups))
+		for _, group := range groups {
+			count, err := a.DB.CountUserGroupMembers(group.ID)
+			if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+			result = append(result, model.UserGroupExternal{
+				ID:group.ID,
+				Name:group.Name,
+				Description:group.Description,
+				MemberCount:count,
+				CreatedAt:group.CreatedAt,
+				UpdatedAt:group.UpdatedAt,
+			})
 		}
 		ctx.JSON(http.StatusOK, result)
 	})
