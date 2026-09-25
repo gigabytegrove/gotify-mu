@@ -1,7 +1,11 @@
 package database
 
 import (
+	"errors"
+	"os"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/gotify/server/v3/model"
 	"gorm.io/gorm"
@@ -127,4 +131,17 @@ func (d *GormDatabase) GetOperationsSummary(dialect string) (model.OperationsSum
 		if err := query.Count(item.target).Error; err != nil { return result, err }
 	}
 	return result, nil
+}
+
+
+func (d *GormDatabase) CreateBackupSnapshot(destination string) error {
+	if d.DB.Dialector.Name() != "sqlite" {
+		return errors.New("online backup bundles currently require SQLite")
+	}
+	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
+		return err
+	}
+	_ = os.Remove(destination)
+	clean := strings.ReplaceAll(destination, "'", "''")
+	return d.DB.Exec("VACUUM INTO '" + clean + "'").Error
 }
