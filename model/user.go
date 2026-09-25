@@ -140,6 +140,7 @@ type CurrentUserExternal struct {
 	MFAEnabled  bool   `json:"mfaEnabled"`
 	MFARequired bool   `json:"mfaRequired"`
 	AuthProvider string `json:"authProvider,omitempty"`
+	PasskeyCount int `json:"passkeyCount"`
 }
 
 // UserExternalPass Model
