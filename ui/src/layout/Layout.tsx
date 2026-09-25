@@ -31,6 +31,7 @@ import Groups from '../group/Groups';
 import Audit from '../audit/Audit';
 import Integrations from '../integration/Integrations';
 import Automation from '../automation/Automation';
+import Operations from '../operations/Operations';
 import {observer} from 'mobx-react-lite';
 import {ConnectionErrorBanner} from '../common/ConnectionErrorBanner';
 import {useStores} from '../stores';
@@ -153,6 +154,10 @@ const Layout = observer(() => {
                                     <Route
                                         path="/automation"
                                         element={authed(elevated(<Automation />))}
+                                    />
+                                    <Route
+                                        path="/operations"
+                                        element={authed(elevated(<Operations />))}
                                     />
                                     <Route
                                         path="/settings"
