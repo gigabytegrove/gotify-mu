@@ -4,7 +4,9 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
+	"encoding/hex"
 	"encoding/binary"
 	"encoding/json"
 	"errors"
@@ -16,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -57,6 +60,7 @@ type Database interface {
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
 	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
+	TryAcquireAutomationLease(name, owner string, now time.Time, ttl time.Duration) (bool, error)
 }
 
 // Engine runs scheduled work and persistent native integrations.
@@ -72,6 +76,8 @@ type Engine struct {
 	integrationCancels []context.CancelFunc
 	integrationWG      sync.WaitGroup
 	reload             chan struct{}
+	leader             atomic.Bool
+	instanceID         string
 }
 
 func New(db Database, notifier Notifier) *Engine {
@@ -82,8 +88,10 @@ func New(db Database, notifier Notifier) *Engine {
 		ctx: ctx,
 		cancel: cancel,
 		reload: make(chan struct{}, 1),
+		instanceID: newInstanceID(),
 	}
-	e.wg.Add(2)
+	e.wg.Add(3)
+	go e.leadershipLoop()
 	go e.schedulerLoop()
 	go e.integrationLoop()
 	return e
@@ -227,17 +235,51 @@ func (e *Engine) queueEscalations(msg *model.Message) error {
 	return nil
 }
 
-func (e *Engine) schedulerLoop() {
+func (e *Engine) leadershipLoop() {
 	defer e.wg.Done()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	e.runDue(time.Now())
+
+	check := func(now time.Time) {
+		acquired, err := e.db.TryAcquireAutomationLease("automation", e.instanceID, now, 30*time.Second)
+		if err != nil {
+			log.Error().Err(err).Msg("Could not acquire automation leadership")
+			acquired = false
+		}
+		previous := e.leader.Swap(acquired)
+		if previous != acquired {
+			e.ReloadIntegrations()
+			if acquired {
+				log.Info().Str("instance", e.instanceID).Msg("This server is now the automation leader")
+			} else {
+				log.Warn().Str("instance", e.instanceID).Msg("This server is no longer the automation leader")
+			}
+		}
+	}
+
+	check(time.Now())
 	for {
 		select {
 		case <-e.ctx.Done():
 			return
 		case now := <-ticker.C:
-			e.runDue(now)
+			check(now)
+		}
+	}
+}
+
+func (e *Engine) schedulerLoop() {
+	defer e.wg.Done()
+	ticker := time.NewTicker(10 * time.Second)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-e.ctx.Done():
+			return
+		case now := <-ticker.C:
+			if e.leader.Load() {
+				e.runDue(now)
+			}
 		}
 	}
 }
@@ -445,6 +487,9 @@ func (e *Engine) stopIntegrations() {
 
 func (e *Engine) restartIntegrations() {
 	e.stopIntegrations()
+	if !e.leader.Load() {
+		return
+	}
 	mqttItems, err := e.db.GetMQTTIntegrations()
 	if err != nil {
 		log.Error().Err(err).Msg("Could not load MQTT integrations")
@@ -898,4 +943,13 @@ func clamp(value, min, max int) int {
 	if value < min { return min }
 	if value > max { return max }
 	return value
+}
+
+
+func newInstanceID() string {
+	raw := make([]byte, 12)
+	if _, err := rand.Read(raw); err != nil {
+		return fmt.Sprintf("instance-%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(raw)
 }
