@@ -22,6 +22,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/gotify/server/v3/model"
+	"github.com/robfig/cron"
 	"github.com/rs/zerolog/log"
 )
 
@@ -49,6 +50,8 @@ type Database interface {
 	GetScheduledNotifications() ([]*model.ScheduledNotification, error)
 	GetDueScheduledNotifications(now time.Time) ([]*model.ScheduledNotification, error)
 	SaveScheduledNotification(item *model.ScheduledNotification) error
+	CreateScheduledNotificationRun(item *model.ScheduledNotificationRun) error
+	SaveScheduledNotificationRun(item *model.ScheduledNotificationRun) error
 
 	GetEscalationRulesForMessage(applicationID uint, priority int) ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
@@ -288,6 +291,33 @@ func (e *Engine) runSchedules(now time.Time) {
 	for _, item := range items {
 		scheduledFor := now
 		if item.NextRunAt != nil { scheduledFor = *item.NextRunAt }
+
+		run := &model.ScheduledNotificationRun{
+			ScheduleID:item.ID,
+			ScheduledFor:scheduledFor,
+			StartedAt:now,
+			Status:"running",
+		}
+		if err := e.db.CreateScheduledNotificationRun(run); err != nil {
+			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not create schedule run history")
+			continue
+		}
+
+		misfirePolicy := strings.ToLower(strings.TrimSpace(item.MisfirePolicy))
+		if misfirePolicy == "" { misfirePolicy = "send" }
+		if misfirePolicy == "skip" && now.Sub(scheduledFor) > 5*time.Minute {
+			finished := now
+			run.Status = "skipped"
+			run.FinishedAt = &finished
+			_ = e.db.SaveScheduledNotificationRun(run)
+			item.LastStatus = "skipped"
+			item.LastError = ""
+			item.NextRunAt = NextScheduleRun(item, scheduledFor.Add(time.Second))
+			if item.NextRunAt == nil { item.Enabled = false }
+			_ = e.db.SaveScheduledNotification(item)
+			continue
+		}
+
 		msg := &model.Message{
 			ApplicationID:item.ApplicationID,
 			Title:item.Title,
@@ -296,17 +326,36 @@ func (e *Engine) runSchedules(now time.Time) {
 			Date:now,
 			DeduplicationKey:fmt.Sprintf("schedule:%d:%d", item.ID, scheduledFor.UnixNano()),
 		}
-		if _, err := e.storeAndDeliver(msg, true); err != nil {
-			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
+		external, publishErr := e.storeAndDeliver(msg, true)
+		finished := time.Now()
+		run.FinishedAt = &finished
+		if publishErr != nil {
+			run.Status = "failed"
+			run.Error = publishErr.Error()
+			item.LastStatus = "failed"
+			item.LastError = publishErr.Error()
+			retry := now.Add(time.Minute)
+			item.NextRunAt = &retry
+			_ = e.db.SaveScheduledNotificationRun(run)
+			_ = e.db.SaveScheduledNotification(item)
+			log.Error().Err(publishErr).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
 			continue
 		}
+		run.Status = "completed"
+		if external != nil { run.MessageID = external.ID }
+		_ = e.db.SaveScheduledNotificationRun(run)
+
 		runAt := now
 		item.LastRunAt = &runAt
-		if item.ScheduleType == "once" {
+		item.RunCount++
+		item.LastStatus = "completed"
+		item.LastError = ""
+		if item.ScheduleType == "once" || (item.MaxRuns > 0 && item.RunCount >= item.MaxRuns) {
 			item.Enabled = false
 			item.NextRunAt = nil
 		} else {
-			item.NextRunAt = NextScheduleRun(item, now.Add(time.Second))
+			item.NextRunAt = NextScheduleRun(item, scheduledFor.Add(time.Second))
+			if item.NextRunAt == nil { item.Enabled = false }
 		}
 		if err := e.db.SaveScheduledNotification(item); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not update schedule")
@@ -314,13 +363,33 @@ func (e *Engine) runSchedules(now time.Time) {
 	}
 }
 
-func NextScheduleRun(item *model.ScheduledNotification, now time.Time) *time.Time {
+func scheduleLocation(item *model.ScheduledNotification) *time.Location {
 	loc := time.UTC
 	if item.Timezone != "" {
-		if parsed, err := time.LoadLocation(item.Timezone); err == nil {
-			loc = parsed
-		}
+		if parsed, err := time.LoadLocation(item.Timezone); err == nil { loc = parsed }
 	}
+	return loc
+}
+
+func excludedScheduleDate(item *model.ScheduledNotification, candidate time.Time) bool {
+	if strings.TrimSpace(item.ExcludedDates) == "" { return false }
+	localDate := candidate.In(scheduleLocation(item)).Format("2006-01-02")
+	for _, raw := range strings.FieldsFunc(item.ExcludedDates, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == ' ' || r == '\t'
+	}) {
+		if strings.TrimSpace(raw) == localDate { return true }
+	}
+	return false
+}
+
+func scheduleWithinLimits(item *model.ScheduledNotification, candidate time.Time) bool {
+	if item.MaxRuns > 0 && item.RunCount >= item.MaxRuns { return false }
+	if item.EndAt != nil && candidate.After(*item.EndAt) { return false }
+	return true
+}
+
+func nextScheduleCandidate(item *model.ScheduledNotification, now time.Time) *time.Time {
+	loc := scheduleLocation(item)
 	localNow := now.In(loc)
 
 	switch item.ScheduleType {
@@ -332,30 +401,41 @@ func NextScheduleRun(item *model.ScheduledNotification, now time.Time) *time.Tim
 		return nil
 	case "hourly":
 		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), localNow.Hour(), clamp(item.Minute, 0, 59), 0, 0, loc)
-		if !candidate.After(localNow) {
-			candidate = candidate.Add(time.Hour)
-		}
+		if !candidate.After(localNow) { candidate = candidate.Add(time.Hour) }
 		value := candidate.UTC()
 		return &value
 	case "daily":
 		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc)
-		if !candidate.After(localNow) {
-			candidate = candidate.AddDate(0, 0, 1)
-		}
+		if !candidate.After(localNow) { candidate = candidate.AddDate(0, 0, 1) }
 		value := candidate.UTC()
 		return &value
 	case "weekly":
 		weekday := time.Weekday(clamp(item.Weekday, 0, 6))
 		days := (int(weekday) - int(localNow.Weekday()) + 7) % 7
 		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc).AddDate(0, 0, days)
-		if !candidate.After(localNow) {
-			candidate = candidate.AddDate(0, 0, 7)
-		}
+		if !candidate.After(localNow) { candidate = candidate.AddDate(0, 0, 7) }
+		value := candidate.UTC()
+		return &value
+	case "cron":
+		schedule, err := cron.Parse(strings.TrimSpace(item.CronExpression))
+		if err != nil { return nil }
+		candidate := schedule.Next(localNow)
 		value := candidate.UTC()
 		return &value
 	default:
 		return nil
 	}
+}
+
+func NextScheduleRun(item *model.ScheduledNotification, now time.Time) *time.Time {
+	searchFrom := now
+	for attempts := 0; attempts < 10000; attempts++ {
+		candidate := nextScheduleCandidate(item, searchFrom)
+		if candidate == nil || !scheduleWithinLimits(item, *candidate) { return nil }
+		if !excludedScheduleDate(item, *candidate) { return candidate }
+		searchFrom = candidate.Add(time.Second)
+	}
+	return nil
 }
 
 func (e *Engine) runDigests(now time.Time) {
