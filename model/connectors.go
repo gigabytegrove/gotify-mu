@@ -29,6 +29,9 @@ type SMTPRoute struct {
 	ApplicationID uint      `gorm:"index" json:"applicationId"`
 	Recipient     string    `gorm:"type:text;index" json:"recipient"`
 	AllowedCIDRs  string    `gorm:"type:text" json:"allowedCidrs"`
+	SenderContains string   `gorm:"type:text" json:"senderContains"`
+	SubjectContains string  `gorm:"type:text" json:"subjectContains"`
+	MaxMessageBytes int     `json:"maxMessageBytes"`
 	Username      string    `gorm:"type:text" json:"username"`
 	Password      string    `gorm:"type:text" json:"-"`
 	Enabled       bool      `json:"enabled"`
@@ -42,6 +45,9 @@ type RSSMonitor struct {
 	ApplicationID uint       `gorm:"index" json:"applicationId"`
 	URL           string     `gorm:"type:text" json:"url"`
 	IntervalMinutes int      `json:"intervalMinutes"`
+	TitleContains  string     `gorm:"type:text" json:"titleContains"`
+	CategoryContains string   `gorm:"type:text" json:"categoryContains"`
+	Priority       int        `json:"priority"`
 	Enabled       bool       `json:"enabled"`
 	Status        string     `gorm:"type:varchar(24)" json:"status"`
 	ETag          string     `gorm:"type:text" json:"-"`
@@ -61,6 +67,7 @@ type SyslogRoute struct {
 	Facility      int       `json:"facility"`
 	MaxSeverity   int       `json:"maxSeverity"`
 	AllowedCIDRs  string    `gorm:"type:text" json:"allowedCidrs"`
+	DeduplicateSeconds int   `json:"deduplicateSeconds"`
 	Enabled       bool      `json:"enabled"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
@@ -73,6 +80,9 @@ type CalendarMonitor struct {
 	URL              string     `gorm:"type:text" json:"url"`
 	IntervalMinutes  int        `json:"intervalMinutes"`
 	NotifyBeforeMinutes int     `json:"notifyBeforeMinutes"`
+	TitleContains      string    `gorm:"type:text" json:"titleContains"`
+	LocationContains   string    `gorm:"type:text" json:"locationContains"`
+	Priority           int       `json:"priority"`
 	Enabled          bool       `json:"enabled"`
 	Status           string     `gorm:"type:varchar(24)" json:"status"`
 	LastCheckedAt    *time.Time `json:"lastCheckedAt,omitempty"`
