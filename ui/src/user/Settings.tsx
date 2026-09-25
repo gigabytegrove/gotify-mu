@@ -123,7 +123,14 @@ const NotificationPreferences = () => {
         void Promise.all([
             axios
                 .get<IQuietHoursPolicy>(config.get('url') + 'automation/quiet-hours')
-                .then((response) => setQuiet(response.data)),
+                .then((response) =>
+                    setQuiet({
+                        ...response.data,
+                        timezone: response.data.id
+                            ? response.data.timezone
+                            : browserTimezone,
+                    })
+                ),
             axios
                 .get<IDigestPolicy>(config.get('url') + 'automation/digest')
                 .then((response) => setDigest(response.data)),
