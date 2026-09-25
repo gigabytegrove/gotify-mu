@@ -14,6 +14,8 @@ import {UserStore} from './user/UserStore';
 import {MessagesStore} from './message/MessagesStore';
 import {ClientStore} from './client/ClientStore';
 import {PluginStore} from './plugin/PluginStore';
+import {GroupStore} from './group/GroupStore';
+import {AuditStore} from './audit/AuditStore';
 import {registerReactions} from './reactions';
 import {StoreContext, StoreMapping} from './stores';
 
@@ -35,6 +37,8 @@ const initStores = (): StoreMapping => {
     const clientStore = new ClientStore(snackManager.snack);
     const wsStore = new WebSocketStore(snackManager.snack, currentUser);
     const pluginStore = new PluginStore(snackManager.snack);
+    const groupStore = new GroupStore(snackManager.snack);
+    const auditStore = new AuditStore();
     appStore.onDelete = () => messagesStore.clearAll();
 
     return {
@@ -47,6 +51,8 @@ const initStores = (): StoreMapping => {
         clientStore,
         wsStore,
         pluginStore,
+        groupStore,
+        auditStore,
     };
 };
 
