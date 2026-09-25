@@ -582,6 +582,19 @@ const NotificationPreferences = () => {
                         }
                         helperText="Messages at this priority or higher are delivered immediately during quiet hours."
                     />
+                    <TextField
+                        select
+                        label="During Quiet Hours"
+                        value={quiet.behavior || 'suppress'}
+                        onChange={(event) =>
+                            setQuiet({
+                                ...quiet,
+                                behavior: event.target.value as 'suppress' | 'defer',
+                            })
+                        }>
+                        <MenuItem value="suppress">Do not send a realtime alert</MenuItem>
+                        <MenuItem value="defer">Deliver the realtime alert when Quiet Hours end</MenuItem>
+                    </TextField>
                     <Button
                         variant="contained"
                         disabled={savingQuiet}
