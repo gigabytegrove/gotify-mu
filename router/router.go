@@ -103,6 +103,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	applicationHandler := api.ApplicationAPI{
 		DB:       db,
 		ImageDir: conf.UploadedImagesDir,
+		OnDelete: func(uint) { automationEngine.ReloadIntegrations() },
 	}
 	applicationMembershipHandler := api.ApplicationMembershipAPI{
 		DB: db,
