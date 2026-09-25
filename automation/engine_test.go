@@ -77,7 +77,7 @@ func TestDecodeMQTTPublishQoS0(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	gotTopic, gotPayload, packetID, qos, err := decodePublish(header, encodedBody)
+	gotTopic, gotPayload, packetID, qos, err := decodePublish(header, encodedBody, 4)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,5 +99,42 @@ func TestAppendMQTTString(t *testing.T) {
 	expected := []byte{0x00, 0x04, 'M', 'Q', 'T', 'T'}
 	if !bytes.Equal(got, expected) {
 		t.Fatalf("expected %v, got %v", expected, got)
+	}
+}
+
+
+func TestDecodeMQTTPublishV5QoS1(t *testing.T) {
+	topic := "alerts/critical"
+	payload := []byte("server down")
+	body := appendMQTTString(nil, topic)
+	body = append(body, 0x12, 0x34) // packet id
+	body = append(body, 0x00)       // MQTT 5 properties length
+	body = append(body, payload...)
+
+	header := byte(0x32) // PUBLISH QoS 1
+	gotTopic, gotPayload, packetID, qos, err := decodePublish(header, body, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if gotTopic != topic || string(gotPayload) != string(payload) || packetID != 0x1234 || qos != 1 {
+		t.Fatalf("unexpected v5 publish decode: topic=%q payload=%q id=%d qos=%d", gotTopic, gotPayload, packetID, qos)
+	}
+}
+
+func TestDecodeMQTTVarInt(t *testing.T) {
+	value, consumed, err := decodeMQTTVarInt([]byte{0xC1, 0x02})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if value != 321 || consumed != 2 {
+		t.Fatalf("expected value=321 consumed=2, got value=%d consumed=%d", value, consumed)
+	}
+}
+
+func TestReadMQTTPacketRejectsOversize(t *testing.T) {
+	encoded := append([]byte{0x30}, encodeRemainingLength(maxMQTTPacketBytes+1)...)
+	reader := bufio.NewReader(bytes.NewReader(encoded))
+	if _, _, err := readMQTTPacket(reader); err == nil {
+		t.Fatal("expected oversized MQTT packet to be rejected")
 	}
 }
