@@ -275,16 +275,17 @@ const ConnectorDialog = ({
         if(kind==='smtp'){
             const x=item as ISMTPRoute|undefined;return {
                 name:x?.name||'',applicationId:x?.applicationId||0,recipient:x?.recipient||'',
-                allowedCidrs:x?.allowedCidrs||'',username:x?.username||'',password:'',enabled:x?.enabled??true,
+                allowedCidrs:x?.allowedCidrs||'',senderContains:x?.senderContains||'',subjectContains:x?.subjectContains||'',
+                maxMessageBytes:x?.maxMessageBytes||5242880,username:x?.username||'',password:'',enabled:x?.enabled??true,
             };
         }
         if(kind==='rss'){
-            const x=item as IRSSMonitor|undefined;return {name:x?.name||'',applicationId:x?.applicationId||0,url:x?.url||'',intervalMinutes:x?.intervalMinutes||15,enabled:x?.enabled??true};
+            const x=item as IRSSMonitor|undefined;return {name:x?.name||'',applicationId:x?.applicationId||0,url:x?.url||'',intervalMinutes:x?.intervalMinutes||15,titleContains:x?.titleContains||'',categoryContains:x?.categoryContains||'',priority:x?.priority||0,enabled:x?.enabled??true};
         }
         if(kind==='syslog'){
-            const x=item as ISyslogRoute|undefined;return {name:x?.name||'',applicationId:x?.applicationId||0,facility:x?.facility??-1,maxSeverity:x?.maxSeverity??7,allowedCidrs:x?.allowedCidrs||'',enabled:x?.enabled??true};
+            const x=item as ISyslogRoute|undefined;return {name:x?.name||'',applicationId:x?.applicationId||0,facility:x?.facility??-1,maxSeverity:x?.maxSeverity??7,allowedCidrs:x?.allowedCidrs||'',deduplicateSeconds:x?.deduplicateSeconds||0,enabled:x?.enabled??true};
         }
-        const x=item as ICalendarMonitor|undefined;return {name:x?.name||'',applicationId:x?.applicationId||0,url:x?.url||'',intervalMinutes:x?.intervalMinutes||15,notifyBeforeMinutes:x?.notifyBeforeMinutes||60,enabled:x?.enabled??true};
+        const x=item as ICalendarMonitor|undefined;return {name:x?.name||'',applicationId:x?.applicationId||0,url:x?.url||'',intervalMinutes:x?.intervalMinutes||15,notifyBeforeMinutes:x?.notifyBeforeMinutes||60,titleContains:x?.titleContains||'',locationContains:x?.locationContains||'',priority:x?.priority||0,enabled:x?.enabled??true};
     });
     const [saving,setSaving]=React.useState(false);
     const set=(key:string,next:string|number|boolean)=>setValue((current)=>({...current,[key]:next}));
@@ -320,22 +321,32 @@ const ConnectorDialog = ({
                     {kind==='smtp' && <>
                         <TextField label="Recipient" value={value.recipient} onChange={(e)=>set('recipient',e.target.value)} helperText="Exact address or wildcard such as *@alerts.example.com" required />
                         <TextField label="Allowed source networks" value={value.allowedCidrs} onChange={(e)=>set('allowedCidrs',e.target.value)} helperText="Optional CIDR list. Empty allows any source that can reach the listener." />
+                        <TextField label="Sender contains" value={value.senderContains} onChange={(e)=>set('senderContains',e.target.value)} helperText="Optional envelope-sender text that must match." />
+                        <TextField label="Subject contains" value={value.subjectContains} onChange={(e)=>set('subjectContains',e.target.value)} helperText="Optional subject text that must match." />
+                        <TextField type="number" label="Maximum message size" value={value.maxMessageBytes} onChange={(e)=>set('maxMessageBytes',Number(e.target.value))} helperText="Bytes; maximum 26214400 (25 MiB)." />
                         <TextField label="Username" value={value.username} onChange={(e)=>set('username',e.target.value)} helperText="Optional SMTP AUTH username." />
                         <TextField type="password" label={(item as ISMTPRoute|undefined)?.passwordConfigured?'New password':'Password'} value={value.password} onChange={(e)=>set('password',e.target.value)} helperText={(item as ISMTPRoute|undefined)?.passwordConfigured?'Leave blank to keep the current password.':'Used when SMTP AUTH is enabled for this route.'} />
                     </>}
                     {kind==='rss' && <>
                         <TextField label="Feed URL" value={value.url} onChange={(e)=>set('url',e.target.value)} required />
                         <TextField type="number" label="Check every" value={value.intervalMinutes} onChange={(e)=>set('intervalMinutes',Number(e.target.value))} helperText="Minutes between checks." />
+                        <TextField label="Title contains" value={value.titleContains} onChange={(e)=>set('titleContains',e.target.value)} helperText="Optional case-insensitive title filter." />
+                        <TextField label="Category contains" value={value.categoryContains} onChange={(e)=>set('categoryContains',e.target.value)} helperText="Optional case-insensitive RSS/Atom category filter." />
+                        <TextField type="number" label="Notification priority" value={value.priority} onChange={(e)=>set('priority',Number(e.target.value))} />
                     </>}
                     {kind==='syslog' && <>
                         <TextField type="number" label="Facility" value={value.facility} onChange={(e)=>set('facility',Number(e.target.value))} helperText="-1 receives any facility; otherwise use 0-23." />
                         <TextField type="number" label="Maximum severity" value={value.maxSeverity} onChange={(e)=>set('maxSeverity',Number(e.target.value))} helperText="0 is Emergency, 7 is Debug. Events at or above this importance are routed." />
                         <TextField label="Allowed source networks" value={value.allowedCidrs} onChange={(e)=>set('allowedCidrs',e.target.value)} helperText="Optional CIDR list." />
+                        <TextField type="number" label="Suppress identical events for" value={value.deduplicateSeconds} onChange={(e)=>set('deduplicateSeconds',Number(e.target.value))} helperText="Seconds. Use 0 to disable duplicate suppression." />
                     </>}
                     {kind==='calendar' && <>
                         <TextField label="iCal URL" value={value.url} onChange={(e)=>set('url',e.target.value)} required />
                         <TextField type="number" label="Check every" value={value.intervalMinutes} onChange={(e)=>set('intervalMinutes',Number(e.target.value))} helperText="Minutes between checks." />
                         <TextField type="number" label="Notify before" value={value.notifyBeforeMinutes} onChange={(e)=>set('notifyBeforeMinutes',Number(e.target.value))} helperText="Minutes before the event start." />
+                        <TextField label="Title contains" value={value.titleContains} onChange={(e)=>set('titleContains',e.target.value)} helperText="Optional case-insensitive event-title filter." />
+                        <TextField label="Location contains" value={value.locationContains} onChange={(e)=>set('locationContains',e.target.value)} helperText="Optional case-insensitive event-location filter." />
+                        <TextField type="number" label="Notification priority" value={value.priority} onChange={(e)=>set('priority',Number(e.target.value))} />
                     </>}
                     <FormControlLabel control={<Switch checked={Boolean(value.enabled)} onChange={(e)=>set('enabled',e.target.checked)} />} label="Enabled" />
                 </Stack>
