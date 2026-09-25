@@ -8,7 +8,7 @@
 
 Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
 
-> **Current published baseline:** **v0.2.2** (pre-release). **v0.3.0 is currently a validated preview candidate** on PR #20 and has not replaced the published baseline yet. Pre-1.0 builds should still be validated in the target environment before production rollout.
+> **Current published baseline:** **v0.2.2** (pre-release). **v0.5.0 is the current hardening/completion preview candidate** on PR #22. It remains unreleased until the full CI, migration, health, compatibility, and live-feature validation gates pass.
 
 ## Why Gotify MU?
 
@@ -66,6 +66,19 @@ The Web UI uses **Channels** as the user-facing term and provides:
 - Native Automation administration for Scheduled Notifications and Escalations
 - Per-user Quiet Hours and Digest preferences
 - Per-user message acknowledgement in Message History
+- TOTP MFA, recovery codes, and WebAuthn/passkeys
+- LDAP / Active Directory authentication
+- Scoped service accounts/API credentials
+- Owner / Manager / Publisher / Member / Read Only Channel roles
+- Group-to-Channel assignment
+- Replies/threads, reactions, mentions, assignment, resolve/reopen, attachments, templates, and saved searches
+- Cron/custom scheduling, schedule history, deferred Quiet Hours, stored Digests, and richer Escalations
+- Hardened Webhooks with signing, replay defense, CIDR rules, rate limiting, templates, conditions, and history
+- MQTT 5 / 3.1.1 with QoS 0/1/2, custom CA and mutual TLS
+- Home Assistant event/entity/data filtering with connection diagnostics
+- First-party Email Delivery, SMTP Receiver, RSS/Atom, Syslog, and Calendar/iCal connectors
+- Signed/checksummed Plugin Catalog installs, updates, and uninstall
+- Operations, backup/restore, diagnostics, active-session administration, audit export/retention, and hardened updates
 
 The underlying `/application` API naming remains in place to avoid breaking existing clients and integrations.
 
@@ -73,7 +86,7 @@ The official Gotify Android app is not modified by the Web UI rewrite.
 
 Administrators can install compatible Linux Go plugin binaries from **Plugins → Install Plugin**. Uploaded plugins are stored under the configured `GOTIFY_PLUGINSDIR` (the default Docker data volume resolves to `/app/data/plugins`) and are loaded immediately. Plugin binaries execute native code inside the Gotify MU process, so only trusted plugins built for the matching Gotify MU/Go ABI and server architecture should be installed.
 
-Authentication/security work such as MFA/2FA, passkeys, and LDAP/Active Directory is tracked separately in [docs/ROADMAP.md](docs/ROADMAP.md). Those features are planned and are not implied to be active by the redesigned UI.
+Authentication and security controls including MFA, passkeys, LDAP/Active Directory, session policy, service accounts, encrypted stored secrets, and audit/security administration are implemented in the v0.5 preview. See [docs/SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md) for the current security status and trust boundaries.
 
 ### Gotify MU channel-management API
 
@@ -123,7 +136,7 @@ The official Gotify Android app continues to receive Chat Channel messages as no
 
 The current published release baseline is **Gotify MU v0.2.2**.
 
-**v0.3.0 is a preview candidate** until PR #20 is accepted, merged, tagged, and published. Release history and compatibility notes are tracked in [CHANGELOG.md](CHANGELOG.md). Detailed notes are available for [v0.2.2](docs/releases/v0.2.2.md) and the [v0.3.0 preview](docs/releases/v0.3.0.md).
+**v0.5.0 is the current preview candidate** on PR #22. It is not considered released until the complete validation gate has passed and the branch is accepted, merged, tagged, and published. Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed preview notes in [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md).
 
 Deployment, validation, updater, backup, and rollback procedures are maintained in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
@@ -185,7 +198,7 @@ Then build and start Gotify MU:
 docker compose up -d --build
 ```
 
-The default deployment publishes Gotify MU on port `8080`.
+The default deployment publishes the Web UI/API on port `8080`. Native SMTP and Syslog receivers are mapped to ports `2525/tcp` and `5514/udp` but bind to `127.0.0.1` by default. Set `GOTIFY_MU_RECEIVER_BIND` to a trusted LAN/host address only when remote devices must reach those listeners.
 
 Open:
 
@@ -373,11 +386,11 @@ The MU database migration is additive. Existing users, applications, tokens and 
 
 **Back up your database before testing an upgrade.** This project is still in active development.
 
-## Security roadmap
+## Security
 
-MFA/2FA, LDAP/Active Directory authentication, stronger session policy, and security auditing are tracked separately from the UI rewrite so authentication changes can be implemented and tested without destabilizing client compatibility.
+The v0.5 preview includes MFA/TOTP, recovery codes, passkeys, LDAP/Active Directory, service accounts, login throttling, encrypted stored secrets, session policy, audit/security administration, hardened Webhooks, plugin signature verification, and a hardened managed updater.
 
-See `docs/SECURITY_ROADMAP.md`.
+See `docs/SECURITY_ROADMAP.md` for implementation status and trust-boundary details.
 
 ## Development
 
