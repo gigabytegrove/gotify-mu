@@ -255,6 +255,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			message.POST("/:id/archive", messageHandler.ArchiveMessage)
 			message.DELETE("/:id/archive", messageHandler.UnarchiveMessage)
 		message.GET("/:id/acknowledgement", automationHandler.GetAcknowledgement)
+		message.GET("/:id/acknowledgements", automationHandler.GetAcknowledgements)
 		message.POST("/:id/acknowledgement", automationHandler.AcknowledgeMessage)
 		message.DELETE("/:id/acknowledgement", automationHandler.UnacknowledgeMessage)
 		}
