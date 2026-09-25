@@ -21,6 +21,8 @@ import Login from '../user/Login';
 import Messages from '../message/Messages';
 import Settings from '../user/Settings';
 import Users from '../user/Users';
+import Groups from '../group/Groups';
+import Audit from '../audit/Audit';
 import {observer} from 'mobx-react-lite';
 import {ConnectionErrorBanner} from '../common/ConnectionErrorBanner';
 import {useStores} from '../stores';
@@ -36,7 +38,7 @@ const Layout = observer(() => {
         currentUser: {
             loggedIn,
             authenticating,
-            user: {name, admin},
+            user: {name, displayName, admin},
             logout,
             tryReconnect,
             connectionErrorMessage,
@@ -83,7 +85,7 @@ const Layout = observer(() => {
 
                         <Header
                             admin={admin}
-                            name={name}
+                            name={displayName || name}
                             style={{top: 0}}
                             version={version}
                             loggedIn={loggedIn}
@@ -127,6 +129,14 @@ const Layout = observer(() => {
                                     <Route
                                         path="/users"
                                         element={authed(elevated(<Users />))}
+                                    />
+                                    <Route
+                                        path="/groups"
+                                        element={authed(elevated(<Groups />))}
+                                    />
+                                    <Route
+                                        path="/audit"
+                                        element={authed(elevated(<Audit />))}
                                     />
                                     <Route
                                         path="/settings"

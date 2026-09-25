@@ -6,6 +6,7 @@ import "time"
 type User struct {
 	ID           uint   `gorm:"primaryKey;autoIncrement"`
 	Name         string `gorm:"type:varchar(180);uniqueIndex:uix_users_name"`
+	DisplayName  string `gorm:"type:text"`
 	Pass         []byte
 	Admin        bool
 	CreatedAt    time.Time
@@ -33,6 +34,8 @@ type UserExternal struct {
 	// required: true
 	// example: unicorn
 	Name string `binding:"required" json:"name" query:"name" form:"name"`
+	// Friendly display name. Login continues to use Name.
+	DisplayName string `json:"displayName,omitempty" query:"displayName" form:"displayName"`
 	// If the user is an administrator.
 	//
 	// required: true
@@ -57,6 +60,8 @@ type CreateUserExternal struct {
 	// required: true
 	// example: unicorn
 	Name string `binding:"required" json:"name" query:"name" form:"name"`
+	// Friendly display name.
+	DisplayName string `json:"displayName,omitempty" query:"displayName" form:"displayName"`
 	// If the user is an administrator.
 	//
 	// required: true
@@ -80,6 +85,8 @@ type UpdateUserExternal struct {
 	// required: true
 	// example: unicorn
 	Name string `binding:"required" json:"name" query:"name" form:"name"`
+	// Friendly display name.
+	DisplayName string `json:"displayName,omitempty" query:"displayName" form:"displayName"`
 	// If the user is an administrator.
 	//
 	// required: true
@@ -106,6 +113,8 @@ type CurrentUserExternal struct {
 	// required: true
 	// example: unicorn
 	Name string `json:"name"`
+	// Friendly display name.
+	DisplayName string `json:"displayName,omitempty"`
 	// If the user is an administrator.
 	//
 	// required: true

@@ -8,6 +8,8 @@ import {ClientStore} from './client/ClientStore';
 import {AppStore} from './application/AppStore';
 import {WebSocketStore} from './message/WebSocketStore';
 import {PluginStore} from './plugin/PluginStore';
+import {GroupStore} from './group/GroupStore';
+import {AuditStore} from './audit/AuditStore';
 
 export interface StoreMapping {
     userStore: UserStore;
@@ -18,6 +20,8 @@ export interface StoreMapping {
     clientStore: ClientStore;
     appStore: AppStore;
     pluginStore: PluginStore;
+    groupStore: GroupStore;
+    auditStore: AuditStore;
     wsStore: WebSocketStore;
 }
 

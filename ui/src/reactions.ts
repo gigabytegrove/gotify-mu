@@ -13,6 +13,8 @@ export const registerReactions = (stores: StoreMapping) => {
         stores.appStore.clear();
         stores.clientStore.clear();
         stores.userStore.clear();
+        stores.groupStore.clear();
+        stores.auditStore.clear();
         stores.wsStore.close();
     };
 

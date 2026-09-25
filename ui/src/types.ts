@@ -71,7 +71,36 @@ export interface IPaging {
 export interface IUser {
     id: number;
     name: string;
+    displayName?: string;
     admin: boolean;
+    createdAt: string;
+}
+
+export interface IUserGroup {
+    id: number;
+    name: string;
+    description: string;
+    memberCount: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IUserGroupMember {
+    userId: number;
+    name: string;
+    displayName?: string;
+    admin: boolean;
+}
+
+export interface IAuditEvent {
+    id: number;
+    userId: number;
+    username: string;
+    action: string;
+    target: string;
+    targetId?: string;
+    details?: string;
+    ipAddress?: string;
     createdAt: string;
 }
 

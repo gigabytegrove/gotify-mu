@@ -103,6 +103,7 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 	ctx.JSON(200, &model.CurrentUserExternal{
 		ID:            user.ID,
 		Name:          user.Name,
+		DisplayName:   user.DisplayName,
 		Admin:         user.Admin,
 		CreatedAt:     user.CreatedAt,
 		ClientID:      client.ID,

@@ -18,6 +18,8 @@ import ArrowForward from '@mui/icons-material/ArrowForward';
 import Inbox from '@mui/icons-material/Inbox';
 import Settings from '@mui/icons-material/Settings';
 import Forum from '@mui/icons-material/Forum';
+import GroupWork from '@mui/icons-material/GroupWork';
+import FactCheck from '@mui/icons-material/FactCheck';
 import {Link} from 'react-router';
 import {observer} from 'mobx-react-lite';
 import DefaultPage from '../common/DefaultPage';
@@ -27,15 +29,18 @@ import {useStores} from '../stores';
 import * as config from '../config';
 
 const Dashboard = observer(() => {
-    const {appStore, userStore, clientStore, pluginStore, currentUser} = useStores();
+    const {appStore, userStore, clientStore, pluginStore, groupStore, currentUser} = useStores();
     const admin = currentUser.user.admin;
 
     React.useEffect(() => {
         void appStore.refresh();
         void clientStore.refresh();
         void pluginStore.refresh();
-        if (admin) void userStore.refresh();
-    }, [admin, appStore, clientStore, pluginStore, userStore]);
+        if (admin) {
+            void userStore.refresh();
+            void groupStore.refresh();
+        }
+    }, [admin, appStore, clientStore, pluginStore, userStore, groupStore]);
 
     const apps = appStore.getItems();
     const globals = apps.filter((app) => app.autoAssign).length;
@@ -44,6 +49,7 @@ const Dashboard = observer(() => {
     const plugins = pluginStore.getItems();
     const enabledPlugins = plugins.filter((plugin) => plugin.enabled).length;
     const users = admin ? userStore.getItems() : [];
+    const groups = admin ? groupStore.getItems() : [];
     const version = config.get('version');
 
     const recentApps = [...apps]
@@ -82,7 +88,7 @@ const Dashboard = observer(() => {
                         <StatCard
                             label="Users"
                             value={users.length}
-                            helper="Local accounts"
+                            helper={`${groups.length} user group${groups.length === 1 ? '' : 's'}`}
                             icon={<People />}
                         />
                     </Grid>
@@ -122,13 +128,29 @@ const Dashboard = observer(() => {
                         View Messages
                     </Button>
                     {admin && (
-                        <Button
-                            component={Link}
-                            to="/users"
-                            variant="outlined"
-                            startIcon={<People />}>
-                            Manage Users
-                        </Button>
+                        <>
+                            <Button
+                                component={Link}
+                                to="/users"
+                                variant="outlined"
+                                startIcon={<People />}>
+                                Manage Users
+                            </Button>
+                            <Button
+                                component={Link}
+                                to="/groups"
+                                variant="outlined"
+                                startIcon={<GroupWork />}>
+                                Manage Groups
+                            </Button>
+                            <Button
+                                component={Link}
+                                to="/audit"
+                                variant="outlined"
+                                startIcon={<FactCheck />}>
+                                Audit Log
+                            </Button>
+                        </>
                     )}
                     <Button
                         component={Link}

@@ -20,6 +20,8 @@ import Dashboard from '@mui/icons-material/Dashboard';
 import Inbox from '@mui/icons-material/Inbox';
 import Forum from '@mui/icons-material/Forum';
 import People from '@mui/icons-material/People';
+import GroupWork from '@mui/icons-material/GroupWork';
+import FactCheck from '@mui/icons-material/FactCheck';
 import DevicesOther from '@mui/icons-material/DevicesOther';
 import Extension from '@mui/icons-material/Extension';
 import Settings from '@mui/icons-material/Settings';
@@ -59,6 +61,8 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
         {label: 'Messages', to: '/messages', icon: <Inbox />},
         {label: 'Channels', to: '/channels', icon: <Forum />},
         {label: 'Users', to: '/users', icon: <People />, adminOnly: true},
+        {label: 'Groups', to: '/groups', icon: <GroupWork />, adminOnly: true},
+        {label: 'Audit Log', to: '/audit', icon: <FactCheck />, adminOnly: true},
         {label: 'Clients', to: '/clients', icon: <DevicesOther />},
         {label: 'Plugins', to: '/plugins', icon: <Extension />},
         {label: 'Settings', to: '/settings', icon: <Settings />},

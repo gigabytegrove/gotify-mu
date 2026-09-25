@@ -28,17 +28,26 @@ import {formatDate} from '../common/TimeAgoFormatter';
 
 interface IRowProps {
     name: string;
+    displayName?: string;
     admin: boolean;
     createdAt: string;
     fDelete: VoidFunction;
     fEdit: VoidFunction;
 }
 
-const UserRow: React.FC<IRowProps> = ({name, admin, createdAt, fDelete, fEdit}) => (
+const UserRow: React.FC<IRowProps> = ({
+    name,
+    displayName,
+    admin,
+    createdAt,
+    fDelete,
+    fEdit,
+}) => (
     <TableRow hover>
         <TableCell>
             <strong>{name}</strong>
         </TableCell>
+        <TableCell>{displayName || '—'}</TableCell>
         <TableCell>
             <Chip
                 size="small"
@@ -74,7 +83,11 @@ const Users = observer(() => {
     const users = userStore.getItems();
     const normalizedQuery = query.trim().toLowerCase();
     const filteredUsers = normalizedQuery
-        ? users.filter((user) => user.name.toLowerCase().includes(normalizedQuery))
+        ? users.filter(
+              (user) =>
+                  user.name.toLowerCase().includes(normalizedQuery) ||
+                  user.displayName?.toLowerCase().includes(normalizedQuery)
+          )
         : users;
     const adminCount = users.filter((user) => user.admin).length;
 
@@ -121,6 +134,7 @@ const Users = observer(() => {
                     <TableHead>
                         <TableRow>
                             <TableCell>Username</TableCell>
+                            <TableCell>Display Name</TableCell>
                             <TableCell>Role</TableCell>
                             <TableCell>Created</TableCell>
                             <TableCell align="right">Actions</TableCell>
@@ -131,6 +145,7 @@ const Users = observer(() => {
                             <UserRow
                                 key={user.id}
                                 name={user.name}
+                                displayName={user.displayName}
                                 admin={user.admin}
                                 createdAt={user.createdAt}
                                 fDelete={() => setDeleteUser(user)}
@@ -149,6 +164,7 @@ const Users = observer(() => {
                     fClose={() => setEditUser(undefined)}
                     fOnSubmit={userStore.update.bind(this, editUser.id)}
                     name={editUser.name}
+                    displayName={editUser.displayName}
                     admin={editUser.admin}
                     isEdit={true}
                 />
