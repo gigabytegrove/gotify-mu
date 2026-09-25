@@ -29,7 +29,6 @@ func CreateArchive(destination, databaseSnapshot, imagesDir, pluginsDir, version
 	if err != nil { return err }
 	defer out.Close()
 	writer := zip.NewWriter(out)
-	defer writer.Close()
 
 	manifest, err := json.MarshalIndent(Manifest{
 		FormatVersion: FormatVersion,
