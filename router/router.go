@@ -404,6 +404,33 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.POST("/integration/home-assistant/:id/event", automationHandler.SendHomeAssistantEvent)
 		adminPlatform.DELETE("/integration/home-assistant/:id", automationHandler.DeleteHomeAssistant)
 
+		adminPlatform.GET("/integration/rss", automationHandler.GetRSS)
+		adminPlatform.POST("/integration/rss", automationHandler.CreateRSS)
+		adminPlatform.PUT("/integration/rss/:id", automationHandler.UpdateRSS)
+		adminPlatform.DELETE("/integration/rss/:id", automationHandler.DeleteRSS)
+
+		adminPlatform.GET("/integration/calendar", automationHandler.GetCalendars)
+		adminPlatform.POST("/integration/calendar", automationHandler.CreateCalendar)
+		adminPlatform.PUT("/integration/calendar/:id", automationHandler.UpdateCalendar)
+		adminPlatform.DELETE("/integration/calendar/:id", automationHandler.DeleteCalendar)
+
+		adminPlatform.GET("/integration/email-gateway", automationHandler.GetEmailGateways)
+		adminPlatform.POST("/integration/email-gateway", automationHandler.CreateEmailGateway)
+		adminPlatform.PUT("/integration/email-gateway/:id", automationHandler.UpdateEmailGateway)
+		adminPlatform.DELETE("/integration/email-gateway/:id", automationHandler.DeleteEmailGateway)
+
+		adminPlatform.GET("/integration/smtp-receiver", automationHandler.GetSMTPReceiver)
+		adminPlatform.PUT("/integration/smtp-receiver", automationHandler.SaveSMTPReceiver)
+		adminPlatform.GET("/integration/smtp-route", automationHandler.GetSMTPRoutes)
+		adminPlatform.POST("/integration/smtp-route", automationHandler.CreateSMTPRoute)
+		adminPlatform.PUT("/integration/smtp-route/:id", automationHandler.UpdateSMTPRoute)
+		adminPlatform.DELETE("/integration/smtp-route/:id", automationHandler.DeleteSMTPRoute)
+
+		adminPlatform.GET("/integration/syslog", automationHandler.GetSyslog)
+		adminPlatform.POST("/integration/syslog", automationHandler.CreateSyslog)
+		adminPlatform.PUT("/integration/syslog/:id", automationHandler.UpdateSyslog)
+		adminPlatform.DELETE("/integration/syslog/:id", automationHandler.DeleteSyslog)
+
 		adminPlatform.GET("/automation/schedule", automationHandler.GetSchedules)
 		adminPlatform.POST("/automation/schedule", automationHandler.CreateSchedule)
 		adminPlatform.PUT("/automation/schedule/:id", automationHandler.UpdateSchedule)
