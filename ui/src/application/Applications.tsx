@@ -85,7 +85,7 @@ const Applications = observer(() => {
                         : `${apps.length} Channel${apps.length === 1 ? '' : 's'} available to your account`
                 }>
                 {apps.length === 0 ? (
-                    <Stack spacing={2} alignItems="flex-start">
+                    <Stack spacing={2} sx={{alignItems: 'flex-start'}}>
                         <Alert severity="info">
                             Create a Channel to start receiving notifications. Administrators can
                             also make Channels Global so every current and future user is assigned.
