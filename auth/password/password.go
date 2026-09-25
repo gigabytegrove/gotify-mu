@@ -2,13 +2,22 @@ package password
 
 import (
 	"errors"
+	"fmt"
 
 	"golang.org/x/crypto/bcrypt"
 )
 
 func ValidateNewPassword(pw string) error {
+	return ValidateNewPasswordWithMinimum(pw, 1)
+}
+
+func ValidateNewPasswordWithMinimum(pw string, minimum int) error {
+	if minimum < 1 { minimum = 1 }
 	if pw == "" {
 		return errors.New("password must not be empty")
+	}
+	if len([]rune(pw)) < minimum {
+		return fmt.Errorf("password must be at least %d characters", minimum)
 	}
 	if len([]byte(pw)) > 72 {
 		return bcrypt.ErrPasswordTooLong
