@@ -315,6 +315,12 @@ The MU database migration is additive. Existing users, applications, tokens and 
 
 **Back up your database before testing an upgrade.** This project is still in active development.
 
+## Security roadmap
+
+MFA/2FA, LDAP/Active Directory authentication, stronger session policy, and security auditing are tracked separately from the UI rewrite so authentication changes can be implemented and tested without destabilizing client compatibility.
+
+See `docs/SECURITY_ROADMAP.md`.
+
 ## Development
 
 Server: Go  
