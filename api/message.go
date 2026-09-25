@@ -732,10 +732,11 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 	}
 	var external *model.MessageExternal
 	if a.Dispatcher != nil {
-		external, err = a.Dispatcher.StoreAndDeliver(msgInternal)
-		if success := successOrAbort(ctx, 500, err); !success {
+		dispatched, dispatchErr := a.Dispatcher.StoreAndDeliver(msgInternal)
+		if success := successOrAbort(ctx, 500, dispatchErr); !success {
 			return
 		}
+		external = dispatched
 	} else {
 		if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
 			return
