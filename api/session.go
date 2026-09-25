@@ -2,12 +2,15 @@ package api
 
 import (
 	"errors"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 )
 
 // SessionDatabase is the interface for session-related database access.
@@ -16,6 +19,8 @@ type SessionDatabase interface {
 	CreateClient(client *model.Client) error
 	GetClientByToken(token string) (*model.Client, error)
 	DeleteClientByID(id uint) error
+	GetUserMFA(userID uint) (*model.UserMFA, error)
+	ConsumeMFARecoveryCode(userID uint, hash string) (bool, error)
 }
 
 // SessionAPI provides handlers for cookie-based session authentication.
@@ -25,6 +30,7 @@ type SessionAPI struct {
 	SecureCookie     bool
 	LocalAuthEnabled bool
 	Policy           func() *model.SecurityPolicy
+	LoginLimiter     *security.Limiter
 }
 
 // swagger:operation POST /auth/local/login auth localLogin
@@ -71,6 +77,12 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		return
 	}
 
+	limiterKey := ctx.ClientIP() + "|" + strings.ToLower(strings.TrimSpace(name))
+	if a.LoginLimiter != nil && !a.LoginLimiter.Allow(limiterKey) {
+		ctx.Header("Retry-After", "60")
+		ctx.AbortWithError(http.StatusTooManyRequests, errors.New("too many authentication attempts"))
+		return
+	}
 	user, err := a.DB.GetUserByName(name)
 	if err != nil {
 		ctx.AbortWithError(500, err)
@@ -80,16 +92,44 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		ctx.AbortWithError(401, errors.New("invalid credentials"))
 		return
 	}
+	if a.LoginLimiter != nil { a.LoginLimiter.Reset(limiterKey) }
+
+	policy := model.DefaultSecurityPolicy()
+	if a.Policy != nil {
+		if configured := a.Policy(); configured != nil { policy = configured }
+	}
+	mfa, err := a.DB.GetUserMFA(user.ID)
+	if err != nil {
+		ctx.AbortWithError(500, err)
+		return
+	}
+	mfaRequired := (mfa != nil && mfa.Enabled) || policy.RequireMFAAll || (policy.RequireMFAAdmins && user.Admin)
+	if mfaRequired {
+		if mfa == nil || !mfa.Enabled {
+			ctx.AbortWithError(http.StatusForbidden, errors.New("MFA enrollment is required for this account"))
+			return
+		}
+		code := strings.TrimSpace(ctx.GetHeader("X-Gotify-MU-MFA"))
+		if code == "" {
+			ctx.JSON(http.StatusPreconditionRequired, gin.H{"error":"mfa_required","errorDescription":"Enter an authenticator or recovery code."})
+			return
+		}
+		valid, verifyErr := verifyMFAWithRecovery(a.DB, user.ID, code, time.Now())
+		if verifyErr != nil {
+			ctx.AbortWithError(500, verifyErr)
+			return
+		}
+		if !valid {
+			ctx.AbortWithError(401, errors.New("invalid MFA code"))
+			return
+		}
+	}
 
 	clientParams := ClientParams{}
 	if err := ctx.Bind(&clientParams); err != nil {
 		return
 	}
 
-	policy := model.DefaultSecurityPolicy()
-	if a.Policy != nil {
-		if configured := a.Policy(); configured != nil { policy = configured }
-	}
 	sessionSeconds := policy.SessionLifetimeHours * 60 * 60
 	if sessionSeconds <= 0 { sessionSeconds = auth.CookieMaxAge }
 	elevation := time.Duration(policy.ElevationMinutes) * time.Minute
