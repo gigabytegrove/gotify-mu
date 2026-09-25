@@ -47,7 +47,7 @@ interface UpdaterStatus {
 
 const releaseLabel = (release: PublishedRelease) => release.name || release.tag_name;
 const normalizeTag = (tag: string) => tag.replace(/^v/i, '');
-const activeUpdaterStates = new Set(['downloading', 'building', 'replacing', 'verifying']);
+const activeUpdaterStates = new Set(['preparing', 'downloading', 'building', 'replacing', 'verifying']);
 
 export const useReleaseUpdate = (): ReleaseState => {
     const [state, setState] = React.useState<ReleaseState>({status: 'loading'});
@@ -146,7 +146,6 @@ export const UpdateStatusCard = () => {
             }
 
             const next = (await response.json()) as UpdaterStatus;
-            const previous = updaterRef.current;
             updaterRef.current = next;
             setUpdater(next);
 
@@ -157,8 +156,6 @@ export const UpdateStatusCard = () => {
             const completedThisSession =
                 updateStartedHere.current &&
                 sawActiveUpdate.current &&
-                previous !== undefined &&
-                activeUpdaterStates.has(previous.state) &&
                 next.state === 'completed';
 
             if (completedThisSession && !reloadScheduled.current) {
