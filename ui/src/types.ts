@@ -264,6 +264,8 @@ export interface ISecurityPolicy {
     auditRetentionDays: number;
     automationRetentionDays: number;
     allowNativePluginUploads: boolean;
+    requirePluginChecksum: boolean;
+    requirePluginSignature: boolean;
     requireMfaAdmins: boolean;
     requireMfaAll: boolean;
     updatedAt: string;
