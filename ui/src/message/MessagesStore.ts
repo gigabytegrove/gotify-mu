@@ -4,7 +4,7 @@ import axios, {AxiosResponse} from 'axios';
 import * as config from '../config';
 import {createTransformer} from 'mobx-utils';
 import {SnackReporter} from '../snack/SnackManager';
-import {IApplication, IMessage, IPagedMessages} from '../types';
+import {IApplication, IMessage, IMessageExtras, IPagedMessages} from '../types';
 import {closeSnackbar, SnackbarKey} from 'notistack';
 
 const AllMessages = -1;
@@ -221,14 +221,16 @@ export class MessagesStore {
         appId: number,
         message: string,
         title: string,
-        priority: number
+        priority: number,
+        extras?: IMessageExtras
     ): Promise<void> => {
         const app = this.appStore.getByID(appId);
-        const payload: Pick<IMessage, 'appid' | 'title' | 'message' | 'priority'> = {
+        const payload: Pick<IMessage, 'appid' | 'title' | 'message' | 'priority' | 'extras'> = {
             appid: appId,
             message,
             priority,
             title,
+            extras,
         };
 
         await axios.post(`${config.get('url')}message`, payload);
