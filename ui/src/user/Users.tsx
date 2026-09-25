@@ -35,11 +35,19 @@ interface IRowProps {
     fEdit: VoidFunction;
 }
 
-const UserRow: React.FC<IRowProps> = ({name, admin, createdAt, fDelete, fEdit}) => (
+const UserRow: React.FC<IRowProps> = ({
+    name,
+    displayName,
+    admin,
+    createdAt,
+    fDelete,
+    fEdit,
+}) => (
     <TableRow hover>
         <TableCell>
             <strong>{name}</strong>
         </TableCell>
+        <TableCell>{displayName || '—'}</TableCell>
         <TableCell>
             <Chip
                 size="small"
@@ -75,7 +83,11 @@ const Users = observer(() => {
     const users = userStore.getItems();
     const normalizedQuery = query.trim().toLowerCase();
     const filteredUsers = normalizedQuery
-        ? users.filter((user) => user.name.toLowerCase().includes(normalizedQuery))
+        ? users.filter(
+              (user) =>
+                  user.name.toLowerCase().includes(normalizedQuery) ||
+                  user.displayName?.toLowerCase().includes(normalizedQuery)
+          )
         : users;
     const adminCount = users.filter((user) => user.admin).length;
 
