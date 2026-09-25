@@ -134,7 +134,7 @@ const Messages = observer(() => {
             title={appId === -1 ? 'Messages' : name}
             description={pageDescription}
             rightControl={
-                <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Stack direction="row" spacing={1} sx={{flexWrap: 'wrap'}} useFlexGap>
                     {app?.autoAssign && <Chip size="small" icon={<Public />} label="Global" />}
                     {app?.allowMemberPost && (
                         <Chip size="small" icon={<Forum />} label="Chat · Experimental" />
@@ -170,7 +170,7 @@ const Messages = observer(() => {
                         : `${messages.length} message${messages.length === 1 ? '' : 's'} currently loaded`
                 }
                 action={
-                    <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                    <Stack direction="row" spacing={1} sx={{flexWrap: 'wrap'}} useFlexGap>
                         {!archivedView && canPost && app && !app.allowMemberPost && (
                             <Button
                                 id="push-message"
