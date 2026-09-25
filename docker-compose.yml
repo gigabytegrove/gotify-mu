@@ -13,6 +13,8 @@ services:
     restart: unless-stopped
     ports:
       - "${GOTIFY_MU_PORT:-8080}:80"
+      - "${GOTIFY_MU_SMTP_PORT:-2525}:2525"
+      - "${GOTIFY_MU_SYSLOG_PORT:-5514}:5514/udp"
     environment:
       GOTIFY_DEFAULTUSER_NAME: "${GOTIFY_DEFAULTUSER_NAME:-admin}"
       GOTIFY_DEFAULTUSER_PASS: "${GOTIFY_DEFAULTUSER_PASS:?Set GOTIFY_DEFAULTUSER_PASS in .env}"
