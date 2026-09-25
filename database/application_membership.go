@@ -56,6 +56,7 @@ func assignUserToAutoApplications(tx *gorm.DB, userID uint) error {
 			UserID:               userID,
 			ReceiveNotifications: true,
 			AutoAssigned:         true,
+			Role:                 model.ChannelRoleMember,
 		}
 		if err := tx.Clauses(membershipConflict()).Create(&membership).Error; err != nil {
 			return err
@@ -78,6 +79,11 @@ func backfillApplicationMemberships(tx *gorm.DB) error {
 				Role:                 model.ChannelRoleOwner,
 			}
 			if err := tx.Clauses(membershipConflict()).Create(&owner).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&model.ApplicationMembership{}).
+				Where("application_id = ? AND user_id = ?", app.ID, app.UserID).
+				Update("role", model.ChannelRoleOwner).Error; err != nil {
 				return err
 			}
 		}
