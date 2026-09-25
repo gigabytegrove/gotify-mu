@@ -21,6 +21,7 @@ import (
 	"github.com/gotify/server/v3/automation"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/security"
+	"github.com/robfig/cron"
 )
 
 type AutomationEngine interface {
@@ -55,6 +56,7 @@ type AutomationDatabase interface {
 	GetScheduledNotificationByID(id uint) (*model.ScheduledNotification, error)
 	SaveScheduledNotification(item *model.ScheduledNotification) error
 	DeleteScheduledNotification(id uint) error
+	GetScheduledNotificationRuns(scheduleID uint, limit int) ([]*model.ScheduledNotificationRun, error)
 
 	GetQuietHoursPolicy(userID uint) (*model.QuietHoursPolicy, error)
 	SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error
@@ -376,18 +378,23 @@ func (a *AutomationAPI) DeleteHomeAssistant(ctx *gin.Context) {
 }
 
 type scheduleParams struct {
-	Name          string     `json:"name" binding:"required"`
-	ApplicationID uint       `json:"applicationId" binding:"required"`
-	Title         string     `json:"title"`
-	Message       string     `json:"message" binding:"required"`
-	Priority      int        `json:"priority"`
-	ScheduleType  string     `json:"scheduleType" binding:"required"`
-	RunAt         *time.Time `json:"runAt"`
-	Hour          int        `json:"hour"`
-	Minute        int        `json:"minute"`
-	Weekday       int        `json:"weekday"`
-	Timezone      string     `json:"timezone"`
-	Enabled       bool       `json:"enabled"`
+	Name           string     `json:"name" binding:"required"`
+	ApplicationID  uint       `json:"applicationId" binding:"required"`
+	Title          string     `json:"title"`
+	Message        string     `json:"message" binding:"required"`
+	Priority       int        `json:"priority"`
+	ScheduleType   string     `json:"scheduleType" binding:"required"`
+	RunAt          *time.Time `json:"runAt"`
+	Hour           int        `json:"hour"`
+	Minute         int        `json:"minute"`
+	Weekday        int        `json:"weekday"`
+	CronExpression string     `json:"cronExpression"`
+	ExcludedDates  string     `json:"excludedDates"`
+	Timezone       string     `json:"timezone"`
+	EndAt          *time.Time `json:"endAt"`
+	MaxRuns        int        `json:"maxRuns"`
+	MisfirePolicy  string     `json:"misfirePolicy"`
+	Enabled        bool       `json:"enabled"`
 }
 
 func (a *AutomationAPI) GetSchedules(ctx *gin.Context) {
@@ -423,6 +430,21 @@ func (a *AutomationAPI) UpdateSchedule(ctx *gin.Context) {
 		if updated.Enabled && updated.NextRunAt == nil { ctx.AbortWithError(400, errors.New("schedule does not have a future run time")); return }
 		if !successOrAbort(ctx, 500, a.DB.SaveScheduledNotification(updated)) { return }
 		ctx.JSON(200, updated)
+	})
+}
+
+func (a *AutomationAPI) GetScheduleRuns(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetScheduledNotificationByID(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		if item == nil { ctx.AbortWithError(404, errors.New("schedule not found")); return }
+		limit := 50
+		if raw := ctx.Query("limit"); raw != "" {
+			if parsed, parseErr := strconv.Atoi(raw); parseErr == nil { limit = parsed }
+		}
+		runs, err := a.DB.GetScheduledNotificationRuns(id, limit)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, runs)
 	})
 }
 
@@ -599,10 +621,13 @@ func (a *AutomationAPI) canAccessMessage(ctx *gin.Context, messageID uint) bool 
 }
 
 func scheduleFromParams(params scheduleParams) *model.ScheduledNotification {
+	misfire := strings.ToLower(strings.TrimSpace(params.MisfirePolicy))
+	if misfire == "" { misfire = "send" }
 	return &model.ScheduledNotification{
 		Name:params.Name,ApplicationID:params.ApplicationID,Title:params.Title,Message:params.Message,Priority:params.Priority,
-		ScheduleType:params.ScheduleType,RunAt:params.RunAt,Hour:params.Hour,Minute:params.Minute,Weekday:params.Weekday,
-		Timezone:valueOr(params.Timezone,"UTC"),Enabled:params.Enabled,
+		ScheduleType:strings.ToLower(strings.TrimSpace(params.ScheduleType)),RunAt:params.RunAt,Hour:params.Hour,Minute:params.Minute,Weekday:params.Weekday,
+		CronExpression:strings.TrimSpace(params.CronExpression),ExcludedDates:strings.TrimSpace(params.ExcludedDates),
+		Timezone:valueOr(params.Timezone,"UTC"),EndAt:params.EndAt,MaxRuns:params.MaxRuns,MisfirePolicy:misfire,Enabled:params.Enabled,
 	}
 }
 
@@ -616,10 +641,27 @@ func validateSchedule(item *model.ScheduledNotification) error {
 		if item.Hour < 0 || item.Hour > 23 || item.Minute < 0 || item.Minute > 59 { return errors.New("invalid daily time") }
 	case "weekly":
 		if item.Weekday < 0 || item.Weekday > 6 || item.Hour < 0 || item.Hour > 23 || item.Minute < 0 || item.Minute > 59 { return errors.New("invalid weekly schedule") }
+	case "cron":
+		if strings.TrimSpace(item.CronExpression) == "" { return errors.New("cron schedules require an expression") }
+		if _, err := cron.Parse(item.CronExpression); err != nil { return errors.New("invalid cron expression") }
 	default:
-		return errors.New("schedule type must be once, hourly, daily, or weekly")
+		return errors.New("schedule type must be once, hourly, daily, weekly, or cron")
 	}
 	if _, err := time.LoadLocation(valueOr(item.Timezone,"UTC")); err != nil { return errors.New("invalid timezone") }
+	if item.MaxRuns < 0 { return errors.New("maximum runs cannot be negative") }
+	if item.MisfirePolicy != "send" && item.MisfirePolicy != "skip" {
+		return errors.New("misfire policy must be send or skip")
+	}
+	if item.EndAt != nil && item.RunAt != nil && item.ScheduleType == "once" && item.RunAt.After(*item.EndAt) {
+		return errors.New("one-time schedule is after the configured end date")
+	}
+	for _, raw := range strings.FieldsFunc(item.ExcludedDates, func(r rune) bool {
+		return r == ',' || r == ';' || r == '\n' || r == ' ' || r == '\t'
+	}) {
+		if _, err := time.Parse("2006-01-02", strings.TrimSpace(raw)); err != nil {
+			return fmt.Errorf("invalid excluded date %q; use YYYY-MM-DD", raw)
+		}
+	}
 	return nil
 }
 
