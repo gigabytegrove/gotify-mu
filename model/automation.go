@@ -195,8 +195,12 @@ type EscalationRule struct {
 	Name                string    `gorm:"type:text" json:"name"`
 	SourceApplicationID uint      `gorm:"index" json:"sourceApplicationId"`
 	TargetApplicationID uint      `gorm:"index" json:"targetApplicationId"`
+	TargetType          string    `gorm:"type:varchar(16)" json:"targetType"`
+	TargetID            uint      `gorm:"index" json:"targetId"`
 	MinPriority         int       `json:"minPriority"`
 	DelayMinutes        int       `json:"delayMinutes"`
+	RepeatMinutes       int       `json:"repeatMinutes"`
+	MaxRepeats          int       `json:"maxRepeats"`
 	Enabled             bool      `json:"enabled"`
 	CreatedAt           time.Time `json:"createdAt"`
 	UpdatedAt           time.Time `json:"updatedAt"`
@@ -204,13 +208,15 @@ type EscalationRule struct {
 
 // EscalationState tracks one pending escalation.
 type EscalationState struct {
-	ID        uint       `gorm:"primaryKey;autoIncrement" json:"id"`
-	RuleID    uint       `gorm:"index;uniqueIndex:uix_escalation_rule_message,priority:1" json:"ruleId"`
-	MessageID uint       `gorm:"index;uniqueIndex:uix_escalation_rule_message,priority:2" json:"messageId"`
-	DueAt     time.Time  `gorm:"index" json:"dueAt"`
-	Completed bool       `gorm:"index" json:"completed"`
-	CreatedAt time.Time  `json:"createdAt"`
-	DoneAt    *time.Time `json:"doneAt,omitempty"`
+	ID                     uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	RuleID                 uint       `gorm:"index;uniqueIndex:uix_escalation_rule_message,priority:1" json:"ruleId"`
+	MessageID              uint       `gorm:"index;uniqueIndex:uix_escalation_rule_message,priority:2" json:"messageId"`
+	DueAt                  time.Time  `gorm:"index" json:"dueAt"`
+	RepeatCount            int        `json:"repeatCount"`
+	LastEscalatedMessageID uint       `gorm:"index" json:"lastEscalatedMessageId,omitempty"`
+	Completed              bool       `gorm:"index" json:"completed"`
+	CreatedAt              time.Time  `json:"createdAt"`
+	DoneAt                 *time.Time `json:"doneAt,omitempty"`
 }
 
 // MessageAcknowledgement records that a user acknowledged a message.
@@ -255,4 +261,14 @@ type ScheduledNotificationRun struct {
 	Status       string     `gorm:"type:varchar(24);index" json:"status"`
 	MessageID    uint       `gorm:"index" json:"messageId,omitempty"`
 	Error        string     `gorm:"type:text" json:"error,omitempty"`
+}
+
+
+// EscalationTargetApplication maps non-Channel escalation targets to internal history Channels.
+type EscalationTargetApplication struct {
+	TargetType    string    `gorm:"primaryKey;type:varchar(16)" json:"targetType"`
+	TargetID      uint      `gorm:"primaryKey;autoIncrement:false" json:"targetId"`
+	ApplicationID uint      `gorm:"uniqueIndex" json:"applicationId"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
