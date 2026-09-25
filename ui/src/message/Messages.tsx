@@ -105,6 +105,7 @@ const Messages = observer(() => {
     const renderMessage = (_index: number, message: IMessage) => (
         <Message
             key={message.id}
+            messageId={message.id}
             fDelete={
                 !archivedView && canDeleteMessage(message)
                     ? () => deleteMessage(message)
@@ -120,6 +121,10 @@ const Messages = observer(() => {
                 void messagesStore.setAcknowledged(message, !Boolean(message.acknowledged))
             }
             acknowledged={Boolean(message.acknowledged)}
+            acknowledgedByAnyone={Boolean(message.acknowledgedByAnyone)}
+            acknowledgementCount={message.acknowledgementCount || 0}
+            lastAcknowledgedBy={message.lastAcknowledgedBy}
+            lastAcknowledgedAt={message.lastAcknowledgedAt}
             senderName={message.senderName}
             onExpand={(expanded) => (expandedState.current[message.id] = expanded)}
             title={message.title}
