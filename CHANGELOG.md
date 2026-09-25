@@ -36,6 +36,12 @@ Native integrations and notification automation release.
 - Existing Gotify application tokens, client tokens, Android notification reception, REST routes, WebSocket delivery, Channels, users, messages, archives, and plugins remain compatible.
 - Database migration is additive.
 
+### Validation
+
+- The v0.3.0 preview application commit `05bcd71fd8501161d6d35e41bae2dc17214f968a` passed the complete Web UI build, full `go test -v ./...` suite, complete Docker/server build, database migration startup, and green application/database health checks.
+- v0.2.2 remains the published rollback baseline until v0.3.0 is accepted and formally released.
+- A maintained deployment/rollback procedure is available in `docs/DEPLOYMENT.md`.
+
 ## [0.2.2] - 2026-09-25
 
 Updater reliability and interface polish release.
