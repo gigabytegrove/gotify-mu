@@ -3,6 +3,7 @@ import {
     AppBar,
     Avatar,
     Box,
+    Button,
     Chip,
     IconButton,
     ListItemIcon,
@@ -19,6 +20,7 @@ import ExitToApp from '@mui/icons-material/ExitToApp';
 import MenuIcon from '@mui/icons-material/Menu';
 import Settings from '@mui/icons-material/Settings';
 import Security from '@mui/icons-material/Security';
+import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
 import {Link} from 'react-router';
 import * as config from '../config';
 
@@ -47,7 +49,7 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                 borderColor: 'divider',
                 backgroundColor: 'background.paper',
             }}>
-            <Toolbar sx={{minHeight: 64, gap: 1.5}}>
+            <Toolbar sx={{minHeight: 58, gap: 1.25, px: {xs: 1.25, sm: 2}}}>
                 {loggedIn && (
                     <IconButton
                         sx={{display: {xs: 'inline-flex', sm: 'none'}}}
@@ -72,10 +74,10 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                         component="img"
                         src={config.get('url') + 'static/gotify-mu-logo.png'}
                         alt="Gotify MU"
-                        sx={{width: 44, height: 32, objectFit: 'contain', borderRadius: 1}}
+                        sx={{width: 40, height: 30, objectFit: 'contain', borderRadius: 1}}
                     />
                     <Box sx={{display: {xs: 'none', sm: 'block'}}}>
-                        <Typography variant="h6" sx={{lineHeight: 1.1}}>
+                        <Typography variant="h6" sx={{fontSize: '1rem', lineHeight: 1.1}}>
                             Gotify MU
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
@@ -100,19 +102,37 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                         }
                         target="_blank"
                         rel="noreferrer"
+                        sx={{display: {xs: 'none', sm: 'inline-flex'}}}
                     />
                 </Tooltip>
 
                 {loggedIn && (
                     <>
-                        <IconButton
+                        <Button
                             id="user-menu-button"
                             aria-label="Account menu"
-                            onClick={(event) => setAnchorEl(event.currentTarget)}>
-                            <Avatar sx={{width: 34, height: 34}}>
+                            onClick={(event) => setAnchorEl(event.currentTarget)}
+                            endIcon={<KeyboardArrowDown fontSize="small" />}
+                            sx={{
+                                minWidth: 0,
+                                px: 0.75,
+                                color: 'text.primary',
+                                gap: 0.5,
+                            }}>
+                            <Avatar sx={{width: 30, height: 30, fontSize: '0.85rem'}}>
                                 {name.slice(0, 1).toUpperCase() || <AccountCircle />}
                             </Avatar>
-                        </IconButton>
+                            <Typography
+                                variant="body2"
+                                sx={{
+                                    display: {xs: 'none', md: 'block'},
+                                    fontWeight: 650,
+                                    maxWidth: 160,
+                                }}
+                                noWrap>
+                                {name}
+                            </Typography>
+                        </Button>
                         <Menu
                             id="user-menu"
                             anchorEl={anchorEl}
