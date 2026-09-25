@@ -275,9 +275,6 @@ const ReleaseUpdateDetails = ({
                         Installed
                     </Typography>
                     <Typography sx={{fontWeight: 700}}>{currentVersion}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        Commit {currentCommit || 'unknown'}
-                    </Typography>
                 </Stack>
                 <Stack spacing={0.35} sx={{alignItems: {sm: 'flex-end'}}}>
                     <Typography variant="body2" color="text.secondary">
@@ -350,11 +347,7 @@ const ReleaseUpdateDetails = ({
                     }
                     disabled={!safeAutomaticInstall || !updaterReady || updaterBusy || installing}
                     onClick={() => void installRelease(state.release)}>
-                    {updaterBusy
-                        ? 'Updating…'
-                        : sameCommit && state.classification === 'development'
-                          ? `Install ${state.release.tag_name}`
-                          : `Install ${state.release.tag_name}`}
+                    {updaterBusy ? 'Updating…' : `Install ${state.release.tag_name}`}
                 </Button>
             </Stack>
 
