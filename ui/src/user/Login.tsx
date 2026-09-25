@@ -2,6 +2,7 @@ import React from 'react';
 import {
     Box,
     Button,
+    Chip,
     Divider,
     Stack,
     TextField,
@@ -14,6 +15,7 @@ import RegistrationDialog from './Register';
 import {useStores} from '../stores';
 import {observer} from 'mobx-react-lite';
 import {useNavigate, useSearchParams} from 'react-router';
+import LockOutlined from '@mui/icons-material/LockOutlined';
 
 const Login = observer(() => {
     const [username, setUsername] = React.useState('');
@@ -60,19 +62,20 @@ const Login = observer(() => {
     };
 
     return (
-        <DefaultPage title="Sign in" maxWidth={460}>
+        <DefaultPage title="Sign in" maxWidth={430}>
             <SurfaceCard>
-                <Stack spacing={2.5}>
-                    <Box sx={{textAlign: 'center'}}>
+                <Stack spacing={2}>
+                    <Box sx={{textAlign: 'center', pt: 0.5}}>
                         <Box
                             component="img"
                             src={config.get('url') + 'static/gotify-mu-logo.png'}
                             alt="Gotify MU"
-                            sx={{width: 180, maxWidth: '70%', mb: 1}}
+                            sx={{width: 150, maxWidth: '65%', mb: 0.75}}
                         />
                         <Typography variant="h5">Welcome to Gotify MU</Typography>
-                        <Typography color="text.secondary">
-                            Sign in to access your Channels and notifications.
+                        <Typography variant="body2" color="text.secondary" sx={{mt: 0.4}}>
+                            Multi-user notification delivery with shared Channels and centralized
+                            administration.
                         </Typography>
                     </Box>
 
@@ -103,6 +106,7 @@ const Login = observer(() => {
                                 />
                                 <Button
                                     type="submit"
+                                    startIcon={<LockOutlined />}
                                     variant="contained"
                                     size="large"
                                     className="login"
@@ -141,6 +145,24 @@ const Login = observer(() => {
                             Create an account
                         </Button>
                     )}
+
+                    <Stack
+                        direction="row"
+                        spacing={0.75}
+                        useFlexGap
+                        sx={{pt: 0.5, justifyContent: 'center', flexWrap: 'wrap'}}>
+                        <Chip
+                            size="small"
+                            variant="outlined"
+                            label={`@${config.get('version').version}`}
+                        />
+                        {localAuthEnabled && (
+                            <Chip size="small" variant="outlined" label="Local auth" />
+                        )}
+                        {oidcEnabled && (
+                            <Chip size="small" variant="outlined" label={oidcIdpName} />
+                        )}
+                    </Stack>
                 </Stack>
             </SurfaceCard>
 
