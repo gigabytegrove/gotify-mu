@@ -392,6 +392,9 @@ export interface ISMTPRoute {
     applicationId: number;
     recipient: string;
     allowedCidrs: string;
+    senderContains: string;
+    subjectContains: string;
+    maxMessageBytes: number;
     username: string;
     passwordConfigured: boolean;
     enabled: boolean;
@@ -403,6 +406,9 @@ export interface IRSSMonitor {
     applicationId: number;
     url: string;
     intervalMinutes: number;
+    titleContains: string;
+    categoryContains: string;
+    priority: number;
     enabled: boolean;
     status: string;
     lastCheckedAt?: string;
@@ -418,6 +424,7 @@ export interface ISyslogRoute {
     facility: number;
     maxSeverity: number;
     allowedCidrs: string;
+    deduplicateSeconds: number;
     enabled: boolean;
 }
 
@@ -428,6 +435,9 @@ export interface ICalendarMonitor {
     url: string;
     intervalMinutes: number;
     notifyBeforeMinutes: number;
+    titleContains: string;
+    locationContains: string;
+    priority: number;
     enabled: boolean;
     status: string;
     lastCheckedAt?: string;
