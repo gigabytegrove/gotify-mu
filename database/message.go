@@ -409,3 +409,29 @@ func (d *GormDatabase) DeleteMessagesByUser(userID uint) error {
 	}
 	return nil
 }
+
+
+func (d *GormDatabase) ApplyMessageRetention(now time.Time) (int, error) {
+	var apps []*model.Application
+	if err := d.DB.Where("retention_days > 0").Find(&apps).Error; err != nil {
+		return 0, err
+	}
+	deleted := 0
+	for _, app := range apps {
+		before := now.AddDate(0, 0, -app.RetentionDays)
+		var ids []uint
+		if err := d.DB.Model(&model.Message{}).
+			Where("application_id = ? AND date < ?", app.ID, before).
+			Order("id asc").
+			Pluck("id", &ids).Error; err != nil {
+			return deleted, err
+		}
+		for _, id := range ids {
+			if err := d.DeleteMessageByID(id); err != nil {
+				return deleted, err
+			}
+			deleted++
+		}
+	}
+	return deleted, nil
+}
