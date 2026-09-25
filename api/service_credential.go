@@ -69,6 +69,10 @@ func (a *ServiceCredentialAPI) Create(ctx *gin.Context) {
 		}
 	}
 	userID := auth.GetUserID(ctx)
+	if slices.Contains(scopes, "message:write") && input.ApplicationID == nil {
+		ctx.AbortWithError(400, errors.New("message:write credentials must be bound to a Channel"))
+		return
+	}
 	if input.ApplicationID != nil {
 		app, err := a.DB.GetApplicationByID(*input.ApplicationID)
 		if !successOrAbort(ctx, 500, err) { return }
