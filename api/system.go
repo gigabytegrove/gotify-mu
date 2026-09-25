@@ -18,6 +18,7 @@ type SystemDatabase interface {
 	SaveSecurityPolicy(model.SecurityPolicy) error
 	GetOperationsSummary(dialect string) (model.OperationsSummary, error)
 	GetAllClients() ([]*model.Client, error)
+	GetClientByID(id uint) (*model.Client, error)
 	GetUserByID(id uint) (*model.User, error)
 	DeleteClientByID(id uint) error
 	GetAuditEventsForExport(limit int) ([]*model.AuditEvent, error)
@@ -25,8 +26,9 @@ type SystemDatabase interface {
 }
 
 type SystemAPI struct {
-	DB      SystemDatabase
-	Dialect string
+	DB            SystemDatabase
+	Dialect       string
+	NotifyDeleted func(uint, string)
 }
 
 type sessionView struct {
@@ -99,7 +101,15 @@ func (a *SystemAPI) GetSessions(ctx *gin.Context) {
 
 func (a *SystemAPI) RevokeSession(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		successOrAbort(ctx, http.StatusInternalServerError, a.DB.DeleteClientByID(id))
+		client, err := a.DB.GetClientByID(id)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if client == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("session not found"))
+			return
+		}
+		if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.DeleteClientByID(id)) { return }
+		if a.NotifyDeleted != nil { a.NotifyDeleted(client.UserID, client.Token) }
+		ctx.Status(http.StatusNoContent)
 	})
 }
 
