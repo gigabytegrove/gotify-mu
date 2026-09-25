@@ -138,3 +138,28 @@ func TestReadMQTTPacketRejectsOversize(t *testing.T) {
 		t.Fatal("expected oversized MQTT packet to be rejected")
 	}
 }
+
+
+func TestHomeAssistantEventFilters(t *testing.T) {
+	integration := &model.HomeAssistantIntegration{
+		EntityIDs: "binary_sensor.front_door, alarm_control_panel.home",
+		DataField: "new_state.state",
+		DataValue: "on",
+	}
+	data := map[string]any{
+		"entity_id": "binary_sensor.front_door",
+		"new_state": map[string]any{"state": "on"},
+	}
+	if !homeAssistantEventMatches(integration, data) {
+		t.Fatal("matching Home Assistant event should pass filters")
+	}
+	data["entity_id"] = "light.kitchen"
+	if homeAssistantEventMatches(integration, data) {
+		t.Fatal("unexpected entity should be rejected")
+	}
+	data["entity_id"] = "binary_sensor.front_door"
+	data["new_state"] = map[string]any{"state": "off"}
+	if homeAssistantEventMatches(integration, data) {
+		t.Fatal("unexpected field value should be rejected")
+	}
+}
