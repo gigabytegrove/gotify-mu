@@ -71,6 +71,7 @@ func backfillApplicationMemberships(tx *gorm.DB) error {
 				ApplicationID:        app.ID,
 				UserID:               app.UserID,
 				ReceiveNotifications: true,
+				Role:                 model.ApplicationRoleManager,
 			}
 			if err := tx.Clauses(membershipConflict()).Create(&owner).Error; err != nil {
 				return err
