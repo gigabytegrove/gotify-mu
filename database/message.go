@@ -365,7 +365,12 @@ func (d *GormDatabase) DeleteMessageByID(id uint) error {
 		if err := tx.Where("message_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
 		if err := tx.Where("message_id = ?", id).Delete(&model.EscalationState{}).Error; err != nil { return err }
 		if err := tx.Where("message_id = ?", id).Delete(&model.DeferredNotification{}).Error; err != nil { return err }
-		return tx.Where("id = ?", id).Delete(&model.Message{}).Error
+		if err := tx.Where("message_id = ?", id).Delete(&model.MessageReaction{}).Error; err != nil { return err }
+		if err := tx.Where("message_id = ?", id).Delete(&model.MessageWorkflow{}).Error; err != nil { return err }
+		if err := tx.Where("message_id = ?", id).Delete(&model.MessageRead{}).Error; err != nil { return err }
+		if err := tx.Where("message_id = ?", id).Delete(&model.MessageMention{}).Error; err != nil { return err }
+		if err := tx.Where("message_id = ?", id).Delete(&model.MessageAttachment{}).Error; err != nil { return err }
+		return tx.Where("id = ? OR reply_to_message_id = ? OR thread_root_message_id = ?", id, id, id).Delete(&model.Message{}).Error
 	})
 }
 
@@ -378,6 +383,11 @@ func (d *GormDatabase) DeleteMessagesByApplication(applicationID uint) error {
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.DigestItem{}).Error; err != nil { return err }
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.EscalationState{}).Error; err != nil { return err }
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.DeferredNotification{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.MessageReaction{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.MessageWorkflow{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.MessageRead{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.MessageMention{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.MessageAttachment{}).Error; err != nil { return err }
 		return tx.Where("application_id = ?", applicationID).Delete(&model.Message{}).Error
 	})
 }
