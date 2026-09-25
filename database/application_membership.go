@@ -30,6 +30,7 @@ func assignApplicationToAllUsers(tx *gorm.DB, applicationID, ownerID uint) error
 			UserID:               userID,
 			ReceiveNotifications: true,
 			AutoAssigned:         true,
+			Role:                 model.ApplicationRoleMember,
 		})
 	}
 	if len(memberships) == 0 {
@@ -52,6 +53,7 @@ func assignUserToAutoApplications(tx *gorm.DB, userID uint) error {
 			UserID:               userID,
 			ReceiveNotifications: true,
 			AutoAssigned:         true,
+			Role:                 model.ApplicationRoleMember,
 		}
 		if err := tx.Clauses(membershipConflict()).Create(&membership).Error; err != nil {
 			return err
