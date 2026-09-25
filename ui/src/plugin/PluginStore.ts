@@ -3,7 +3,7 @@ import {action} from 'mobx';
 import {BaseStore} from '../common/BaseStore';
 import * as config from '../config';
 import {SnackReporter} from '../snack/SnackManager';
-import {IPlugin} from '../types';
+import {IPlugin, IPluginCatalogEntry} from '../types';
 
 export interface IPluginInstallResult {
     name: string;
@@ -38,9 +38,15 @@ export class PluginStore extends BaseStore<IPlugin> {
     };
 
     @action
-    public installPlugin = async (file: File): Promise<IPluginInstallResult> => {
+    public installPlugin = async (
+        file: File,
+        verification?: {sha256?: string; signature?: string; publicKey?: string}
+    ): Promise<IPluginInstallResult> => {
         const form = new FormData();
         form.append('plugin', file);
+        if (verification?.sha256) form.append('sha256', verification.sha256);
+        if (verification?.signature) form.append('signature', verification.signature);
+        if (verification?.publicKey) form.append('publicKey', verification.publicKey);
 
         const response = await axios.post<IPluginInstallResult>(
             `${config.get('url')}plugin/install`,
@@ -55,6 +61,47 @@ export class PluginStore extends BaseStore<IPlugin> {
         }
         await this.refresh();
         return response.data;
+    };
+
+    public getCatalog = async (): Promise<IPluginCatalogEntry[]> =>
+        axios
+            .get<IPluginCatalogEntry[]>(`${config.get('url')}plugin/catalog`)
+            .then((response) => response.data);
+
+    @action
+    public installCatalogPlugin = async (entry: IPluginCatalogEntry): Promise<void> => {
+        const response = await axios.post<{restartRequired?: boolean}>(
+            `${config.get('url')}plugin/catalog/install`,
+            {modulePath: entry.modulePath, version: entry.version}
+        );
+        this.snack(
+            response.data.restartRequired
+                ? 'Plugin update staged. Restart Gotify MU to load it.'
+                : 'Plugin installed from catalog'
+        );
+        await this.refresh();
+    };
+
+    @action
+    public uninstallPlugin = async (id: number): Promise<void> => {
+        await axios.delete(`${config.get('url')}plugin/${id}/uninstall`);
+        this.snack('Plugin uninstalled');
+        await this.refresh();
+    };
+
+    @action
+    public stagePluginUpdate = async (
+        id: number,
+        file: File,
+        verification?: {sha256?: string; signature?: string; publicKey?: string}
+    ): Promise<void> => {
+        const form = new FormData();
+        form.append('plugin', file);
+        if (verification?.sha256) form.append('sha256', verification.sha256);
+        if (verification?.signature) form.append('signature', verification.signature);
+        if (verification?.publicKey) form.append('publicKey', verification.publicKey);
+        await axios.post(`${config.get('url')}plugin/${id}/update`, form);
+        this.snack('Plugin update staged. Restart Gotify MU to load it.');
     };
 
     @action
