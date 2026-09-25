@@ -4,6 +4,7 @@ import Alert from '@mui/material/Alert';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import CircularProgress from '@mui/material/CircularProgress';
+import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Download from '@mui/icons-material/Download';
@@ -27,18 +28,26 @@ type ReleaseState =
     | {status: 'error'; message: string}
     | {status: 'ready'; release: PublishedRelease; classification: UpdateClassification};
 
+interface UpdateActivity {
+    timestamp: string;
+    message: string;
+}
+
 interface UpdaterStatus {
     ready: boolean;
     state: string;
     version?: string;
     message?: string;
+    step?: string;
+    progress?: number;
+    activity?: UpdateActivity[];
     startedAt?: string;
     finishedAt?: string;
 }
 
 const releaseLabel = (release: PublishedRelease) => release.name || release.tag_name;
 const normalizeTag = (tag: string) => tag.replace(/^v/i, '');
-const activeUpdaterStates = new Set(['downloading', 'building', 'replacing', 'verifying']);
+const activeUpdaterStates = new Set(['preparing', 'downloading', 'building', 'replacing', 'verifying']);
 
 export const useReleaseUpdate = (): ReleaseState => {
     const [state, setState] = React.useState<ReleaseState>({status: 'loading'});
@@ -109,7 +118,7 @@ export const UpdateAvailableBanner = () => {
                 </Button>
             }>
             {development
-                ? `Published release ${state.release.tag_name} is available. This server is running development build ${currentVersion}.`
+                ? `Published release ${state.release.tag_name} is available. This server is running preview version ${currentVersion}.`
                 : `Gotify MU ${state.release.tag_name} is available. This server is running ${currentVersion}.`}
         </Alert>
     );
@@ -121,6 +130,9 @@ export const UpdateStatusCard = () => {
     const currentVersion = current.version;
     const [updater, setUpdater] = React.useState<UpdaterStatus>();
     const [installing, setInstalling] = React.useState(false);
+    const updaterRef = React.useRef<UpdaterStatus | undefined>(undefined);
+    const updateStartedHere = React.useRef(false);
+    const sawActiveUpdate = React.useRef(false);
     const reloadScheduled = React.useRef(false);
 
     const loadUpdaterStatus = React.useCallback(async () => {
@@ -132,24 +144,38 @@ export const UpdateStatusCard = () => {
             if (!response.ok) {
                 throw new Error(`HTTP ${response.status}`);
             }
+
             const next = (await response.json()) as UpdaterStatus;
+            updaterRef.current = next;
             setUpdater(next);
 
-            if (next.state === 'completed' && !reloadScheduled.current) {
+            if (activeUpdaterStates.has(next.state)) {
+                sawActiveUpdate.current = true;
+            }
+
+            const completedThisSession =
+                updateStartedHere.current &&
+                sawActiveUpdate.current &&
+                next.state === 'completed';
+
+            if (completedThisSession && !reloadScheduled.current) {
                 reloadScheduled.current = true;
                 window.setTimeout(() => window.location.reload(), 1500);
             }
         } catch {
-            if (!updater || activeUpdaterStates.has(updater.state) || installing) {
+            const previous = updaterRef.current;
+            if (previous && activeUpdaterStates.has(previous.state)) {
                 return;
             }
-            setUpdater({
+            const unavailable: UpdaterStatus = {
                 ready: false,
                 state: 'unavailable',
-                message: 'Managed updater helper is unavailable.',
-            });
+                message: 'Automatic updates are temporarily unavailable.',
+            };
+            updaterRef.current = unavailable;
+            setUpdater(unavailable);
         }
-    }, [installing, updater]);
+    }, []);
 
     React.useEffect(() => {
         void loadUpdaterStatus();
@@ -159,6 +185,10 @@ export const UpdateStatusCard = () => {
 
     const installRelease = async (release: PublishedRelease) => {
         setInstalling(true);
+        updateStartedHere.current = true;
+        sawActiveUpdate.current = false;
+        reloadScheduled.current = false;
+
         try {
             await axios.post(`${config.get('url')}update/install`, {
                 version: normalizeTag(release.tag_name),
@@ -174,7 +204,7 @@ export const UpdateStatusCard = () => {
     return (
         <SurfaceCard
             title="Software Update"
-            subtitle="Install Gotify MU releases directly from the Web UI with automatic health verification and rollback."
+            subtitle="Install available updates here. If an update cannot be completed safely, the previous version is restored automatically."
             action={<NewReleases color="action" />}>
             {state.status === 'loading' && (
                 <Stack direction="row" spacing={1.25} sx={{alignItems: 'center'}}>
@@ -245,9 +275,6 @@ const ReleaseUpdateDetails = ({
                         Installed
                     </Typography>
                     <Typography sx={{fontWeight: 700}}>{currentVersion}</Typography>
-                    <Typography variant="caption" color="text.secondary">
-                        Commit {currentCommit || 'unknown'}
-                    </Typography>
                 </Stack>
                 <Stack spacing={0.35} sx={{alignItems: {sm: 'flex-end'}}}>
                     <Typography variant="body2" color="text.secondary">
@@ -281,16 +308,15 @@ const ReleaseUpdateDetails = ({
             )}
             {state.classification === 'development' && sameCommit && (
                 <Alert severity="success">
-                    This development build is the exact commit published as {state.release.tag_name}.
-                    You can switch it to the official release build without changing application
-                    data.
+                    This preview version matches {state.release.tag_name}. You can install the
+                    published version without changing your application data.
                 </Alert>
             )}
             {state.classification === 'development' && !sameCommit && (
                 <Alert severity="info">
-                    This server is running a development build that differs from{' '}
-                    {state.release.tag_name}. Automatic installation of that older release is
-                    disabled to prevent an accidental downgrade.
+                    This server is running a preview version newer than {state.release.tag_name}.
+                    Installing the older published version is disabled to prevent an accidental
+                    downgrade.
                 </Alert>
             )}
 
@@ -300,7 +326,7 @@ const ReleaseUpdateDetails = ({
                 sx={{alignItems: {sm: 'center'}, justifyContent: 'space-between'}}>
                 <Stack direction="row" spacing={0.75} sx={{alignItems: 'center'}}>
                     <Typography variant="body2" color="text.secondary">
-                        Managed updater
+                        Automatic updates
                     </Typography>
                     <Chip
                         size="small"
@@ -321,36 +347,83 @@ const ReleaseUpdateDetails = ({
                     }
                     disabled={!safeAutomaticInstall || !updaterReady || updaterBusy || installing}
                     onClick={() => void installRelease(state.release)}>
-                    {updaterBusy
-                        ? 'Updating…'
-                        : sameCommit && state.classification === 'development'
-                          ? `Install ${state.release.tag_name} Release Build`
-                          : `Install ${state.release.tag_name}`}
+                    {updaterBusy ? 'Updating…' : `Install ${state.release.tag_name}`}
                 </Button>
             </Stack>
 
-            {updater?.message && (
-                <Alert
-                    severity={
-                        updater.state === 'failed' || updater.state === 'rolled_back'
-                            ? 'warning'
-                            : 'info'
-                    }>
-                    {updater.message}
-                    {updater.version ? ` (v${updater.version})` : ''}
-                </Alert>
+            {updater && updater.state !== 'idle' && updater.state !== 'unavailable' && (
+                <Stack spacing={1.25}>
+                    <Stack
+                        direction="row"
+                        spacing={1}
+                        sx={{alignItems: 'center', justifyContent: 'space-between'}}>
+                        <Typography sx={{fontWeight: 700}}>
+                            {updater.step || 'Preparing update'}
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary">
+                            {Math.max(0, Math.min(100, updater.progress ?? 0))}%
+                        </Typography>
+                    </Stack>
+                    <LinearProgress
+                        variant="determinate"
+                        value={Math.max(0, Math.min(100, updater.progress ?? 0))}
+                    />
+                    {updater.message && (
+                        <Typography variant="body2" color="text.secondary">
+                            {updater.message}
+                        </Typography>
+                    )}
+
+                    {updater.activity && updater.activity.length > 0 && (
+                        <Stack spacing={0.5}>
+                            <Typography variant="subtitle2">Update activity</Typography>
+                            <Stack
+                                spacing={0.5}
+                                sx={{
+                                    maxHeight: 220,
+                                    overflowY: 'auto',
+                                    p: 1.25,
+                                    borderRadius: 1.5,
+                                    bgcolor: 'action.hover',
+                                }}>
+                                {updater.activity.slice(-12).map((entry, index) => (
+                                    <Stack
+                                        key={`${entry.timestamp}-${index}`}
+                                        direction="row"
+                                        spacing={1}
+                                        sx={{alignItems: 'baseline'}}>
+                                        <Typography
+                                            variant="caption"
+                                            color="text.secondary"
+                                            sx={{minWidth: 74}}>
+                                            {new Date(entry.timestamp).toLocaleTimeString([], {
+                                                hour: 'numeric',
+                                                minute: '2-digit',
+                                                second: '2-digit',
+                                            })}
+                                        </Typography>
+                                        <Typography variant="body2">{entry.message}</Typography>
+                                    </Stack>
+                                ))}
+                            </Stack>
+                        </Stack>
+                    )}
+                </Stack>
             )}
+
+            {(updater?.state === 'failed' || updater?.state === 'rolled_back') &&
+                updater.message && <Alert severity="warning">{updater.message}</Alert>}
 
             {!updaterReady && (
                 <Typography variant="body2" color="text.secondary">
-                    Direct installation requires the Gotify MU updater helper. Existing installations
-                    can enable it once; future releases can then be installed here without SSH.
+                    Automatic installation is not enabled on this server. Updates can still be
+                    downloaded below and installed by the server administrator.
                 </Typography>
             )}
 
             {state.release.assets.length > 0 && (
                 <Stack spacing={1}>
-                    <Typography variant="subtitle2">Manual recovery downloads</Typography>
+                    <Typography variant="subtitle2">Download files</Typography>
                     <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
                         {state.release.assets.map((asset) => (
                             <Button

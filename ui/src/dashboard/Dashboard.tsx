@@ -65,7 +65,7 @@ const Dashboard = observer(() => {
     return (
         <DefaultPage
             title="Dashboard"
-            description="Server health, access, and notification activity at a glance."
+            description="Notifications, access, and server status at a glance."
             rightControl={
                 <Button
                     component={Link}
@@ -245,8 +245,8 @@ const Dashboard = observer(() => {
 
                 <Grid size={{xs: 12, lg: 5}}>
                     <SurfaceCard
-                        title="Server & Security"
-                        subtitle="Runtime identity and authentication state."
+                        title="Server Status"
+                        subtitle="Current version and sign-in status."
                         action={
                             <Chip
                                 size="small"
@@ -256,10 +256,6 @@ const Dashboard = observer(() => {
                         }>
                         <Stack spacing={1}>
                             <InfoRow label="Version" value={`@${version.version}`} />
-                            <Divider />
-                            <InfoRow label="Commit" value={version.commit || 'unknown'} mono />
-                            <Divider />
-                            <InfoRow label="Build date" value={version.buildDate || 'unknown'} />
                             <Divider />
                             <InfoRow label="Signed in as" value={currentUser.user.name} />
                             <Divider />
@@ -282,14 +278,14 @@ const Dashboard = observer(() => {
                                 spacing={1}
                                 sx={{alignItems: 'center', justifyContent: 'space-between'}}>
                                 <Typography variant="body2" color="text.secondary">
-                                    Authentication
+                                    Sign-in methods
                                 </Typography>
                                 <Stack direction="row" spacing={0.5} useFlexGap sx={{flexWrap: 'wrap'}}>
                                     {config.get('localAuth') && (
-                                        <Chip size="small" variant="outlined" label="Local" />
+                                        <Chip size="small" variant="outlined" label="Password" />
                                     )}
                                     {config.get('oidc') && (
-                                        <Chip size="small" variant="outlined" label="OIDC" />
+                                        <Chip size="small" variant="outlined" label="Single sign-on" />
                                     )}
                                 </Stack>
                             </Stack>
@@ -301,15 +297,7 @@ const Dashboard = observer(() => {
     );
 });
 
-const InfoRow = ({
-    label,
-    value,
-    mono = false,
-}: {
-    label: string;
-    value: string;
-    mono?: boolean;
-}) => (
+const InfoRow = ({label, value}: {label: string; value: string}) => (
     <Stack
         direction="row"
         spacing={2}
@@ -321,7 +309,6 @@ const InfoRow = ({
             variant="body2"
             sx={{
                 fontWeight: 650,
-                fontFamily: mono ? 'monospace' : undefined,
                 maxWidth: '65%',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',

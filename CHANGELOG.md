@@ -2,6 +2,32 @@
 
 All notable Gotify MU changes are documented here.
 
+## [0.2.2] - 2026-09-25
+
+Updater reliability and interface polish release.
+
+### Fixed
+
+- Fixed the Settings page repeatedly reloading after a successful update.
+- Fixed update-status polling restarting immediately after every response.
+- Update status now refreshes at a steady interval without hammering the server.
+- Completed updates no longer trigger another page reload after the page has already reloaded.
+
+### Added
+
+- Overall update progress percentage.
+- Clear user-facing update stages.
+- Live update activity history with timestamps.
+- Download progress and staged installation progress.
+- Automatic recovery status shown directly in the update screen.
+
+### Changed
+
+- Update language now uses end-user terms instead of installation-engine terminology.
+- Dashboard and Settings no longer volunteer internal build details such as commit hashes and build dates.
+- Security settings show active sign-in methods only instead of unfinished roadmap features.
+- Internal update diagnostics remain in server logs and are not exposed in the Web UI.
+
 ## [0.2.1] - 2026-09-25
 
 Managed in-app update release.
