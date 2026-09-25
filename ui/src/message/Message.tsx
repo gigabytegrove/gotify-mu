@@ -25,7 +25,12 @@ import {Markdown} from '../common/Markdown';
 import * as config from '../config';
 import {IMessage, IMessageAcknowledgement, IMessageExtras} from '../types';
 import MessageCollaboration from './MessageCollaboration';
-import {contentType, RenderMode} from './extras';
+import {
+    contentType,
+    notificationActions,
+    notificationFields,
+    RenderMode,
+} from './extras';
 import {TimeAgoFormatter} from '../common/TimeAgoFormatter';
 
 const PREVIEW_HEIGHT = 360;
@@ -93,6 +98,16 @@ const Message = ({
 
     React.useEffect(() => void onExpand(expanded), [expanded, onExpand]);
     React.useEffect(() => refreshOverflowing(), [content, refreshOverflowing]);
+
+    const richFields = notificationFields(extras);
+    const richActions = notificationActions(extras).filter((action) => {
+        try {
+            const parsed = new URL(action.url);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    });
 
     const renderContent = () => {
         switch (contentType(extras)) {
@@ -252,6 +267,51 @@ const Message = ({
                     }}>
                     {renderContent()}
                 </Box>
+
+                {richFields.length > 0 && (
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: {xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))'},
+                            gap: 1,
+                        }}>
+                        {richFields.map((field, index) => (
+                            <Box
+                                key={field.label + index}
+                                sx={{
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1.5,
+                                    p: 1,
+                                    minWidth: 0,
+                                }}>
+                                <Typography variant="caption" color="text.secondary">
+                                    {field.label}
+                                </Typography>
+                                <Typography variant="body2" sx={{wordBreak: 'break-word'}}>
+                                    {field.value}
+                                </Typography>
+                            </Box>
+                        ))}
+                    </Box>
+                )}
+
+                {richActions.length > 0 && (
+                    <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
+                        {richActions.map((action, index) => (
+                            <Button
+                                key={action.label + index}
+                                size="small"
+                                variant="outlined"
+                                component="a"
+                                href={action.url}
+                                target="_blank"
+                                rel="noopener noreferrer">
+                                {action.label}
+                            </Button>
+                        ))}
+                    </Stack>
+                )}
 
                 <MessageCollaboration message={message} onChanged={fRefresh} />
 
