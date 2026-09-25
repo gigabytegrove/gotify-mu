@@ -25,6 +25,7 @@ type CollaborationDatabase interface {
 	GetMessageByID(id uint) (*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
+	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
 	GetUserByID(id uint) (*model.User, error)
 	GetThreadMessagesForUser(userID, rootID uint) ([]*model.Message, error)
 	AddMessageReaction(messageID, userID uint, emoji string) error
@@ -110,6 +111,61 @@ func canManageMessage(app *model.Application, membership *model.ApplicationMembe
 	return membership.EffectiveRole == model.ChannelRoleManager
 }
 
+func normalizeMention(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	value = strings.Trim(value, "@.,:;!?()[]{}<>\"'")
+	return value
+}
+
+func (a *CollaborationAPI) resolveMentions(applicationID uint, body string, explicit []uint) ([]uint, error) {
+	selected := make(map[uint]struct{})
+	for _, id := range explicit {
+		if id != 0 {
+			selected[id] = struct{}{}
+		}
+	}
+	wanted := make(map[string]struct{})
+	for _, token := range strings.Fields(body) {
+		if !strings.HasPrefix(token, "@") {
+			continue
+		}
+		name := normalizeMention(token)
+		if name != "" {
+			wanted[name] = struct{}{}
+		}
+	}
+	if len(wanted) == 0 {
+		out := make([]uint, 0, len(selected))
+		for id := range selected { out = append(out, id) }
+		return out, nil
+	}
+	recipientIDs, err := a.DB.GetApplicationRecipientUserIDs(applicationID)
+	if err != nil {
+		return nil, err
+	}
+	for _, id := range recipientIDs {
+		user, userErr := a.DB.GetUserByID(id)
+		if userErr != nil {
+			return nil, userErr
+		}
+		if user == nil {
+			continue
+		}
+		names := []string{normalizeMention(user.Name), normalizeMention(user.DisplayName)}
+		for _, name := range names {
+			if _, ok := wanted[name]; ok && name != "" {
+				selected[id] = struct{}{}
+				break
+			}
+		}
+	}
+	out := make([]uint, 0, len(selected))
+	for id := range selected {
+		out = append(out, id)
+	}
+	return out, nil
+}
+
 type replyParams struct {
 	Message        string `json:"message" binding:"required"`
 	Title          string `json:"title"`
@@ -158,8 +214,12 @@ func (a *CollaborationAPI) Reply(ctx *gin.Context) {
 		if !successOrAbort(ctx, http.StatusInternalServerError, err) {
 			return
 		}
-		if len(params.MentionUserIDs) > 0 {
-			if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.ReplaceMessageMentions(message.ID, params.MentionUserIDs)) {
+		mentions, mentionErr := a.resolveMentions(app.ID, params.Message, params.MentionUserIDs)
+		if !successOrAbort(ctx, http.StatusInternalServerError, mentionErr) {
+			return
+		}
+		if len(mentions) > 0 {
+			if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.ReplaceMessageMentions(message.ID, mentions)) {
 				return
 			}
 		}
