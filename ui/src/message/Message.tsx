@@ -23,7 +23,8 @@ import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
 import TimeAgo from 'react-timeago';
 import {Markdown} from '../common/Markdown';
 import * as config from '../config';
-import {IMessageAcknowledgement, IMessageExtras} from '../types';
+import {IMessage, IMessageAcknowledgement, IMessageExtras} from '../types';
+import MessageCollaboration from './MessageCollaboration';
 import {contentType, RenderMode} from './extras';
 import {TimeAgoFormatter} from '../common/TimeAgoFormatter';
 
@@ -40,6 +41,8 @@ interface IProps {
     fArchive?: VoidFunction;
     fRestore?: VoidFunction;
     messageId: number;
+    message: IMessage;
+    fRefresh: () => Promise<void>;
     fAcknowledge?: VoidFunction;
     acknowledged?: boolean;
     acknowledgedByAnyone?: boolean;
@@ -57,6 +60,8 @@ const Message = ({
     fArchive,
     fRestore,
     messageId,
+    message,
+    fRefresh,
     fAcknowledge,
     acknowledged = false,
     acknowledgedByAnyone = false,
@@ -247,6 +252,8 @@ const Message = ({
                     }}>
                     {renderContent()}
                 </Box>
+
+                <MessageCollaboration message={message} onChanged={fRefresh} />
 
                 {isOverflowing && (
                     <Button
