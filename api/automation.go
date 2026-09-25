@@ -15,6 +15,7 @@ import (
 	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/automation"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 )
 
 type AutomationEngine interface {
@@ -94,13 +95,15 @@ func (a *AutomationAPI) CreateWebhookRoute(ctx *gin.Context) {
 	secret, err := generateIntegrationSecret()
 	if !successOrAbort(ctx, 500, err) { return }
 	item := &model.WebhookRoute{
-		Name: params.Name, ApplicationID: params.ApplicationID, Secret: secret, Enabled: params.Enabled,
+		Name: params.Name, ApplicationID: params.ApplicationID, Secret: security.WebhookVerifier(secret), Enabled: params.Enabled,
 		TitleField: valueOr(params.TitleField, "title"), MessageField: valueOr(params.MessageField, "message"),
 		PriorityField: valueOr(params.PriorityField, "priority"), DefaultTitle: params.DefaultTitle,
 		DefaultPriority: params.DefaultPriority,
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
-	ctx.JSON(201, webhookView(item))
+	view := webhookView(item)
+	view.Path = "/integrations/webhook/" + secret
+	ctx.JSON(201, view)
 }
 
 func (a *AutomationAPI) UpdateWebhookRoute(ctx *gin.Context) {
@@ -126,9 +129,11 @@ func (a *AutomationAPI) RegenerateWebhookSecret(ctx *gin.Context) {
 		if item == nil { ctx.AbortWithError(404, errors.New("webhook not found")); return }
 		secret, err := generateIntegrationSecret()
 		if !successOrAbort(ctx, 500, err) { return }
-		item.Secret = secret
+		item.Secret = security.WebhookVerifier(secret)
 		if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
-		ctx.JSON(200, webhookView(item))
+		view := webhookView(item)
+		view.Path = "/integrations/webhook/" + secret
+		ctx.JSON(200, view)
 	})
 }
 
@@ -195,9 +200,11 @@ func (a *AutomationAPI) CreateMQTT(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&params); err != nil { return }
 	if !a.channelExists(ctx, params.ApplicationID) { return }
 	if !validMQTTURL(params.BrokerURL) { ctx.AbortWithError(400, errors.New("broker URL must use mqtt, mqtts, tcp, or tls")); return }
+	protectedPassword, err := security.Protect(params.Password)
+	if !successOrAbort(ctx, 500, err) { return }
 	item := &model.MQTTIntegration{
 		Name: params.Name, ApplicationID: params.ApplicationID, BrokerURL: params.BrokerURL,
-		ClientID: params.ClientID, Username: params.Username, Password: params.Password, Topic: params.Topic, Enabled: params.Enabled,
+		ClientID: params.ClientID, Username: params.Username, Password: protectedPassword, Topic: params.Topic, Enabled: params.Enabled,
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 	a.Engine.ReloadIntegrations()
@@ -215,7 +222,11 @@ func (a *AutomationAPI) UpdateMQTT(ctx *gin.Context) {
 		if !validMQTTURL(params.BrokerURL) { ctx.AbortWithError(400, errors.New("broker URL must use mqtt, mqtts, tcp, or tls")); return }
 		item.Name, item.ApplicationID, item.BrokerURL, item.ClientID = params.Name, params.ApplicationID, params.BrokerURL, params.ClientID
 		item.Username, item.Topic, item.Enabled = params.Username, params.Topic, params.Enabled
-		if params.Password != "" { item.Password = params.Password }
+		if params.Password != "" {
+			protectedPassword, protectErr := security.Protect(params.Password)
+			if !successOrAbort(ctx, 500, protectErr) { return }
+			item.Password = protectedPassword
+		}
 		if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, mqttView(item))
@@ -251,9 +262,11 @@ func (a *AutomationAPI) CreateHomeAssistant(ctx *gin.Context) {
 	if !a.channelExists(ctx, params.ApplicationID) { return }
 	if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("Home Assistant URL must use http or https")); return }
 	if strings.TrimSpace(params.Token) == "" { ctx.AbortWithError(400, errors.New("access token is required")); return }
+	protectedToken, err := security.Protect(params.Token)
+	if !successOrAbort(ctx, 500, err) { return }
 	item := &model.HomeAssistantIntegration{
 		Name: params.Name, ApplicationID: params.ApplicationID, BaseURL: strings.TrimRight(params.BaseURL, "/"),
-		Token: params.Token, EventType: params.EventType, Enabled: params.Enabled,
+		Token: protectedToken, EventType: params.EventType, Enabled: params.Enabled,
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 	a.Engine.ReloadIntegrations()
@@ -271,7 +284,11 @@ func (a *AutomationAPI) UpdateHomeAssistant(ctx *gin.Context) {
 		if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("Home Assistant URL must use http or https")); return }
 		item.Name, item.ApplicationID, item.BaseURL = params.Name, params.ApplicationID, strings.TrimRight(params.BaseURL, "/")
 		item.EventType, item.Enabled = params.EventType, params.Enabled
-		if params.Token != "" { item.Token = params.Token }
+		if params.Token != "" {
+			protectedToken, protectErr := security.Protect(params.Token)
+			if !successOrAbort(ctx, 500, protectErr) { return }
+			item.Token = protectedToken
+		}
 		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, homeAssistantView(item))
@@ -534,7 +551,7 @@ func validateSchedule(item *model.ScheduledNotification) error {
 func webhookView(item *model.WebhookRoute) model.WebhookRouteView {
 	return model.WebhookRouteView{
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,Enabled:item.Enabled,
-		Path:"/integrations/webhook/"+item.Secret,TitleField:item.TitleField,MessageField:item.MessageField,
+		Path:"",TitleField:item.TitleField,MessageField:item.MessageField,
 		PriorityField:item.PriorityField,DefaultTitle:item.DefaultTitle,DefaultPriority:item.DefaultPriority,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
