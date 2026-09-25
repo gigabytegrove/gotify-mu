@@ -43,6 +43,7 @@ const Operations = () => {
     const [runs, setRuns] = React.useState<IAutomationRun[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [revoke, setRevoke] = React.useState<IAdminSession>();
+    const [restoreResult, setRestoreResult] = React.useState<string>();
 
     const refresh = React.useCallback(async () => {
         setLoading(true);
@@ -66,6 +67,27 @@ const Operations = () => {
         void refresh();
     }, [refresh]);
 
+    const downloadBackup = async () => {
+        const response = await axios.get(api('operations/backup'), {responseType: 'blob'});
+        const href = URL.createObjectURL(response.data);
+        const link = document.createElement('a');
+        link.href = href;
+        link.download = 'gotify-mu-backup-' + new Date().toISOString().slice(0, 10) + '.zip';
+        link.click();
+        URL.revokeObjectURL(href);
+    };
+
+    const stageRestore = async (file: File) => {
+        const form = new FormData();
+        form.append('backup', file);
+        const response = await axios.post<{
+            message: string;
+            backupVersion?: string;
+        }>(api('operations/restore'), form);
+        setRestoreResult(response.data.message);
+        snackManager.snack('Backup staged for restore');
+    };
+
     const downloadDiagnostics = async () => {
         const response = await axios.get(api('operations/diagnostics'), {responseType: 'blob'});
         const href = URL.createObjectURL(response.data);
@@ -85,11 +107,49 @@ const Operations = () => {
                     <Button startIcon={<Download />} onClick={() => void downloadDiagnostics()}>
                         Diagnostics
                     </Button>
+                    <Button startIcon={<Download />} onClick={() => void downloadBackup()}>
+                        Backup
+                    </Button>
                     <Button startIcon={<Refresh />} disabled={loading} onClick={() => void refresh()}>
                         Refresh
                     </Button>
                 </Stack>
             }>
+            <SurfaceCard
+                title="Backup & Restore"
+                subtitle="Download a consistent server backup or stage a verified backup for restoration on the next restart.">
+                <Stack spacing={1.5}>
+                    <Stack direction={{xs: 'column', sm: 'row'}} spacing={1}>
+                        <Button variant="contained" onClick={() => void downloadBackup()}>
+                            Download Backup
+                        </Button>
+                        <Button component="label" variant="outlined">
+                            Stage Restore
+                            <input
+                                hidden
+                                type="file"
+                                accept=".zip,application/zip"
+                                onChange={(event) => {
+                                    const selected = event.target.files?.[0];
+                                    if (selected) void stageRestore(selected);
+                                    event.target.value = '';
+                                }}
+                            />
+                        </Button>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                        Restore archives are validated before staging. The restore is applied before
+                        the database opens on the next Gotify MU restart, and the current data is
+                        preserved automatically as an emergency pre-restore copy.
+                    </Typography>
+                    {restoreResult && (
+                        <Typography variant="body2" color="warning.main">
+                            {restoreResult}
+                        </Typography>
+                    )}
+                </Stack>
+            </SurfaceCard>
+
             <SurfaceCard title="System" subtitle="Current server totals and storage usage.">
                 {stats ? (
                     <Box
