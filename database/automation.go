@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/gotify/server/v3/model"
@@ -56,7 +57,13 @@ func (d *GormDatabase) GetMQTTIntegrationByID(id uint) (*model.MQTTIntegration, 
 	return item, nil
 }
 func (d *GormDatabase) SaveMQTTIntegration(item *model.MQTTIntegration) error { return d.DB.Save(item).Error }
-func (d *GormDatabase) DeleteMQTTIntegration(id uint) error { return d.DB.Delete(&model.MQTTIntegration{}, id).Error }
+func (d *GormDatabase) DeleteMQTTIntegration(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("kind = ? AND object_id = ?", "mqtt", id).Delete(&model.IntegrationStatus{}).Error; err != nil { return err }
+		if err := tx.Where("key = ?", fmt.Sprintf("integration:mqtt:%d", id)).Delete(&model.AutomationLease{}).Error; err != nil { return err }
+		return tx.Delete(&model.MQTTIntegration{}, id).Error
+	})
+}
 
 func (d *GormDatabase) GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error) {
 	var items []*model.HomeAssistantIntegration
@@ -71,7 +78,13 @@ func (d *GormDatabase) GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssi
 	return item, nil
 }
 func (d *GormDatabase) SaveHomeAssistantIntegration(item *model.HomeAssistantIntegration) error { return d.DB.Save(item).Error }
-func (d *GormDatabase) DeleteHomeAssistantIntegration(id uint) error { return d.DB.Delete(&model.HomeAssistantIntegration{}, id).Error }
+func (d *GormDatabase) DeleteHomeAssistantIntegration(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("kind = ? AND object_id = ?", "home-assistant", id).Delete(&model.IntegrationStatus{}).Error; err != nil { return err }
+		if err := tx.Where("key = ?", fmt.Sprintf("integration:home-assistant:%d", id)).Delete(&model.AutomationLease{}).Error; err != nil { return err }
+		return tx.Delete(&model.HomeAssistantIntegration{}, id).Error
+	})
+}
 
 func (d *GormDatabase) GetScheduledNotifications() ([]*model.ScheduledNotification, error) {
 	var items []*model.ScheduledNotification
