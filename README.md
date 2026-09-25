@@ -8,7 +8,7 @@
 
 Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
 
-> **Project status:** active development. The multi-user foundation is available for testing, but releases should be treated as pre-production until the compatibility and migration test suite is complete.
+> **Current release:** **v0.2.0** (pre-release). The multi-user foundation is now versioned and release-tracked, but pre-1.0 builds should still be validated in the target environment before production rollout.
 
 ## Why Gotify MU?
 
@@ -114,11 +114,27 @@ Gotify MU records the sender's user ID and username. If a member leaves the titl
 
 The official Gotify Android app continues to receive Chat Channel messages as normal Gotify messages. The stock Android app does not gain a compose/chat interface from this server feature; sending is available in the Gotify MU Web UI or through compatible API clients.
 
+## Releases
+
+The current release baseline is **Gotify MU v0.2.0**.
+
+Release history and compatibility notes are tracked in [CHANGELOG.md](CHANGELOG.md). Detailed v0.2.0 notes are available in [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md).
+
+For a release checkout:
+
+```bash
+git clone https://github.com/gigabytegrove/gotify-mu.git
+cd gotify-mu
+git checkout v0.2.0
+```
+
+Release builds inject the release version, commit, and build date into the server binary. Development builds continue to use `master-<commit>`, `master-local`, or `dev-<commit>` identities as appropriate.
+
 ## Deployment
 
 Gotify MU currently follows the upstream Gotify configuration model. Existing `GOTIFY_*` environment variables are intentionally retained for compatibility.
 
-> **Testing status:** there is not yet a published Gotify MU container image. For now, deploy by building directly from this repository.
+> **Container status:** source/Docker builds remain the baseline deployment method for v0.2.0. The repository release workflow is prepared to publish versioned GHCR images when GitHub Actions is enabled for the repository.
 
 ### Recommended: Docker Compose
 
@@ -226,7 +242,7 @@ Inspect the running container:
 docker ps --filter name=gotify-mu
 ```
 
-### Updating a test installation
+### Updating a development installation
 
 After new changes are merged into `master`:
 
@@ -237,6 +253,27 @@ docker compose up -d --build
 ```
 
 Your `./data` directory remains in place.
+
+### Building the v0.2.0 release manually
+
+After checking out the release tag, build with explicit release identity:
+
+```bash
+cd /opt/gotify-mu
+
+COMMIT="$(git rev-parse --short HEAD)"
+
+docker build --no-cache \
+  --build-arg BUILD_JS=1 \
+  --build-arg GO_VERSION=1.26.0 \
+  --build-arg GOTIFY_MU_VERSION="0.2.0" \
+  --build-arg GOTIFY_MU_COMMIT="${COMMIT}" \
+  -f docker/Dockerfile \
+  -t gotify-mu:0.2.0 \
+  .
+```
+
+Use the same persistent `/app/data` mount when replacing an existing container.
 
 ### Manual Docker deployment
 

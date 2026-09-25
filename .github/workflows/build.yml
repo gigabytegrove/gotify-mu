@@ -67,5 +67,8 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/*.zip
           tag: ${{ github.ref }}
+          release_name: "Gotify MU v${{ env.VERSION }}"
+          body: "See CHANGELOG.md and docs/releases/v${{ env.VERSION }}.md for release notes and compatibility details."
+          prerelease: true
           overwrite: true
           file_glob: true
