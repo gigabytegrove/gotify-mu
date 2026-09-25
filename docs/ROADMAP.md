@@ -131,20 +131,34 @@ The goal is **alerts + collaboration**, not a general-purpose Slack replacement.
 
 ## Notification intelligence
 
+These are native Gotify MU capabilities, not plugins, because they directly affect message delivery behavior.
+
 Planned:
 
 - user quiet hours
 - per-Channel quiet hours
+- priority-based quiet-hour exceptions
+- hold, suppress, or defer behavior
+- timezone-aware quiet-hour schedules
 - per-Channel priority thresholds
 - per-device notification preferences
 - snooze
-- scheduled notifications
+- one-time scheduled notifications
+- recurring scheduled notifications
+- per-Channel schedules
+- schedule enable/disable and history
 - digest mode
+- hourly, daily, and custom digest schedules
+- per-user and per-Channel digest rules
+- immediate-delivery exceptions for higher-priority messages
 - escalation rules
-- repeat-until-acknowledged
+- multi-stage escalation paths
+- acknowledgement/resolution-based escalation
 - acknowledgement deadlines
 - fallback/escalation targets
-- user/group escalation
+- user, Group, and Channel escalation targets
+- repeat-until-acknowledged
+- stop escalation after acknowledgement or resolution
 - notification templates
 
 ## Rich messages
@@ -164,21 +178,48 @@ Planned:
 
 ## Automation and integrations
 
-Planned:
+### Native integration framework
 
-- generic inbound Webhooks
+The following integrations are planned as built-in Gotify MU functionality rather than plugins because they are foundational notification transports or are expected to participate deeply in routing and delivery behavior.
+
+#### Webhook Router
+
+- named inbound webhook endpoints
 - generic outbound Webhooks
+- route incoming requests to one or more Channels
 - routing rules
 - transformation rules
 - conditional rules
 - reusable endpoints
 - templates
 - retry policy
-- delivery logs
+- delivery history and errors
 - webhook signing/secrets
-- integration-specific plugins where a generic webhook is insufficient
+
+#### MQTT
+
+- connect to one or more MQTT brokers
+- subscribe to configured topics
+- route topic events into Channels
+- topic filters
+- payload templates
+- optional publishing from Gotify MU where appropriate
+- per-connection health/status
+
+#### Home Assistant
+
+- direct Home Assistant integration
+- receive selected Home Assistant events and notifications
+- route selected events into Gotify MU Channels
+- send supported Gotify MU actions/events back to Home Assistant
+- configurable entity and event filters
+- connection/status visibility in the Web UI
+
+The native integration framework should share consistent configuration, health/status, secrets handling, routing, retry, and audit behavior.
 
 ## Plugin ecosystem
+
+Plugins are intended for optional external sources and specialized integrations that do not need to control Gotify MU's core message-delivery behavior.
 
 Current:
 
@@ -186,9 +227,72 @@ Current:
 - enable/disable
 - administrator upload/install from the Web UI
 
+### Approved first-party plugins
+
+- **Email Gateway**
+  - connect to supported mailboxes
+  - turn matching incoming email into Channel messages
+  - rules by sender, recipient, subject, and mailbox
+  - attachment handling where practical
+
+- **SMTP Receiver**
+  - receive SMTP directly from devices and services
+  - intended for systems that can only send email alerts
+  - recipient-to-Channel routing
+  - sender and subject rules
+  - configurable size and attachment limits
+
+- **RSS / Atom Monitor**
+  - monitor RSS and Atom feeds
+  - post newly discovered entries to Channels
+  - per-feed polling interval
+  - duplicate protection
+  - optional title/category filtering
+
+- **Syslog Receiver**
+  - receive syslog messages
+  - source/facility/severity filtering
+  - route matching events into Channels
+  - duplicate/noise controls
+
+- **Calendar / iCal**
+  - subscribe to iCal-compatible calendars
+  - notify before upcoming events
+  - per-calendar and per-event reminder rules
+  - duplicate-event protection
+
+### Under consideration
+
+These are not committed roadmap items yet:
+
+- **Uptime Monitor**
+- **Heartbeat Monitor**
+
+Dedicated uptime/heartbeat monitoring remains optional because established tools already cover that use case well. Gotify MU should integrate cleanly with those tools through Webhooks unless a clear need emerges for native monitoring.
+
+### Not currently planned
+
+From the current integration/plugin proposal, the following are intentionally not on the roadmap:
+
+- Discord bridge
+- Slack bridge
+- Microsoft Teams bridge
+- Prometheus Alertmanager bridge
+- Grafana alerts plugin
+- GitHub integration
+- GitLab integration
+- ntfy bridge
+- Gotify-to-Gotify bridge
+- SNMP trap receiver
+- standalone message formatter plugin
+- standalone rate-limit/deduplication plugin
+
+### Plugin platform roadmap
+
 Planned:
 
 - Plugin Catalog
+- first-party / third-party publisher identification
 - custom catalog/repository URLs
 - icons and metadata
 - screenshots
@@ -202,6 +306,8 @@ Planned:
 - uninstall
 - automatic update policy
 - plugin permission/capability presentation
+- standardized event hooks for message ingest and optional integration extensions
+- isolated plugin/service interface for plugins that should not execute inside the main Gotify MU process
 
 ## Search, archive, and retention
 
