@@ -27,6 +27,7 @@ func TestShouldAuditMutation(t *testing.T) {
 	assert.True(t, shouldAuditMutation("/group/:id/members"))
 	assert.True(t, shouldAuditMutation("/plugin/install"))
 	assert.True(t, shouldAuditMutation("/application/:id/security"))
+	assert.True(t, shouldAuditMutation("/update/install"))
 	assert.False(t, shouldAuditMutation("/message"))
 	assert.False(t, shouldAuditMutation("/application/:id/message/archive"))
 	assert.False(t, shouldAuditMutation("/plugin/:id/custom/:token/webhook"))
