@@ -59,7 +59,7 @@ const initStores = (): StoreMapping => {
 (function clientJS() {
     config.set('url', prodUrl);
     const stores = initStores();
-    initAxios(stores.currentUser, stores.snackManager.snack);
+    initAxios(stores.currentUser, stores.elevateStore, stores.snackManager.snack);
 
     registerReactions(stores);
 
