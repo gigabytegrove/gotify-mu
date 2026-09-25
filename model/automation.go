@@ -47,10 +47,15 @@ type MQTTIntegration struct {
 	Name          string    `gorm:"type:text" json:"name"`
 	ApplicationID uint      `gorm:"index" json:"applicationId"`
 	BrokerURL     string    `gorm:"type:text" json:"brokerUrl"`
-	ClientID      string    `gorm:"type:text" json:"clientId"`
-	Username      string    `gorm:"type:text" json:"username"`
-	Password      string    `gorm:"type:text" json:"-"`
-	Topic           string     `gorm:"type:text" json:"topic"`
+	ClientID          string     `gorm:"type:text" json:"clientId"`
+	Username          string     `gorm:"type:text" json:"username"`
+	Password          string     `gorm:"type:text" json:"-"`
+	ProtocolVersion   int        `json:"protocolVersion"`
+	QoS               int        `json:"qos"`
+	CACertificate     string     `gorm:"type:text" json:"caCertificate,omitempty"`
+	ClientCertificate string     `gorm:"type:text" json:"clientCertificate,omitempty"`
+	ClientKey         string     `gorm:"type:text" json:"-"`
+	Topic             string     `gorm:"type:text" json:"topic"`
 	Enabled         bool       `json:"enabled"`
 	Status          string     `gorm:"type:varchar(24)" json:"status"`
 	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
