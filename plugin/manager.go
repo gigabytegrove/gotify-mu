@@ -60,7 +60,11 @@ type Manager struct {
 }
 
 // NewManager created a Manager from configurations.
-func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier Notifier, dispatcher Dispatcher) (*Manager, error) {
+func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier Notifier, dispatchers ...Dispatcher) (*Manager, error) {
+	var dispatcher Dispatcher
+	if len(dispatchers) > 0 {
+		dispatcher = dispatchers[0]
+	}
 	manager := &Manager{
 		mutex:     &sync.RWMutex{},
 		instances: map[uint]compat.PluginInstance{},
