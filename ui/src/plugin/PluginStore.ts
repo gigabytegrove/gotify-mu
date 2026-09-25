@@ -38,9 +38,17 @@ export class PluginStore extends BaseStore<IPlugin> {
     };
 
     @action
-    public installPlugin = async (file: File): Promise<IPluginInstallResult> => {
+    public installPlugin = async (
+        file: File,
+        sha256: string,
+        signature: string
+    ): Promise<IPluginInstallResult> => {
         const form = new FormData();
         form.append('plugin', file);
+        form.append('sha256', sha256);
+        if (signature.trim()) {
+            form.append('signature', signature.trim());
+        }
 
         const response = await axios.post<IPluginInstallResult>(
             `${config.get('url')}plugin/install`,
