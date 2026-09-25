@@ -779,8 +779,12 @@ func toExternalMessage(msg *model.Message) *model.MessageExternal {
 		Priority:      &msg.Priority,
 		Date:          msg.Date,
 		SenderUserID:  msg.SenderUserID,
-		SenderName:    msg.SenderName,
-		Acknowledged:  msg.Acknowledged,
+		SenderName:             msg.SenderName,
+		Acknowledged:           msg.Acknowledged,
+		AcknowledgedByAnyone:   msg.AcknowledgedByAnyone,
+		AcknowledgementCount:   msg.AcknowledgementCount,
+		LastAcknowledgedBy:     msg.LastAcknowledgedBy,
+		LastAcknowledgedAt:     msg.LastAcknowledgedAt,
 	}
 	if len(msg.Extras) != 0 {
 		res.Extras = make(map[string]any)
