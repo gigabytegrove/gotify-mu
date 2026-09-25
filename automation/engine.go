@@ -330,6 +330,25 @@ func (e *Engine) runSchedules(now time.Time) {
 	for _, item := range items {
 		if item.NextRunAt == nil { continue }
 		triggerTime := item.NextRunAt.UTC()
+
+		if scheduleExpired(item, now) {
+			item.Enabled = false
+			item.NextRunAt = nil
+			if err := e.db.SaveScheduledNotification(item); err != nil {
+				log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not disable completed schedule")
+			}
+			continue
+		}
+
+		if item.MisfirePolicy == "skip" && now.Sub(triggerTime) > time.Minute {
+			item.NextRunAt = NextScheduleRun(item, now)
+			if item.NextRunAt == nil { item.Enabled = false }
+			if err := e.db.SaveScheduledNotification(item); err != nil {
+				log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not advance skipped schedule")
+			}
+			continue
+		}
+
 		triggerKey := fmt.Sprintf("schedule:%d:%d", item.ID, triggerTime.UnixNano())
 		run, err := e.db.GetAutomationRunByTrigger(triggerKey)
 		if err != nil {
@@ -338,11 +357,21 @@ func (e *Engine) runSchedules(now time.Time) {
 		}
 		if run == nil {
 			run = &model.AutomationRun{Kind:"schedule", ObjectID:item.ID, TriggerKey:triggerKey, Status:"running", StartedAt:now}
-			if _, err := e.db.CreateAutomationRun(run); err != nil {
-				log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not create schedule run")
+			created, createErr := e.db.CreateAutomationRun(run)
+			if createErr != nil {
+				log.Error().Err(createErr).Uint("schedule_id", item.ID).Msg("Could not create schedule run")
 				continue
 			}
+			if !created {
+				continue
+			}
+		} else if run.Status == "completed" {
+			item.NextRunAt = NextScheduleRun(item, triggerTime.Add(time.Second))
+			if item.NextRunAt == nil { item.Enabled = false }
+			_ = e.db.SaveScheduledNotification(item)
+			continue
 		}
+
 		msg, publishErr := e.publishWithKey(item.ApplicationID, item.Title, item.Message, item.Priority, triggerKey, 0)
 		finished := time.Now()
 		run.FinishedAt = &finished
@@ -360,11 +389,13 @@ func (e *Engine) runSchedules(now time.Time) {
 
 		runAt := now
 		item.LastRunAt = &runAt
-		if item.ScheduleType == "once" {
+		item.RunCount++
+		if item.ScheduleType == "once" || (item.MaxRuns > 0 && item.RunCount >= item.MaxRuns) {
 			item.Enabled = false
 			item.NextRunAt = nil
 		} else {
 			item.NextRunAt = NextScheduleRun(item, triggerTime.Add(time.Second))
+			if item.NextRunAt == nil { item.Enabled = false }
 		}
 		if err := e.db.SaveScheduledNotification(item); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not update schedule")
@@ -381,39 +412,167 @@ func NextScheduleRun(item *model.ScheduledNotification, now time.Time) *time.Tim
 	}
 	localNow := now.In(loc)
 
+	var candidate time.Time
 	switch item.ScheduleType {
 	case "once":
-		if item.RunAt != nil && item.RunAt.After(now) {
-			value := *item.RunAt
-			return &value
-		}
-		return nil
+		if item.RunAt == nil || !item.RunAt.After(now) { return nil }
+		candidate = item.RunAt.In(loc)
 	case "hourly":
-		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), localNow.Hour(), clamp(item.Minute, 0, 59), 0, 0, loc)
-		if !candidate.After(localNow) {
-			candidate = candidate.Add(time.Hour)
-		}
-		value := candidate.UTC()
-		return &value
+		candidate = time.Date(localNow.Year(), localNow.Month(), localNow.Day(), localNow.Hour(), clamp(item.Minute, 0, 59), 0, 0, loc)
+		if !candidate.After(localNow) { candidate = candidate.Add(time.Hour) }
 	case "daily":
-		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc)
-		if !candidate.After(localNow) {
-			candidate = candidate.AddDate(0, 0, 1)
-		}
-		value := candidate.UTC()
-		return &value
+		candidate = time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc)
+		if !candidate.After(localNow) { candidate = candidate.AddDate(0, 0, 1) }
 	case "weekly":
 		weekday := time.Weekday(clamp(item.Weekday, 0, 6))
 		days := (int(weekday) - int(localNow.Weekday()) + 7) % 7
-		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc).AddDate(0, 0, days)
-		if !candidate.After(localNow) {
-			candidate = candidate.AddDate(0, 0, 7)
-		}
-		value := candidate.UTC()
-		return &value
+		candidate = time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc).AddDate(0, 0, days)
+		if !candidate.After(localNow) { candidate = candidate.AddDate(0, 0, 7) }
+	case "cron":
+		next, err := nextCronRun(item.CronExpression, localNow)
+		if err != nil { return nil }
+		candidate = next
 	default:
 		return nil
 	}
+
+	for isExcludedScheduleDate(item.ExcludeDates, candidate) {
+		switch item.ScheduleType {
+		case "once":
+			return nil
+		case "hourly":
+			candidate = candidate.Add(time.Hour)
+		case "daily":
+			candidate = candidate.AddDate(0, 0, 1)
+		case "weekly":
+			candidate = candidate.AddDate(0, 0, 7)
+		case "cron":
+			next, err := nextCronRun(item.CronExpression, candidate)
+			if err != nil { return nil }
+			candidate = next
+		}
+	}
+
+	value := candidate.UTC()
+	if item.EndAt != nil && value.After(item.EndAt.UTC()) {
+		return nil
+	}
+	if item.MaxRuns > 0 && item.RunCount >= item.MaxRuns {
+		return nil
+	}
+	return &value
+}
+
+func scheduleExpired(item *model.ScheduledNotification, now time.Time) bool {
+	if item.MaxRuns > 0 && item.RunCount >= item.MaxRuns { return true }
+	return item.EndAt != nil && now.After(item.EndAt.UTC())
+}
+
+// ValidateExcludeDates accepts comma-separated YYYY-MM-DD dates.
+func ValidateExcludeDates(raw string) error {
+	for _, part := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(part)
+		if value == "" { continue }
+		if _, err := time.Parse("2006-01-02", value); err != nil {
+			return fmt.Errorf("invalid excluded date %q; use YYYY-MM-DD", value)
+		}
+	}
+	return nil
+}
+
+func isExcludedScheduleDate(raw string, candidate time.Time) bool {
+	if strings.TrimSpace(raw) == "" { return false }
+	value := candidate.Format("2006-01-02")
+	for _, part := range strings.Split(raw, ",") {
+		if strings.TrimSpace(part) == value { return true }
+	}
+	return false
+}
+
+// ValidateCronExpression accepts standard five-field cron expressions:
+// minute hour day-of-month month day-of-week.
+func ValidateCronExpression(expression string) error {
+	_, err := parseCronExpression(expression)
+	return err
+}
+
+type cronSpec struct {
+	minute map[int]bool
+	hour   map[int]bool
+	day    map[int]bool
+	month  map[int]bool
+	weekday map[int]bool
+}
+
+func parseCronExpression(expression string) (*cronSpec, error) {
+	fields := strings.Fields(strings.TrimSpace(expression))
+	if len(fields) != 5 {
+		return nil, errors.New("cron schedule must contain five fields: minute hour day month weekday")
+	}
+	minute, err := parseCronField(fields[0], 0, 59)
+	if err != nil { return nil, fmt.Errorf("invalid cron minute: %w", err) }
+	hour, err := parseCronField(fields[1], 0, 23)
+	if err != nil { return nil, fmt.Errorf("invalid cron hour: %w", err) }
+	day, err := parseCronField(fields[2], 1, 31)
+	if err != nil { return nil, fmt.Errorf("invalid cron day: %w", err) }
+	month, err := parseCronField(fields[3], 1, 12)
+	if err != nil { return nil, fmt.Errorf("invalid cron month: %w", err) }
+	weekday, err := parseCronField(fields[4], 0, 7)
+	if err != nil { return nil, fmt.Errorf("invalid cron weekday: %w", err) }
+	if weekday[7] { weekday[0] = true; delete(weekday, 7) }
+	return &cronSpec{minute:minute,hour:hour,day:day,month:month,weekday:weekday}, nil
+}
+
+func parseCronField(raw string, min, max int) (map[int]bool, error) {
+	result := make(map[int]bool)
+	for _, part := range strings.Split(raw, ",") {
+		part = strings.TrimSpace(part)
+		if part == "" { return nil, errors.New("empty field value") }
+		step := 1
+		base := part
+		if slash := strings.IndexByte(part, '/'); slash >= 0 {
+			base = part[:slash]
+			parsed, err := strconv.Atoi(part[slash+1:])
+			if err != nil || parsed < 1 { return nil, errors.New("invalid step") }
+			step = parsed
+		}
+		start, end := min, max
+		if base != "*" {
+			if dash := strings.IndexByte(base, '-'); dash >= 0 {
+				var err error
+				start, err = strconv.Atoi(base[:dash])
+				if err != nil { return nil, errors.New("invalid range start") }
+				end, err = strconv.Atoi(base[dash+1:])
+				if err != nil { return nil, errors.New("invalid range end") }
+			} else {
+				value, err := strconv.Atoi(base)
+				if err != nil { return nil, errors.New("invalid value") }
+				start, end = value, value
+			}
+		}
+		if start < min || end > max || start > end { return nil, errors.New("value outside allowed range") }
+		for value := start; value <= end; value += step { result[value] = true }
+	}
+	if len(result) == 0 { return nil, errors.New("field has no values") }
+	return result, nil
+}
+
+func nextCronRun(expression string, after time.Time) (time.Time, error) {
+	spec, err := parseCronExpression(expression)
+	if err != nil { return time.Time{}, err }
+	candidate := after.Truncate(time.Minute).Add(time.Minute)
+	deadline := candidate.AddDate(5, 0, 0)
+	for !candidate.After(deadline) {
+		if spec.minute[candidate.Minute()] &&
+			spec.hour[candidate.Hour()] &&
+			spec.day[candidate.Day()] &&
+			spec.month[int(candidate.Month())] &&
+			spec.weekday[int(candidate.Weekday())] {
+			return candidate, nil
+		}
+		candidate = candidate.Add(time.Minute)
+	}
+	return time.Time{}, errors.New("cron expression has no matching time within five years")
 }
 
 func (e *Engine) runDigests(now time.Time) {
