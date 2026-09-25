@@ -25,6 +25,10 @@ type OperationsSummary struct {
 	Channels               int64  `json:"channels"`
 	Messages               int64  `json:"messages"`
 	Clients                int64  `json:"clients"`
+	ConnectedClients       int    `json:"connectedClients"`
+	StorageBytes           int64  `json:"storageBytes"`
+	StorageFiles           int64  `json:"storageFiles"`
+	AttachmentFiles        int64  `json:"attachmentFiles"`
 	Plugins                int64  `json:"plugins"`
 	Webhooks               int64  `json:"webhooks"`
 	MQTTConnections        int64  `json:"mqttConnections"`
