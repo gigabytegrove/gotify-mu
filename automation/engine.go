@@ -6,6 +6,7 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -776,7 +777,7 @@ func (e *Engine) runWithLease(ctx context.Context, name string, work func(contex
 }
 
 func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration) error {
-	conn, err := dialMQTT(ctx, integration.BrokerURL)
+	conn, err := dialMQTT(ctx, integration)
 	if err != nil {
 		return err
 	}
@@ -796,15 +797,18 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 	if clientID == "" {
 		clientID = "gotify-mu-" + strconv.FormatUint(uint64(integration.ID), 10)
 	}
-	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password); err != nil {
+	protocol := integration.ProtocolVersion
+	if protocol == 0 { protocol = 5 }
+	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password, protocol); err != nil {
 		return err
 	}
-	if err := mqttSubscribe(conn, reader, integration.Topic); err != nil {
+	if err := mqttSubscribe(conn, reader, integration.Topic, integration.QoS, protocol); err != nil {
 		return err
 	}
 	connectedAt := time.Now()
 	_ = e.db.UpdateMQTTIntegrationStatus(integration.ID, "connected", &connectedAt, nil, "", nil, false)
 
+	pendingQoS2 := make(map[uint16]struct{})
 	for {
 		if ctx.Err() != nil {
 			return nil
@@ -821,38 +825,58 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 			return err
 		}
 		packetType := header >> 4
-		if packetType != 3 {
-			continue
-		}
-		topic, payload, packetID, qos, err := decodePublish(header, body)
-		if err != nil {
-			return err
-		}
-		title, message, priority := integration.Name, string(payload), 0
-		var object map[string]any
-		if json.Unmarshal(payload, &object) == nil {
-			if value, ok := object["title"].(string); ok && value != "" {
-				title = value
+		switch packetType {
+		case 3:
+			topic, payload, packetID, qos, decodeErr := decodePublish(header, body, protocol)
+			if decodeErr != nil {
+				return decodeErr
 			}
-			if value, ok := object["message"].(string); ok {
-				message = value
+			if qos == 2 && packetID != 0 {
+				if _, duplicate := pendingQoS2[packetID]; duplicate {
+					_, _ = conn.Write([]byte{0x50, 0x02, byte(packetID >> 8), byte(packetID)})
+					continue
+				}
 			}
-			if value, ok := numberAsInt(object["priority"]); ok {
-				priority = value
+			title, message, priority := integration.Name, string(payload), 0
+			var object map[string]any
+			if json.Unmarshal(payload, &object) == nil {
+				if value, ok := object["title"].(string); ok && value != "" {
+					title = value
+				}
+				if value, ok := object["message"].(string); ok {
+					message = value
+				}
+				if value, ok := numberAsInt(object["priority"]); ok {
+					priority = value
+				}
 			}
-		}
-		if title == "" {
-			title = topic
-		}
-		if _, err := e.Publish(integration.ApplicationID, title, message, priority); err != nil {
-			log.Error().Err(err).Uint("integration_id", integration.ID).Msg("MQTT message could not be published")
-		} else {
-			messageAt := time.Now()
-			_ = e.db.UpdateMQTTIntegrationStatus(integration.ID, "connected", nil, &messageAt, "", nil, false)
-		}
-		if qos == 1 && packetID != 0 {
-			ack := []byte{0x40, 0x02, byte(packetID >> 8), byte(packetID)}
-			_, _ = conn.Write(ack)
+			if title == "" {
+				title = topic
+			}
+			if _, publishErr := e.Publish(integration.ApplicationID, title, message, priority); publishErr != nil {
+				log.Error().Err(publishErr).Uint("integration_id", integration.ID).Msg("MQTT message could not be published")
+			} else {
+				messageAt := time.Now()
+				_ = e.db.UpdateMQTTIntegrationStatus(integration.ID, "connected", nil, &messageAt, "", nil, false)
+			}
+			switch qos {
+			case 1:
+				if packetID != 0 {
+					_, _ = conn.Write([]byte{0x40, 0x02, byte(packetID >> 8), byte(packetID)})
+				}
+			case 2:
+				if packetID != 0 {
+					pendingQoS2[packetID] = struct{}{}
+					_, _ = conn.Write([]byte{0x50, 0x02, byte(packetID >> 8), byte(packetID)})
+				}
+			}
+		case 6:
+			if len(body) < 2 {
+				return errors.New("invalid MQTT PUBREL packet")
+			}
+			packetID := binary.BigEndian.Uint16(body[:2])
+			delete(pendingQoS2, packetID)
+			_, _ = conn.Write([]byte{0x70, 0x02, byte(packetID >> 8), byte(packetID)})
 		}
 	}
 }
@@ -864,19 +888,23 @@ func (e *Engine) TestMQTTConnection(id uint) error {
 	if integration == nil { return errors.New("MQTT connection not found") }
 	ctx, cancel := context.WithTimeout(e.ctx, 15*time.Second)
 	defer cancel()
-	conn, err := dialMQTT(ctx, integration.BrokerURL)
+	conn, err := dialMQTT(ctx, integration)
 	if err != nil { return err }
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
 	clientID := integration.ClientID
 	if clientID == "" { clientID = fmt.Sprintf("gotify-mu-test-%d", integration.ID) }
-	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password); err != nil { return err }
-	if err := mqttSubscribe(conn, reader, integration.Topic); err != nil { return err }
+	protocol := integration.ProtocolVersion
+	if protocol == 0 { protocol = 5 }
+	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password, protocol); err != nil { return err }
+	if err := mqttSubscribe(conn, reader, integration.Topic, integration.QoS, protocol); err != nil { return err }
 	return nil
 }
 
-func dialMQTT(ctx context.Context, raw string) (net.Conn, error) {
-	parsed, err := url.Parse(raw)
+const maxMQTTPacketBytes = 4 << 20
+
+func dialMQTT(ctx context.Context, integration *model.MQTTIntegration) (net.Conn, error) {
+	parsed, err := url.Parse(integration.BrokerURL)
 	if err != nil {
 		return nil, err
 	}
@@ -891,7 +919,24 @@ func dialMQTT(ctx context.Context, raw string) (net.Conn, error) {
 	dialer := &net.Dialer{Timeout: 10 * time.Second}
 	switch parsed.Scheme {
 	case "mqtts", "tls":
-		return tls.DialWithDialer(dialer, "tcp", host, &tls.Config{MinVersion: tls.VersionTLS12, ServerName: parsed.Hostname()})
+		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: parsed.Hostname()}
+		if strings.TrimSpace(integration.CACertificate) != "" {
+			pool, poolErr := x509.SystemCertPool()
+			if poolErr != nil || pool == nil { pool = x509.NewCertPool() }
+			if !pool.AppendCertsFromPEM([]byte(integration.CACertificate)) {
+				return nil, errors.New("MQTT CA certificate is invalid")
+			}
+			tlsConfig.RootCAs = pool
+		}
+		if strings.TrimSpace(integration.ClientCertificate) != "" || strings.TrimSpace(integration.ClientKey) != "" {
+			if strings.TrimSpace(integration.ClientCertificate) == "" || strings.TrimSpace(integration.ClientKey) == "" {
+				return nil, errors.New("MQTT client certificate and private key must be configured together")
+			}
+			cert, certErr := tls.X509KeyPair([]byte(integration.ClientCertificate), []byte(integration.ClientKey))
+			if certErr != nil { return nil, fmt.Errorf("invalid MQTT client certificate: %w", certErr) }
+			tlsConfig.Certificates = []tls.Certificate{cert}
+		}
+		return tls.DialWithDialer(dialer, "tcp", host, tlsConfig)
 	case "mqtt", "tcp", "":
 		return dialer.DialContext(ctx, "tcp", host)
 	default:
@@ -899,61 +944,60 @@ func dialMQTT(ctx context.Context, raw string) (net.Conn, error) {
 	}
 }
 
-func mqttConnect(conn net.Conn, reader *bufio.Reader, clientID, username, password string) error {
+func mqttConnect(conn net.Conn, reader *bufio.Reader, clientID, username, password string, protocol int) error {
 	flags := byte(0x02)
-	if username != "" {
-		flags |= 0x80
-	}
-	if password != "" {
-		flags |= 0x40
+	if username != "" { flags |= 0x80 }
+	if password != "" { flags |= 0x40 }
+	if protocol != 4 && protocol != 5 {
+		return errors.New("unsupported MQTT protocol version")
 	}
 	var variable []byte
 	variable = appendMQTTString(variable, "MQTT")
-	variable = append(variable, 0x04, flags, 0x00, 0x3c)
+	variable = append(variable, byte(protocol), flags, 0x00, 0x3c)
+	if protocol == 5 {
+		variable = append(variable, 0x00)
+	}
 	var payload []byte
 	payload = appendMQTTString(payload, clientID)
-	if username != "" {
-		payload = appendMQTTString(payload, username)
-	}
-	if password != "" {
-		payload = appendMQTTString(payload, password)
-	}
+	if username != "" { payload = appendMQTTString(payload, username) }
+	if password != "" { payload = appendMQTTString(payload, password) }
 	packet := []byte{0x10}
 	packet = append(packet, encodeRemainingLength(len(variable)+len(payload))...)
 	packet = append(packet, variable...)
 	packet = append(packet, payload...)
-	if _, err := conn.Write(packet); err != nil {
-		return err
-	}
+	if _, err := conn.Write(packet); err != nil { return err }
 	header, body, err := readMQTTPacket(reader)
-	if err != nil {
-		return err
-	}
+	if err != nil { return err }
 	if header>>4 != 2 || len(body) < 2 || body[1] != 0 {
 		return errors.New("MQTT broker rejected connection")
 	}
 	return nil
 }
 
-func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string) error {
-	if strings.TrimSpace(topic) == "" {
-		return errors.New("MQTT topic is required")
-	}
+func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string, qos, protocol int) error {
+	if strings.TrimSpace(topic) == "" { return errors.New("MQTT topic is required") }
+	if qos < 0 || qos > 2 { return errors.New("MQTT QoS must be 0, 1, or 2") }
 	var body []byte
 	body = append(body, 0x00, 0x01)
+	if protocol == 5 { body = append(body, 0x00) }
 	body = appendMQTTString(body, topic)
-	body = append(body, 0x00)
+	body = append(body, byte(qos))
 	packet := []byte{0x82}
 	packet = append(packet, encodeRemainingLength(len(body))...)
 	packet = append(packet, body...)
-	if _, err := conn.Write(packet); err != nil {
-		return err
-	}
+	if _, err := conn.Write(packet); err != nil { return err }
 	header, response, err := readMQTTPacket(reader)
-	if err != nil {
-		return err
+	if err != nil { return err }
+	if header>>4 != 9 || len(response) < 3 {
+		return errors.New("MQTT subscription was rejected")
 	}
-	if header>>4 != 9 || len(response) < 3 || response[2] == 0x80 {
+	offset := 2
+	if protocol == 5 {
+		properties, consumed, propErr := decodeMQTTVarInt(response[offset:])
+		if propErr != nil { return propErr }
+		offset += consumed + properties
+	}
+	if offset >= len(response) || response[offset] >= 0x80 {
 		return errors.New("MQTT subscription was rejected")
 	}
 	return nil
@@ -961,44 +1005,59 @@ func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string) error {
 
 func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 	header, err := reader.ReadByte()
-	if err != nil {
-		return 0, nil, err
-	}
+	if err != nil { return 0, nil, err }
 	multiplier, remaining := 1, 0
 	for i := 0; i < 4; i++ {
-		value, err := reader.ReadByte()
-		if err != nil {
-			return 0, nil, err
-		}
+		value, readErr := reader.ReadByte()
+		if readErr != nil { return 0, nil, readErr }
 		remaining += int(value&127) * multiplier
+		if remaining > maxMQTTPacketBytes {
+			return 0, nil, fmt.Errorf("MQTT packet exceeds %d-byte limit", maxMQTTPacketBytes)
+		}
 		if value&128 == 0 {
 			body := make([]byte, remaining)
-			_, err = io.ReadFull(reader, body)
-			return header, body, err
+			_, readErr = io.ReadFull(reader, body)
+			return header, body, readErr
 		}
 		multiplier *= 128
 	}
 	return 0, nil, errors.New("invalid MQTT remaining length")
 }
 
-func decodePublish(header byte, body []byte) (string, []byte, uint16, byte, error) {
-	if len(body) < 2 {
-		return "", nil, 0, 0, errors.New("invalid MQTT publish packet")
+func decodeMQTTVarInt(data []byte) (int, int, error) {
+	multiplier, value := 1, 0
+	for i := 0; i < 4; i++ {
+		if i >= len(data) { return 0, 0, io.ErrUnexpectedEOF }
+		current := data[i]
+		value += int(current&127) * multiplier
+		if current&128 == 0 { return value, i+1, nil }
+		multiplier *= 128
 	}
+	return 0, 0, errors.New("invalid MQTT variable integer")
+}
+
+func decodePublish(header byte, body []byte, protocol int) (string, []byte, uint16, byte, error) {
+	if len(body) < 2 { return "", nil, 0, 0, errors.New("invalid MQTT publish packet") }
 	length := int(binary.BigEndian.Uint16(body[:2]))
-	if len(body) < 2+length {
-		return "", nil, 0, 0, errors.New("invalid MQTT topic length")
-	}
+	if len(body) < 2+length { return "", nil, 0, 0, errors.New("invalid MQTT topic length") }
 	topic := string(body[2 : 2+length])
 	offset := 2 + length
 	qos := (header >> 1) & 0x03
+	if qos == 3 { return "", nil, 0, 0, errors.New("invalid MQTT QoS") }
 	var packetID uint16
 	if qos > 0 {
-		if len(body) < offset+2 {
-			return "", nil, 0, 0, errors.New("invalid MQTT packet id")
-		}
+		if len(body) < offset+2 { return "", nil, 0, 0, errors.New("invalid MQTT packet id") }
 		packetID = binary.BigEndian.Uint16(body[offset : offset+2])
 		offset += 2
+	}
+	if protocol == 5 {
+		properties, consumed, err := decodeMQTTVarInt(body[offset:])
+		if err != nil { return "", nil, 0, 0, err }
+		offset += consumed
+		if properties < 0 || offset+properties > len(body) {
+			return "", nil, 0, 0, errors.New("invalid MQTT property length")
+		}
+		offset += properties
 	}
 	return topic, body[offset:], packetID, qos, nil
 }
@@ -1014,13 +1073,9 @@ func encodeRemainingLength(length int) []byte {
 	for {
 		value := byte(length % 128)
 		length /= 128
-		if length > 0 {
-			value |= 0x80
-		}
+		if length > 0 { value |= 0x80 }
 		result = append(result, value)
-		if length == 0 {
-			return result
-		}
+		if length == 0 { return result }
 	}
 }
 
