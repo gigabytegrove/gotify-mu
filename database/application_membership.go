@@ -182,7 +182,16 @@ func (d *GormDatabase) DeleteApplicationMembership(applicationID, userID uint) e
 
 func (d *GormDatabase) CountApplicationMemberships(applicationID uint) (int64, error) {
 	var count int64
-	err := d.DB.Model(&model.ApplicationMembership{}).Where("application_id = ?", applicationID).Count(&count).Error
+	err := d.DB.Raw(`
+		SELECT COUNT(*) FROM (
+			SELECT user_id FROM application_memberships WHERE application_id = ?
+			UNION
+			SELECT ugm.user_id
+			FROM application_group_grants agg
+			JOIN user_group_memberships ugm ON ugm.group_id = agg.group_id
+			WHERE agg.application_id = ?
+		) AS effective_members
+	`, applicationID, applicationID).Scan(&count).Error
 	return count, err
 }
 
