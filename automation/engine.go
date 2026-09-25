@@ -2,6 +2,7 @@ package automation
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/binary"
@@ -10,6 +11,7 @@ import (
 	"fmt"
 	"io"
 	"net"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -54,6 +56,7 @@ type Database interface {
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
+	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
 }
 
 // Engine runs scheduled work and persistent native integrations.
@@ -718,6 +721,43 @@ func encodeRemainingLength(length int) []byte {
 			return result
 		}
 	}
+}
+
+// SendHomeAssistantEvent sends an event through a configured Home Assistant connection.
+func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error {
+	integration, err := e.db.GetHomeAssistantIntegrationByID(id)
+	if err != nil {
+		return err
+	}
+	if integration == nil {
+		return errors.New("Home Assistant connection not found")
+	}
+	eventType = strings.TrimSpace(eventType)
+	if eventType == "" {
+		return errors.New("event type is required")
+	}
+	base := strings.TrimRight(integration.BaseURL, "/")
+	endpoint := base + "/api/events/" + url.PathEscape(eventType)
+	payload, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	request, err := http.NewRequestWithContext(e.ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
+	if err != nil {
+		return err
+	}
+	request.Header.Set("Authorization", "Bearer "+integration.Token)
+	request.Header.Set("Content-Type", "application/json")
+	client := &http.Client{Timeout: 15 * time.Second}
+	response, err := client.Do(request)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if response.StatusCode < 200 || response.StatusCode >= 300 {
+		return fmt.Errorf("Home Assistant returned HTTP %d", response.StatusCode)
+	}
+	return nil
 }
 
 func (e *Engine) runHomeAssistantLoop(ctx context.Context, integration *model.HomeAssistantIntegration) {
