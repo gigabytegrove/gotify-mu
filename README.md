@@ -154,32 +154,13 @@ At minimum, change:
 
 ```text
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
+GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
 
-The included `docker-compose.yml` is:
+Generate `GOTIFY_MU_UPDATER_TOKEN` with `openssl rand -hex 32`.
 
-```yaml
-services:
-  gotify-mu:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      args:
-        BUILD_JS: "1"
-        GO_VERSION: "1.26.0"
-        GOTIFY_MU_VERSION: "${GOTIFY_MU_VERSION:-master-local}"
-        GOTIFY_MU_COMMIT: "${GOTIFY_MU_COMMIT:-local}"
-    image: gotify-mu:master
-    container_name: gotify-mu
-    restart: unless-stopped
-    ports:
-      - "${GOTIFY_MU_PORT:-8080}:80"
-    environment:
-      GOTIFY_DEFAULTUSER_NAME: "${GOTIFY_DEFAULTUSER_NAME:-admin}"
-      GOTIFY_DEFAULTUSER_PASS: "${GOTIFY_DEFAULTUSER_PASS:?Set GOTIFY_DEFAULTUSER_PASS in .env}"
-    volumes:
-      - "./data:/app/data"
-```
+The included `docker-compose.yml` starts both Gotify MU and the private updater helper. The helper has no published host port and communicates with the application over the `gotify-mu-system` Docker network.
+
 
 Example `.env`:
 
