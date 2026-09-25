@@ -78,6 +78,8 @@ const ChannelCard = ({
     return (
         <Paper
             ref={setNodeRef}
+            className="channel-card"
+            data-channel-id={app.id}
             variant="outlined"
             sx={{
                 p: 2,
@@ -112,7 +114,11 @@ const ChannelCard = ({
                         direction={{xs: 'column', sm: 'row'}}
                         spacing={1}
                         alignItems={{xs: 'flex-start', sm: 'center'}}>
-                        <Typography variant="h6" noWrap sx={{maxWidth: '100%'}}>
+                        <Typography
+                            className="channel-name"
+                            variant="h6"
+                            noWrap
+                            sx={{maxWidth: '100%'}}>
                             {app.name}
                         </Typography>
                         <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
@@ -133,7 +139,10 @@ const ChannelCard = ({
                         </Stack>
                     </Stack>
 
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography
+                        className="channel-description"
+                        variant="body2"
+                        color="text.secondary">
                         {app.description || 'No description'}
                     </Typography>
 
@@ -183,6 +192,7 @@ const ChannelCard = ({
                     </Tooltip>
 
                     <IconButton
+                        className="channel-actions"
                         aria-label="Channel actions"
                         onClick={(event) => setAnchorEl(event.currentTarget)}>
                         <MoreVert />
@@ -202,7 +212,7 @@ const ChannelCard = ({
                     </ListItemIcon>
                     <ListItemText>Members & permissions</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={() => action(fEdit)} disabled={!canManage}>
+                <MenuItem className="edit" onClick={() => action(fEdit)} disabled={!canManage}>
                     <ListItemIcon>
                         <Edit fontSize="small" />
                     </ListItemIcon>
@@ -222,7 +232,10 @@ const ChannelCard = ({
                     </ListItemIcon>
                     <ListItemText>Remove image</ListItemText>
                 </MenuItem>
-                <MenuItem onClick={() => action(fRegenerateToken)} disabled={!canManage}>
+                <MenuItem
+                    className="regenerate-token"
+                    onClick={() => action(fRegenerateToken)}
+                    disabled={!canManage}>
                     <ListItemIcon>
                         <Key fontSize="small" />
                     </ListItemIcon>
@@ -235,6 +248,7 @@ const ChannelCard = ({
                     <ListItemText>Clear history for everyone</ListItemText>
                 </MenuItem>
                 <MenuItem
+                    className="delete"
                     onClick={() => action(fDelete)}
                     disabled={app.internal || !canManage || !canDeleteChannel}>
                     <ListItemIcon>
