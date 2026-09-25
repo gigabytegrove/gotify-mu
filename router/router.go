@@ -21,6 +21,7 @@ import (
 	"github.com/gotify/server/v3/docs"
 	gerror "github.com/gotify/server/v3/error"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/operations"
 	"github.com/gotify/server/v3/plugin"
 	"github.com/gotify/server/v3/security"
 	"github.com/gotify/server/v3/ui"
@@ -150,7 +151,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		ldapHandler = api.NewLDAP(conf, db, userChangeNotifier)
 	}
 	auditHandler := api.AuditAPI{DB: db}
-	systemHandler := api.SystemAPI{DB: db, Dialect: conf.Database.Dialect, NotifyDeleted: streamHandler.NotifyDeletedClient}
+	systemHandler := api.SystemAPI{
+		DB: db,
+		Dialect: conf.Database.Dialect,
+		DataDir: operations.DataDirectory(conf.Database.Dialect, conf.Database.Connection),
+		DatabaseFile: operations.DatabaseFile(conf.Database.Dialect, conf.Database.Connection),
+		VersionInfo: vInfo,
+		NotifyDeleted: streamHandler.NotifyDeletedClient,
+	}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{
@@ -413,6 +421,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/admin/security-policy", systemHandler.GetSecurityPolicy)
 		adminPlatform.PUT("/admin/security-policy", systemHandler.SaveSecurityPolicy)
 		adminPlatform.GET("/admin/operations", systemHandler.GetOperations)
+		adminPlatform.GET("/admin/backup", systemHandler.DownloadBackup)
+		adminPlatform.POST("/admin/restore", systemHandler.StageRestore)
+		adminPlatform.DELETE("/admin/restore", systemHandler.CancelRestore)
+		adminPlatform.GET("/admin/diagnostics", systemHandler.DownloadDiagnostics)
 		adminPlatform.GET("/admin/sessions", systemHandler.GetSessions)
 		adminPlatform.DELETE("/admin/sessions/:id", systemHandler.RevokeSession)
 		adminPlatform.GET("/admin/service-accounts", serviceHandler.GetAccounts)
