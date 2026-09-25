@@ -98,6 +98,16 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.AuditEvent),
 		new(model.UserGroup),
 		new(model.UserGroupMembership),
+		new(model.WebhookRoute),
+		new(model.MQTTIntegration),
+		new(model.HomeAssistantIntegration),
+		new(model.ScheduledNotification),
+		new(model.QuietHoursPolicy),
+		new(model.DigestPolicy),
+		new(model.DigestItem),
+		new(model.EscalationRule),
+		new(model.EscalationState),
+		new(model.MessageAcknowledgement),
 	); err != nil {
 		return nil, err
 	}
