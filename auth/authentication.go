@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"github.com/rs/zerolog/log"
 )
 
@@ -45,6 +46,7 @@ type Auth struct {
 	SecureCookie     bool
 	LocalAuthEnabled bool
 	CrossOrigin      *http.CrossOriginProtection
+	LoginLimiter     *security.Limiter
 }
 
 // RequireAdmin requires an elevated client token or basic auth, the user must be an admin.
@@ -165,9 +167,15 @@ func (a *Auth) handleUser(checks ...func(*model.User) (authState, error)) func(c
 			if !a.LocalAuthEnabled {
 				return authStateLocalAuthDisabled, nil
 			}
+			limiterKey := ctx.ClientIP() + "|" + strings.ToLower(strings.TrimSpace(name))
+			if a.LoginLimiter != nil && !a.LoginLimiter.Allow(limiterKey) {
+				ctx.Header("Retry-After", "60")
+				return authStateForbidden, errors.New("too many authentication attempts")
+			}
 			if user, err := a.DB.GetUserByName(name); err != nil {
 				return authStateSkip, err
 			} else if user != nil && password.ComparePassword(user.Pass, []byte(pass)) {
+				if a.LoginLimiter != nil { a.LoginLimiter.Reset(limiterKey) }
 				RegisterUser(ctx, user)
 
 				for _, check := range checks {
