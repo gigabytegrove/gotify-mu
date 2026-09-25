@@ -25,7 +25,7 @@ import {ThemeKey} from '../layout/theme';
 import {useStores} from '../stores';
 import * as config from '../config';
 import {UpdateStatusCard} from '../update/UpdateStatus';
-import {IDigestPolicy, IQuietHoursPolicy, ISecurityPolicy} from '../types';
+import {IDigestPolicy, IQuietHoursPolicy, ISecurityPolicy, IMFAStatus} from '../types';
 
 interface IProps {
     themeMode: ThemeKey;
@@ -43,6 +43,7 @@ const Settings = ({themeMode, setTheme}: IProps) => {
         {currentUser.user.admin && <UpdateStatusCard />}
         {currentUser.user.admin && <AdministratorSecurityPolicy />}
 
+        <MFASettings />
         <NotificationPreferences />
 
         <SurfaceCard
@@ -99,6 +100,165 @@ const Settings = ({themeMode, setTheme}: IProps) => {
     );
 };
 
+
+const MFASettings = () => {
+    const {elevateStore, snackManager} = useStores();
+    const [status, setStatus] = React.useState<IMFAStatus>();
+    const [secret, setSecret] = React.useState('');
+    const [otpauthUri, setOtpauthUri] = React.useState('');
+    const [code, setCode] = React.useState('');
+    const [recoveryCodes, setRecoveryCodes] = React.useState<string[]>([]);
+
+    const refresh = React.useCallback(async () => {
+        const response = await axios.get<IMFAStatus>(config.get('url') + 'security/mfa');
+        setStatus(response.data);
+    }, []);
+
+    React.useEffect(() => {
+        void refresh();
+    }, [refresh]);
+
+    if (!status) {
+        return (
+            <SurfaceCard title="Multi-factor Authentication" subtitle="Protect local sign-in with an authenticator app.">
+                <Typography color="text.secondary">Loading multi-factor authentication…</Typography>
+            </SurfaceCard>
+        );
+    }
+
+    if (!elevateStore.elevated) {
+        return (
+            <SurfaceCard title="Multi-factor Authentication" subtitle="Protect local sign-in with an authenticator app.">
+                <ElevationForm />
+            </SurfaceCard>
+        );
+    }
+
+    const start = async () => {
+        const response = await axios.post<{secret: string; otpauthUri: string}>(
+            config.get('url') + 'security/mfa/start'
+        );
+        setSecret(response.data.secret);
+        setOtpauthUri(response.data.otpauthUri);
+        setRecoveryCodes([]);
+    };
+
+    const enable = async () => {
+        const response = await axios.post<{enabled: boolean; recoveryCodes: string[]}>(
+            config.get('url') + 'security/mfa/enable',
+            {code}
+        );
+        setRecoveryCodes(response.data.recoveryCodes);
+        setCode('');
+        setSecret('');
+        setOtpauthUri('');
+        await refresh();
+        snackManager.snack('Multi-factor authentication enabled');
+    };
+
+    const disable = async () => {
+        await axios.post(config.get('url') + 'security/mfa/disable', {code});
+        setCode('');
+        setRecoveryCodes([]);
+        await refresh();
+        snackManager.snack('Multi-factor authentication disabled');
+    };
+
+    return (
+        <SurfaceCard
+            title="Multi-factor Authentication"
+            subtitle="Protect local sign-in with an authenticator app and recovery codes."
+            action={<Security color="action" />}>
+            <Stack spacing={2}>
+                <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                    <Chip
+                        size="small"
+                        color={status.enabled ? 'success' : 'default'}
+                        label={status.enabled ? 'Enabled' : 'Not enabled'}
+                    />
+                    {status.enabled && (
+                        <Typography variant="body2" color="text.secondary">
+                            {status.recoveryCodesRemaining} recovery codes remaining
+                        </Typography>
+                    )}
+                </Stack>
+
+                {!status.enabled && !secret && (
+                    <Button variant="contained" onClick={() => void start()} sx={{alignSelf: 'flex-start'}}>
+                        Set Up Authenticator
+                    </Button>
+                )}
+
+                {!status.enabled && secret && (
+                    <>
+                        <Typography>
+                            Add this secret to your authenticator app, then enter the current six-digit code.
+                        </Typography>
+                        <TextField
+                            label="Authenticator secret"
+                            value={secret}
+                            slotProps={{input: {readOnly: true}}}
+                            fullWidth
+                        />
+                        <TextField
+                            label="Authenticator setup URI"
+                            value={otpauthUri}
+                            slotProps={{input: {readOnly: true}}}
+                            fullWidth
+                        />
+                        <TextField
+                            label="Verification code"
+                            value={code}
+                            onChange={(event) => setCode(event.target.value)}
+                            autoComplete="one-time-code"
+                            fullWidth
+                        />
+                        <Button
+                            variant="contained"
+                            disabled={!code}
+                            onClick={() => void enable()}
+                            sx={{alignSelf: 'flex-start'}}>
+                            Enable MFA
+                        </Button>
+                    </>
+                )}
+
+                {status.enabled && (
+                    <>
+                        <TextField
+                            label="Authenticator or recovery code"
+                            value={code}
+                            onChange={(event) => setCode(event.target.value)}
+                            autoComplete="one-time-code"
+                            helperText="Required to disable multi-factor authentication."
+                            fullWidth
+                        />
+                        <Button
+                            color="error"
+                            variant="outlined"
+                            disabled={!code}
+                            onClick={() => void disable()}
+                            sx={{alignSelf: 'flex-start'}}>
+                            Disable MFA
+                        </Button>
+                    </>
+                )}
+
+                {recoveryCodes.length > 0 && (
+                    <Box sx={{p: 1.5, border: 1, borderColor: 'warning.main', borderRadius: 2}}>
+                        <Typography sx={{fontWeight: 700}}>Save these recovery codes now</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
+                            Each code works once. They will not be shown again.
+                        </Typography>
+                        <Typography component="pre" sx={{m: 0, whiteSpace: 'pre-wrap'}}>
+                            {recoveryCodes.join('\n')}
+                        </Typography>
+                    </Box>
+                )}
+            </Stack>
+        </SurfaceCard>
+    );
+};
 
 const AdministratorSecurityPolicy = () => {
     const {snackManager} = useStores();
@@ -203,6 +363,28 @@ const AdministratorSecurityPolicy = () => {
                         fullWidth
                     />
                 </Stack>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.requireMfaAdmins}
+                            onChange={(event) =>
+                                setPolicy({...policy, requireMfaAdmins: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Require multi-factor authentication for administrators"
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.requireMfaAll}
+                            onChange={(event) =>
+                                setPolicy({...policy, requireMfaAll: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Require multi-factor authentication for all local users"
+                />
                 <FormControlLabel
                     control={
                         <Switch
