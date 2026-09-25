@@ -62,6 +62,7 @@ type AutomationDatabase interface {
 
 	SetMessageAcknowledgement(userID, messageID uint, acknowledged bool, now time.Time) error
 	IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error)
+	GetMessageAcknowledgements(messageID uint) ([]*model.MessageAcknowledgementView, error)
 }
 
 type AutomationAPI struct {
@@ -479,6 +480,15 @@ func (a *AutomationAPI) GetAcknowledgement(ctx *gin.Context) {
 		value, err := a.DB.IsMessageAcknowledgedByUser(auth.GetUserID(ctx), id)
 		if !successOrAbort(ctx, 500, err) { return }
 		ctx.JSON(200, gin.H{"acknowledged":value})
+	})
+}
+
+func (a *AutomationAPI) GetAcknowledgements(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if !a.canAccessMessage(ctx, id) { return }
+		items, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, items)
 	})
 }
 
