@@ -48,9 +48,14 @@ type Notifier interface {
 }
 
 // The MessageAPI provides handlers for managing messages.
+type MessageDispatcher interface {
+	StoreAndDeliver(message *model.Message) (*model.MessageExternal, error)
+}
+
 type MessageAPI struct {
-	DB       MessageDatabase
-	Notifier Notifier
+	DB         MessageDatabase
+	Notifier   Notifier
+	Dispatcher MessageDispatcher
 }
 
 type pagingParams struct {
@@ -728,12 +733,20 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		msgInternal.SenderUserID = postingUser.ID
 		msgInternal.SenderName = postingUser.Name
 	}
-	if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
-		return
-	}
-	external := toExternalMessage(msgInternal)
-	for _, userID := range recipients {
-		a.Notifier.Notify(userID, external)
+	var external *model.MessageExternal
+	if a.Dispatcher != nil {
+		external, err = a.Dispatcher.StoreAndDeliver(msgInternal)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+	} else {
+		if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
+			return
+		}
+		external = toExternalMessage(msgInternal)
+		for _, userID := range recipients {
+			a.Notifier.Notify(userID, external)
+		}
 	}
 	ctx.JSON(200, external)
 }
@@ -765,6 +778,7 @@ func toExternalMessage(msg *model.Message) *model.MessageExternal {
 		Date:          msg.Date,
 		SenderUserID:  msg.SenderUserID,
 		SenderName:    msg.SenderName,
+		Acknowledged:  msg.Acknowledged,
 	}
 	if len(msg.Extras) != 0 {
 		res.Extras = make(map[string]any)
