@@ -92,6 +92,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 				if err := db.CleanupAutomationHistory(before); err != nil {
 					log.Error().Err(err).Msg("Could not clean automation history")
 				}
+				if err := db.CleanupWebhookDeliveries(before); err != nil {
+					log.Error().Err(err).Msg("Could not clean webhook delivery history")
+				}
 			}
 			if err := cleanupOrphanAttachments(db, attachmentDir); err != nil {
 				log.Error().Err(err).Msg("Could not clean orphaned attachments")
@@ -465,6 +468,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/integration/webhook", automationHandler.GetWebhookRoutes)
 		adminPlatform.POST("/integration/webhook", automationHandler.CreateWebhookRoute)
 		adminPlatform.PUT("/integration/webhook/:id", automationHandler.UpdateWebhookRoute)
+		adminPlatform.GET("/integration/webhook/:id/history", automationHandler.GetWebhookDeliveries)
 		adminPlatform.POST("/integration/webhook/:id/regenerate", automationHandler.RegenerateWebhookSecret)
 		adminPlatform.POST("/integration/webhook/:id/test", automationHandler.TestWebhookRoute)
 		adminPlatform.DELETE("/integration/webhook/:id", automationHandler.DeleteWebhookRoute)
