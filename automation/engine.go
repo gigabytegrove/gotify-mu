@@ -49,12 +49,16 @@ type Database interface {
 	GetScheduledNotifications() ([]*model.ScheduledNotification, error)
 	GetDueScheduledNotifications(now time.Time) ([]*model.ScheduledNotification, error)
 	SaveScheduledNotification(item *model.ScheduledNotification) error
+	CommitScheduledRun(item *model.ScheduledNotification, scheduledFor time.Time, runAt time.Time, nextRunAt *time.Time, disable bool) (*model.Message, error)
 
 	GetEscalationRulesForMessage(applicationID uint, priority int) ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
 	QueueEscalation(item *model.EscalationState) error
 	GetDueEscalations(now time.Time) ([]*model.EscalationState, error)
 	SaveEscalationState(item *model.EscalationState) error
+	CommitEscalation(state *model.EscalationState, applicationID uint, title string, body string, priority int, now time.Time) (*model.Message, error)
+	CompleteEscalation(stateID uint, now time.Time) error
+	DeleteAutomationHistoryBefore(before time.Time) error
 	IsMessageAcknowledged(messageID uint) (bool, error)
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
@@ -147,6 +151,10 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 	if err := e.db.CreateMessage(msg); err != nil {
 		return nil, err
 	}
+	return e.deliverStored(msg, allowEscalation)
+}
+
+func (e *Engine) deliverStored(msg *model.Message, allowEscalation bool) (*model.MessageExternal, error) {
 	recipients, err := e.db.GetApplicationRecipientUserIDs(msg.ApplicationID)
 	if err != nil {
 		return nil, err
@@ -288,6 +296,11 @@ func (e *Engine) runDue(now time.Time) {
 	e.runSchedules(now)
 	e.runDigests(now)
 	e.runEscalations(now)
+	if now.Minute() == 0 {
+		if err := e.db.DeleteAutomationHistoryBefore(now.AddDate(0, 0, -30)); err != nil {
+			log.Error().Err(err).Msg("Could not clean old automation history")
+		}
+	}
 }
 
 func (e *Engine) runSchedules(now time.Time) {
@@ -297,20 +310,25 @@ func (e *Engine) runSchedules(now time.Time) {
 		return
 	}
 	for _, item := range items {
-		if _, err := e.Publish(item.ApplicationID, item.Title, item.Message, item.Priority); err != nil {
-			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
+		scheduledFor := now
+		if item.NextRunAt != nil {
+			scheduledFor = *item.NextRunAt
+		}
+		disable := item.ScheduleType == "once"
+		var nextRunAt *time.Time
+		if !disable {
+			nextRunAt = NextScheduleRun(item, now.Add(time.Second))
+		}
+		msg, err := e.db.CommitScheduledRun(item, scheduledFor, now, nextRunAt, disable)
+		if err != nil {
+			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Scheduled notification commit failed")
 			continue
 		}
-		runAt := now
-		item.LastRunAt = &runAt
-		if item.ScheduleType == "once" {
-			item.Enabled = false
-			item.NextRunAt = nil
-		} else {
-			item.NextRunAt = NextScheduleRun(item, now.Add(time.Second))
+		if msg == nil {
+			continue
 		}
-		if err := e.db.SaveScheduledNotification(item); err != nil {
-			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not update schedule")
+		if _, err := e.deliverStored(msg, true); err != nil {
+			log.Error().Err(err).Uint("schedule_id", item.ID).Uint("message_id", msg.ID).Msg("Scheduled notification delivery failed")
 		}
 	}
 }
@@ -389,7 +407,7 @@ func (e *Engine) runDigests(now time.Time) {
 			}
 			last := items[len(items)-1]
 			e.notifier.Notify(policy.UserID, &model.MessageExternal{
-				ID: last.MessageID,
+				ID: 0,
 				ApplicationID: last.ApplicationID,
 				Title: fmt.Sprintf("%d notification digest", len(items)),
 				Message: strings.Join(lines, "\n"),
@@ -426,37 +444,45 @@ func (e *Engine) runEscalations(now time.Time) {
 			log.Error().Err(err).Uint("message_id", state.MessageID).Msg("Could not inspect acknowledgement")
 			continue
 		}
-		if !acknowledged {
-			rule, err := e.db.GetEscalationRuleByID(state.RuleID)
-			if err != nil || rule == nil || !rule.Enabled {
-				state.Completed = true
-			} else {
-				msg, loadErr := e.db.GetMessageByID(state.MessageID)
-				if loadErr != nil || msg == nil {
-					state.Completed = true
-				} else {
-					title := msg.Title
-					if title == "" {
-						title = "Escalated notification"
-					} else {
-						title = "Escalated: " + title
-					}
-					body := msg.Message + "\n\nThis notification was escalated because it was not acknowledged."
-					escalated := &model.Message{ApplicationID:rule.TargetApplicationID,Title:title,Message:body,Priority:msg.Priority,Date:time.Now()}
-					if _, publishErr := e.storeAndDeliver(escalated, false); publishErr != nil {
-						log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
-						continue
-					}
-					state.Completed = true
-				}
+		if acknowledged {
+			if err := e.db.CompleteEscalation(state.ID, now); err != nil {
+				log.Error().Err(err).Uint("escalation_id", state.ID).Msg("Could not complete acknowledged escalation")
 			}
-		} else {
-			state.Completed = true
+			continue
 		}
-		done := now
-		state.DoneAt = &done
-		if err := e.db.SaveEscalationState(state); err != nil {
-			log.Error().Err(err).Uint("escalation_id", state.ID).Msg("Could not complete escalation")
+
+		rule, err := e.db.GetEscalationRuleByID(state.RuleID)
+		if err != nil || rule == nil || !rule.Enabled {
+			if completeErr := e.db.CompleteEscalation(state.ID, now); completeErr != nil {
+				log.Error().Err(completeErr).Uint("escalation_id", state.ID).Msg("Could not complete inactive escalation")
+			}
+			continue
+		}
+
+		msg, loadErr := e.db.GetMessageByID(state.MessageID)
+		if loadErr != nil || msg == nil {
+			if completeErr := e.db.CompleteEscalation(state.ID, now); completeErr != nil {
+				log.Error().Err(completeErr).Uint("escalation_id", state.ID).Msg("Could not complete missing-message escalation")
+			}
+			continue
+		}
+
+		title := msg.Title
+		if title == "" {
+			title = "Escalated notification"
+		} else {
+			title = "Escalated: " + title
+		}
+		body := msg.Message + "\n\nThis notification was escalated because it was not acknowledged."
+		escalated, commitErr := e.db.CommitEscalation(state, rule.TargetApplicationID, title, body, msg.Priority, now)
+		if commitErr != nil {
+			log.Error().Err(commitErr).Uint("rule_id", rule.ID).Msg("Escalation commit failed")
+			continue
+		}
+		if escalated != nil {
+			if _, deliveryErr := e.deliverStored(escalated, false); deliveryErr != nil {
+				log.Error().Err(deliveryErr).Uint("rule_id", rule.ID).Uint("message_id", escalated.ID).Msg("Escalation delivery failed")
+			}
 		}
 	}
 }
