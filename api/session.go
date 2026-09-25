@@ -16,6 +16,7 @@ type SessionDatabase interface {
 	CreateClient(client *model.Client) error
 	GetClientByToken(token string) (*model.Client, error)
 	DeleteClientByID(id uint) error
+	CreateAuditEvent(event *model.AuditEvent) error
 }
 
 // SessionAPI provides handlers for cookie-based session authentication.
@@ -76,6 +77,13 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		return
 	}
 	if user == nil || !password.ComparePassword(user.Pass, []byte(pass)) {
+		_ = a.DB.CreateAuditEvent(&model.AuditEvent{
+			Username:  name,
+			Action:    "login_failed",
+			Target:    "/auth/local/login",
+			IPAddress: ctx.ClientIP(),
+			Details:   "Invalid local credentials",
+		})
 		ctx.AbortWithError(401, errors.New("invalid credentials"))
 		return
 	}
@@ -99,6 +107,13 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 	}
 
 	auth.SetCookie(ctx.Writer, tokenPrivate, auth.CookieMaxAge, a.SecureCookie)
+	_ = a.DB.CreateAuditEvent(&model.AuditEvent{
+		UserID:    user.ID,
+		Username:  user.Name,
+		Action:    "login",
+		Target:    "/auth/local/login",
+		IPAddress: ctx.ClientIP(),
+	})
 
 	ctx.JSON(200, &model.CurrentUserExternal{
 		ID:            user.ID,
