@@ -310,6 +310,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/update/status", updateHandler.Status)
 		adminPlatform.POST("/update/install", updateHandler.Install)
 
+		adminPlatform.GET("/integration/status", automationHandler.GetIntegrationStatus)
 		adminPlatform.GET("/integration/webhook", automationHandler.GetWebhookRoutes)
 		adminPlatform.POST("/integration/webhook", automationHandler.CreateWebhookRoute)
 		adminPlatform.PUT("/integration/webhook/:id", automationHandler.UpdateWebhookRoute)
@@ -319,6 +320,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/integration/mqtt", automationHandler.GetMQTT)
 		adminPlatform.POST("/integration/mqtt", automationHandler.CreateMQTT)
 		adminPlatform.PUT("/integration/mqtt/:id", automationHandler.UpdateMQTT)
+		adminPlatform.POST("/integration/mqtt/:id/test", automationHandler.TestMQTT)
 		adminPlatform.DELETE("/integration/mqtt/:id", automationHandler.DeleteMQTT)
 
 		adminPlatform.GET("/integration/home-assistant", automationHandler.GetHomeAssistant)
