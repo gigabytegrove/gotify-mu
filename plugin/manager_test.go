@@ -566,6 +566,21 @@ func TestInstallPlugin_InvalidExtension_expectError(t *testing.T) {
 	assert.Contains(t, err.Error(), ".so")
 }
 
+func TestInstallPlugin_InvalidBinary_removesFile(t *testing.T) {
+	tmpDir := test.NewTmpDir("gotify_installplugin_invalidbinary")
+	defer tmpDir.Clean()
+
+	db := testdb.NewDBWithDefaultUser(t)
+	manager, err := NewManager(db, tmpDir.Path(), nil, nil)
+	assert.NoError(t, err)
+
+	_, _, err = manager.InstallPlugin("broken.so", strings.NewReader("not an ELF plugin"))
+	assert.Error(t, err)
+
+	_, statErr := os.Stat(tmpDir.Path("broken.so"))
+	assert.True(t, os.IsNotExist(statErr), "invalid upload should not remain in the plugin directory")
+}
+
 func TestPluginFileLoadError(t *testing.T) {
 	err := pluginFileLoadError{Filename: "test.so", UnderlyingError: errors.New("test error")}
 	assert.Error(t, err)
