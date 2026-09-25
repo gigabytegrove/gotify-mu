@@ -141,3 +141,8 @@ func WebhookVerifier(secret string) string {
 func IsWebhookVerifier(value string) bool {
 	return strings.HasPrefix(value, webhookHashPrefix)
 }
+
+func StableHash(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:16])
+}
