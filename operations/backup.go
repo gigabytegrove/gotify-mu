@@ -17,6 +17,34 @@ const (
 	PendingRestoreName = ".gotify-mu-restore-pending.zip"
 )
 
+func DataDirectory(dialect, connection string) string {
+	if dialect != "sqlite3" && dialect != "sqlite" {
+		return ""
+	}
+	candidate := strings.TrimPrefix(strings.TrimSpace(connection), "file:")
+	if query := strings.IndexByte(candidate, '?'); query >= 0 {
+		candidate = candidate[:query]
+	}
+	if candidate == "" || candidate == ":memory:" {
+		return ""
+	}
+	return filepath.Clean(filepath.Dir(candidate))
+}
+
+func DatabaseFile(dialect, connection string) string {
+	if dialect != "sqlite3" && dialect != "sqlite" {
+		return ""
+	}
+	candidate := strings.TrimPrefix(strings.TrimSpace(connection), "file:")
+	if query := strings.IndexByte(candidate, '?'); query >= 0 {
+		candidate = candidate[:query]
+	}
+	if candidate == "" || candidate == ":memory:" {
+		return ""
+	}
+	return filepath.Clean(candidate)
+}
+
 type BackupManifest struct {
 	FormatVersion int       `json:"formatVersion"`
 	Product       string    `json:"product"`
