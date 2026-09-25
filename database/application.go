@@ -119,11 +119,12 @@ func (d *GormDatabase) GetApplicationsByUser(userID uint) ([]*model.Application,
 // or has been assigned to through an ApplicationMembership.
 func (d *GormDatabase) GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error) {
 	var apps []*model.Application
-	err := d.DB.Joins("JOIN application_memberships AS am ON am.application_id = applications.id AND am.user_id = ?", userID).
-		Order("applications.sort_key, applications.id ASC").Find(&apps).Error
-	if err == gorm.ErrRecordNotFound {
-		err = nil
-	}
+	err := d.DB.Where(
+		"EXISTS (SELECT 1 FROM application_memberships am WHERE am.application_id = applications.id AND am.user_id = ?) OR "+
+			"EXISTS (SELECT 1 FROM application_group_assignments aga JOIN user_group_memberships ugm ON ugm.group_id = aga.group_id WHERE aga.application_id = applications.id AND ugm.user_id = ?)",
+		userID, userID,
+	).Order("applications.sort_key, applications.id ASC").Find(&apps).Error
+	if err == gorm.ErrRecordNotFound { err = nil }
 	return apps, err
 }
 
