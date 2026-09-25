@@ -49,6 +49,8 @@ export interface IMessage {
     senderUserId?: number;
     senderName?: string;
     acknowledged?: boolean;
+    acknowledgedByAny?: boolean;
+    acknowledgedCount?: number;
     image?: string;
     extras?: IMessageExtras;
 }
@@ -116,12 +118,57 @@ export interface IVersion {
     buildDate: string;
 }
 
+export type IChannelRole = 'owner' | 'manager' | 'publisher' | 'member' | 'read-only';
+
 export interface IApplicationMember {
     userId: number;
     name: string;
     owner: boolean;
     receiveNotifications: boolean;
     autoAssigned: boolean;
+    role: IChannelRole;
+}
+
+export interface IApplicationGroupGrant {
+    groupId: number;
+    name: string;
+    role: Exclude<IChannelRole, 'owner'>;
+    receiveNotifications: boolean;
+}
+
+export interface IMessageAcknowledgement {
+    userId: number;
+    username: string;
+    displayName?: string;
+    acknowledgedAt: string;
+}
+
+export interface IIntegrationStatus {
+    kind: 'mqtt' | 'home-assistant';
+    id: number;
+    state: string;
+    message?: string;
+    lastConnectedAt?: string;
+    lastMessageAt?: string;
+    lastErrorAt?: string;
+    updatedAt: string;
+}
+
+export interface IAuditSettings {
+    id: number;
+    retentionDays: number;
+}
+
+export interface IServiceCredential {
+    id: number;
+    userId: number;
+    applicationId?: number;
+    name: string;
+    scopes: Array<'message:write' | 'message:read' | 'channel:read'>;
+    createdAt: string;
+    lastUsed?: string;
+    expiresAt?: string;
+    token?: string;
 }
 
 
@@ -136,6 +183,9 @@ export interface IWebhookRoute {
     priorityField: string;
     defaultTitle: string;
     defaultPriority: number;
+    requireSignature: boolean;
+    signatureConfigured: boolean;
+    allowedCidrs?: string;
     createdAt: string;
     updatedAt: string;
 }
