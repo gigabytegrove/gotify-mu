@@ -274,3 +274,108 @@ export interface IMFAStatus {
     enabled: boolean;
     recoveryCodesRemaining: number;
 }
+
+
+export interface IRSSIntegration {
+    id: number;
+    name: string;
+    applicationId: number;
+    url: string;
+    pollMinutes: number;
+    titlePrefix: string;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ICalendarIntegration {
+    id: number;
+    name: string;
+    applicationId: number;
+    url: string;
+    pollMinutes: number;
+    advanceMinutes: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IEmailGateway {
+    id: number;
+    name: string;
+    applicationId: number;
+    host: string;
+    port: number;
+    useTls: boolean;
+    startTls: boolean;
+    username: string;
+    passwordConfigured: boolean;
+    fromAddress: string;
+    toAddresses: string;
+    minPriority: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ISMTPReceiver {
+    id: number;
+    listenAddress: string;
+    username: string;
+    passwordConfigured: boolean;
+    allowedCidrs: string;
+    maxMessageBytes: number;
+    enabled: boolean;
+    updatedAt: string;
+}
+
+export interface ISMTPRoute {
+    id: number;
+    recipient: string;
+    applicationId: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ISyslogReceiver {
+    id: number;
+    name: string;
+    applicationId: number;
+    listenAddress: string;
+    protocol: 'udp' | 'tcp';
+    allowedCidrs: string;
+    minSeverity: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IAdminSession {
+    id: number;
+    userId: number;
+    username: string;
+    displayName?: string;
+    name: string;
+    createdAt: string;
+    lastUsed?: string;
+    elevatedUntil?: string;
+    expiresAt?: string;
+}
+
+export interface ISystemStats {
+    users: number;
+    channels: number;
+    messages: number;
+    clients: number;
+    groups: number;
+    webhooks: number;
+    mqttConnections: number;
+    homeAssistantConnections: number;
+    schedules: number;
+    escalationRules: number;
+    auditEvents: number;
+    automationRuns: number;
+    databaseBytes?: number;
+    dataBytes?: number;
+}
