@@ -48,6 +48,7 @@ export interface IMessage {
     date: string;
     senderUserId?: number;
     senderName?: string;
+    acknowledged?: boolean;
     image?: string;
     extras?: IMessageExtras;
 }
@@ -121,4 +122,98 @@ export interface IApplicationMember {
     owner: boolean;
     receiveNotifications: boolean;
     autoAssigned: boolean;
+}
+
+
+export interface IWebhookRoute {
+    id: number;
+    name: string;
+    applicationId: number;
+    enabled: boolean;
+    path: string;
+    titleField: string;
+    messageField: string;
+    priorityField: string;
+    defaultTitle: string;
+    defaultPriority: number;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IMQTTIntegration {
+    id: number;
+    name: string;
+    applicationId: number;
+    brokerUrl: string;
+    clientId: string;
+    username: string;
+    passwordConfigured: boolean;
+    topic: string;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IHomeAssistantIntegration {
+    id: number;
+    name: string;
+    applicationId: number;
+    baseUrl: string;
+    tokenConfigured: boolean;
+    eventType: string;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IScheduledNotification {
+    id: number;
+    name: string;
+    applicationId: number;
+    title: string;
+    message: string;
+    priority: number;
+    scheduleType: 'once' | 'hourly' | 'daily' | 'weekly';
+    runAt?: string;
+    hour: number;
+    minute: number;
+    weekday: number;
+    timezone: string;
+    enabled: boolean;
+    lastRunAt?: string;
+    nextRunAt?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IQuietHoursPolicy {
+    id?: number;
+    userId: number;
+    enabled: boolean;
+    startMinute: number;
+    endMinute: number;
+    timezone: string;
+    allowPriority: number;
+}
+
+export interface IDigestPolicy {
+    id?: number;
+    userId: number;
+    enabled: boolean;
+    intervalMinutes: number;
+    immediatePriority: number;
+    lastSentAt?: string;
+    nextRunAt?: string;
+}
+
+export interface IEscalationRule {
+    id: number;
+    name: string;
+    sourceApplicationId: number;
+    targetApplicationId: number;
+    minPriority: number;
+    delayMinutes: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
 }
