@@ -96,6 +96,40 @@ export class CurrentUser {
         }
     };
 
+    public loginDirectory = async (
+        username: string,
+        password: string
+    ): Promise<boolean> => {
+        runInAction(() => {
+            this.loggedIn = false;
+            this.authenticating = true;
+        });
+        const name = this.createClientName();
+        try {
+            const response = await axios.create().request<ICurrentUser>({
+                url: config.get('url') + 'auth/ldap/login',
+                method: 'POST',
+                data: {name},
+                headers: {Authorization: 'Basic ' + btoa(username + ':' + password)},
+            });
+            runInAction(() => {
+                this.user = response.data;
+                this.loggedIn = true;
+                this.authenticating = false;
+                this.connectionErrorMessage = null;
+                this.reconnectTime = 7500;
+            });
+            this.snack('Directory sign-in successful');
+            return true;
+        } catch {
+            runInAction(() => {
+                this.authenticating = false;
+            });
+            this.snack('Directory sign-in failed');
+            return false;
+        }
+    };
+
     public tryAuthenticate = async (): Promise<AxiosResponse<ICurrentUser>> => {
         return axios
             .create()
