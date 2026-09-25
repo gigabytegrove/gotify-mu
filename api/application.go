@@ -173,6 +173,10 @@ func (a *ApplicationAPI) GetApplications(ctx *gin.Context) {
 		if membership != nil {
 			receiveNotifications := membership.ReceiveNotifications
 			app.ReceiveNotifications = &receiveNotifications
+			app.CurrentRole = membership.EffectiveRole
+		}
+		if app.UserID == userID {
+			app.CurrentRole = model.ChannelRoleOwner
 		}
 		app.Token = ""
 		withResolvedImage(app)
@@ -309,7 +313,7 @@ func (a *ApplicationAPI) UpdateApplication(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		allowed, err := a.isOwnerOrAdmin(auth.GetUserID(ctx), app)
+		allowed, err := a.canManageApplication(auth.GetUserID(ctx), app)
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
@@ -470,7 +474,7 @@ func (a *ApplicationAPI) UploadApplicationImage(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		allowed, err := a.isOwnerOrAdmin(auth.GetUserID(ctx), app)
+		allowed, err := a.canManageApplication(auth.GetUserID(ctx), app)
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
@@ -567,7 +571,7 @@ func (a *ApplicationAPI) RemoveApplicationImage(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		allowed, err := a.isOwnerOrAdmin(auth.GetUserID(ctx), app)
+		allowed, err := a.canManageApplication(auth.GetUserID(ctx), app)
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
@@ -631,6 +635,17 @@ func handleApplicationError(ctx *gin.Context, err error) {
 	} else {
 		ctx.AbortWithError(500, err)
 	}
+}
+
+func (a *ApplicationAPI) canManageApplication(userID uint, app *model.Application) (bool, error) {
+	if app == nil { return false, nil }
+	if app.UserID == userID { return true, nil }
+	user, err := a.DB.GetUserByID(userID)
+	if err != nil { return false, err }
+	if user != nil && user.Admin { return true, nil }
+	membership, err := a.DB.GetApplicationMembership(app.ID, userID)
+	if err != nil { return false, err }
+	return membership != nil && membership.EffectiveRole == model.ChannelRoleManager, nil
 }
 
 func (a *ApplicationAPI) isOwnerOrAdmin(userID uint, app *model.Application) (bool, error) {
