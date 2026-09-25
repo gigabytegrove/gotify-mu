@@ -100,10 +100,6 @@ func (e *Engine) ReloadIntegrations() {
 
 // Publish stores a normal Gotify MU message and applies native delivery policies.
 func (e *Engine) Publish(applicationID uint, title, message string, priority int) (*model.Message, error) {
-	return e.publish(applicationID, title, message, priority, true)
-}
-
-func (e *Engine) publish(applicationID uint, title, message string, priority int, allowEscalation bool) (*model.Message, error) {
 	app, err := e.db.GetApplicationByID(applicationID)
 	if err != nil {
 		return nil, err
@@ -114,7 +110,6 @@ func (e *Engine) publish(applicationID uint, title, message string, priority int
 	if strings.TrimSpace(title) == "" {
 		title = app.Name
 	}
-
 	msg := &model.Message{
 		ApplicationID: applicationID,
 		Title: title,
@@ -122,11 +117,25 @@ func (e *Engine) publish(applicationID uint, title, message string, priority int
 		Priority: priority,
 		Date: time.Now(),
 	}
+	if _, err := e.storeAndDeliver(msg, true); err != nil {
+		return nil, err
+	}
+	return msg, nil
+}
+
+// StoreAndDeliver stores a normal message and applies quiet hours, digests, and escalations.
+func (e *Engine) StoreAndDeliver(msg *model.Message) (*model.MessageExternal, error) {
+	return e.storeAndDeliver(msg, true)
+}
+
+func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*model.MessageExternal, error) {
+	if msg.Date.IsZero() {
+		msg.Date = time.Now()
+	}
 	if err := e.db.CreateMessage(msg); err != nil {
 		return nil, err
 	}
-
-	recipients, err := e.db.GetApplicationRecipientUserIDs(applicationID)
+	recipients, err := e.db.GetApplicationRecipientUserIDs(msg.ApplicationID)
 	if err != nil {
 		return nil, err
 	}
@@ -137,13 +146,12 @@ func (e *Engine) publish(applicationID uint, title, message string, priority int
 			e.notifier.Notify(userID, external)
 		}
 	}
-
 	if allowEscalation {
 		if err := e.queueEscalations(msg); err != nil {
 			log.Error().Err(err).Uint("message_id", msg.ID).Msg("Could not queue escalation")
 		}
 	}
-	return msg, nil
+	return external, nil
 }
 
 func (e *Engine) deliver(userID uint, msg *model.Message, external *model.MessageExternal) error {
@@ -243,7 +251,7 @@ func (e *Engine) runSchedules(now time.Time) {
 		return
 	}
 	for _, item := range items {
-		if _, err := e.publish(item.ApplicationID, item.Title, item.Message, item.Priority, true); err != nil {
+		if _, err := e.Publish(item.ApplicationID, item.Title, item.Message, item.Priority); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
 			continue
 		}
@@ -388,7 +396,8 @@ func (e *Engine) runEscalations(now time.Time) {
 						title = "Escalated: " + title
 					}
 					body := msg.Message + "\n\nThis notification was escalated because it was not acknowledged."
-					if _, publishErr := e.publish(rule.TargetApplicationID, title, body, msg.Priority, false); publishErr != nil {
+					escalated := &model.Message{ApplicationID:rule.TargetApplicationID,Title:title,Message:body,Priority:msg.Priority,Date:time.Now()}
+					if _, publishErr := e.storeAndDeliver(escalated, false); publishErr != nil {
 						log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
 						continue
 					}
@@ -807,6 +816,7 @@ func externalMessage(msg *model.Message) *model.MessageExternal {
 		Date: msg.Date,
 		SenderUserID: msg.SenderUserID,
 		SenderName: msg.SenderName,
+		Acknowledged: msg.Acknowledged,
 	}
 }
 
