@@ -173,7 +173,9 @@ func (m *manager) finishUpdate(state, step, message string, progress int, finish
 func (m *manager) snapshot() updateStatus {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	return m.status
+	status := m.status
+	status.Activity = append([]activityEntry(nil), m.status.Activity...)
+	return status
 }
 
 func (m *manager) authenticate(next http.HandlerFunc) http.HandlerFunc {
