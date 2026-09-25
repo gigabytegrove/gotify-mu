@@ -55,7 +55,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
     const items: NavItem[] = [
         {label: 'Dashboard', to: '/', icon: <Dashboard />, exact: true},
         {label: 'Messages', to: '/messages', icon: <Inbox />},
-        {label: 'Channels', to: '/applications', icon: <Forum />},
+        {label: 'Channels', to: '/channels', icon: <Forum />},
         {label: 'Users', to: '/users', icon: <People />, adminOnly: true},
         {label: 'Clients', to: '/clients', icon: <DevicesOther />},
         {label: 'Plugins', to: '/plugins', icon: <Extension />},
@@ -87,7 +87,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                             <ListItemButton
                                 key={item.to}
                                 id={
-                                    item.to === '/applications'
+                                    item.to === '/channels'
                                         ? 'navigate-apps'
                                         : item.to === '/users'
                                           ? 'navigate-users'
@@ -133,7 +133,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                     )}
                     {loggedIn &&
                         apps.map((app) => {
-                            const to = `/messages/${app.id}`;
+                            const to = `/channels/${app.id}`;
                             return (
                                 <ListItemButton
                                     key={app.id}
