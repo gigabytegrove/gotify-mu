@@ -215,3 +215,16 @@ type WebhookReplay struct {
 	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
 	CreatedAt time.Time `json:"createdAt"`
 }
+
+
+// IntegrationRuntimeStatus is live operational state for a native integration.
+type IntegrationRuntimeStatus struct {
+	Kind            string     `json:"kind"`
+	ID              uint       `json:"id"`
+	State           string     `json:"state"`
+	Message         string     `json:"message,omitempty"`
+	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
+	LastMessageAt   *time.Time `json:"lastMessageAt,omitempty"`
+	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
+}
