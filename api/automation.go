@@ -66,6 +66,7 @@ type AutomationDatabase interface {
 
 	SetMessageAcknowledgement(userID, messageID uint, acknowledged bool, now time.Time) error
 	IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error)
+	GetMessageAcknowledgements(messageID uint) ([]model.MessageAcknowledgementExternal, error)
 }
 
 type AutomationAPI struct {
@@ -544,7 +545,9 @@ func (a *AutomationAPI) GetAcknowledgement(ctx *gin.Context) {
 		if !a.canAccessMessage(ctx, id) { return }
 		value, err := a.DB.IsMessageAcknowledgedByUser(auth.GetUserID(ctx), id)
 		if !successOrAbort(ctx, 500, err) { return }
-		ctx.JSON(200, gin.H{"acknowledged":value})
+		items, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{"acknowledged":value,"count":len(items),"acknowledgedBy":items})
 	})
 }
 
@@ -552,7 +555,9 @@ func (a *AutomationAPI) AcknowledgeMessage(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		if !a.canAccessMessage(ctx, id) { return }
 		if !successOrAbort(ctx, 500, a.DB.SetMessageAcknowledgement(auth.GetUserID(ctx), id, true, time.Now())) { return }
-		ctx.JSON(200, gin.H{"acknowledged":true})
+		items, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{"acknowledged":true,"count":len(items),"acknowledgedBy":items})
 	})
 }
 
@@ -560,7 +565,9 @@ func (a *AutomationAPI) UnacknowledgeMessage(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		if !a.canAccessMessage(ctx, id) { return }
 		if !successOrAbort(ctx, 500, a.DB.SetMessageAcknowledgement(auth.GetUserID(ctx), id, false, time.Now())) { return }
-		ctx.JSON(200, gin.H{"acknowledged":false})
+		items, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{"acknowledged":false,"count":len(items),"acknowledgedBy":items})
 	})
 }
 
