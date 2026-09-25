@@ -229,6 +229,16 @@ func (d *GormDatabase) SaveAutomationRun(item *model.AutomationRun) error {
 	return d.DB.Save(item).Error
 }
 
+func (d *GormDatabase) GetAutomationRunByTrigger(triggerKey string) (*model.AutomationRun, error) {
+	item := new(model.AutomationRun)
+	if err := d.DB.Where("trigger_key = ?", triggerKey).First(item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) { return nil, nil }
+		return nil, err
+	}
+	return item, nil
+}
+
+
 func (d *GormDatabase) GetAutomationRuns(kind string, objectID uint, limit int) ([]*model.AutomationRun, error) {
 	if limit <= 0 || limit > 500 { limit = 100 }
 	query := d.DB.Model(&model.AutomationRun{})
