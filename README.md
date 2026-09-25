@@ -8,7 +8,7 @@
 
 Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
 
-> **Current release:** **v0.2.0** (pre-release). The multi-user foundation is now versioned and release-tracked, but pre-1.0 builds should still be validated in the target environment before production rollout.
+> **Current release:** **v0.2.1** (pre-release). v0.2.1 adds managed in-app Docker updates on top of the v0.2.0 multi-user foundation. Pre-1.0 builds should still be validated in the target environment before production rollout.
 
 ## Why Gotify MU?
 
@@ -61,7 +61,7 @@ The Web UI uses **Channels** as the user-facing term and provides:
 - Standardized light, dark, and system themes
 - Responsive desktop and mobile-web navigation
 - Consistent dialogs, tables, cards, status indicators, and destructive-action language
-- Administrator update discovery with Dashboard notices and direct release downloads from Settings
+- Administrator update discovery with Dashboard notices, direct release downloads, and managed in-app installation from Settings
 
 The underlying `/application` API naming remains in place to avoid breaking existing clients and integrations.
 
@@ -117,9 +117,9 @@ The official Gotify Android app continues to receive Chat Channel messages as no
 
 ## Releases
 
-The current release baseline is **Gotify MU v0.2.0**.
+The current release baseline is **Gotify MU v0.2.1**.
 
-Release history and compatibility notes are tracked in [CHANGELOG.md](CHANGELOG.md). Detailed v0.2.0 notes are available in [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md).
+Release history and compatibility notes are tracked in [CHANGELOG.md](CHANGELOG.md). Detailed v0.2.1 notes are available in [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md), with the original multi-user baseline documented in [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md).
 
 For a release checkout:
 
@@ -242,6 +242,22 @@ Inspect the running container:
 ```bash
 docker ps --filter name=gotify-mu
 ```
+
+### Managed in-app updates
+
+Docker installations can enable the Gotify MU updater helper for one-click release installation from **Settings → Software Update**.
+
+The helper runs on a private Docker network with no published host port. It requires a random shared token and access to the Docker socket so it can preserve the current runtime configuration, replace the Gotify MU application container, verify health, and automatically restore the previous container if the replacement fails.
+
+Generate the shared token with:
+
+```bash
+openssl rand -hex 32
+```
+
+Store it as `GOTIFY_MU_UPDATER_TOKEN` in the local `.env`. Never commit that token.
+
+Docker socket access is privileged host access. If managed self-updating is not desired, omit the updater helper and continue to use the manual update procedure.
 
 ### Updating a development installation
 
