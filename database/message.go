@@ -46,7 +46,7 @@ func (d *GormDatabase) markAcknowledged(userID uint, messages []*model.Message) 
 			if row.DisplayName != "" { message.LastAcknowledgedBy = row.DisplayName } else { message.LastAcknowledgedBy = row.Username }
 		}
 	}
-	return nil
+	return d.EnrichMessageCollaboration(userID, messages)
 }
 
 func visibleMessages(db *gorm.DB, userID uint) *gorm.DB {
