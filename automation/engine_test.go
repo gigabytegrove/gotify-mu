@@ -101,3 +101,51 @@ func TestAppendMQTTString(t *testing.T) {
 		t.Fatalf("expected %v, got %v", expected, got)
 	}
 }
+
+
+func TestNextScheduleRunCron(t *testing.T) {
+	item := &model.ScheduledNotification{
+		ScheduleType: "cron",
+		CronExpression: "15 9 * * 1-5",
+		Timezone: "America/New_York",
+	}
+	now := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
+	next := NextScheduleRun(item, now)
+	expected := time.Date(2026, 9, 25, 13, 15, 0, 0, time.UTC)
+	if next == nil || !next.Equal(expected) {
+		t.Fatalf("expected %s, got %v", expected, next)
+	}
+}
+
+func TestCronExclusionAndEndDate(t *testing.T) {
+	end := time.Date(2026, 9, 28, 23, 59, 0, 0, time.UTC)
+	item := &model.ScheduledNotification{
+		ScheduleType: "daily",
+		Hour: 9,
+		Minute: 0,
+		Timezone: "UTC",
+		ExcludeDates: "2026-09-26",
+		EndAt: &end,
+	}
+	now := time.Date(2026, 9, 25, 10, 0, 0, 0, time.UTC)
+	next := NextScheduleRun(item, now)
+	expected := time.Date(2026, 9, 27, 9, 0, 0, 0, time.UTC)
+	if next == nil || !next.Equal(expected) {
+		t.Fatalf("expected %s, got %v", expected, next)
+	}
+}
+
+func TestValidateCronExpression(t *testing.T) {
+	if err := ValidateCronExpression("*/5 8-17 * * 1-5"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateCronExpression("61 * * * *"); err == nil {
+		t.Fatal("expected invalid minute to fail")
+	}
+	if err := ValidateExcludeDates("2026-09-25,2026-12-25"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateExcludeDates("09/25/2026"); err == nil {
+		t.Fatal("expected invalid excluded date to fail")
+	}
+}
