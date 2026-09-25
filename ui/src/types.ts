@@ -203,6 +203,9 @@ export interface IHomeAssistantIntegration {
     baseUrl: string;
     tokenConfigured: boolean;
     eventType: string;
+    entityIds: string;
+    dataField: string;
+    dataValue: string;
     enabled: boolean;
     status: string;
     lastConnectedAt?: string;
