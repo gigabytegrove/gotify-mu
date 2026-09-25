@@ -134,9 +134,10 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		return
 	}
 	result := &model.CurrentUserExternal{
-		ID:        user.ID,
-		Name:      user.Name,
-		Admin:     user.Admin,
+		ID:          user.ID,
+		Name:        user.Name,
+		DisplayName: user.DisplayName,
+		Admin:       user.Admin,
 		CreatedAt: user.CreatedAt,
 	}
 	client := auth.GetClient(ctx)
@@ -200,9 +201,10 @@ func (a *UserAPI) CreateUser(ctx *gin.Context) {
 			return
 		}
 		internal := &model.User{
-			Name:  user.Name,
-			Admin: user.Admin,
-			Pass:  pw,
+			Name:        user.Name,
+			DisplayName: user.DisplayName,
+			Admin:       user.Admin,
+			Pass:        pw,
 		}
 
 		// The auth middleware guarantees authenticated requests to be elevated admins.
@@ -493,6 +495,7 @@ func (a *UserAPI) UpdateUserByID(ctx *gin.Context) {
 				}
 
 				dbUser.Name = updatedUser.Name
+				dbUser.DisplayName = updatedUser.DisplayName
 				dbUser.Admin = updatedUser.Admin
 
 				if updatedUser.Pass != "" {
@@ -520,9 +523,10 @@ func (a *UserAPI) UpdateUserByID(ctx *gin.Context) {
 
 func toExternalUser(internal *model.User) *model.UserExternal {
 	return &model.UserExternal{
-		Name:      internal.Name,
-		Admin:     internal.Admin,
-		ID:        internal.ID,
+		Name:        internal.Name,
+		DisplayName: internal.DisplayName,
+		Admin:       internal.Admin,
+		ID:          internal.ID,
 		CreatedAt: internal.CreatedAt,
 	}
 }
