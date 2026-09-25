@@ -404,7 +404,7 @@ func (a *OIDCAPI) ExternalTokenHandler(ctx *gin.Context) {
 	}
 	ctx.JSON(http.StatusOK, &model.OIDCExternalTokenResponse{
 		Token: client.Token,
-		User:  &model.UserExternal{ID: user.ID, Name: user.Name, Admin: user.Admin},
+		User:  &model.UserExternal{ID: user.ID, Name: user.Name, DisplayName: user.DisplayName, Admin: user.Admin},
 	})
 }
 
