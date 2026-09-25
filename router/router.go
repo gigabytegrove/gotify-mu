@@ -67,6 +67,34 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			ctx.Abort()
 		})
 	}
+	maintenanceStop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		run := func() {
+			policy, err := db.GetSecurityPolicy()
+			if err != nil {
+				log.Error().Err(err).Msg("Could not load audit retention policy")
+				return
+			}
+			if policy.AuditRetentionDays > 0 {
+				before := time.Now().AddDate(0, 0, -policy.AuditRetentionDays)
+				if err := db.DeleteAuditEventsBefore(before); err != nil {
+					log.Error().Err(err).Msg("Could not apply audit retention")
+				}
+			}
+		}
+		run()
+		for {
+			select {
+			case <-ticker.C:
+				run()
+			case <-maintenanceStop:
+				return
+			}
+		}
+	}()
+
 	streamHandler := stream.New(
 		time.Duration(conf.Server.Stream.PingPeriodSeconds)*time.Second, 15*time.Second, conf.Server.Stream.AllowedOrigins,
 	)
@@ -363,6 +391,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.DELETE("/automation/escalation/:id", automationHandler.DeleteEscalation)
 	}
 	return g, func() {
+		close(maintenanceStop)
 		automationEngine.Close()
 		streamHandler.Close()
 	}
