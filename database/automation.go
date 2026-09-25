@@ -330,3 +330,121 @@ func (d *GormDatabase) TryAcquireAutomationLease(name, owner string, now time.Ti
 	})
 	return acquired, err
 }
+
+
+func (d *GormDatabase) CommitScheduledRun(
+	item *model.ScheduledNotification,
+	scheduledFor time.Time,
+	runAt time.Time,
+	nextRunAt *time.Time,
+	disable bool,
+) (*model.Message, error) {
+	var result *model.Message
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		var existing model.ScheduledRun
+		err := tx.Where("schedule_id = ? AND scheduled_for = ?", item.ID, scheduledFor).First(&existing).Error
+		if err == nil {
+			message := new(model.Message)
+			if loadErr := tx.First(message, existing.MessageID).Error; loadErr != nil {
+				return loadErr
+			}
+			result = message
+			return nil
+		}
+		if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		message := &model.Message{
+			ApplicationID: item.ApplicationID,
+			Title:         item.Title,
+			Message:       item.Message,
+			Priority:      item.Priority,
+			Date:          runAt,
+		}
+		if err := tx.Create(message).Error; err != nil {
+			return err
+		}
+		run := &model.ScheduledRun{
+			ScheduleID:   item.ID,
+			ScheduledFor: scheduledFor,
+			MessageID:    message.ID,
+		}
+		if err := tx.Create(run).Error; err != nil {
+			return err
+		}
+
+		updates := map[string]any{
+			"last_run_at": runAt,
+			"next_run_at": nextRunAt,
+		}
+		if disable {
+			updates["enabled"] = false
+		}
+		if err := tx.Model(&model.ScheduledNotification{}).Where("id = ?", item.ID).Updates(updates).Error; err != nil {
+			return err
+		}
+		result = message
+		return nil
+	})
+	return result, err
+}
+
+func (d *GormDatabase) CommitEscalation(
+	state *model.EscalationState,
+	applicationID uint,
+	title string,
+	body string,
+	priority int,
+	now time.Time,
+) (*model.Message, error) {
+	var result *model.Message
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		current := new(model.EscalationState)
+		if err := tx.First(current, state.ID).Error; err != nil {
+			return err
+		}
+		if current.Completed {
+			return nil
+		}
+		message := &model.Message{
+			ApplicationID: applicationID,
+			Title:         title,
+			Message:       body,
+			Priority:      priority,
+			Date:          now,
+		}
+		if err := tx.Create(message).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(current).Updates(map[string]any{
+			"completed": true,
+			"done_at":   now,
+		}).Error; err != nil {
+			return err
+		}
+		result = message
+		return nil
+	})
+	return result, err
+}
+
+func (d *GormDatabase) CompleteEscalation(stateID uint, now time.Time) error {
+	return d.DB.Model(&model.EscalationState{}).Where("id = ?", stateID).Updates(map[string]any{
+		"completed": true,
+		"done_at":   now,
+	}).Error
+}
+
+func (d *GormDatabase) DeleteAutomationHistoryBefore(before time.Time) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("created_at < ?", before).Delete(&model.ScheduledRun{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("completed = ? AND done_at IS NOT NULL AND done_at < ?", true, before).
+			Delete(&model.EscalationState{}).Error; err != nil {
+			return err
+		}
+		return nil
+	})
+}
