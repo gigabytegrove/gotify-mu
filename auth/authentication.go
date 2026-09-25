@@ -107,7 +107,7 @@ func (a *Auth) RequireServiceScope(scope string) gin.HandlerFunc {
 
 // RequireAny requires client, application, or basic auth.
 func (a *Auth) RequireApplicationOrClient(ctx *gin.Context) {
-	a.evaluateOr401(ctx, a.handleApplication, a.handleClient(), a.handleUser())
+	a.evaluateOr401(ctx, a.handleApplication, a.handleService("message:write"), a.handleClient(), a.handleUser())
 }
 
 func (a *Auth) evaluate(ctx *gin.Context, funcs ...func(ctx *gin.Context) (authState, error)) bool {
