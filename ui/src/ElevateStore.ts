@@ -3,6 +3,7 @@ import {action, observable, runInAction} from 'mobx';
 import * as config from './config';
 import {SnackReporter} from './snack/SnackManager';
 import {CurrentUser} from './CurrentUser';
+import {elevateWithPasskey} from './passkey';
 
 export class ElevateStore {
     @observable accessor elevated = false;
@@ -64,6 +65,14 @@ export class ElevateStore {
             this.reauthenticationRequired = false;
         });
         this.cleanupOidcElevate();
+    };
+
+    public passkeyElevate = async (): Promise<void> => {
+        await elevateWithPasskey();
+        await this.currentUser.tryAuthenticate();
+        runInAction(() => {
+            this.reauthenticationRequired = false;
+        });
     };
 
     public directoryElevate = async (
