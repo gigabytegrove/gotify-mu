@@ -206,11 +206,10 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 
 	record := func(status, detail string, messageID uint) {
 		if len(detail) > 500 { detail = detail[:500] }
-		if err := a.DB.CreateWebhookDelivery(&model.WebhookDelivery{
+		// Delivery history is diagnostic and must not break webhook delivery.
+		_ = a.DB.CreateWebhookDelivery(&model.WebhookDelivery{
 			WebhookRouteID:item.ID, IPAddress:ctx.ClientIP(), Status:status, Detail:detail, MessageID:messageID,
-		}); err != nil {
-			// Delivery history is diagnostic and must not break webhook delivery.
-		}
+		})
 	}
 
 	if !webhookIPAllowed(ctx.ClientIP(), item.AllowedCIDRs) {
