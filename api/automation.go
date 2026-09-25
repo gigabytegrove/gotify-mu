@@ -152,6 +152,17 @@ func (a *AutomationAPI) RegenerateWebhookSecret(ctx *gin.Context) {
 	})
 }
 
+func (a *AutomationAPI) TestWebhookRoute(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetWebhookRouteByID(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		if item == nil { ctx.AbortWithError(404, errors.New("webhook not found")); return }
+		msg, err := a.Engine.Publish(item.ApplicationID, "Webhook test", "Gotify MU webhook test completed successfully.", item.DefaultPriority)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{"sent":true, "messageId":msg.ID})
+	})
+}
+
 func (a *AutomationAPI) DeleteWebhookRoute(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) { successOrAbort(ctx, 500, a.DB.DeleteWebhookRoute(id)) })
 }
