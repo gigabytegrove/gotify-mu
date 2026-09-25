@@ -1,8 +1,13 @@
 import React, {useState} from 'react';
 import axios from 'axios';
 import {
+    Alert,
     Button,
     Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     FormControl,
     InputLabel,
     MenuItem,
@@ -25,7 +30,7 @@ import {ThemeKey} from '../layout/theme';
 import {useStores} from '../stores';
 import * as config from '../config';
 import {UpdateStatusCard} from '../update/UpdateStatus';
-import {IDigestPolicy, IQuietHoursPolicy} from '../types';
+import {IDigestPolicy, IMFASetupResult, IMFAStatus, IQuietHoursPolicy} from '../types';
 
 interface IProps {
     themeMode: ThemeKey;
@@ -62,6 +67,8 @@ const Settings = ({themeMode, setTheme}: IProps) => {
                 </Select>
             </FormControl>
         </SurfaceCard>
+
+        <MFASettings />
 
         <SurfaceCard
             title="Account Security"
@@ -305,6 +312,233 @@ const NotificationPreferences = () => {
                     </Button>
                 </Stack>
             </SurfaceCard>
+        </>
+    );
+};
+
+
+const MFASettings = () => {
+    const {currentUser, elevateStore, snackManager} = useStores();
+    const [status, setStatus] = React.useState<IMFAStatus>();
+    const [setup, setSetup] = React.useState<IMFASetupResult>();
+    const [code, setCode] = React.useState('');
+    const [busy, setBusy] = React.useState(false);
+    const [recoveryCodes, setRecoveryCodes] = React.useState<string[]>();
+
+    const refresh = React.useCallback(async () => {
+        const response = await axios.get<IMFAStatus>(config.get('url') + 'current/user/mfa/status');
+        setStatus(response.data);
+    }, []);
+
+    React.useEffect(() => {
+        void refresh();
+    }, [refresh]);
+
+    if (!config.get('localAuth')) return null;
+
+    const requireElevation = (): boolean => {
+        if (!elevateStore.elevated) {
+            elevateStore.requestReauthentication();
+            return false;
+        }
+        return true;
+    };
+
+    const beginSetup = async () => {
+        if (!requireElevation()) return;
+        setBusy(true);
+        try {
+            const response = await axios.post<IMFASetupResult>(
+                config.get('url') + 'current/user/mfa/setup'
+            );
+            setSetup(response.data);
+            setRecoveryCodes(response.data.recoveryCodes);
+            setCode('');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const enable = async () => {
+        if (!setup || !code) return;
+        setBusy(true);
+        try {
+            await axios.post(config.get('url') + 'current/user/mfa/enable', {code});
+            await refresh();
+            await currentUser.tryAuthenticate();
+            setSetup(undefined);
+            setCode('');
+            snackManager.snack('Multi-factor authentication enabled');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const disable = async () => {
+        if (!requireElevation() || !code) return;
+        setBusy(true);
+        try {
+            await axios.post(config.get('url') + 'current/user/mfa/disable', {code});
+            await refresh();
+            await currentUser.tryAuthenticate();
+            setCode('');
+            snackManager.snack('Multi-factor authentication disabled');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const regenerate = async () => {
+        if (!requireElevation() || !code) return;
+        setBusy(true);
+        try {
+            const response = await axios.post<{recoveryCodes: string[]}>(
+                config.get('url') + 'current/user/mfa/recovery-codes',
+                {code}
+            );
+            setRecoveryCodes(response.data.recoveryCodes);
+            setCode('');
+            await refresh();
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    return (
+        <>
+            <SurfaceCard
+                title="Multi-factor Authentication"
+                subtitle="Protect password sign-in with an authenticator app and recovery codes."
+                action={<Security color="action" />}>
+                <Stack spacing={2}>
+                    <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                        <Typography sx={{flex: 1}}>
+                            Authenticator verification
+                        </Typography>
+                        <Chip
+                            size="small"
+                            color={status?.enabled ? 'success' : 'default'}
+                            label={status?.enabled ? 'Enabled' : 'Disabled'}
+                        />
+                    </Stack>
+                    {currentUser.user.mfaRequired && !status?.enabled && (
+                        <Alert severity="warning">
+                            Multi-factor authentication is required by server policy.
+                        </Alert>
+                    )}
+                    {status?.enabled ? (
+                        <>
+                            <TextField
+                                label="Authenticator or recovery code"
+                                value={code}
+                                onChange={(event) => setCode(event.target.value)}
+                                autoComplete="one-time-code"
+                                helperText={
+                                    (status.recoveryCodes || 0) +
+                                    ' recovery code' +
+                                    (status.recoveryCodes === 1 ? '' : 's') +
+                                    ' remaining.'
+                                }
+                            />
+                            <Stack direction={{xs: 'column', sm: 'row'}} spacing={1}>
+                                <Button
+                                    variant="outlined"
+                                    disabled={busy || !code}
+                                    onClick={() => void regenerate()}>
+                                    Replace Recovery Codes
+                                </Button>
+                                <Button
+                                    color="error"
+                                    variant="outlined"
+                                    disabled={busy || !code}
+                                    onClick={() => void disable()}>
+                                    Disable MFA
+                                </Button>
+                            </Stack>
+                        </>
+                    ) : (
+                        <Button
+                            variant="contained"
+                            disabled={busy}
+                            onClick={() => void beginSetup()}
+                            sx={{alignSelf: 'flex-start'}}>
+                            Set Up Authenticator
+                        </Button>
+                    )}
+                </Stack>
+            </SurfaceCard>
+
+            <Dialog open={Boolean(setup)} onClose={() => !busy && setSetup(undefined)} fullWidth maxWidth="sm">
+                <DialogTitle>Set Up Authenticator</DialogTitle>
+                <DialogContent>
+                    {setup && (
+                        <Stack spacing={2} sx={{pt: 1}}>
+                            <Typography>
+                                Add this account to your authenticator app, then enter the current
+                                six-digit code to verify setup.
+                            </Typography>
+                            <TextField
+                                label="Setup key"
+                                value={setup.secret}
+                                slotProps={{htmlInput: {readOnly: true}}}
+                                fullWidth
+                            />
+                            <TextField
+                                label="Authenticator setup link"
+                                value={setup.provisioningUri}
+                                slotProps={{htmlInput: {readOnly: true}}}
+                                fullWidth
+                            />
+                            <Alert severity="warning">
+                                Save the recovery codes shown below before enabling MFA. They are
+                                displayed only when generated.
+                            </Alert>
+                            <Typography
+                                component="pre"
+                                sx={{whiteSpace: 'pre-wrap', fontFamily: 'monospace'}}>
+                                {(recoveryCodes || []).join('\n')}
+                            </Typography>
+                            <TextField
+                                autoFocus
+                                label="Verification code"
+                                value={code}
+                                onChange={(event) => setCode(event.target.value)}
+                                autoComplete="one-time-code"
+                            />
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setSetup(undefined)} disabled={busy}>
+                        Cancel
+                    </Button>
+                    <Button
+                        variant="contained"
+                        disabled={busy || !code}
+                        onClick={() => void enable()}>
+                        Verify and Enable
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
+            <Dialog
+                open={Boolean(recoveryCodes && !setup)}
+                onClose={() => setRecoveryCodes(undefined)}
+                fullWidth
+                maxWidth="sm">
+                <DialogTitle>New Recovery Codes</DialogTitle>
+                <DialogContent>
+                    <Alert severity="warning" sx={{mb: 2}}>
+                        Store these recovery codes somewhere safe. They will not be shown again.
+                    </Alert>
+                    <Typography component="pre" sx={{whiteSpace: 'pre-wrap', fontFamily: 'monospace'}}>
+                        {(recoveryCodes || []).join('\n')}
+                    </Typography>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setRecoveryCodes(undefined)}>Done</Button>
+                </DialogActions>
+            </Dialog>
         </>
     );
 };
