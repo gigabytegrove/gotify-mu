@@ -129,17 +129,25 @@ type ScheduledNotification struct {
 	Title         string     `gorm:"type:text" json:"title"`
 	Message       string     `gorm:"type:text" json:"message"`
 	Priority      int        `json:"priority"`
-	ScheduleType  string     `gorm:"type:varchar(16)" json:"scheduleType"`
-	RunAt         *time.Time `json:"runAt,omitempty"`
-	Hour          int        `json:"hour"`
-	Minute        int        `json:"minute"`
-	Weekday       int        `json:"weekday"`
-	Timezone      string     `gorm:"type:text" json:"timezone"`
-	Enabled       bool       `json:"enabled"`
-	LastRunAt     *time.Time `json:"lastRunAt,omitempty"`
-	NextRunAt     *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
-	CreatedAt     time.Time  `json:"createdAt"`
-	UpdatedAt     time.Time  `json:"updatedAt"`
+	ScheduleType   string     `gorm:"type:varchar(16)" json:"scheduleType"`
+	RunAt          *time.Time `json:"runAt,omitempty"`
+	Hour           int        `json:"hour"`
+	Minute         int        `json:"minute"`
+	Weekday        int        `json:"weekday"`
+	CronExpression string     `gorm:"type:text" json:"cronExpression,omitempty"`
+	ExcludedDates  string     `gorm:"type:text" json:"excludedDates,omitempty"`
+	Timezone       string     `gorm:"type:text" json:"timezone"`
+	EndAt          *time.Time `json:"endAt,omitempty"`
+	MaxRuns        int        `json:"maxRuns"`
+	RunCount       int        `json:"runCount"`
+	MisfirePolicy  string     `gorm:"type:varchar(16)" json:"misfirePolicy"`
+	Enabled        bool       `json:"enabled"`
+	LastRunAt      *time.Time `json:"lastRunAt,omitempty"`
+	NextRunAt      *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
+	LastStatus     string     `gorm:"type:varchar(24)" json:"lastStatus,omitempty"`
+	LastError      string     `gorm:"type:text" json:"lastError,omitempty"`
+	CreatedAt      time.Time  `json:"createdAt"`
+	UpdatedAt      time.Time  `json:"updatedAt"`
 }
 
 // QuietHoursPolicy controls realtime notification delivery for one user.
@@ -234,4 +242,17 @@ type MessageAcknowledgementView struct {
 	Username       string    `json:"username"`
 	DisplayName    string    `json:"displayName,omitempty"`
 	AcknowledgedAt time.Time `json:"acknowledgedAt"`
+}
+
+
+// ScheduledNotificationRun records one scheduler execution attempt.
+type ScheduledNotificationRun struct {
+	ID           uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	ScheduleID   uint       `gorm:"index" json:"scheduleId"`
+	ScheduledFor time.Time  `gorm:"index" json:"scheduledFor"`
+	StartedAt    time.Time  `json:"startedAt"`
+	FinishedAt   *time.Time `json:"finishedAt,omitempty"`
+	Status       string     `gorm:"type:varchar(24);index" json:"status"`
+	MessageID    uint       `gorm:"index" json:"messageId,omitempty"`
+	Error        string     `gorm:"type:text" json:"error,omitempty"`
 }
