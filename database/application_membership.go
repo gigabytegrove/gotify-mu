@@ -89,21 +89,83 @@ func backfillApplicationMemberships(tx *gorm.DB) error {
 }
 
 func (d *GormDatabase) GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error) {
+	var direct *model.ApplicationMembership
 	membership := new(model.ApplicationMembership)
-	err := d.DB.Where("application_id = ? AND user_id = ?", applicationID, userID).Find(membership).Error
-	if err == gorm.ErrRecordNotFound {
-		err = nil
+	err := d.DB.Where("application_id = ? AND user_id = ?", applicationID, userID).First(membership).Error
+	switch {
+	case err == nil:
+		direct = membership
+	case err == gorm.ErrRecordNotFound:
+		direct = nil
+	default:
+		return nil, err
 	}
-	if membership.ApplicationID == applicationID && membership.UserID == userID {
-		return membership, err
+
+	grants, err := d.GetApplicationGroupGrantsForUser(applicationID, userID)
+	if err != nil {
+		return nil, err
 	}
-	return nil, err
+	if direct == nil && len(grants) == 0 {
+		return nil, nil
+	}
+
+	result := &model.ApplicationMembership{
+		ApplicationID:        applicationID,
+		UserID:               userID,
+		ReceiveNotifications: false,
+		Role:                 model.ApplicationRoleReadOnly,
+	}
+	if direct != nil {
+		*result = *direct
+		if result.Role == "" {
+			result.Role = model.ApplicationRoleMember
+		}
+	}
+	for _, grant := range grants {
+		if roleRank(grant.Role) > roleRank(result.Role) {
+			result.Role = grant.Role
+		}
+		if direct == nil && grant.ReceiveNotifications {
+			result.ReceiveNotifications = true
+		}
+	}
+
+	var preference model.ApplicationNotificationPreference
+	prefErr := d.DB.Where("application_id = ? AND user_id = ?", applicationID, userID).First(&preference).Error
+	switch {
+	case prefErr == nil:
+		result.ReceiveNotifications = preference.Enabled
+	case prefErr == gorm.ErrRecordNotFound:
+	default:
+		return nil, prefErr
+	}
+	return result, nil
 }
 
 func (d *GormDatabase) GetApplicationMemberships(applicationID uint) ([]*model.ApplicationMembership, error) {
-	var memberships []*model.ApplicationMembership
-	err := d.DB.Where("application_id = ?", applicationID).Order("user_id ASC").Find(&memberships).Error
-	return memberships, err
+	var userIDs []uint
+	if err := d.DB.Raw(`
+		SELECT user_id FROM application_memberships WHERE application_id = ?
+		UNION
+		SELECT ugm.user_id
+		FROM application_group_grants agg
+		JOIN user_group_memberships ugm ON ugm.group_id = agg.group_id
+		WHERE agg.application_id = ?
+		ORDER BY user_id
+	`, applicationID, applicationID).Scan(&userIDs).Error; err != nil {
+		return nil, err
+	}
+	memberships := make([]*model.ApplicationMembership, 0, len(userIDs))
+	for _, userID := range userIDs {
+		membership, err := d.GetApplicationMembership(applicationID, userID)
+		if err != nil {
+			return nil, err
+		}
+		if membership != nil {
+			memberships = append(memberships, membership)
+		}
+	}
+	return memberships, nil
 }
 
 func (d *GormDatabase) UpsertApplicationMembership(membership *model.ApplicationMembership) error {
@@ -125,11 +187,17 @@ func (d *GormDatabase) CountApplicationMemberships(applicationID uint) (int64, e
 }
 
 func (d *GormDatabase) GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error) {
-	var userIDs []uint
-	err := d.DB.Model(&model.ApplicationMembership{}).
-		Where("application_id = ? AND receive_notifications = ?", applicationID, true).
-		Order("user_id ASC").Pluck("user_id", &userIDs).Error
-	return userIDs, err
+	memberships, err := d.GetApplicationMemberships(applicationID)
+	if err != nil {
+		return nil, err
+	}
+	userIDs := make([]uint, 0, len(memberships))
+	for _, membership := range memberships {
+		if membership.ReceiveNotifications {
+			userIDs = append(userIDs, membership.UserID)
+		}
+	}
+	return userIDs, nil
 }
 
 // SetApplicationMembershipNotifications changes realtime delivery for one channel member
@@ -138,24 +206,22 @@ func (d *GormDatabase) SetApplicationMembershipNotifications(
 	applicationID, userID uint,
 	enabled bool,
 ) error {
-	result := d.DB.Model(&model.ApplicationMembership{}).
-		Where("application_id = ? AND user_id = ?", applicationID, userID).
-		Update("receive_notifications", enabled)
-	if result.Error != nil {
-		return result.Error
+	membership, err := d.GetApplicationMembership(applicationID, userID)
+	if err != nil {
+		return err
 	}
-	if result.RowsAffected == 0 {
-		var count int64
-		if err := d.DB.Model(&model.ApplicationMembership{}).
-			Where("application_id = ? AND user_id = ?", applicationID, userID).
-			Count(&count).Error; err != nil {
-			return err
-		}
-		if count == 0 {
-			return gorm.ErrRecordNotFound
-		}
+	if membership == nil {
+		return gorm.ErrRecordNotFound
 	}
-	return nil
+	preference := &model.ApplicationNotificationPreference{
+		ApplicationID: applicationID,
+		UserID:        userID,
+		Enabled:       enabled,
+	}
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"application_id"},{Name:"user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"enabled","updated_at"}),
+	}).Create(preference).Error
 }
 
 // TransferApplicationOwnership changes the canonical Gotify application owner.
@@ -247,4 +313,20 @@ func (d *GormDatabase) SetApplicationAutoAssign(applicationID uint, enabled bool
 		return tx.Where("application_id = ? AND auto_assigned = ?", applicationID, true).
 			Delete(&model.ApplicationMembership{}).Error
 	})
+}
+
+
+func roleRank(role string) int {
+	switch role {
+	case model.ApplicationRoleManager:
+		return 4
+	case model.ApplicationRolePublisher:
+		return 3
+	case model.ApplicationRoleMember:
+		return 2
+	case model.ApplicationRoleReadOnly:
+		return 1
+	default:
+		return 0
+	}
 }
