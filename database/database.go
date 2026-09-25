@@ -96,6 +96,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.Client),
 		new(model.PluginConf),
 		new(model.ApplicationMembership),
+		new(model.ApplicationGroupAssignment),
 		new(model.MessageDismissal),
 		new(model.AuditEvent),
 		new(model.UserGroup),
