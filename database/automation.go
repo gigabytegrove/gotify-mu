@@ -1,8 +1,11 @@
 package database
 
 import (
+	"errors"
+	"fmt"
 	"time"
 
+	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/security"
 	"gorm.io/gorm"
@@ -154,7 +157,7 @@ func (d *GormDatabase) GetQuietHoursPolicy(userID uint) (*model.QuietHoursPolicy
 func (d *GormDatabase) SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error {
 	return d.DB.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name:"user_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"enabled","start_minute","end_minute","timezone","allow_priority","updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"enabled","start_minute","end_minute","timezone","allow_priority","mode","updated_at"}),
 	}).Create(item).Error
 }
 
@@ -275,4 +278,76 @@ func (d *GormDatabase) migrateIntegrationSecrets() error {
 		}
 		return nil
 	})
+}
+
+
+func (d *GormDatabase) QueueDeferredNotification(userID, messageID uint) error {
+	return d.DB.Clauses(clause.OnConflict{DoNothing:true}).Create(&model.DeferredNotification{
+		UserID:userID, MessageID:messageID,
+	}).Error
+}
+
+func (d *GormDatabase) GetDeferredNotifications() ([]*model.DeferredNotification, error) {
+	var items []*model.DeferredNotification
+	return items, d.DB.Order("created_at asc").Find(&items).Error
+}
+
+func (d *GormDatabase) DeleteDeferredNotification(userID, messageID uint) error {
+	return d.DB.Where("user_id = ? AND message_id = ?", userID, messageID).Delete(&model.DeferredNotification{}).Error
+}
+
+func (d *GormDatabase) TryAcquireAutomationLease(name, holder string, now time.Time, ttl time.Duration) (bool, error) {
+	expires := now.Add(ttl)
+	result := d.DB.Model(&model.AutomationLease{}).
+		Where("name = ? AND (holder = ? OR expires_at <= ?)", name, holder, now).
+		Updates(map[string]any{"holder":holder, "expires_at":expires, "updated_at":now})
+	if result.Error != nil { return false, result.Error }
+	if result.RowsAffected > 0 { return true, nil }
+
+	lease := &model.AutomationLease{Name:name, Holder:holder, ExpiresAt:expires, UpdatedAt:now}
+	err := d.DB.Create(lease).Error
+	if err == nil { return true, nil }
+	if errors.Is(err, gorm.ErrDuplicatedKey) { return false, nil }
+	return false, err
+}
+
+func (d *GormDatabase) ReleaseAutomationLease(name, holder string) error {
+	return d.DB.Where("name = ? AND holder = ?", name, holder).Delete(&model.AutomationLease{}).Error
+}
+
+func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]*model.MessageAcknowledgementView, error) {
+	var rows []model.MessageAcknowledgementView
+	err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.user_id, users.name AS username, users.display_name, ma.acknowledged_at").
+		Joins("LEFT JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id = ?", messageID).
+		Order("ma.acknowledged_at DESC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+func (d *GormDatabase) GetOrCreateDigestApplication(userID uint) (*model.Application, error) {
+	app := new(model.Application)
+	err := d.DB.Where("user_id = ? AND internal = ? AND name = ?", userID, true, "Notification Digest").First(app).Error
+	if err == nil { return app, nil }
+	if !errors.Is(err, gorm.ErrRecordNotFound) { return nil, err }
+
+	publicToken, _ := auth.GenerateApplicationToken()
+	app = &model.Application{
+		UserID:userID,
+		Name:"Notification Digest",
+		Description:"Periodic notification summaries",
+		Token:publicToken,
+		Internal:true,
+	}
+	if err := d.CreateApplication(app); err != nil {
+		// A concurrent worker may have created the same logical app. Prefer the
+		// existing one when it can be found.
+		existing := new(model.Application)
+		if findErr := d.DB.Where("user_id = ? AND internal = ? AND name = ?", userID, true, "Notification Digest").First(existing).Error; findErr == nil {
+			return existing, nil
+		}
+		return nil, fmt.Errorf("create digest application: %w", err)
+	}
+	return app, nil
 }
