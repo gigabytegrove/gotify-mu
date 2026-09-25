@@ -11,6 +11,8 @@ type SecurityPolicy struct {
 	AuditRetentionDays       int       `json:"auditRetentionDays"`
 	AutomationRetentionDays  int       `json:"automationRetentionDays"`
 	AllowNativePluginUploads bool      `json:"allowNativePluginUploads"`
+	RequireMFAAdmins         bool      `json:"requireMfaAdmins"`
+	RequireMFAAll            bool      `json:"requireMfaAll"`
 	UpdatedAt                time.Time `json:"updatedAt"`
 }
 
