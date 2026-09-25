@@ -50,10 +50,16 @@ type MQTTIntegration struct {
 	ClientID      string    `gorm:"type:text" json:"clientId"`
 	Username      string    `gorm:"type:text" json:"username"`
 	Password      string    `gorm:"type:text" json:"-"`
-	Topic         string    `gorm:"type:text" json:"topic"`
-	Enabled       bool      `json:"enabled"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	Topic           string     `gorm:"type:text" json:"topic"`
+	Enabled         bool       `json:"enabled"`
+	Status          string     `gorm:"type:varchar(24)" json:"status"`
+	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
+	LastMessageAt   *time.Time `json:"lastMessageAt,omitempty"`
+	LastError       string     `gorm:"type:text" json:"lastError,omitempty"`
+	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
+	ReconnectCount  int        `json:"reconnectCount"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
 }
 
 // MQTTIntegrationView masks the stored password.
@@ -65,10 +71,16 @@ type MQTTIntegrationView struct {
 	ClientID            string    `json:"clientId"`
 	Username            string    `json:"username"`
 	PasswordConfigured bool      `json:"passwordConfigured"`
-	Topic               string    `json:"topic"`
-	Enabled             bool      `json:"enabled"`
-	CreatedAt           time.Time `json:"createdAt"`
-	UpdatedAt           time.Time `json:"updatedAt"`
+	Topic               string     `json:"topic"`
+	Enabled             bool       `json:"enabled"`
+	Status              string     `json:"status"`
+	LastConnectedAt     *time.Time `json:"lastConnectedAt,omitempty"`
+	LastMessageAt       *time.Time `json:"lastMessageAt,omitempty"`
+	LastError           string     `json:"lastError,omitempty"`
+	LastErrorAt         *time.Time `json:"lastErrorAt,omitempty"`
+	ReconnectCount      int        `json:"reconnectCount"`
+	CreatedAt           time.Time  `json:"createdAt"`
+	UpdatedAt           time.Time  `json:"updatedAt"`
 }
 
 // HomeAssistantIntegration subscribes to Home Assistant events over its WebSocket API.
@@ -78,10 +90,16 @@ type HomeAssistantIntegration struct {
 	ApplicationID uint      `gorm:"index" json:"applicationId"`
 	BaseURL       string    `gorm:"type:text" json:"baseUrl"`
 	Token         string    `gorm:"type:text" json:"-"`
-	EventType     string    `gorm:"type:text" json:"eventType"`
-	Enabled       bool      `json:"enabled"`
-	CreatedAt     time.Time `json:"createdAt"`
-	UpdatedAt     time.Time `json:"updatedAt"`
+	EventType       string     `gorm:"type:text" json:"eventType"`
+	Enabled         bool       `json:"enabled"`
+	Status          string     `gorm:"type:varchar(24)" json:"status"`
+	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
+	LastEventAt     *time.Time `json:"lastEventAt,omitempty"`
+	LastError       string     `gorm:"type:text" json:"lastError,omitempty"`
+	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
+	ReconnectCount  int        `json:"reconnectCount"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
 }
 
 // HomeAssistantIntegrationView masks the stored access token.
@@ -91,10 +109,16 @@ type HomeAssistantIntegrationView struct {
 	ApplicationID   uint      `json:"applicationId"`
 	BaseURL         string    `json:"baseUrl"`
 	TokenConfigured bool      `json:"tokenConfigured"`
-	EventType       string    `json:"eventType"`
-	Enabled         bool      `json:"enabled"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+	EventType       string     `json:"eventType"`
+	Enabled         bool       `json:"enabled"`
+	Status          string     `json:"status"`
+	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
+	LastEventAt     *time.Time `json:"lastEventAt,omitempty"`
+	LastError       string     `json:"lastError,omitempty"`
+	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
+	ReconnectCount  int        `json:"reconnectCount"`
+	CreatedAt       time.Time  `json:"createdAt"`
+	UpdatedAt       time.Time  `json:"updatedAt"`
 }
 
 // ScheduledNotification is a recurring or one-time Channel notification.
