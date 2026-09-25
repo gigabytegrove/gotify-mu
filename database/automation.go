@@ -448,3 +448,33 @@ func (d *GormDatabase) DeleteAutomationHistoryBefore(before time.Time) error {
 		return nil
 	})
 }
+
+
+func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]*model.MessageAcknowledgementView, error) {
+	type row struct {
+		UserID         uint
+		Username       string
+		DisplayName    string
+		AcknowledgedAt time.Time
+	}
+	var rows []row
+	err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.user_id, users.name AS username, users.display_name, ma.acknowledged_at").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id = ?", messageID).
+		Order("ma.acknowledged_at ASC").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	out := make([]*model.MessageAcknowledgementView, 0, len(rows))
+	for _, item := range rows {
+		out = append(out, &model.MessageAcknowledgementView{
+			UserID:         item.UserID,
+			Username:       item.Username,
+			DisplayName:    item.DisplayName,
+			AcknowledgedAt: item.AcknowledgedAt,
+		})
+	}
+	return out, nil
+}
