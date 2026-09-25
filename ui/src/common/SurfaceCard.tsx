@@ -16,10 +16,8 @@ const SurfaceCard = ({title, subtitle, action, children}: IProps) => (
         {(title || subtitle || action) && (
             <Stack
                 direction="row"
-                justifyContent="space-between"
-                alignItems="flex-start"
                 spacing={2}
-                sx={{mb: 2}}>
+                sx={{mb: 2, justifyContent: 'space-between', alignItems: 'flex-start'}}> 
                 <Box>
                     {title && <Typography variant="h6">{title}</Typography>}
                     {subtitle && (
