@@ -93,6 +93,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}()
 	loginLimiter := security.NewLimiter(12, 5)
 	webhookLimiter := security.NewLimiter(240, 30)
+	policyProvider := func() *model.SecurityPolicy {
+		policy, err := db.GetSecurityPolicy()
+		if err != nil {
+			log.Error().Err(err).Msg("Could not load security policy")
+			return model.DefaultSecurityPolicy()
+		}
+		return policy
+	}
 	authentication := auth.Auth{
 		DB:               db,
 		SecureCookie:     conf.Server.SecureCookie,
@@ -107,6 +115,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		DB:            db,
 		ImageDir:      conf.UploadedImagesDir,
 		NotifyDeleted: streamHandler.NotifyDeletedClient,
+		Policy:        policyProvider,
 	}
 	applicationHandler := api.ApplicationAPI{
 		DB:       db,
@@ -116,13 +125,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	applicationMembershipHandler := api.ApplicationMembershipAPI{
 		DB: db,
 	}
-	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled}
+	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled, Policy: policyProvider}
 	userChangeNotifier := new(api.UserChangeNotifier)
-	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
+	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration, Policy: policyProvider}
 	auditHandler := api.AuditAPI{DB: db}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
+	securityPolicyHandler := api.SecurityPolicyAPI{DB: db}
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
@@ -133,7 +143,32 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		Manager:  pluginManager,
 		Notifier: streamHandler,
 		DB:       db,
+		Policy:   policyProvider,
 	}
+
+	go func() {
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				now := time.Now()
+				loginLimiter.Cleanup(24*time.Hour)
+				webhookLimiter.Cleanup(24*time.Hour)
+				policy := policyProvider()
+				if policy.AuditRetentionDays > 0 {
+					if err := db.DeleteAuditEventsBefore(now.AddDate(0, 0, -policy.AuditRetentionDays)); err != nil {
+						log.Error().Err(err).Msg("Could not apply audit retention policy")
+					}
+				}
+				if policy.AutomationRetentionDays > 0 {
+					if err := db.DeleteAutomationRunsBefore(now.AddDate(0, 0, -policy.AutomationRetentionDays)); err != nil {
+						log.Error().Err(err).Msg("Could not apply automation history retention policy")
+					}
+				}
+			}
+		}
+	}()
 
 	userChangeNotifier.OnUserDeleted(streamHandler.NotifyDeletedUser)
 	userChangeNotifier.OnUserDeleted(pluginManager.RemoveUser)
@@ -312,6 +347,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	adminPlatform := g.Group("")
 	{
 		adminPlatform.Use(authentication.RequireAdmin)
+		adminPlatform.GET("/security/policy", securityPolicyHandler.Get)
+		adminPlatform.PUT("/security/policy", securityPolicyHandler.Save)
 		adminPlatform.GET("/audit", auditHandler.GetAuditEvents)
 		adminPlatform.GET("/group", groupHandler.GetGroups)
 		adminPlatform.POST("/group", groupHandler.CreateGroup)
