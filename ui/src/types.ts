@@ -116,6 +116,8 @@ export interface IAuditEvent {
 export interface ICurrentUser extends IUser {
     clientId?: number;
     elevatedUntil?: string;
+    mfaEnabled?: boolean;
+    mfaRequired?: boolean;
 }
 
 export interface IVersion {
@@ -272,4 +274,54 @@ export interface IScheduledNotificationRun {
     status: string;
     messageId?: number;
     error?: string;
+}
+
+
+export interface IMFAStatus {
+    enabled: boolean;
+    enrolledAt?: string;
+    recoveryCodes: number;
+}
+
+export interface IMFASetupResult {
+    secret: string;
+    provisioningUri: string;
+    recoveryCodes: string[];
+}
+
+export interface ISecurityPolicy {
+    minimumPasswordLength: number;
+    sessionInactivityMinutes: number;
+    elevationMinutes: number;
+    requireMfaForAdmins: boolean;
+    requireMfaForAllLocalUsers: boolean;
+    auditRetentionDays: number;
+}
+
+export interface IOperationsSummary {
+    users: number;
+    channels: number;
+    messages: number;
+    clients: number;
+    plugins: number;
+    webhooks: number;
+    mqttConnections: number;
+    homeAssistantConnections: number;
+    schedules: number;
+    pendingEscalations: number;
+    pendingDigests: number;
+    deferredNotifications: number;
+    auditEvents: number;
+    databaseDialect: string;
+}
+
+export interface IAdminSession {
+    id: number;
+    userId: number;
+    username: string;
+    name: string;
+    createdAt: string;
+    lastUsed?: string;
+    elevatedUntil?: string;
+    expiresAt?: string;
 }
