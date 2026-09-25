@@ -28,6 +28,7 @@ import {formatDate} from '../common/TimeAgoFormatter';
 
 interface IRowProps {
     name: string;
+    displayName?: string;
     admin: boolean;
     createdAt: string;
     fDelete: VoidFunction;
@@ -121,6 +122,7 @@ const Users = observer(() => {
                     <TableHead>
                         <TableRow>
                             <TableCell>Username</TableCell>
+                            <TableCell>Display Name</TableCell>
                             <TableCell>Role</TableCell>
                             <TableCell>Created</TableCell>
                             <TableCell align="right">Actions</TableCell>
@@ -131,6 +133,7 @@ const Users = observer(() => {
                             <UserRow
                                 key={user.id}
                                 name={user.name}
+                                displayName={user.displayName}
                                 admin={user.admin}
                                 createdAt={user.createdAt}
                                 fDelete={() => setDeleteUser(user)}
@@ -149,6 +152,7 @@ const Users = observer(() => {
                     fClose={() => setEditUser(undefined)}
                     fOnSubmit={userStore.update.bind(this, editUser.id)}
                     name={editUser.name}
+                    displayName={editUser.displayName}
                     admin={editUser.admin}
                     isEdit={true}
                 />
