@@ -14,8 +14,13 @@ type Message struct {
 	Extras        []byte
 	Date          time.Time
 	SenderUserID  uint `gorm:"index"`
-	SenderName    string `gorm:"type:text"`
-	Acknowledged  bool   `gorm:"-" json:"-"`
+	SenderName       string     `gorm:"type:text"`
+	DeduplicationKey string     `gorm:"type:varchar(220);uniqueIndex" json:"-"`
+	Acknowledged     bool       `gorm:"-" json:"-"`
+	AcknowledgedByAnyone bool   `gorm:"-" json:"-"`
+	AcknowledgementCount int    `gorm:"-" json:"-"`
+	LastAcknowledgedBy string   `gorm:"-" json:"-"`
+	LastAcknowledgedAt *time.Time `gorm:"-" json:"-"`
 }
 
 // MessageExternal Model
@@ -76,6 +81,14 @@ type MessageExternal struct {
 	SenderName string `json:"senderName,omitempty"`
 	// Whether the current requesting user has acknowledged this message.
 	Acknowledged bool `json:"acknowledged,omitempty"`
+	// Whether anyone with access to the Channel has acknowledged this message.
+	AcknowledgedByAnyone bool `json:"acknowledgedByAnyone,omitempty"`
+	// Number of users that have acknowledged this message.
+	AcknowledgementCount int `json:"acknowledgementCount,omitempty"`
+	// Most recent user to acknowledge this message.
+	LastAcknowledgedBy string `json:"lastAcknowledgedBy,omitempty"`
+	// Time of the most recent acknowledgement.
+	LastAcknowledgedAt *time.Time `json:"lastAcknowledgedAt,omitempty"`
 }
 
 // CreateMessage Model
