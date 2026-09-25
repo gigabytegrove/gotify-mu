@@ -42,6 +42,17 @@ func (d *GormDatabase) CreateClient(client *model.Client) error {
 	return d.DB.Create(client).Error
 }
 
+func (d *GormDatabase) GetAllClients() ([]*model.Client, error) {
+	var clients []*model.Client
+	if err := d.notExpired(d.DB).Order("last_used DESC, id DESC").Find(&clients).Error; err != nil {
+		return nil, err
+	}
+	for _, client := range clients {
+		client.PopulateExpiresAt()
+	}
+	return clients, nil
+}
+
 // GetClientsByUser returns all clients from a user.
 func (d *GormDatabase) GetClientsByUser(userID uint) ([]*model.Client, error) {
 	var clients []*model.Client
