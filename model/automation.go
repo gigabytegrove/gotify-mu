@@ -180,3 +180,12 @@ type MessageAcknowledgement struct {
 	MessageID      uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
 	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }
+
+
+// AutomationLease ensures only one Gotify MU instance runs shared automation/integration workers.
+type AutomationLease struct {
+	Name      string    `gorm:"primaryKey;type:varchar(120)" json:"name"`
+	Owner     string    `gorm:"type:varchar(120);index" json:"owner"`
+	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
