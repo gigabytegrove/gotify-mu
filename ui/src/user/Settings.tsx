@@ -25,7 +25,7 @@ import {ThemeKey} from '../layout/theme';
 import {useStores} from '../stores';
 import * as config from '../config';
 import {UpdateStatusCard} from '../update/UpdateStatus';
-import {IDigestPolicy, IQuietHoursPolicy} from '../types';
+import {IDigestPolicy, IQuietHoursPolicy, ISecurityPolicy} from '../types';
 
 interface IProps {
     themeMode: ThemeKey;
@@ -41,6 +41,7 @@ const Settings = ({themeMode, setTheme}: IProps) => {
         description="Account preferences and sign-in settings."
         maxWidth={900}>
         {currentUser.user.admin && <UpdateStatusCard />}
+        {currentUser.user.admin && <AdministratorSecurityPolicy />}
 
         <NotificationPreferences />
 
@@ -98,6 +99,139 @@ const Settings = ({themeMode, setTheme}: IProps) => {
     );
 };
 
+
+const AdministratorSecurityPolicy = () => {
+    const {snackManager} = useStores();
+    const [policy, setPolicy] = React.useState<ISecurityPolicy>();
+    const [saving, setSaving] = React.useState(false);
+
+    React.useEffect(() => {
+        void axios
+            .get<ISecurityPolicy>(config.get('url') + 'security/policy')
+            .then((response) => setPolicy(response.data));
+    }, []);
+
+    if (!policy) {
+        return (
+            <SurfaceCard
+                title="Server Security"
+                subtitle="Authentication, retention, and native extension policy."
+                action={<Security color="action" />}>
+                <Typography color="text.secondary">Loading server security policy…</Typography>
+            </SurfaceCard>
+        );
+    }
+
+    const save = async () => {
+        setSaving(true);
+        try {
+            const response = await axios.put<ISecurityPolicy>(
+                config.get('url') + 'security/policy',
+                policy
+            );
+            setPolicy(response.data);
+            snackManager.snack('Server security policy saved');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <SurfaceCard
+            title="Server Security"
+            subtitle="Authentication, retention, and native extension policy."
+            action={<Security color="action" />}>
+            <Stack spacing={2}>
+                <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                    <TextField
+                        label="Minimum password length"
+                        type="number"
+                        value={policy.minPasswordLength}
+                        onChange={(event) =>
+                            setPolicy({...policy, minPasswordLength: Number(event.target.value)})
+                        }
+                        slotProps={{htmlInput: {min: 8, max: 72}}}
+                        fullWidth
+                    />
+                    <TextField
+                        label="Web session lifetime"
+                        type="number"
+                        value={policy.sessionLifetimeHours}
+                        onChange={(event) =>
+                            setPolicy({...policy, sessionLifetimeHours: Number(event.target.value)})
+                        }
+                        helperText="Hours"
+                        slotProps={{htmlInput: {min: 1, max: 8760}}}
+                        fullWidth
+                    />
+                    <TextField
+                        label="Elevated session"
+                        type="number"
+                        value={policy.elevationMinutes}
+                        onChange={(event) =>
+                            setPolicy({...policy, elevationMinutes: Number(event.target.value)})
+                        }
+                        helperText="Minutes"
+                        slotProps={{htmlInput: {min: 1, max: 1440}}}
+                        fullWidth
+                    />
+                </Stack>
+                <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                    <TextField
+                        label="Audit retention"
+                        type="number"
+                        value={policy.auditRetentionDays}
+                        onChange={(event) =>
+                            setPolicy({...policy, auditRetentionDays: Number(event.target.value)})
+                        }
+                        helperText="Days"
+                        slotProps={{htmlInput: {min: 1, max: 3650}}}
+                        fullWidth
+                    />
+                    <TextField
+                        label="Automation history retention"
+                        type="number"
+                        value={policy.automationRetentionDays}
+                        onChange={(event) =>
+                            setPolicy({
+                                ...policy,
+                                automationRetentionDays: Number(event.target.value),
+                            })
+                        }
+                        helperText="Days"
+                        slotProps={{htmlInput: {min: 1, max: 3650}}}
+                        fullWidth
+                    />
+                </Stack>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.allowNativePluginUploads}
+                            onChange={(event) =>
+                                setPolicy({
+                                    ...policy,
+                                    allowNativePluginUploads: event.target.checked,
+                                })
+                            }
+                        />
+                    }
+                    label="Allow administrators to upload native plugin binaries"
+                />
+                <Typography variant="caption" color="text.secondary">
+                    Native plugin binaries execute inside the Gotify MU server process. Keep uploads
+                    disabled unless the plugin source and build are trusted.
+                </Typography>
+                <Button
+                    variant="contained"
+                    disabled={saving}
+                    onClick={() => void save()}
+                    sx={{alignSelf: 'flex-start'}}>
+                    Save Server Security
+                </Button>
+            </Stack>
+        </SurfaceCard>
+    );
+};
 
 const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
