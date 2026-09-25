@@ -189,3 +189,13 @@ type AutomationLease struct {
 	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
+
+
+// ScheduledRun records an atomic schedule execution so a restart cannot create the same scheduled message twice.
+type ScheduledRun struct {
+	ID          uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	ScheduleID  uint      `gorm:"index;uniqueIndex:uix_schedule_run,priority:1" json:"scheduleId"`
+	ScheduledFor time.Time `gorm:"index;uniqueIndex:uix_schedule_run,priority:2" json:"scheduledFor"`
+	MessageID   uint      `gorm:"index" json:"messageId"`
+	CreatedAt   time.Time `json:"createdAt"`
+}
