@@ -28,8 +28,9 @@ type ApplicationMembershipAPI struct {
 }
 
 type ApplicationMemberParams struct {
-	UserID               uint  `json:"userId" binding:"required"`
-	ReceiveNotifications *bool `json:"receiveNotifications,omitempty"`
+	UserID               uint   `json:"userId" binding:"required"`
+	ReceiveNotifications *bool  `json:"receiveNotifications,omitempty"`
+	Role                 string `json:"role"`
 }
 
 type ApplicationMemberExternal struct {
@@ -38,6 +39,7 @@ type ApplicationMemberExternal struct {
 	Owner                bool   `json:"owner"`
 	ReceiveNotifications bool   `json:"receiveNotifications"`
 	AutoAssigned         bool   `json:"autoAssigned"`
+	Role                 string `json:"role"`
 }
 
 type ApplicationAutoAssignParams struct {
@@ -72,7 +74,14 @@ func (a *ApplicationMembershipAPI) authorizeOwnerOrAdmin(
 	if err != nil {
 		return false, err
 	}
-	return user != nil && user.Admin, nil
+	if user != nil && user.Admin {
+		return true, nil
+	}
+	membership, err := a.DB.GetApplicationMembership(app.ID, userID)
+	if err != nil {
+		return false, err
+	}
+	return membership != nil && membership.Role == model.ApplicationRoleManager, nil
 }
 
 func (a *ApplicationMembershipAPI) getAuthorizedApplication(
@@ -123,6 +132,11 @@ func (a *ApplicationMembershipAPI) GetMembers(ctx *gin.Context) {
 				Owner:                user.ID == app.UserID,
 				ReceiveNotifications: membership.ReceiveNotifications,
 				AutoAssigned:         membership.AutoAssigned,
+				Role: func() string {
+					if user.ID == app.UserID { return "owner" }
+					if membership.Role == "" { return model.ApplicationRoleMember }
+					return membership.Role
+				}(),
 			})
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -168,11 +182,20 @@ func (a *ApplicationMembershipAPI) UpsertMember(ctx *gin.Context) {
 		if params.ReceiveNotifications != nil {
 			receive = *params.ReceiveNotifications
 		}
+		role := params.Role
+		if role == "" {
+			role = model.ApplicationRoleMember
+		}
+		if !model.ValidApplicationRole(role) {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid Channel role"))
+			return
+		}
 
 		membership := &model.ApplicationMembership{
 			ApplicationID:        id,
 			UserID:               params.UserID,
 			ReceiveNotifications: receive,
+			Role:                 role,
 		}
 		if success := successOrAbort(
 			ctx,
@@ -186,6 +209,7 @@ func (a *ApplicationMembershipAPI) UpsertMember(ctx *gin.Context) {
 			UserID:               user.ID,
 			Name:                 user.Name,
 			ReceiveNotifications: membership.ReceiveNotifications,
+			Role:                 membership.Role,
 		})
 	})
 }
