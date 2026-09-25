@@ -26,6 +26,7 @@ type ClientAPI struct {
 	DB            ClientDatabase
 	ImageDir      string
 	NotifyDeleted func(uint, string)
+	Policy        func() *model.SecurityPolicy
 }
 
 // Client Params Model
@@ -315,7 +316,19 @@ func (a *ClientAPI) ElevateClient(ctx *gin.Context) {
 			return
 		}
 
-		elevatedUntil := time.Now().Add(time.Duration(params.DurationSeconds) * time.Second)
+		policy := model.DefaultSecurityPolicy()
+		if a.Policy != nil {
+			if configured := a.Policy(); configured != nil { policy = configured }
+		}
+		maxDuration := policy.ElevationMinutes * 60
+		if maxDuration < 60 { maxDuration = 60 }
+		duration := params.DurationSeconds
+		if duration <= 0 { duration = maxDuration }
+		if duration > maxDuration {
+			ctx.AbortWithError(400, fmt.Errorf("elevation may not exceed %d minutes", policy.ElevationMinutes))
+			return
+		}
+		elevatedUntil := time.Now().Add(time.Duration(duration) * time.Second)
 		if err := a.DB.UpdateClientElevatedUntil(client.ID, &elevatedUntil); err != nil {
 			ctx.AbortWithError(500, err)
 			return
