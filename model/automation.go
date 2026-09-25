@@ -135,8 +135,18 @@ type QuietHoursPolicy struct {
 	EndMinute     int       `json:"endMinute"`
 	Timezone      string    `gorm:"type:text" json:"timezone"`
 	AllowPriority int       `json:"allowPriority"`
+	Behavior      string    `gorm:"type:varchar(16);default:suppress" json:"behavior"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
+}
+
+// DeferredNotification holds a realtime notification until Quiet Hours ends.
+type DeferredNotification struct {
+	UserID        uint      `gorm:"primaryKey;autoIncrement:false" json:"userId"`
+	MessageID     uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
+	ApplicationID uint      `gorm:"index" json:"applicationId"`
+	DueAt         time.Time `gorm:"index" json:"dueAt"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 
 // DigestPolicy controls summary delivery for lower-priority notifications.
