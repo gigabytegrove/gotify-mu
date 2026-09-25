@@ -24,6 +24,7 @@ import History from '@mui/icons-material/History';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
 import ConfirmDialog from '../common/ConfirmDialog';
+import {PriorityField, TimeOfDayField, TimezoneField, priorityLabel} from '../common/NotificationFields';
 import * as config from '../config';
 import {useStores} from '../stores';
 import {
@@ -200,8 +201,8 @@ const Automation = () => {
                                     ' minute' +
                                     (item.delayMinutes === 1 ? '' : 's') +
                                     ' if priority is ' +
-                                    item.minPriority +
-                                    ' or higher and the message is still unacknowledged.' +
+                                    priorityLabel(item.minPriority) +
+                                    ' (' + item.minPriority + ') or higher and the message is still unacknowledged.' +
                                     (item.repeatMinutes > 0 && item.maxRepeats > 0
                                         ? ' Repeats every ' +
                                           item.repeatMinutes +
@@ -559,12 +560,7 @@ const ScheduleDialog = ({
                         minRows={3}
                         required
                     />
-                    <TextField
-                        label="Priority"
-                        type="number"
-                        value={priority}
-                        onChange={(e) => setPriority(Number(e.target.value))}
-                    />
+                    <PriorityField value={priority} onChange={setPriority} />
                     <TextField
                         select
                         label="Schedule"
@@ -622,31 +618,19 @@ const ScheduleDialog = ({
                                     ))}
                                 </TextField>
                             )}
-                            <TextField
-                                type="number"
-                                label="Hour"
-                                value={hour}
-                                onChange={(e) => setHour(Number(e.target.value))}
-                                slotProps={{htmlInput: {min: 0, max: 23}}}
-                                fullWidth
-                            />
-                            <TextField
-                                type="number"
-                                label="Minute"
-                                value={minute}
-                                onChange={(e) => setMinute(Number(e.target.value))}
-                                slotProps={{htmlInput: {min: 0, max: 59}}}
-                                fullWidth
+                            <TimeOfDayField
+                                hour={hour}
+                                minute={minute}
+                                onChange={(nextHour, nextMinute) => {
+                                    setHour(nextHour);
+                                    setMinute(nextMinute);
+                                }}
+                                label="Send at"
                             />
                         </Stack>
                     )}
                     {scheduleType !== 'once' && (
-                        <TextField
-                            label="Timezone"
-                            value={timezoneValue}
-                            onChange={(e) => setTimezoneValue(e.target.value)}
-                            helperText="Use an IANA timezone such as America/New_York."
-                        />
+                        <TimezoneField value={timezoneValue} onChange={setTimezoneValue} />
                     )}
                     <TextField
                         label="Excluded dates"
@@ -816,11 +800,10 @@ const EscalationDialog = ({
                             ))}
                         </TextField>
                     )}
-                    <TextField
-                        type="number"
+                    <PriorityField
                         label="Minimum priority"
                         value={minPriority}
-                        onChange={(e) => setMinPriority(Number(e.target.value))}
+                        onChange={setMinPriority}
                     />
                     <TextField
                         type="number"
