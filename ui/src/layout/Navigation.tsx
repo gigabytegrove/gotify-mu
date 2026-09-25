@@ -151,8 +151,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                                         />
                                     </ListItemAvatar>
                                     <ListItemText
-                                        primary={app.name}
-                                        primaryTypographyProps={{noWrap: true}}
+                                        primary={<Typography noWrap>{app.name}</Typography>}
                                     />
                                     {app.autoAssign && (
                                         <Public
