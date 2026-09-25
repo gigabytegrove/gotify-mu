@@ -132,12 +132,24 @@ export interface IVersion {
     buildDate: string;
 }
 
+export type ChannelRole = 'readonly' | 'member' | 'publisher' | 'manager' | 'owner';
+
 export interface IApplicationMember {
     userId: number;
     name: string;
     owner: boolean;
     receiveNotifications: boolean;
     autoAssigned: boolean;
+    groupAssigned: boolean;
+    role: ChannelRole;
+}
+
+export interface IApplicationGroupAssignment {
+    groupId: number;
+    name: string;
+    role: Exclude<ChannelRole, 'owner'>;
+    receiveNotifications: boolean;
+    memberCount: number;
 }
 
 
