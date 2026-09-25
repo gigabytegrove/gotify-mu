@@ -1,6 +1,8 @@
 package database
 
 import (
+	"errors"
+
 	"github.com/gotify/server/v3/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -59,6 +61,26 @@ func (d *GormDatabase) GetMessageByID(id uint) (*model.Message, error) {
 // CreateMessage creates a message.
 func (d *GormDatabase) CreateMessage(message *model.Message) error {
 	return d.DB.Create(message).Error
+}
+
+// CreateMessageOnce inserts an idempotent message. When the deduplication key already exists,
+// the existing message is returned and created is false.
+func (d *GormDatabase) CreateMessageOnce(message *model.Message) (*model.Message, bool, error) {
+	if message.DedupKey == "" {
+		if err := d.DB.Create(message).Error; err != nil { return nil, false, err }
+		return message, true, nil
+	}
+	if err := d.DB.Create(message).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			existing := new(model.Message)
+			if loadErr := d.DB.Where("dedup_key = ?", message.DedupKey).First(existing).Error; loadErr != nil {
+				return nil, false, loadErr
+			}
+			return existing, false, nil
+		}
+		return nil, false, err
+	}
+	return message, true, nil
 }
 
 // GetMessagesByUser returns all messages from a user.
