@@ -278,3 +278,28 @@ func (d *GormDatabase) GetIntegrationStatus(kind string, objectID uint) (*model.
 func (d *GormDatabase) DeleteIntegrationStatus(kind string, objectID uint) error {
 	return d.DB.Where("kind = ? AND object_id = ?", kind, objectID).Delete(&model.IntegrationStatus{}).Error
 }
+
+func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]model.MessageAcknowledgementExternal, error) {
+	type row struct {
+		UserID uint
+		Name string
+		DisplayName string
+		AcknowledgedAt time.Time
+	}
+	var rows []row
+	if err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.user_id, users.name, users.display_name, ma.acknowledged_at").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id = ?", messageID).
+		Order("ma.acknowledged_at ASC").
+		Scan(&rows).Error; err != nil {
+		return nil, err
+	}
+	items := make([]model.MessageAcknowledgementExternal, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, model.MessageAcknowledgementExternal{
+			UserID:row.UserID, Name:row.Name, DisplayName:row.DisplayName, AcknowledgedAt:row.AcknowledgedAt,
+		})
+	}
+	return items, nil
+}
