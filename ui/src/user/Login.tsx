@@ -20,6 +20,8 @@ import LockOutlined from '@mui/icons-material/LockOutlined';
 const Login = observer(() => {
     const [username, setUsername] = React.useState('');
     const [password, setPassword] = React.useState('');
+    const [mfaCode, setMfaCode] = React.useState('');
+    const [mfaRequired, setMfaRequired] = React.useState(false);
     const [registerDialog, setRegisterDialog] = React.useState(false);
     const {currentUser} = useStores();
     const navigate = useNavigate();
@@ -56,9 +58,12 @@ const Login = observer(() => {
         oidcLoginUrl,
     ]);
 
-    const login = (event: React.FormEvent) => {
+    const login = async (event: React.FormEvent) => {
         event.preventDefault();
-        void currentUser.login(username, password);
+        const result = await currentUser.login(username, password, mfaCode);
+        if (result.mfaRequired) {
+            setMfaRequired(true);
+        }
     };
 
     return (
@@ -104,6 +109,18 @@ const Login = observer(() => {
                                     onChange={(event) => setPassword(event.target.value)}
                                     fullWidth
                                 />
+                                {mfaRequired && (
+                                    <TextField
+                                        autoFocus
+                                        id="mfa-code"
+                                        label="Verification code"
+                                        value={mfaCode}
+                                        onChange={(event) => setMfaCode(event.target.value)}
+                                        autoComplete="one-time-code"
+                                        helperText="Enter your authenticator code or one recovery code."
+                                        fullWidth
+                                    />
+                                )}
                                 <Button
                                     type="submit"
                                     startIcon={<LockOutlined />}
