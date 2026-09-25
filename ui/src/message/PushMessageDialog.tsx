@@ -13,7 +13,7 @@ import {
     Tooltip,
 } from '@mui/material';
 import Send from '@mui/icons-material/Send';
-import {NumberField} from '../common/NumberField';
+import {PriorityField} from '../common/NotificationFields';
 import * as config from '../config';
 import {IMessageTemplate} from '../types';
 import {useStores} from '../stores';
@@ -119,9 +119,8 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
                         multiline
                         minRows={5}
                     />
-                    <NumberField
+                    <PriorityField
                         className="priority"
-                        label="Priority"
                         value={priority}
                         onChange={setPriority}
                         fullWidth
