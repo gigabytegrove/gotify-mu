@@ -60,7 +60,27 @@ func (d *GormDatabase) SaveWebhookRoute(item *model.WebhookRoute) error {
 	item.Secret = plain
 	return err
 }
-func (d *GormDatabase) DeleteWebhookRoute(id uint) error { return d.DB.Delete(&model.WebhookRoute{}, id).Error }
+func (d *GormDatabase) DeleteWebhookRoute(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("webhook_route_id = ?", id).Delete(&model.WebhookDelivery{}).Error; err != nil { return err }
+		return tx.Delete(&model.WebhookRoute{}, id).Error
+	})
+}
+
+func (d *GormDatabase) CreateWebhookDelivery(item *model.WebhookDelivery) error {
+	return d.DB.Create(item).Error
+}
+
+func (d *GormDatabase) GetWebhookDeliveries(routeID uint, limit int) ([]*model.WebhookDelivery, error) {
+	if limit <= 0 || limit > 500 { limit = 100 }
+	var items []*model.WebhookDelivery
+	err := d.DB.Where("webhook_route_id = ?", routeID).Order("created_at DESC, id DESC").Limit(limit).Find(&items).Error
+	return items, err
+}
+
+func (d *GormDatabase) CleanupWebhookDeliveries(before time.Time) error {
+	return d.DB.Where("created_at < ?", before).Delete(&model.WebhookDelivery{}).Error
+}
 
 func (d *GormDatabase) GetMQTTIntegrations() ([]*model.MQTTIntegration, error) {
 	var items []*model.MQTTIntegration
