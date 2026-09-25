@@ -69,6 +69,23 @@ type endpointInfo struct {
 	Aliases []string `json:"Aliases"`
 }
 
+type deviceMapping struct {
+	PathOnHost        string `json:"PathOnHost"`
+	PathInContainer   string `json:"PathInContainer"`
+	CgroupPermissions string `json:"CgroupPermissions"`
+}
+
+type ulimit struct {
+	Name string `json:"Name"`
+	Soft int64  `json:"Soft"`
+	Hard int64  `json:"Hard"`
+}
+
+type logConfig struct {
+	Type   string            `json:"Type"`
+	Config map[string]string `json:"Config"`
+}
+
 type inspectedContainer struct {
 	Config struct {
 		Env        []string          `json:"Env"`
@@ -84,6 +101,24 @@ type inspectedContainer struct {
 		ExtraHosts    []string                 `json:"ExtraHosts"`
 		DNS           []string                 `json:"Dns"`
 		DNSSearch     []string                 `json:"DnsSearch"`
+		ReadonlyRootfs bool                    `json:"ReadonlyRootfs"`
+		CapAdd         []string                `json:"CapAdd"`
+		CapDrop        []string                `json:"CapDrop"`
+		SecurityOpt    []string                `json:"SecurityOpt"`
+		Tmpfs          map[string]string       `json:"Tmpfs"`
+		Memory         int64                   `json:"Memory"`
+		NanoCpus       int64                   `json:"NanoCpus"`
+		CPUQuota       int64                   `json:"CpuQuota"`
+		CPUPeriod      int64                   `json:"CpuPeriod"`
+		CpusetCpus     string                  `json:"CpusetCpus"`
+		PidsLimit      *int64                  `json:"PidsLimit"`
+		Privileged     bool                    `json:"Privileged"`
+		IpcMode        string                  `json:"IpcMode"`
+		PidMode        string                  `json:"PidMode"`
+		ShmSize        int64                   `json:"ShmSize"`
+		Devices        []deviceMapping         `json:"Devices"`
+		Ulimits        []ulimit                `json:"Ulimits"`
+		LogConfig      logConfig               `json:"LogConfig"`
 	} `json:"HostConfig"`
 	Mounts []mountInfo `json:"Mounts"`
 	NetworkSettings struct {
@@ -474,6 +509,71 @@ func createArgs(name, image string, inspected *inspectedContainer) []string {
 	for _, search := range inspected.HostConfig.DNSSearch {
 		args = append(args, "--dns-search", search)
 	}
+	if inspected.HostConfig.ReadonlyRootfs {
+		args = append(args, "--read-only")
+	}
+	for _, capability := range inspected.HostConfig.CapAdd {
+		args = append(args, "--cap-add", capability)
+	}
+	for _, capability := range inspected.HostConfig.CapDrop {
+		args = append(args, "--cap-drop", capability)
+	}
+	for _, option := range inspected.HostConfig.SecurityOpt {
+		args = append(args, "--security-opt", option)
+	}
+	for path, options := range inspected.HostConfig.Tmpfs {
+		value := path
+		if options != "" {
+			value += ":" + options
+		}
+		args = append(args, "--tmpfs", value)
+	}
+	if inspected.HostConfig.Memory > 0 {
+		args = append(args, "--memory", strconv.FormatInt(inspected.HostConfig.Memory, 10))
+	}
+	if inspected.HostConfig.NanoCpus > 0 {
+		args = append(args, "--cpus", strconv.FormatFloat(float64(inspected.HostConfig.NanoCpus)/1e9, 'f', -1, 64))
+	}
+	if inspected.HostConfig.CPUPeriod > 0 {
+		args = append(args, "--cpu-period", strconv.FormatInt(inspected.HostConfig.CPUPeriod, 10))
+	}
+	if inspected.HostConfig.CPUQuota > 0 {
+		args = append(args, "--cpu-quota", strconv.FormatInt(inspected.HostConfig.CPUQuota, 10))
+	}
+	if inspected.HostConfig.CpusetCpus != "" {
+		args = append(args, "--cpuset-cpus", inspected.HostConfig.CpusetCpus)
+	}
+	if inspected.HostConfig.PidsLimit != nil && *inspected.HostConfig.PidsLimit > 0 {
+		args = append(args, "--pids-limit", strconv.FormatInt(*inspected.HostConfig.PidsLimit, 10))
+	}
+	if inspected.HostConfig.Privileged {
+		args = append(args, "--privileged")
+	}
+	if inspected.HostConfig.IpcMode != "" && inspected.HostConfig.IpcMode != "private" {
+		args = append(args, "--ipc", inspected.HostConfig.IpcMode)
+	}
+	if inspected.HostConfig.PidMode != "" {
+		args = append(args, "--pid", inspected.HostConfig.PidMode)
+	}
+	if inspected.HostConfig.ShmSize > 0 {
+		args = append(args, "--shm-size", strconv.FormatInt(inspected.HostConfig.ShmSize, 10))
+	}
+	for _, device := range inspected.HostConfig.Devices {
+		value := device.PathOnHost + ":" + device.PathInContainer
+		if device.CgroupPermissions != "" {
+			value += ":" + device.CgroupPermissions
+		}
+		args = append(args, "--device", value)
+	}
+	for _, limit := range inspected.HostConfig.Ulimits {
+		args = append(args, "--ulimit", fmt.Sprintf("%s=%d:%d", limit.Name, limit.Soft, limit.Hard))
+	}
+	if inspected.HostConfig.LogConfig.Type != "" {
+		args = append(args, "--log-driver", inspected.HostConfig.LogConfig.Type)
+		for key, value := range inspected.HostConfig.LogConfig.Config {
+			args = append(args, "--log-opt", key+"="+value)
+		}
+	}
 	if inspected.Config.User != "" {
 		args = append(args, "--user", inspected.Config.User)
 	}
@@ -503,15 +603,23 @@ func inspectContainer(name string) (*inspectedContainer, error) {
 func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		output, err := runDocker("inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}", name)
+		output, err := runDocker("inspect", "--format", "{{.State.Status}}", name)
 		if err == nil {
 			status := strings.TrimSpace(output)
-			if status == "healthy" || status == "running" {
-				m.updateProgress("verifying", "Final checks", "Final checks", 99)
-				return nil
-			}
 			if status == "unhealthy" || status == "exited" || status == "dead" {
 				return fmt.Errorf("replacement service entered state %s", status)
+			}
+			if status == "running" {
+				health, healthErr := runDocker(
+					"exec", name, "sh", "-c",
+					"curl -fsS http://127.0.0.1/health",
+				)
+				if healthErr == nil &&
+					strings.Contains(health, "\"health\":\"green\"") &&
+					strings.Contains(health, "\"database\":\"green\"") {
+					m.updateProgress("verifying", "Final checks", "Final checks", 99)
+					return nil
+				}
 			}
 		}
 		elapsed := timeout - time.Until(deadline)
@@ -522,7 +630,7 @@ func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 		m.updateProgress("verifying", "Checking updated version", "Checking updated version", progress)
 		time.Sleep(2 * time.Second)
 	}
-	return errors.New("replacement service did not become healthy before timeout")
+	return errors.New("replacement service did not report healthy application and database state before timeout")
 }
 
 func runDocker(args ...string) (string, error) {
