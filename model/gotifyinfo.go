@@ -34,5 +34,7 @@ type GotifyInfo struct {
 	//
 	// required: true
 	// example: false
-	OIDCAutoRedirect bool `json:"oidcAutoRedirect"`
+	OIDCAutoRedirect bool   `json:"oidcAutoRedirect"`
+	LDAP             bool   `json:"ldap"`
+	LDAPIDPName      string `json:"ldapIdpName"`
 }
