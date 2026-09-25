@@ -22,8 +22,10 @@ const DefaultPage: FC<React.PropsWithChildren<IProps>> = ({
             <Stack
                 direction={{xs: 'column', sm: 'row'}}
                 spacing={2}
-                alignItems={{xs: 'stretch', sm: 'center'}}
-                justifyContent="space-between">
+                sx={{
+                    alignItems: {xs: 'stretch', sm: 'center'},
+                    justifyContent: 'space-between',
+                }}>
                 <Box sx={{minWidth: 0}}>
                     <Typography variant="h4" component="h1">
                         {title}
