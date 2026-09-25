@@ -356,6 +356,7 @@ const Messages = observer(() => {
 
             {pushMessageOpen && app && (
                 <PushMessageDialog
+                    appId={app.id}
                     appName={app.name}
                     defaultPriority={app.defaultPriority}
                     fClose={() => setPushMessageOpen(false)}
