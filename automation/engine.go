@@ -619,6 +619,56 @@ func (e *Engine) restartIntegrations() {
 	}
 }
 
+func (e *Engine) TestMQTT(id uint) error {
+	integration, err := e.db.GetMQTTIntegrationByID(id)
+	if err != nil { return err }
+	if integration == nil { return errors.New("MQTT connection not found") }
+	password, err := security.Reveal(integration.Password)
+	if err != nil { return err }
+	ctx, cancel := context.WithTimeout(e.ctx, 12*time.Second)
+	defer cancel()
+	conn, err := dialMQTT(ctx, integration.BrokerURL)
+	if err != nil { return err }
+	defer conn.Close()
+	_ = conn.SetDeadline(time.Now().Add(10 * time.Second))
+	reader := bufio.NewReader(conn)
+	clientID := integration.ClientID
+	if clientID == "" { clientID = "gotify-mu-test-" + strconv.FormatUint(uint64(integration.ID), 10) }
+	if err := mqttConnect(conn, reader, clientID, integration.Username, password); err != nil { return err }
+	if err := mqttSubscribe(conn, reader, integration.Topic); err != nil { return err }
+	return nil
+}
+
+func (e *Engine) TestHomeAssistant(id uint) error {
+	integration, err := e.db.GetHomeAssistantIntegrationByID(id)
+	if err != nil { return err }
+	if integration == nil { return errors.New("Home Assistant connection not found") }
+	token, err := security.Reveal(integration.Token)
+	if err != nil { return err }
+	parsed, err := url.Parse(integration.BaseURL)
+	if err != nil { return err }
+	switch parsed.Scheme {
+	case "https": parsed.Scheme = "wss"
+	case "http": parsed.Scheme = "ws"
+	default: return errors.New("Home Assistant URL must use http or https")
+	}
+	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/api/websocket"
+	ctx, cancel := context.WithTimeout(e.ctx, 12*time.Second)
+	defer cancel()
+	conn, _, err := websocket.DefaultDialer.DialContext(ctx, parsed.String(), nil)
+	if err != nil { return err }
+	defer conn.Close()
+	_ = conn.SetReadDeadline(time.Now().Add(10 * time.Second))
+	var hello map[string]any
+	if err := conn.ReadJSON(&hello); err != nil { return err }
+	if hello["type"] != "auth_required" { return errors.New("unexpected Home Assistant authentication response") }
+	if err := conn.WriteJSON(map[string]any{"type":"auth","access_token":token}); err != nil { return err }
+	var response map[string]any
+	if err := conn.ReadJSON(&response); err != nil { return err }
+	if response["type"] != "auth_ok" { return errors.New("Home Assistant authentication failed") }
+	return nil
+}
+
 func (e *Engine) runMQTTLoop(ctx context.Context, integration *model.MQTTIntegration) {
 	key := fmt.Sprintf("integration:mqtt:%d", integration.ID)
 	for {
