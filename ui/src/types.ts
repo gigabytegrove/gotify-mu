@@ -395,3 +395,17 @@ export interface ICalendarMonitor {
     lastError?: string;
     lastErrorAt?: string;
 }
+
+
+export interface IPluginCatalogEntry {
+    name: string;
+    modulePath: string;
+    version: string;
+    description: string;
+    website?: string;
+    downloadUrl: string;
+    sha256: string;
+    signature: string;
+    publicKey: string;
+    installed: boolean;
+}
