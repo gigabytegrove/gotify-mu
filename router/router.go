@@ -16,6 +16,7 @@ import (
 	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/automation"
 	"github.com/gotify/server/v3/config"
+	"github.com/gotify/server/v3/connectors"
 	"github.com/gotify/server/v3/database"
 	"github.com/gotify/server/v3/docs"
 	gerror "github.com/gotify/server/v3/error"
@@ -122,6 +123,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		CrossOrigin:      http.NewCrossOriginProtection(),
 	}
 	automationEngine := automation.New(db, streamHandler)
+	connectorManager := connectors.New(db, automationEngine)
+	automationEngine.AddPostStoreHook(connectorManager.OnMessage)
 	messageHandler := api.MessageAPI{Notifier: streamHandler, DB: db, Dispatcher: automationEngine}
 	healthHandler := api.HealthAPI{DB: db}
 	clientHandler := api.ClientAPI{
@@ -151,6 +154,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		WebhookLimiter: security.NewDynamicLimiter(),
 		WebhookReplay: security.NewReplayCache(),
 	}
+	connectorHandler := api.ConnectorAPI{DB: db, Runtime: connectorManager}
 	loginLimiter := security.NewFixedWindowLimiter(10, 5*time.Minute)
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
@@ -389,9 +393,36 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.POST("/automation/escalation", automationHandler.CreateEscalation)
 		adminPlatform.PUT("/automation/escalation/:id", automationHandler.UpdateEscalation)
 		adminPlatform.DELETE("/automation/escalation/:id", automationHandler.DeleteEscalation)
+
+		adminPlatform.GET("/connector/email", connectorHandler.GetEmailGateways)
+		adminPlatform.POST("/connector/email", connectorHandler.CreateEmailGateway)
+		adminPlatform.PUT("/connector/email/:id", connectorHandler.UpdateEmailGateway)
+		adminPlatform.POST("/connector/email/:id/test", connectorHandler.TestEmailGateway)
+		adminPlatform.DELETE("/connector/email/:id", connectorHandler.DeleteEmailGateway)
+
+		adminPlatform.GET("/connector/smtp", connectorHandler.GetSMTPRoutes)
+		adminPlatform.POST("/connector/smtp", connectorHandler.CreateSMTPRoute)
+		adminPlatform.PUT("/connector/smtp/:id", connectorHandler.UpdateSMTPRoute)
+		adminPlatform.DELETE("/connector/smtp/:id", connectorHandler.DeleteSMTPRoute)
+
+		adminPlatform.GET("/connector/rss", connectorHandler.GetRSS)
+		adminPlatform.POST("/connector/rss", connectorHandler.CreateRSS)
+		adminPlatform.PUT("/connector/rss/:id", connectorHandler.UpdateRSS)
+		adminPlatform.DELETE("/connector/rss/:id", connectorHandler.DeleteRSS)
+
+		adminPlatform.GET("/connector/syslog", connectorHandler.GetSyslog)
+		adminPlatform.POST("/connector/syslog", connectorHandler.CreateSyslog)
+		adminPlatform.PUT("/connector/syslog/:id", connectorHandler.UpdateSyslog)
+		adminPlatform.DELETE("/connector/syslog/:id", connectorHandler.DeleteSyslog)
+
+		adminPlatform.GET("/connector/calendar", connectorHandler.GetCalendars)
+		adminPlatform.POST("/connector/calendar", connectorHandler.CreateCalendar)
+		adminPlatform.PUT("/connector/calendar/:id", connectorHandler.UpdateCalendar)
+		adminPlatform.DELETE("/connector/calendar/:id", connectorHandler.DeleteCalendar)
 	}
 	return g, func() {
 		close(maintenanceStop)
+		connectorManager.Close()
 		automationEngine.Close()
 		streamHandler.Close()
 	}
