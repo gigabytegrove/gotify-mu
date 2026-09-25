@@ -23,11 +23,15 @@ type SystemDatabase interface {
 	DeleteClientByID(id uint) error
 	GetAuditEventsForExport(limit int) ([]*model.AuditEvent, error)
 	DeleteAuditEventsBefore(before time.Time) error
+	CreateBackupSnapshot(destination string) error
 }
 
 type SystemAPI struct {
 	DB            SystemDatabase
 	Dialect       string
+	DataDir       string
+	DatabaseFile  string
+	VersionInfo   *model.VersionInfo
 	NotifyDeleted func(uint, string)
 }
 
