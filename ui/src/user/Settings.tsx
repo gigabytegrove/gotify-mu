@@ -22,17 +22,23 @@ import ElevationForm from '../common/ElevationForm';
 import {ThemeKey} from '../layout/theme';
 import {useStores} from '../stores';
 import * as config from '../config';
+import {UpdateStatusCard} from '../update/UpdateStatus';
 
 interface IProps {
     themeMode: ThemeKey;
     setTheme: (theme: ThemeKey) => void;
 }
 
-const Settings = ({themeMode, setTheme}: IProps) => (
+const Settings = ({themeMode, setTheme}: IProps) => {
+    const {currentUser} = useStores();
+
+    return (
     <DefaultPage
         title="Settings"
         description="Account preferences, authentication, and server security information."
         maxWidth={900}>
+        {currentUser.user.admin && <UpdateStatusCard />}
+
         <SurfaceCard
             title="Appearance"
             subtitle="Choose how the Gotify MU Web UI is displayed."
@@ -106,7 +112,8 @@ const Settings = ({themeMode, setTheme}: IProps) => (
             <ChangePasswordForm />
         </SurfaceCard>
     </DefaultPage>
-);
+    );
+};
 
 const ChangePasswordForm = () => {
     const [pass, setPass] = useState('');
