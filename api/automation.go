@@ -26,6 +26,8 @@ type AutomationEngine interface {
 	Publish(applicationID uint, title, message string, priority int) (*model.Message, error)
 	ReloadIntegrations()
 	SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error
+	TestMQTT(id uint) error
+	TestHomeAssistant(id uint) error
 }
 
 type AutomationDatabase interface {
@@ -332,6 +334,13 @@ func (a *AutomationAPI) UpdateMQTT(ctx *gin.Context) {
 	})
 }
 
+func (a *AutomationAPI) TestMQTT(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 502, a.Engine.TestMQTT(id)) { return }
+		ctx.JSON(200, gin.H{"connected":true})
+	})
+}
+
 func (a *AutomationAPI) DeleteMQTT(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		if successOrAbort(ctx, 500, a.DB.DeleteMQTTIntegration(id)) { a.Engine.ReloadIntegrations() }
@@ -391,6 +400,13 @@ func (a *AutomationAPI) UpdateHomeAssistant(ctx *gin.Context) {
 		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, homeAssistantView(item))
+	})
+}
+
+func (a *AutomationAPI) TestHomeAssistant(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 502, a.Engine.TestHomeAssistant(id)) { return }
+		ctx.JSON(200, gin.H{"connected":true})
 	})
 }
 
