@@ -6,6 +6,7 @@ import {CurrentUser} from './CurrentUser';
 
 export class ElevateStore {
     @observable accessor elevated = false;
+    @observable accessor reauthenticationRequired = false;
     @observable accessor oidcElevatePending = false;
     private oidcPollIntervalId: number | undefined = undefined;
     private oidcPopup: Window | null = null;
@@ -28,6 +29,7 @@ export class ElevateStore {
             return 0;
         }
         this.elevated = true;
+        this.reauthenticationRequired = false;
         return ms;
     };
 
@@ -41,6 +43,7 @@ export class ElevateStore {
             },
         });
         await this.currentUser.tryAuthenticate();
+        this.dismissReauthentication();
         this.cleanupOidcElevate();
     };
 
@@ -83,8 +86,21 @@ export class ElevateStore {
 
         if (!this.elevated) {
             this.snack(`${config.get('oidcIdpName')} elevation was not completed.`);
+        } else {
+            this.dismissReauthentication();
         }
         this.cleanupOidcElevate();
+    };
+
+    @action
+    public requireReauthentication = () => {
+        this.elevated = false;
+        this.reauthenticationRequired = true;
+    };
+
+    @action
+    public dismissReauthentication = () => {
+        this.reauthenticationRequired = false;
     };
 
     public cleanupOidcElevate = () => {
