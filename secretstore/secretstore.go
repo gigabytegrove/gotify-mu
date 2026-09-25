@@ -20,6 +20,18 @@ type Store struct {
 	aead cipher.AEAD
 }
 
+func NewEphemeral() (*Store, error) {
+	key := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, key); err != nil {
+		return nil, err
+	}
+	block, err := aes.NewCipher(key)
+	if err != nil { return nil, err }
+	aead, err := cipher.NewGCM(block)
+	if err != nil { return nil, err }
+	return &Store{aead: aead}, nil
+}
+
 func Open(path string) (*Store, error) {
 	if strings.TrimSpace(path) == "" {
 		return nil, errors.New("secret key path is required")
