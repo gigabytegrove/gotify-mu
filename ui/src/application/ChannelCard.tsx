@@ -2,6 +2,7 @@ import React from 'react';
 import {
     Avatar,
     Box,
+    Button,
     Chip,
     IconButton,
     ListItemIcon,
@@ -26,7 +27,8 @@ import Delete from '@mui/icons-material/Delete';
 import DeleteSweep from '@mui/icons-material/DeleteSweep';
 import CloudUpload from '@mui/icons-material/CloudUpload';
 import ImageNotSupported from '@mui/icons-material/ImageNotSupported';
-import OpenInNew from '@mui/icons-material/OpenInNew';
+import ArrowForward from '@mui/icons-material/ArrowForward';
+import Person from '@mui/icons-material/Person';
 import {Link} from 'react-router';
 import {useSortable} from '@dnd-kit/sortable';
 import {CSS} from '@dnd-kit/utilities';
@@ -37,6 +39,7 @@ import {formatDate} from '../common/TimeAgoFormatter';
 interface IProps {
     app: IApplication;
     canManage: boolean;
+    isOwner: boolean;
     canDeleteChannel: boolean;
     canClearHistory: boolean;
     fEdit: VoidFunction;
@@ -52,6 +55,7 @@ interface IProps {
 const ChannelCard = ({
     app,
     canManage,
+    isOwner,
     canDeleteChannel,
     canClearHistory,
     fEdit,
@@ -82,84 +86,105 @@ const ChannelCard = ({
             data-channel-id={app.id}
             variant="outlined"
             sx={{
-                p: 2,
-                borderRadius: 3,
+                p: {xs: 1.5, sm: 1.75},
+                borderRadius: 2.5,
                 opacity: isDragging ? 0.55 : 1,
                 transform: CSS.Transform.toString(transform),
-                transition,
+                transition:
+                    transition || 'transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease',
+                '&:hover': {
+                    boxShadow: 2,
+                    borderColor: 'action.selected',
+                },
             }}>
-            <Stack direction="row" spacing={2} sx={{alignItems: 'flex-start'}}>
-                <Box
-                    {...attributes}
-                    {...listeners}
-                    sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        minHeight: 52,
-                        cursor: canManage ? 'grab' : 'default',
-                        color: 'text.disabled',
-                        touchAction: 'none',
-                    }}>
-                    <DragIndicator />
-                </Box>
+            <Stack direction="row" spacing={{xs: 1, sm: 1.5}} sx={{alignItems: 'center'}}>
+                <Tooltip title={canManage ? 'Drag to reorder' : ''}>
+                    <Box
+                        {...attributes}
+                        {...listeners}
+                        sx={{
+                            display: {xs: 'none', sm: 'flex'},
+                            alignItems: 'center',
+                            alignSelf: 'stretch',
+                            cursor: canManage ? 'grab' : 'default',
+                            color: 'text.disabled',
+                            touchAction: 'none',
+                            mx: -0.5,
+                        }}>
+                        <DragIndicator fontSize="small" />
+                    </Box>
+                </Tooltip>
 
                 <Avatar
                     src={config.get('url') + app.image}
                     variant="rounded"
-                    sx={{width: 52, height: 52, flexShrink: 0}}
+                    sx={{width: 46, height: 46, flexShrink: 0}}
                 />
 
-                <Stack spacing={1} sx={{minWidth: 0, flex: 1}}>
+                <Box sx={{minWidth: 0, flex: 1}}>
                     <Stack
-                        direction={{xs: 'column', sm: 'row'}}
-                        spacing={1}
-                        sx={{alignItems: {xs: 'flex-start', sm: 'center'}}}>
+                        direction="row"
+                        spacing={0.75}
+                        useFlexGap
+                        sx={{alignItems: 'center', flexWrap: 'wrap'}}>
                         <Typography
                             className="channel-name"
                             variant="h6"
                             noWrap
-                            sx={{maxWidth: '100%'}}>
+                            sx={{fontSize: '1rem', maxWidth: '100%'}}>
                             {app.name}
                         </Typography>
-                        <Stack direction="row" spacing={0.75} sx={{flexWrap: 'wrap'}} useFlexGap>
-                            {app.autoAssign && (
-                                <Chip size="small" icon={<Public />} label="Global" />
-                            )}
-                            {app.allowMemberPost && (
-                                <Chip size="small" icon={<Forum />} label="Chat" />
-                            )}
-                            {app.receiveNotifications === false && (
-                                <Chip
-                                    size="small"
-                                    variant="outlined"
-                                    icon={<NotificationsOff />}
-                                    label="Muted"
-                                />
-                            )}
-                        </Stack>
+                        {isOwner && (
+                            <Chip
+                                size="small"
+                                variant="outlined"
+                                icon={<Person fontSize="small" />}
+                                label="Owner"
+                            />
+                        )}
+                        {app.autoAssign && (
+                            <Chip size="small" icon={<Public fontSize="small" />} label="Global" />
+                        )}
+                        {app.allowMemberPost && (
+                            <Chip
+                                size="small"
+                                variant="outlined"
+                                icon={<Forum fontSize="small" />}
+                                label="Chat"
+                            />
+                        )}
+                        {app.receiveNotifications === false && (
+                            <Chip
+                                size="small"
+                                variant="outlined"
+                                icon={<NotificationsOff fontSize="small" />}
+                                label="Muted"
+                            />
+                        )}
                     </Stack>
 
                     <Typography
                         className="channel-description"
                         variant="body2"
-                        color="text.secondary">
+                        color="text.secondary"
+                        noWrap
+                        sx={{mt: 0.15}}>
                         {app.description || 'No description'}
                     </Typography>
 
                     <Stack
-                        direction={{xs: 'column', sm: 'row'}}
-                        spacing={{xs: 0.5, sm: 2.5}}
-                        color="text.secondary">
+                        direction="row"
+                        spacing={1.5}
+                        useFlexGap
+                        sx={{mt: 0.4, flexWrap: 'wrap', color: 'text.secondary'}}>
+                        <Typography variant="caption">Priority {app.defaultPriority}</Typography>
                         <Typography variant="caption">
-                            Priority {app.defaultPriority}
-                        </Typography>
-                        <Typography variant="caption">
-                            Last used: {app.lastUsed ? formatDate(app.lastUsed) : 'Never'}
+                            {app.lastUsed ? `Used ${formatDate(app.lastUsed)}` : 'Never used'}
                         </Typography>
                     </Stack>
-                </Stack>
+                </Box>
 
-                <Stack direction="row" spacing={0.5} sx={{alignItems: 'center'}}>
+                <Stack direction="row" spacing={0.25} sx={{alignItems: 'center', flexShrink: 0}}>
                     <Tooltip
                         title={
                             app.receiveNotifications === false
@@ -167,6 +192,7 @@ const ChannelCard = ({
                                 : 'Mute notifications'
                         }>
                         <IconButton
+                            size="small"
                             onClick={fToggleNotifications}
                             className="toggle-notifications"
                             aria-label={
@@ -175,27 +201,28 @@ const ChannelCard = ({
                                     : 'Mute notifications'
                             }>
                             {app.receiveNotifications === false ? (
-                                <NotificationsOff />
+                                <NotificationsOff fontSize="small" />
                             ) : (
-                                <NotificationsActive />
+                                <NotificationsActive fontSize="small" />
                             )}
                         </IconButton>
                     </Tooltip>
 
-                    <Tooltip title="Open channel">
-                        <IconButton
-                            component={Link}
-                            to={`/channels/${app.id}`}
-                            aria-label="Open channel">
-                            <OpenInNew />
-                        </IconButton>
-                    </Tooltip>
+                    <Button
+                        size="small"
+                        component={Link}
+                        to={`/channels/${app.id}`}
+                        endIcon={<ArrowForward fontSize="small" />}
+                        sx={{display: {xs: 'none', sm: 'inline-flex'}}}>
+                        Open
+                    </Button>
 
                     <IconButton
+                        size="small"
                         className="channel-actions"
                         aria-label="Channel actions"
                         onClick={(event) => setAnchorEl(event.currentTarget)}>
-                        <MoreVert />
+                        <MoreVert fontSize="small" />
                     </IconButton>
                 </Stack>
             </Stack>
