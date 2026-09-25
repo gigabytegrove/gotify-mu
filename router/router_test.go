@@ -40,6 +40,27 @@ func TestShouldAuditMutation(t *testing.T) {
 	assert.False(t, shouldAuditMutation("/auth/local/login"))
 }
 
+
+func TestAuditSanitization(t *testing.T) {
+	payload := map[string]any{
+		"name": "integration",
+		"password": "secret-password",
+		"nested": map[string]any{
+			"clientKey": "private-key",
+			"tokenConfigured": true,
+		},
+	}
+	sanitizeAuditValue(payload)
+	assert.Equal(t, "integration", payload["name"])
+	assert.Equal(t, "[redacted]", payload["password"])
+	nested := payload["nested"].(map[string]any)
+	assert.Equal(t, "[redacted]", nested["clientKey"])
+	assert.Equal(t, true, nested["tokenConfigured"])
+	assert.True(t, auditSensitiveKey("bind_password"))
+	assert.True(t, auditSensitiveKey("homeAssistantToken"))
+	assert.False(t, auditSensitiveKey("tokenConfigured"))
+}
+
 func TestIntegrationSuite(t *testing.T) {
 	suite.Run(t, new(IntegrationSuite))
 }
