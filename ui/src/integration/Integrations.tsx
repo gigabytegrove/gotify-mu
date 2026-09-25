@@ -28,6 +28,7 @@ import SurfaceCard from '../common/SurfaceCard';
 import ConfirmDialog from '../common/ConfirmDialog';
 import * as config from '../config';
 import {useStores} from '../stores';
+import FirstPartyConnectors from './FirstPartyConnectors';
 import {
     IHomeAssistantIntegration,
     IMQTTIntegration,
@@ -312,6 +313,8 @@ const Integrations = () => {
                     }}
                 />
             )}
+
+            <FirstPartyConnectors channels={channels} />
 
             {webhookEdit !== undefined && (
                 <WebhookDialog
