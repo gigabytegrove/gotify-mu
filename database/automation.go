@@ -44,12 +44,17 @@ func (d *GormDatabase) GetWebhookRouteBySecret(secret string) (*model.WebhookRou
 
 func (d *GormDatabase) SaveWebhookRoute(item *model.WebhookRoute) error {
 	plain := item.Secret
+	plainSigning := item.SigningSecret
 	encrypted, err := d.secrets.Encrypt(plain)
 	if err != nil { return err }
+	encryptedSigning, err := d.secrets.Encrypt(plainSigning)
+	if err != nil { return err }
 	item.Secret = encrypted
+	item.SigningSecret = encryptedSigning
 	item.SecretHash = secretstore.Hash(plain)
 	err = d.DB.Save(item).Error
 	item.Secret = plain
+	item.SigningSecret = plainSigning
 	return err
 }
 func (d *GormDatabase) DeleteWebhookRoute(id uint) error { return d.DB.Delete(&model.WebhookRoute{}, id).Error }
@@ -231,7 +236,10 @@ func (d *GormDatabase) decryptWebhookRoute(item *model.WebhookRoute) error {
 	if item == nil { return nil }
 	plain, err := d.secrets.Decrypt(item.Secret)
 	if err != nil { return err }
+	signing, err := d.secrets.Decrypt(item.SigningSecret)
+	if err != nil { return err }
 	item.Secret = plain
+	item.SigningSecret = signing
 	return nil
 }
 
@@ -261,8 +269,16 @@ func (d *GormDatabase) migrateIntegrationSecrets() error {
 			encrypted, err := d.secrets.Encrypt(plain)
 			if err != nil { return err }
 			hash := secretstore.Hash(plain)
-			if item.Secret != encrypted || item.SecretHash != hash {
-				if err := tx.Model(item).Updates(map[string]any{"secret": encrypted, "secret_hash": hash}).Error; err != nil { return err }
+			signingPlain, err := d.secrets.Decrypt(item.SigningSecret)
+			if err != nil { return err }
+			encryptedSigning, err := d.secrets.Encrypt(signingPlain)
+			if err != nil { return err }
+			if item.Secret != encrypted || item.SecretHash != hash || item.SigningSecret != encryptedSigning {
+				if err := tx.Model(item).Updates(map[string]any{
+					"secret": encrypted,
+					"secret_hash": hash,
+					"signing_secret": encryptedSigning,
+				}).Error; err != nil { return err }
 			}
 		}
 
@@ -477,4 +493,28 @@ func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]*model.Mess
 		})
 	}
 	return out, nil
+}
+
+
+func (d *GormDatabase) ConsumeWebhookReplay(routeID uint, signature string, now time.Time, ttl time.Duration) (bool, error) {
+	accepted := false
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("expires_at <= ?", now).Delete(&model.WebhookReplay{}).Error; err != nil {
+			return err
+		}
+		entry := &model.WebhookReplay{
+			RouteID:   routeID,
+			Signature: signature,
+			ExpiresAt: now.Add(ttl),
+		}
+		if err := tx.Create(entry).Error; err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				return nil
+			}
+			return err
+		}
+		accepted = true
+		return nil
+	})
+	return accepted, err
 }
