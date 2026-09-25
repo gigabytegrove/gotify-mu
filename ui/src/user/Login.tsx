@@ -30,6 +30,8 @@ const Login = observer(() => {
     const localAuthEnabled = config.get('localAuth');
     const oidcEnabled = config.get('oidc');
     const oidcIdpName = config.get('oidcIdpName');
+    const ldapEnabled = config.get('ldap');
+    const ldapIdpName = config.get('ldapIdpName');
 
     const oidcAutoRedirect =
         oidcEnabled &&
@@ -139,6 +141,25 @@ const Login = observer(() => {
                         </Box>
                     )}
 
+                    {ldapEnabled && (
+                        <>
+                            {localAuthEnabled && <Divider>or</Divider>}
+                            <Button
+                                variant="outlined"
+                                size="large"
+                                fullWidth
+                                disabled={
+                                    !username ||
+                                    !password ||
+                                    Boolean(currentUser.connectionErrorMessage) ||
+                                    currentUser.authenticating
+                                }
+                                onClick={() => void currentUser.loginDirectory(username, password)}>
+                                Sign in with {ldapIdpName}
+                            </Button>
+                        </>
+                    )}
+
                     {oidcEnabled && (
                         <>
                             {localAuthEnabled && <Divider>or</Divider>}
@@ -178,6 +199,9 @@ const Login = observer(() => {
                         )}
                         {oidcEnabled && (
                             <Chip size="small" variant="outlined" label={oidcIdpName} />
+                        )}
+                        {ldapEnabled && (
+                            <Chip size="small" variant="outlined" label={ldapIdpName} />
                         )}
                     </Stack>
                 </Stack>
