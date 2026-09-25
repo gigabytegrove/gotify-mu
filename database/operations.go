@@ -1,6 +1,9 @@
 package database
 
 import (
+	"fmt"
+	"strings"
+
 	"github.com/gotify/server/v3/model"
 )
 
@@ -38,4 +41,13 @@ func (d *GormDatabase) GetSystemStats() (*model.SystemStats, error) {
 		if err := d.DB.Model(item.model).Count(item.dest).Error; err != nil { return nil, err }
 	}
 	return stats, nil
+}
+
+
+func (d *GormDatabase) CreateSQLiteSnapshot(path string) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("snapshot path is required")
+	}
+	escaped := strings.ReplaceAll(path, "'", "''")
+	return d.DB.Exec("VACUUM INTO '" + escaped + "'").Error
 }
