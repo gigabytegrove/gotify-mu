@@ -2,6 +2,27 @@
 
 All notable Gotify MU changes are documented here.
 
+## [0.2.1] - 2026-09-25
+
+Managed in-app update release.
+
+### Added
+
+- Real administrator-managed in-app updates from **Settings → Software Update**.
+- A private Gotify MU updater helper container that can build a selected official release, recreate the running Gotify MU container, verify health, and roll back automatically on failure.
+- Elevated administrator API endpoints for updater status and release installation.
+- Dashboard update notices now route administrators into the in-app updater instead of sending them directly to GitHub.
+- Release safety checks prevent a development build from blindly downgrading itself to an older published release.
+- Existing container ports, environment, restart policy, mounts, network attachments, DNS, and host mappings are preserved during replacement.
+- Manual GitHub release downloads remain available as a recovery path.
+
+### Security
+
+- The updater helper is not published on a host port.
+- Server-to-updater requests require a generated shared token.
+- Starting an update requires an elevated administrator session.
+- The updater helper requires Docker socket access and should only be enabled on hosts where managed self-updating is desired.
+
 ## [0.2.0] - 2026-09-25
 
 First formal Gotify MU pre-release.
