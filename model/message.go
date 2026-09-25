@@ -14,8 +14,11 @@ type Message struct {
 	Extras        []byte
 	Date          time.Time
 	SenderUserID  uint `gorm:"index"`
-	SenderName    string `gorm:"type:text"`
-	Acknowledged  bool   `gorm:"-" json:"-"`
+	SenderName      string `gorm:"type:text"`
+	DedupKey        string `gorm:"type:varchar(220);uniqueIndex" json:"-"`
+	ParentMessageID uint   `gorm:"index" json:"-"`
+	Acknowledged    bool   `gorm:"-" json:"-"`
+	AckCount        int64  `gorm:"-" json:"-"`
 }
 
 // MessageExternal Model
@@ -76,6 +79,10 @@ type MessageExternal struct {
 	SenderName string `json:"senderName,omitempty"`
 	// Whether the current requesting user has acknowledged this message.
 	Acknowledged bool `json:"acknowledged,omitempty"`
+	// Number of users that have acknowledged this message.
+	AcknowledgementCount int64 `json:"acknowledgementCount,omitempty"`
+	// The original message id when this message was created by escalation/reply automation.
+	ParentMessageID uint `json:"parentMessageId,omitempty"`
 }
 
 // CreateMessage Model
