@@ -297,7 +297,14 @@ func (d *GormDatabase) migrateIntegrationSecrets() error {
 			if err != nil { return err }
 			encrypted, err := d.Secrets.Encrypt(plain)
 			if err != nil { return err }
-			if err := tx.Model(item).Update("password", encrypted).Error; err != nil { return err }
+			keyPlain, err := d.Secrets.Decrypt(item.ClientKey)
+			if err != nil { return err }
+			keyEncrypted, err := d.Secrets.Encrypt(keyPlain)
+			if err != nil { return err }
+			if err := tx.Model(item).Updates(map[string]any{
+				"password": encrypted,
+				"client_key": keyEncrypted,
+			}).Error; err != nil { return err }
 		}
 
 		var home []*model.HomeAssistantIntegration
