@@ -11,6 +11,8 @@ type SecurityPolicy struct {
 	AuditRetentionDays       int       `json:"auditRetentionDays"`
 	AutomationRetentionDays  int       `json:"automationRetentionDays"`
 	AllowNativePluginUploads bool      `json:"allowNativePluginUploads"`
+	RequirePluginChecksum    bool      `json:"requirePluginChecksum"`
+	RequirePluginSignature   bool      `json:"requirePluginSignature"`
 	RequireMFAAdmins         bool      `json:"requireMfaAdmins"`
 	RequireMFAAll            bool      `json:"requireMfaAll"`
 	UpdatedAt                time.Time `json:"updatedAt"`
@@ -25,5 +27,7 @@ func DefaultSecurityPolicy() *SecurityPolicy {
 		AuditRetentionDays: 180,
 		AutomationRetentionDays: 90,
 		AllowNativePluginUploads: false,
+		RequirePluginChecksum: true,
+		RequirePluginSignature: false,
 	}
 }
