@@ -635,6 +635,11 @@ const MQTTDialog = ({
     const [clientId, setClientId] = React.useState(item?.clientId || '');
     const [username, setUsername] = React.useState(item?.username || '');
     const [password, setPassword] = React.useState('');
+    const [protocolVersion, setProtocolVersion] = React.useState(item?.protocolVersion || 5);
+    const [qos, setQos] = React.useState(item?.qos ?? 0);
+    const [caCertificate, setCaCertificate] = React.useState(item?.caCertificate || '');
+    const [clientCertificate, setClientCertificate] = React.useState(item?.clientCertificate || '');
+    const [clientKey, setClientKey] = React.useState('');
     const [topic, setTopic] = React.useState(item?.topic || '');
     const [enabled, setEnabled] = React.useState(item?.enabled ?? true);
     const [saving, setSaving] = React.useState(false);
@@ -642,7 +647,21 @@ const MQTTDialog = ({
     const save = async () => {
         setSaving(true);
         try {
-            const payload = {name, applicationId, brokerUrl, clientId, username, password, topic, enabled};
+            const payload = {
+                name,
+                applicationId,
+                brokerUrl,
+                clientId,
+                username,
+                password,
+                protocolVersion,
+                qos,
+                caCertificate,
+                clientCertificate,
+                clientKey,
+                topic,
+                enabled,
+            };
             if (item) {
                 await axios.put(api(`integration/mqtt/${item.id}`), payload);
             } else {
@@ -675,6 +694,27 @@ const MQTTDialog = ({
                         placeholder="home/alerts/#"
                         required
                     />
+                    <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                        <TextField
+                            select
+                            label="Protocol"
+                            value={protocolVersion}
+                            onChange={(e) => setProtocolVersion(Number(e.target.value))}
+                            fullWidth>
+                            <MenuItem value={5}>MQTT 5</MenuItem>
+                            <MenuItem value={4}>MQTT 3.1.1</MenuItem>
+                        </TextField>
+                        <TextField
+                            select
+                            label="QoS"
+                            value={qos}
+                            onChange={(e) => setQos(Number(e.target.value))}
+                            fullWidth>
+                            <MenuItem value={0}>0 · At most once</MenuItem>
+                            <MenuItem value={1}>1 · At least once</MenuItem>
+                            <MenuItem value={2}>2 · Exactly once</MenuItem>
+                        </TextField>
+                    </Stack>
                     <TextField label="Client ID" value={clientId} onChange={(e) => setClientId(e.target.value)} />
                     <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
                     <TextField
@@ -683,6 +723,37 @@ const MQTTDialog = ({
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         helperText={item?.passwordConfigured ? 'Leave blank to keep the current password.' : ''}
+                    />
+                    <TextField
+                        label="Custom CA certificate"
+                        value={caCertificate}
+                        onChange={(e) => setCaCertificate(e.target.value)}
+                        multiline
+                        minRows={3}
+                        placeholder="-----BEGIN CERTIFICATE-----"
+                        helperText="Optional PEM certificate authority for private brokers."
+                    />
+                    <TextField
+                        label="Client certificate"
+                        value={clientCertificate}
+                        onChange={(e) => setClientCertificate(e.target.value)}
+                        multiline
+                        minRows={3}
+                        placeholder="-----BEGIN CERTIFICATE-----"
+                        helperText="Optional PEM client certificate for mutual TLS."
+                    />
+                    <TextField
+                        label={item?.clientKeyConfigured ? 'New client private key' : 'Client private key'}
+                        type="password"
+                        value={clientKey}
+                        onChange={(e) => setClientKey(e.target.value)}
+                        multiline
+                        minRows={3}
+                        helperText={
+                            item?.clientKeyConfigured
+                                ? 'Leave blank to keep the current private key.'
+                                : 'Required only when a client certificate is configured.'
+                        }
                     />
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
