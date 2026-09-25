@@ -691,7 +691,8 @@ func auditSensitiveKey(key string) bool {
 	for _, sensitive := range []string{
 		"password", "pass", "token", "secret", "signature", "privatekey", "clientkey",
 		"recoverycode", "recoverycodes", "credential", "authorization", "bindpassword",
-		"accesstoken", "refreshtoken", "clientsecret", "totpsecret",
+		"accesstoken", "refreshtoken", "clientsecret", "totpsecret", "apikey", "accesskey",
+		"privatecredential", "webhooksecret",
 	} {
 		if normalized == sensitive || strings.HasSuffix(normalized, sensitive) {
 			return true
