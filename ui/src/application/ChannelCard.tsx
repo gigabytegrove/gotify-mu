@@ -32,7 +32,7 @@ import {useSortable} from '@dnd-kit/sortable';
 import {CSS} from '@dnd-kit/utilities';
 import {IApplication} from '../types';
 import * as config from '../config';
-import {LastUsedCell} from '../common/LastUsedCell';
+import {formatDate} from '../common/TimeAgoFormatter';
 
 interface IProps {
     app: IApplication;
@@ -145,7 +145,7 @@ const ChannelCard = ({
                             Priority {app.defaultPriority}
                         </Typography>
                         <Typography variant="caption">
-                            Last used: <LastUsedCell lastUsed={app.lastUsed} />
+                            Last used: {app.lastUsed ? formatDate(app.lastUsed) : 'Never'}
                         </Typography>
                     </Stack>
                 </Stack>
