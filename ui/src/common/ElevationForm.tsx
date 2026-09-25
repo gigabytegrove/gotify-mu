@@ -11,8 +11,9 @@ import {Box, Divider} from '@mui/material';
 const ElevateDuration = 60 * 60;
 
 const ElevationForm = observer(() => {
-    const {elevateStore} = useStores();
+    const {elevateStore, currentUser} = useStores();
     const [password, setPassword] = useState('');
+    const [mfaCode, setMfaCode] = useState('');
     const [error, setError] = useState('');
 
     const localAuthEnabled = config.get('localAuth');
@@ -22,7 +23,7 @@ const ElevationForm = observer(() => {
 
     const handleLocalElevate = async () => {
         try {
-            await elevateStore.localElevate(password, ElevateDuration);
+            await elevateStore.localElevate(password, ElevateDuration, mfaCode);
         } catch {
             setError('Elevation failed. Check your password.');
         }
@@ -71,10 +72,25 @@ const ElevationForm = observer(() => {
                         error={!!error}
                         helperText={error}
                     />
+                    {currentUser.user.mfaEnabled && (
+                        <TextField
+                            margin="dense"
+                            label="Verification code"
+                            className="elevation-mfa-code"
+                            value={mfaCode}
+                            onChange={(e) => {
+                                setMfaCode(e.target.value);
+                                setError('');
+                            }}
+                            autoComplete="one-time-code"
+                            helperText="Authenticator code or recovery code."
+                            fullWidth
+                        />
+                    )}
                     <Button
                         type="submit"
                         className="elevation-submit"
-                        disabled={password.length === 0}
+                        disabled={password.length === 0 || (Boolean(currentUser.user.mfaEnabled) && mfaCode.length === 0)}
                         color="primary"
                         variant="contained"
                         fullWidth>
