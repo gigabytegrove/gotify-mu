@@ -2,6 +2,8 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -250,11 +252,24 @@ func (m *manager) performInstall(version string, started time.Time) {
 		return
 	}
 
-	archivePath := filepath.Join(tempDir, "source.zip")
-	sourceURL := fmt.Sprintf("https://github.com/%s/archive/refs/tags/v%s.zip", m.repository, version)
+	sourceURL, checksumURL, sourceName, err := m.resolveReleaseAssets(version)
+	if err != nil {
+		m.fail(version, started, "The release package could not be verified.", err)
+		return
+	}
+	archivePath := filepath.Join(tempDir, sourceName)
+	checksumPath := filepath.Join(tempDir, "SHA256SUMS")
 	m.updateProgress("downloading", "Downloading update", "Downloading update", 10)
-	if err := m.downloadFile(sourceURL, archivePath, 10, 24); err != nil {
+	if err := m.downloadFile(sourceURL, archivePath, 10, 22); err != nil {
 		m.fail(version, started, "The update could not be downloaded.", err)
+		return
+	}
+	if err := m.downloadFile(checksumURL, checksumPath, 22, 24); err != nil {
+		m.fail(version, started, "The release checksum could not be downloaded.", err)
+		return
+	}
+	if err := verifyReleaseChecksum(archivePath, checksumPath, sourceName); err != nil {
+		m.fail(version, started, "The downloaded update failed integrity verification.", err)
 		return
 	}
 
@@ -285,6 +300,68 @@ func (m *manager) performInstall(version string, started time.Time) {
 
 	finished := time.Now().UTC()
 	m.finishUpdate("completed", "Update complete", "Update installed successfully", 100, finished)
+}
+
+func (m *manager) resolveReleaseAssets(version string) (string, string, string, error) {
+	endpoint := fmt.Sprintf("https://api.github.com/repos/%s/releases/tags/v%s", m.repository, version)
+	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
+	if err != nil { return "", "", "", err }
+	request.Header.Set("Accept", "application/vnd.github+json")
+	request.Header.Set("User-Agent", "gotify-mu-updater")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil { return "", "", "", err }
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return "", "", "", fmt.Errorf("GitHub release lookup returned HTTP %d", response.StatusCode)
+	}
+	var payload struct {
+		Assets []struct {
+			Name string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil { return "", "", "", err }
+	expectedSource := fmt.Sprintf("gotify-mu-v%s-source.zip", version)
+	var sourceURL, checksumURL string
+	for _, asset := range payload.Assets {
+		switch asset.Name {
+		case expectedSource:
+			sourceURL = asset.BrowserDownloadURL
+		case "SHA256SUMS":
+			checksumURL = asset.BrowserDownloadURL
+		}
+	}
+	if sourceURL == "" || checksumURL == "" {
+		return "", "", "", errors.New("release is missing the signed source package or SHA256SUMS")
+	}
+	return sourceURL, checksumURL, expectedSource, nil
+}
+
+func verifyReleaseChecksum(archivePath, checksumPath, expectedName string) error {
+	content, err := os.ReadFile(checksumPath)
+	if err != nil { return err }
+	var expected string
+	for _, line := range strings.Split(string(content), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) < 2 { continue }
+		if filepath.Base(strings.TrimPrefix(fields[len(fields)-1], "*")) == expectedName {
+			expected = strings.ToLower(fields[0])
+			break
+		}
+	}
+	if len(expected) != 64 {
+		return errors.New("SHA256SUMS does not contain the release source package")
+	}
+	file, err := os.Open(archivePath)
+	if err != nil { return err }
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil { return err }
+	actual := hex.EncodeToString(hash.Sum(nil))
+	if actual != expected {
+		return fmt.Errorf("source checksum mismatch: expected %s, got %s", expected, actual)
+	}
+	return nil
 }
 
 func (m *manager) resolveCommit(version string) (string, error) {
@@ -491,15 +568,18 @@ func inspectContainer(name string) (*inspectedContainer, error) {
 func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		output, err := runDocker("inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}", name)
+		output, err := runDocker("inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}missing-healthcheck{{end}}", name)
 		if err == nil {
 			status := strings.TrimSpace(output)
-			if status == "healthy" || status == "running" {
+			if status == "healthy" {
 				m.updateProgress("verifying", "Final checks", "Final checks", 99)
 				return nil
 			}
-			if status == "unhealthy" || status == "exited" || status == "dead" {
-				return fmt.Errorf("replacement service entered state %s", status)
+			if status == "missing-healthcheck" {
+				return errors.New("replacement service does not define a Docker health check")
+			}
+			if status == "unhealthy" {
+				return errors.New("replacement service became unhealthy")
 			}
 		}
 		elapsed := timeout - time.Until(deadline)
@@ -517,9 +597,24 @@ func runDocker(args ...string) (string, error) {
 	command := exec.Command("docker", args...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(redactDockerArgs(args), " "), err, strings.TrimSpace(string(output)))
 	}
 	return string(output), nil
+}
+
+func redactDockerArgs(args []string) []string {
+	out := append([]string(nil), args...)
+	for i := 0; i < len(out); i++ {
+		if out[i] == "--env" && i+1 < len(out) {
+			if key, _, found := strings.Cut(out[i+1], "="); found {
+				out[i+1] = key + "=[masked]"
+			} else {
+				out[i+1] = "[masked]"
+			}
+			i++
+		}
+	}
+	return out
 }
 
 func (m *manager) downloadFile(url, path string, startProgress, endProgress int) error {
@@ -669,6 +764,7 @@ func (m *manager) buildRelease(root, image, version, commit, buildDate string) e
 		"--progress=plain",
 		"--pull",
 		"--build-arg", "BUILD_JS=1",
+		"--build-arg", "RUN_TESTS=1",
 		"--build-arg", "GO_VERSION=1.26.0",
 		"--build-arg", "GOTIFY_MU_VERSION="+version,
 		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
