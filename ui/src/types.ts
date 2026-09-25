@@ -57,6 +57,9 @@ export interface IMessage {
     rootMessageId?: number;
     escalationRuleId?: number;
     escalationDepth?: number;
+    replyToMessageId?: number;
+    threadRootMessageId?: number;
+    collaboration?: IMessageCollaboration;
     image?: string;
     extras?: IMessageExtras;
 }
@@ -418,4 +421,59 @@ export interface IPasskey {
     name: string;
     createdAt: string;
     lastUsedAt?: string;
+}
+
+
+export interface IMessageAttachment {
+    id: number;
+    filename: string;
+    contentType: string;
+    size: number;
+    url: string;
+}
+
+export interface IMessageReactionSummary {
+    emoji: string;
+    count: number;
+    reactedByMe: boolean;
+}
+
+export interface IMessageCollaboration {
+    attachments?: IMessageAttachment[];
+    reactions?: IMessageReactionSummary[];
+    assignedUserId?: number;
+    assignedUserName?: string;
+    status?: string;
+    resolvedBy?: number;
+    resolvedByName?: string;
+    resolvedAt?: string;
+    read?: boolean;
+    mentioned?: boolean;
+    replyCount?: number;
+}
+
+export interface IMessageTemplate {
+    id: number;
+    name: string;
+    applicationId?: number;
+    title: string;
+    message: string;
+    priority: number;
+    extras?: IMessageExtras;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ISavedMessageSearch {
+    id: number;
+    name: string;
+    query: string;
+    applicationId?: number;
+    minPriority: number;
+    maxPriority: number;
+    sender?: string;
+    status?: string;
+    acknowledged?: string;
+    createdAt: string;
+    updatedAt: string;
 }
