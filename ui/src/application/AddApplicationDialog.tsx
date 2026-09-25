@@ -102,7 +102,7 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                         <>
                             <Divider />
                             <Stack spacing={0.5}>
-                                <Typography variant="subtitle1" fontWeight={700}>
+                                <Typography variant="subtitle1" sx={{fontWeight: 700}}>
                                     Membership
                                 </Typography>
                                 <Typography variant="body2" color="text.secondary">
@@ -118,7 +118,7 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                                     />
                                 }
                                 label={
-                                    <Stack direction="row" spacing={1} alignItems="center">
+                                    <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
                                         <span>Global Channel</span>
                                         <Chip
                                             size="small"
@@ -133,7 +133,7 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                             <Accordion elevation={0} disableGutters sx={{border: 1, borderColor: 'divider'}}>
                                 <AccordionSummary expandIcon={<ExpandMore />}>
                                     <Stack direction="row" spacing={1} alignItems="center">
-                                        <Typography fontWeight={600}>Advanced</Typography>
+                                        <Typography sx={{fontWeight: 600}}>Advanced</Typography>
                                         <Chip
                                             size="small"
                                             icon={<Science fontSize="small" />}
