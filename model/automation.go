@@ -15,6 +15,9 @@ type WebhookRoute struct {
 	PriorityField   string    `gorm:"type:text" json:"priorityField"`
 	DefaultTitle    string    `gorm:"type:text" json:"defaultTitle"`
 	DefaultPriority int       `json:"defaultPriority"`
+	RequireSignature bool     `json:"requireSignature"`
+	SigningSecret   string    `gorm:"type:text" json:"-"`
+	AllowedCIDRs    string    `gorm:"type:text" json:"allowedCidrs,omitempty"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
@@ -30,8 +33,11 @@ type WebhookRouteView struct {
 	MessageField    string    `json:"messageField"`
 	PriorityField   string    `json:"priorityField"`
 	DefaultTitle    string    `json:"defaultTitle"`
-	DefaultPriority int       `json:"defaultPriority"`
-	CreatedAt       time.Time `json:"createdAt"`
+	DefaultPriority   int       `json:"defaultPriority"`
+	RequireSignature  bool      `json:"requireSignature"`
+	SignatureConfigured bool    `json:"signatureConfigured"`
+	AllowedCIDRs      string    `json:"allowedCidrs,omitempty"`
+	CreatedAt         time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
@@ -198,4 +204,14 @@ type ScheduledRun struct {
 	ScheduledFor time.Time `gorm:"index;uniqueIndex:uix_schedule_run,priority:2" json:"scheduledFor"`
 	MessageID   uint      `gorm:"index" json:"messageId"`
 	CreatedAt   time.Time `json:"createdAt"`
+}
+
+
+// WebhookReplay records a signed request during its validity window to prevent replay.
+type WebhookReplay struct {
+	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	RouteID   uint      `gorm:"index;uniqueIndex:uix_webhook_replay,priority:1" json:"routeId"`
+	Signature string    `gorm:"type:varchar(128);uniqueIndex:uix_webhook_replay,priority:2" json:"-"`
+	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
+	CreatedAt time.Time `json:"createdAt"`
 }
