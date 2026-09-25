@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
@@ -142,4 +143,38 @@ func (a *LDAPAPI) Login(ctx *gin.Context) {
 		ID:user.ID,Name:user.Name,DisplayName:user.DisplayName,Admin:user.Admin,CreatedAt:user.CreatedAt,
 		ClientID:client.ID,ElevatedUntil:client.ElevatedUntil,AuthProvider:"ldap",
 	})
+}
+
+func (a *LDAPAPI) Elevate(ctx *gin.Context) {
+	username,passwordValue,ok:=ctx.Request.BasicAuth()
+	if !ok||username==""||passwordValue==""{
+		ctx.AbortWithError(http.StatusUnauthorized,errors.New("directory credentials required"))
+		return
+	}
+	directoryUser,err:=ldapauth.Authenticate(a.ldapConfig(),username,passwordValue)
+	if err!=nil{ctx.AbortWithError(http.StatusUnauthorized,errors.New("directory re-authentication failed"));return}
+	ldapID:=strings.ToLower(strings.TrimSpace(directoryUser.DN))
+	user,err:=a.DB.GetUserByLDAP(ldapID)
+	if !successOrAbort(ctx,500,err){return}
+	if user==nil||user.ID!=auth.GetUserID(ctx){
+		ctx.AbortWithError(http.StatusForbidden,errors.New("directory account does not match the current user"))
+		return
+	}
+	client:=auth.GetClient(ctx)
+	if client==nil||client.UserID!=user.ID{
+		ctx.AbortWithError(http.StatusForbidden,errors.New("browser session required"))
+		return
+	}
+	var params model.ElevateRequest
+	if err:=ctx.ShouldBindJSON(&params);err!=nil{return}
+	policy,err:=a.DB.GetSecurityPolicy();if !successOrAbort(ctx,500,err){return}
+	maxSeconds:=policy.ElevationMinutes*60;if maxSeconds<=0{maxSeconds=3600}
+	duration:=params.DurationSeconds
+	if duration<=0||duration>maxSeconds{duration=maxSeconds}
+	until:=time.Now().Add(time.Duration(duration)*time.Second)
+	if !successOrAbort(ctx,500,a.DB.UpdateClientElevatedUntil(client.ID,&until)){return}
+	_ = a.DB.CreateAuditEvent(&model.AuditEvent{
+		UserID:user.ID,Username:user.Name,Action:"session_elevated",Target:"directory_auth",TargetID:strconv.FormatUint(uint64(client.ID),10),IPAddress:ctx.ClientIP(),
+	})
+	ctx.Status(http.StatusNoContent)
 }
