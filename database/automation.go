@@ -116,8 +116,28 @@ func (d *GormDatabase) GetQuietHoursPolicy(userID uint) (*model.QuietHoursPolicy
 func (d *GormDatabase) SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error {
 	return d.DB.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name:"user_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"enabled","start_minute","end_minute","timezone","allow_priority","updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"enabled","start_minute","end_minute","timezone","allow_priority","behavior","updated_at"}),
 	}).Create(item).Error
+}
+
+func (d *GormDatabase) QueueDeferredNotification(item *model.DeferredNotification) error {
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"user_id"},{Name:"message_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"application_id","due_at"}),
+	}).Create(item).Error
+}
+
+func (d *GormDatabase) GetDueDeferredNotifications(now time.Time) ([]*model.DeferredNotification, error) {
+	var items []*model.DeferredNotification
+	return items, d.DB.Where("due_at <= ?", now).Order("due_at asc").Find(&items).Error
+}
+
+func (d *GormDatabase) DeleteDeferredNotification(userID, messageID uint) error {
+	return d.DB.Where("user_id = ? AND message_id = ?", userID, messageID).Delete(&model.DeferredNotification{}).Error
+}
+
+func (d *GormDatabase) DeleteDeferredNotificationsForUser(userID uint) error {
+	return d.DB.Where("user_id = ?", userID).Delete(&model.DeferredNotification{}).Error
 }
 
 func (d *GormDatabase) GetDigestPolicy(userID uint) (*model.DigestPolicy, error) {
