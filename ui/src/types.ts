@@ -208,6 +208,7 @@ export interface IQuietHoursPolicy {
     endMinute: number;
     timezone: string;
     allowPriority: number;
+    behavior: 'suppress' | 'defer';
 }
 
 export interface IDigestPolicy {
