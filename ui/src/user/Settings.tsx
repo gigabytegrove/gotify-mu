@@ -399,9 +399,41 @@ const AdministratorSecurityPolicy = () => {
                     }
                     label="Allow administrators to upload native plugin binaries"
                 />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.requirePluginChecksum}
+                            onChange={(event) =>
+                                setPolicy({
+                                    ...policy,
+                                    requirePluginChecksum: event.target.checked,
+                                })
+                            }
+                        />
+                    }
+                    label="Require a matching SHA-256 checksum for native plugin uploads"
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.requirePluginSignature}
+                            onChange={(event) =>
+                                setPolicy({
+                                    ...policy,
+                                    requirePluginSignature: event.target.checked,
+                                    requirePluginChecksum: event.target.checked
+                                        ? true
+                                        : policy.requirePluginChecksum,
+                                })
+                            }
+                        />
+                    }
+                    label="Require a signature from a trusted plugin signing key"
+                />
                 <Typography variant="caption" color="text.secondary">
-                    Native plugin binaries execute inside the Gotify MU server process. Keep uploads
-                    disabled unless the plugin source and build are trusted.
+                    Native plugin binaries execute inside the Gotify MU server process. Uploads are
+                    disabled by default. Signature verification uses trusted Ed25519 public keys
+                    configured by the server administrator.
                 </Typography>
                 <Button
                     variant="contained"
