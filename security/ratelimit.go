@@ -83,3 +83,41 @@ func RateLimitMiddleware(limiter *FixedWindowLimiter, key func(*gin.Context) str
 		})
 	}
 }
+
+
+type DynamicLimiter struct {
+	mu      sync.Mutex
+	entries map[string]limiterEntry
+	now     func() time.Time
+}
+
+func NewDynamicLimiter() *DynamicLimiter {
+	return &DynamicLimiter{entries: make(map[string]limiterEntry), now: time.Now}
+}
+
+func (l *DynamicLimiter) Allow(key string, limit int, window time.Duration) (bool, time.Duration) {
+	if limit <= 0 {
+		return true, 0
+	}
+	now := l.now()
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	entry := l.entries[key]
+	if entry.WindowStart.IsZero() || now.Sub(entry.WindowStart) >= window {
+		entry.WindowStart = now
+		entry.Count = 0
+	}
+	entry.Count++
+	entry.LastSeen = now
+	l.entries[key] = entry
+	if len(l.entries) > 4096 {
+		cutoff := now.Add(-2 * window)
+		for k, candidate := range l.entries {
+			if candidate.LastSeen.Before(cutoff) { delete(l.entries, k) }
+		}
+	}
+	if entry.Count <= limit { return true, 0 }
+	retry := window - now.Sub(entry.WindowStart)
+	if retry < time.Second { retry = time.Second }
+	return false, retry
+}
