@@ -2,6 +2,7 @@ package database
 
 import (
 	"errors"
+	"time"
 
 	"github.com/gotify/server/v3/model"
 	"gorm.io/gorm"
@@ -10,25 +11,41 @@ import (
 
 
 func (d *GormDatabase) markAcknowledged(userID uint, messages []*model.Message) error {
-	if len(messages) == 0 {
-		return nil
-	}
+	if len(messages) == 0 { return nil }
 	ids := make([]uint, 0, len(messages))
-	for _, message := range messages {
-		ids = append(ids, message.ID)
+	for _, message := range messages { ids = append(ids, message.ID) }
+
+	type acknowledgementRow struct {
+		MessageID      uint
+		UserID         uint
+		Name           string
+		DisplayName    string
+		AcknowledgedAt time.Time
 	}
-	var acknowledged []uint
-	if err := d.DB.Model(&model.MessageAcknowledgement{}).
-		Where("user_id = ? AND message_id IN ?", userID, ids).
-		Pluck("message_id", &acknowledged).Error; err != nil {
+	var rows []acknowledgementRow
+	if err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.message_id, ma.user_id, users.name, users.display_name, ma.acknowledged_at").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id IN ?", ids).
+		Order("ma.acknowledged_at ASC").
+		Scan(&rows).Error; err != nil {
 		return err
 	}
-	set := make(map[uint]struct{}, len(acknowledged))
-	for _, id := range acknowledged {
-		set[id] = struct{}{}
+	byMessage := make(map[uint][]model.MessageAcknowledgementExternal)
+	for _, row := range rows {
+		byMessage[row.MessageID] = append(byMessage[row.MessageID], model.MessageAcknowledgementExternal{
+			UserID:row.UserID, Name:row.Name, DisplayName:row.DisplayName, AcknowledgedAt:row.AcknowledgedAt,
+		})
 	}
 	for _, message := range messages {
-		_, message.Acknowledged = set[message.ID]
+		message.Acknowledgements = byMessage[message.ID]
+		message.AckCount = int64(len(message.Acknowledgements))
+		for _, acknowledgement := range message.Acknowledgements {
+			if acknowledgement.UserID == userID {
+				message.Acknowledged = true
+				break
+			}
+		}
 	}
 	return nil
 }
