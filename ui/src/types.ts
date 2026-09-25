@@ -11,6 +11,7 @@ export interface IApplication {
     image: string;
     internal: boolean;
     defaultPriority: number;
+    retentionDays: number;
     lastUsed: string | null;
     createdAt: string;
 }
