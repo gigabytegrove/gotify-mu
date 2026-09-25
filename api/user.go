@@ -65,6 +65,7 @@ type UserAPI struct {
 	PasswordStrength   int
 	UserChangeNotifier *UserChangeNotifier
 	Registration       bool
+	Policy             func() *model.SecurityPolicy
 }
 
 // GetUsers returns all the users
@@ -191,7 +192,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 func (a *UserAPI) CreateUser(ctx *gin.Context) {
 	user := model.CreateUserExternal{}
 	if err := ctx.Bind(&user); err == nil {
-		if err := password.ValidateNewPassword(user.Pass); err != nil {
+		if err := password.ValidateNewPasswordWithMinimum(user.Pass, a.minPasswordLength()); err != nil {
 			ctx.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
@@ -413,7 +414,7 @@ func (a *UserAPI) DeleteUserByID(ctx *gin.Context) {
 func (a *UserAPI) ChangePassword(ctx *gin.Context) {
 	pw := model.UserExternalPass{}
 	if err := ctx.Bind(&pw); err == nil {
-		if err := password.ValidateNewPassword(pw.Pass); err != nil {
+		if err := password.ValidateNewPasswordWithMinimum(pw.Pass, a.minPasswordLength()); err != nil {
 			ctx.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
@@ -499,7 +500,7 @@ func (a *UserAPI) UpdateUserByID(ctx *gin.Context) {
 				dbUser.Admin = updatedUser.Admin
 
 				if updatedUser.Pass != "" {
-					if err := password.ValidateNewPassword(updatedUser.Pass); err != nil {
+					if err := password.ValidateNewPasswordWithMinimum(updatedUser.Pass, a.minPasswordLength()); err != nil {
 						ctx.AbortWithError(http.StatusBadRequest, err)
 						return
 					}
@@ -519,6 +520,15 @@ func (a *UserAPI) UpdateUserByID(ctx *gin.Context) {
 			}
 		}
 	})
+}
+
+func (a *UserAPI) minPasswordLength() int {
+	if a.Policy != nil {
+		if policy := a.Policy(); policy != nil && policy.MinPasswordLength > 0 {
+			return policy.MinPasswordLength
+		}
+	}
+	return 1
 }
 
 func toExternalUser(internal *model.User) *model.UserExternal {
