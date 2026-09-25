@@ -123,6 +123,8 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.SyslogRoute),
 		new(model.CalendarMonitor),
 		new(model.ConnectorSeenItem),
+		new(model.PasskeyCredential),
+		new(model.WebAuthnChallenge),
 	); err != nil {
 		return nil, err
 	}
