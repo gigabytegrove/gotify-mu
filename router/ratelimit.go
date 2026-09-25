@@ -2,6 +2,7 @@ package router
 
 import (
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
@@ -48,7 +49,7 @@ func (l *requestLimiter) Middleware() gin.HandlerFunc {
 			l.items[key] = bucket
 			l.mutex.Unlock()
 
-			ctx.Header("Retry-After", http.StatusText(retryAfter))
+			ctx.Header("Retry-After", strconv.Itoa(retryAfter))
 			ctx.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error": "Too many requests. Try again later.",
 			})
