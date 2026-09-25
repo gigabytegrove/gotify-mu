@@ -203,6 +203,22 @@ const Integrations = () => {
                             item.applicationId
                         )}`,
                         enabled: item.enabled,
+                        details: (
+                            <Button
+                                size="small"
+                                onClick={async () => {
+                                    await axios.post(
+                                        api('integration/home-assistant/' + item.id + '/event'),
+                                        {
+                                            eventType: 'gotify_mu_test',
+                                            data: {message: 'Gotify MU connection test'},
+                                        }
+                                    );
+                                    snackManager.snack('Test event sent to Home Assistant');
+                                }}>
+                                Send Test Event
+                            </Button>
+                        ),
                         onEdit: () => setHomeAssistantEdit(item),
                         onDelete: async () => {
                             await axios.delete(api(`integration/home-assistant/${item.id}`));
