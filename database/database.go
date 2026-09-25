@@ -95,6 +95,9 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.PluginConf),
 		new(model.ApplicationMembership),
 		new(model.MessageDismissal),
+		new(model.AuditEvent),
+		new(model.UserGroup),
+		new(model.UserGroupMembership),
 	); err != nil {
 		return nil, err
 	}
