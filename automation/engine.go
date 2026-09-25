@@ -40,6 +40,9 @@ type Database interface {
 	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
 
 	GetQuietHoursPolicy(userID uint) (*model.QuietHoursPolicy, error)
+	QueueDeferredNotification(item *model.DeferredNotification) error
+	GetDueDeferredNotifications(now time.Time) ([]*model.DeferredNotification, error)
+	DeleteDeferredNotification(userID, messageID uint) error
 	GetDigestPolicy(userID uint) (*model.DigestPolicy, error)
 	QueueDigestItem(item *model.DigestItem) error
 	GetDigestItems(userID uint) ([]*model.DigestItem, error)
@@ -246,6 +249,14 @@ func (e *Engine) deliver(userID uint, msg *model.Message, external *model.Messag
 		return err
 	}
 	if quiet != nil && quiet.Enabled && msg.Priority < quiet.AllowPriority && quietNow(quiet, time.Now()) {
+		if quiet.Behavior == "defer" {
+			return e.db.QueueDeferredNotification(&model.DeferredNotification{
+				UserID: userID,
+				MessageID: msg.ID,
+				ApplicationID: msg.ApplicationID,
+				DueAt: quietHoursEnd(quiet, time.Now()),
+			})
+		}
 		return nil
 	}
 
@@ -271,6 +282,73 @@ func quietNow(policy *model.QuietHoursPolicy, now time.Time) bool {
 		return minute >= start && minute < end
 	}
 	return minute >= start || minute < end
+}
+
+
+func quietHoursEnd(policy *model.QuietHoursPolicy, now time.Time) time.Time {
+	loc := time.UTC
+	if policy.Timezone != "" {
+		if parsed, err := time.LoadLocation(policy.Timezone); err == nil { loc = parsed }
+	}
+	local := now.In(loc)
+	endMinute := clamp(policy.EndMinute, 0, 1439)
+	candidate := time.Date(local.Year(), local.Month(), local.Day(), endMinute/60, endMinute%60, 0, 0, loc)
+	if !candidate.After(local) {
+		candidate = candidate.AddDate(0, 0, 1)
+	}
+	return candidate.UTC()
+}
+
+func (e *Engine) runDeferredNotifications(now time.Time) {
+	items, err := e.db.GetDueDeferredNotifications(now)
+	if err != nil {
+		log.Error().Err(err).Msg("Could not load deferred notifications")
+		return
+	}
+	for _, item := range items {
+		msg, err := e.db.GetMessageByID(item.MessageID)
+		if err != nil {
+			log.Error().Err(err).Uint("message_id", item.MessageID).Msg("Could not load deferred message")
+			continue
+		}
+		if msg == nil {
+			_ = e.db.DeleteDeferredNotification(item.UserID, item.MessageID)
+			continue
+		}
+
+		recipients, err := e.db.GetApplicationRecipientUserIDs(msg.ApplicationID)
+		if err != nil {
+			log.Error().Err(err).Uint("message_id", item.MessageID).Msg("Could not verify deferred recipient")
+			continue
+		}
+		allowed := false
+		for _, userID := range recipients {
+			if userID == item.UserID { allowed = true; break }
+		}
+		if !allowed {
+			_ = e.db.DeleteDeferredNotification(item.UserID, item.MessageID)
+			continue
+		}
+
+		quiet, err := e.db.GetQuietHoursPolicy(item.UserID)
+		if err != nil {
+			log.Error().Err(err).Uint("user_id", item.UserID).Msg("Could not load Quiet Hours for deferred notification")
+			continue
+		}
+		if quiet != nil && quiet.Enabled && quiet.Behavior == "defer" &&
+			msg.Priority < quiet.AllowPriority && quietNow(quiet, now) {
+			item.DueAt = quietHoursEnd(quiet, now)
+			if err := e.db.QueueDeferredNotification(item); err != nil {
+				log.Error().Err(err).Uint("message_id", item.MessageID).Msg("Could not reschedule deferred notification")
+			}
+			continue
+		}
+
+		e.notifier.Notify(item.UserID, externalMessage(msg))
+		if err := e.db.DeleteDeferredNotification(item.UserID, item.MessageID); err != nil {
+			log.Error().Err(err).Uint("message_id", item.MessageID).Msg("Could not clear deferred notification")
+		}
+	}
 }
 
 func (e *Engine) queueEscalations(msg *model.Message) error {
@@ -317,6 +395,7 @@ func (e *Engine) schedulerLoop() {
 
 func (e *Engine) runDue(now time.Time) {
 	e.runSchedules(now)
+	e.runDeferredNotifications(now)
 	e.runDigests(now)
 	e.runEscalations(now)
 }
