@@ -1,5 +1,9 @@
 name: build
-on: [push, pull_request]
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -8,8 +12,8 @@ permissions:
 jobs:
   gotify:
     runs-on: ubuntu-latest
-    # Run on push for branches in this repo, and on pull_request only for forks.
-    if: github.event_name == 'push' || (github.event_name == 'pull_request' && github.repository != github.event.pull_request.head.repo.full_name)
+    # Run on pushes/manual runs for this repository and on pull_request only for forks.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.repository != github.event.pull_request.head.repo.full_name)
     steps:
       - uses: actions/setup-go@v7
         with:
@@ -18,6 +22,50 @@ jobs:
         with:
           node-version: '24'
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Determine release context
+        id: release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          RELEASE=false
+          CREATE_TAG=false
+          VERSION=""
+
+          if [[ "${GITHUB_REF}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+            RELEASE=true
+          elif [[ "${GITHUB_REF}" == "refs/heads/master" || "${GITHUB_EVENT_NAME}" == "workflow_dispatch" ]]; then
+            VERSION="$(tr -d '[:space:]' < VERSION)"
+            if [[ -z "${VERSION}" ]]; then
+              echo "VERSION file is empty"
+              exit 1
+            fi
+
+            TAG="v${VERSION}"
+            RELEASE_HTTP="$(curl -sS -o /dev/null -w '%{http_code}' \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GH_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}")"
+
+            if [[ "${RELEASE_HTTP}" != "200" ]]; then
+              RELEASE=true
+              if ! git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+                CREATE_TAG=true
+              fi
+            fi
+          fi
+
+          echo "release=${RELEASE}" >> "${GITHUB_OUTPUT}"
+          echo "create_tag=${CREATE_TAG}" >> "${GITHUB_OUTPUT}"
+          echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
+
       - run: (cd ui && yarn)
       - run: make build-js
       - uses: golangci/golangci-lint-action@v9
@@ -32,43 +80,64 @@ jobs:
       - uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-      - if: startsWith(github.ref, 'refs/tags/v')
-        run: echo "VERSION=${GITHUB_REF/refs\/tags\/v/}" >> $GITHUB_ENV
-      - if: startsWith(github.ref, 'refs/tags/v')
-        run: |
-          export LD_FLAGS="-w -s -X main.Version=$VERSION -X main.BuildDate=$(date "+%F-%T") -X main.Commit=$(git rev-parse --verify HEAD) -X main.Mode=prod"
-          echo "LD_FLAGS=$LD_FLAGS" >> $GITHUB_ENV
 
+      - if: steps.release.outputs.release == 'true'
+        name: Set release build identity
+        shell: bash
+        run: |
+          VERSION="${{ steps.release.outputs.version }}"
+          echo "VERSION=${VERSION}" >> "${GITHUB_ENV}"
+          echo "LD_FLAGS=-w -s -X main.Version=${VERSION} -X main.BuildDate=$(date "+%F-%T") -X main.Commit=$(git rev-parse --verify HEAD) -X main.Mode=prod" >> "${GITHUB_ENV}"
+
+      - if: steps.release.outputs.release == 'true'
+        name: Build release archives
+        run: |
           make build
           sudo chown -R $UID build
           make package-zip
           ls -lath build
-      - if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/master')
+
+      - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
         name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
-      - if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/master')
+      - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
         name: Set up QEMU
         uses: docker/setup-qemu-action@v4
-      - if: startsWith(github.ref, 'refs/tags/v') || startsWith(github.ref, 'refs/heads/master')
+      - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ github.token }}
-      - if: startsWith(github.ref, 'refs/tags/v')
+
+      - if: steps.release.outputs.release == 'true'
+        name: Publish release container
         run: |
-          make DOCKER_BUILD_PUSH=true build-docker
+          make VERSION="${{ steps.release.outputs.version }}" DOCKER_BUILD_PUSH=true build-docker
+
       - if: startsWith(github.ref, 'refs/heads/master')
+        name: Publish master container
         run: |
           make DOCKER_BUILD_PUSH=true build-docker-multiarch-master
-      - if: startsWith(github.ref, 'refs/tags/v')
+
+      - if: steps.release.outputs.create_tag == 'true'
+        name: Create release tag
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "v${{ steps.release.outputs.version }}" -m "Gotify MU v${{ steps.release.outputs.version }}"
+          git push origin "v${{ steps.release.outputs.version }}"
+
+      - if: steps.release.outputs.release == 'true'
+        name: Publish GitHub release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/*.zip
-          tag: ${{ github.ref }}
-          release_name: "Gotify MU v${{ env.VERSION }}"
-          body: "See CHANGELOG.md and docs/releases/v${{ env.VERSION }}.md for release notes and compatibility details."
+          tag: "v${{ steps.release.outputs.version }}"
+          release_name: "Gotify MU v${{ steps.release.outputs.version }}"
+          body: "See CHANGELOG.md and docs/releases/v${{ steps.release.outputs.version }}.md for release notes and compatibility details."
           prerelease: true
           overwrite: true
           file_glob: true
