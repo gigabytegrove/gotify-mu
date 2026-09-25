@@ -35,3 +35,14 @@ type UserGroupMemberExternal struct {
 	DisplayName string `json:"displayName,omitempty"`
 	Admin       bool   `json:"admin"`
 }
+
+
+// ApplicationGroupGrant grants a User Group access to a Channel.
+type ApplicationGroupGrant struct {
+	ApplicationID        uint      `gorm:"primaryKey;autoIncrement:false;index" json:"applicationId"`
+	GroupID              uint      `gorm:"primaryKey;autoIncrement:false;index" json:"groupId"`
+	Role                 string    `gorm:"type:varchar(24);not null;default:'member'" json:"role"`
+	ReceiveNotifications bool      `gorm:"not null" json:"receiveNotifications"`
+	CreatedAt            time.Time `json:"createdAt"`
+	UpdatedAt            time.Time `json:"updatedAt"`
+}
