@@ -43,6 +43,8 @@ type AutomationDatabase interface {
 	GetWebhookRouteBySecret(secret string) (*model.WebhookRoute, error)
 	SaveWebhookRoute(item *model.WebhookRoute) error
 	DeleteWebhookRoute(id uint) error
+	CreateWebhookDelivery(item *model.WebhookDelivery) error
+	GetWebhookDeliveries(routeID uint, limit int) ([]*model.WebhookDelivery, error)
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
 	GetMQTTIntegrationByID(id uint) (*model.MQTTIntegration, error)
@@ -90,6 +92,10 @@ type webhookParams struct {
 	TitleField      string `json:"titleField"`
 	MessageField    string `json:"messageField"`
 	PriorityField   string `json:"priorityField"`
+	MatchField      string `json:"matchField"`
+	MatchValue      string `json:"matchValue"`
+	TitleTemplate   string `json:"titleTemplate"`
+	MessageTemplate string `json:"messageTemplate"`
 	DefaultTitle    string `json:"defaultTitle"`
 	DefaultPriority    int    `json:"defaultPriority"`
 	RequireSignature   bool   `json:"requireSignature"`
@@ -114,8 +120,10 @@ func (a *AutomationAPI) CreateWebhookRoute(ctx *gin.Context) {
 	item := &model.WebhookRoute{
 		Name: params.Name, ApplicationID: params.ApplicationID, Secret: secret, Enabled: params.Enabled,
 		TitleField: valueOr(params.TitleField, "title"), MessageField: valueOr(params.MessageField, "message"),
-		PriorityField: valueOr(params.PriorityField, "priority"), DefaultTitle: params.DefaultTitle,
-		DefaultPriority: params.DefaultPriority,
+		PriorityField: valueOr(params.PriorityField, "priority"),
+		MatchField: strings.TrimSpace(params.MatchField), MatchValue: params.MatchValue,
+		TitleTemplate: params.TitleTemplate, MessageTemplate: params.MessageTemplate,
+		DefaultTitle: params.DefaultTitle, DefaultPriority: params.DefaultPriority,
 		RequireSignature: params.RequireSignature,
 		AllowedCIDRs: strings.TrimSpace(params.AllowedCIDRs),
 		RateLimitPerMinute: normalizedWebhookRateLimit(params.RateLimitPerMinute),
@@ -134,7 +142,10 @@ func (a *AutomationAPI) UpdateWebhookRoute(ctx *gin.Context) {
 		if !a.channelExists(ctx, params.ApplicationID) { return }
 		item.Name, item.ApplicationID, item.Enabled = params.Name, params.ApplicationID, params.Enabled
 		item.TitleField, item.MessageField = valueOr(params.TitleField, "title"), valueOr(params.MessageField, "message")
-		item.PriorityField, item.DefaultTitle, item.DefaultPriority = valueOr(params.PriorityField, "priority"), params.DefaultTitle, params.DefaultPriority
+		item.PriorityField = valueOr(params.PriorityField, "priority")
+		item.MatchField, item.MatchValue = strings.TrimSpace(params.MatchField), params.MatchValue
+		item.TitleTemplate, item.MessageTemplate = params.TitleTemplate, params.MessageTemplate
+		item.DefaultTitle, item.DefaultPriority = params.DefaultTitle, params.DefaultPriority
 		item.RequireSignature = params.RequireSignature
 		item.AllowedCIDRs = strings.TrimSpace(params.AllowedCIDRs)
 		item.RateLimitPerMinute = normalizedWebhookRateLimit(params.RateLimitPerMinute)
@@ -171,13 +182,39 @@ func (a *AutomationAPI) DeleteWebhookRoute(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) { successOrAbort(ctx, 500, a.DB.DeleteWebhookRoute(id)) })
 }
 
+func (a *AutomationAPI) GetWebhookDeliveries(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetWebhookRouteByID(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		if item == nil { ctx.AbortWithError(404, errors.New("webhook not found")); return }
+		limit := 100
+		if raw := ctx.Query("limit"); raw != "" {
+			if parsed, parseErr := strconv.Atoi(raw); parseErr == nil { limit = parsed }
+		}
+		items, err := a.DB.GetWebhookDeliveries(id, limit)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, items)
+	})
+}
+
+
 func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 	secret := strings.TrimSpace(ctx.Param("secret"))
 	item, err := a.DB.GetWebhookRouteBySecret(secret)
 	if !successOrAbort(ctx, 500, err) { return }
 	if item == nil { ctx.AbortWithStatus(http.StatusNotFound); return }
 
+	record := func(status, detail string, messageID uint) {
+		if len(detail) > 500 { detail = detail[:500] }
+		if err := a.DB.CreateWebhookDelivery(&model.WebhookDelivery{
+			WebhookRouteID:item.ID, IPAddress:ctx.ClientIP(), Status:status, Detail:detail, MessageID:messageID,
+		}); err != nil {
+			// Delivery history is diagnostic and must not break webhook delivery.
+		}
+	}
+
 	if !webhookIPAllowed(ctx.ClientIP(), item.AllowedCIDRs) {
+		record("rejected", "source IP is not allowed", 0)
 		ctx.AbortWithStatus(http.StatusForbidden)
 		return
 	}
@@ -188,6 +225,7 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 		if allowed, retry := a.WebhookLimiter.Allow(key, limit, time.Minute); !allowed {
 			seconds := int(retry.Round(time.Second).Seconds())
 			if seconds < 1 { seconds = 1 }
+			record("rate_limited", "rate limit exceeded", 0)
 			ctx.Header("Retry-After", strconv.Itoa(seconds))
 			ctx.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error":"webhook rate limit exceeded"})
 			return
@@ -196,8 +234,13 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 
 	const maxWebhookBytes = 1 << 20
 	body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, maxWebhookBytes+1))
-	if !successOrAbort(ctx, 400, err) { return }
+	if err != nil {
+		record("failed", "request body could not be read", 0)
+		ctx.AbortWithError(http.StatusBadRequest, err)
+		return
+	}
 	if len(body) > maxWebhookBytes {
+		record("rejected", "payload exceeds 1 MiB", 0)
 		ctx.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, gin.H{"error":"webhook payload exceeds 1 MiB"})
 		return
 	}
@@ -206,12 +249,14 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 		timestamp := strings.TrimSpace(ctx.GetHeader("X-Gotify-MU-Timestamp"))
 		signature := strings.TrimSpace(ctx.GetHeader("X-Gotify-MU-Signature"))
 		if !validWebhookSignature(secret, timestamp, signature, body, time.Now()) {
+			record("rejected", "signature verification failed", 0)
 			ctx.AbortWithStatus(http.StatusUnauthorized)
 			return
 		}
 		if a.WebhookReplay != nil {
 			replayKey := security.HashSecret(secret + "|" + timestamp + "|" + signature)
 			if !a.WebhookReplay.Remember(replayKey, 10*time.Minute) {
+				record("rejected", "duplicate signed request", 0)
 				ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{"error":"duplicate webhook request"})
 				return
 			}
@@ -222,26 +267,55 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 	message := strings.TrimSpace(string(body))
 	priority := item.DefaultPriority
 	var payload any
-	if json.Unmarshal(body, &payload) == nil {
-		if value, ok := lookupPayload(payload, item.TitleField); ok {
+	jsonPayload := json.Unmarshal(body, &payload) == nil
+
+	if item.MatchField != "" {
+		if !jsonPayload {
+			record("ignored", "conditional rule requires a JSON payload", 0)
+			ctx.JSON(http.StatusAccepted, gin.H{"accepted":false,"matched":false})
+			return
+		}
+		value, ok := lookupPayload(payload, item.MatchField)
+		if !ok || (item.MatchValue != "" && payloadString(value) != item.MatchValue) {
+			record("ignored", "conditional routing rule did not match", 0)
+			ctx.JSON(http.StatusAccepted, gin.H{"accepted":false,"matched":false})
+			return
+		}
+	}
+
+	if jsonPayload {
+		if item.TitleTemplate != "" {
+			title = renderPayloadTemplate(item.TitleTemplate, payload, string(body))
+		} else if value, ok := lookupPayload(payload, item.TitleField); ok {
 			if text := payloadString(value); text != "" { title = text }
 		}
-		if value, ok := lookupPayload(payload, item.MessageField); ok {
+
+		if item.MessageTemplate != "" {
+			message = renderPayloadTemplate(item.MessageTemplate, payload, string(body))
+		} else if value, ok := lookupPayload(payload, item.MessageField); ok {
 			if text := payloadString(value); text != "" { message = text }
 		} else if encoded, marshalErr := json.MarshalIndent(payload, "", "  "); marshalErr == nil {
 			message = string(encoded)
 		}
+
 		if value, ok := lookupPayload(payload, item.PriorityField); ok {
 			if number, numberOK := payloadInt(value); numberOK { priority = number }
 		}
 	}
+
 	if strings.TrimSpace(message) == "" {
-		ctx.AbortWithError(400, errors.New("webhook payload did not contain a message"))
+		record("failed", "payload did not contain a message", 0)
+		ctx.AbortWithError(http.StatusBadRequest, errors.New("webhook payload did not contain a message"))
 		return
 	}
 	msg, err := a.Engine.Publish(item.ApplicationID, title, message, priority)
-	if !successOrAbort(ctx, 500, err) { return }
-	ctx.JSON(http.StatusAccepted, gin.H{"accepted": true, "messageId": msg.ID})
+	if err != nil {
+		record("failed", "message delivery failed", 0)
+		ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	record("delivered", "", msg.ID)
+	ctx.JSON(http.StatusAccepted, gin.H{"accepted": true, "matched":true, "messageId": msg.ID})
 }
 
 type mqttParams struct {
@@ -777,7 +851,9 @@ func webhookView(item *model.WebhookRoute) model.WebhookRouteView {
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,Enabled:item.Enabled,
 		RequireSignature:item.RequireSignature,AllowedCIDRs:item.AllowedCIDRs,RateLimitPerMinute:normalizedWebhookRateLimit(item.RateLimitPerMinute),
 		Path:"/integrations/webhook/"+item.Secret,TitleField:item.TitleField,MessageField:item.MessageField,
-		PriorityField:item.PriorityField,DefaultTitle:item.DefaultTitle,DefaultPriority:item.DefaultPriority,
+		PriorityField:item.PriorityField,MatchField:item.MatchField,MatchValue:item.MatchValue,
+		TitleTemplate:item.TitleTemplate,MessageTemplate:item.MessageTemplate,
+		DefaultTitle:item.DefaultTitle,DefaultPriority:item.DefaultPriority,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
 }
@@ -815,12 +891,50 @@ func lookupPayload(payload any, path string) (any, bool) {
 	if strings.TrimSpace(path) == "" { return nil, false }
 	current := payload
 	for _, part := range strings.Split(path, ".") {
-		object, ok := current.(map[string]any)
-		if !ok { return nil, false }
-		current, ok = object[part]
-		if !ok { return nil, false }
+		switch typed := current.(type) {
+		case map[string]any:
+			next, ok := typed[part]
+			if !ok { return nil, false }
+			current = next
+		case []any:
+			index, err := strconv.Atoi(part)
+			if err != nil || index < 0 || index >= len(typed) { return nil, false }
+			current = typed[index]
+		default:
+			return nil, false
+		}
 	}
 	return current, true
+}
+
+func renderPayloadTemplate(template string, payload any, raw string) string {
+	var result strings.Builder
+	for {
+		start := strings.Index(template, "{{")
+		if start < 0 {
+			result.WriteString(template)
+			break
+		}
+		result.WriteString(template[:start])
+		template = template[start+2:]
+		end := strings.Index(template, "}}")
+		if end < 0 {
+			result.WriteString("{{")
+			result.WriteString(template)
+			break
+		}
+		key := strings.TrimSpace(template[:end])
+		template = template[end+2:]
+		switch key {
+		case "raw":
+			result.WriteString(raw)
+		default:
+			if value, ok := lookupPayload(payload, key); ok {
+				result.WriteString(payloadString(value))
+			}
+		}
+	}
+	return result.String()
 }
 
 func payloadString(value any) string {
