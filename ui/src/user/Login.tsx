@@ -20,6 +20,7 @@ import LockOutlined from '@mui/icons-material/LockOutlined';
 const Login = observer(() => {
     const [username, setUsername] = React.useState('');
     const [password, setPassword] = React.useState('');
+    const [mfaCode, setMfaCode] = React.useState('');
     const [registerDialog, setRegisterDialog] = React.useState(false);
     const {currentUser} = useStores();
     const navigate = useNavigate();
@@ -58,7 +59,7 @@ const Login = observer(() => {
 
     const login = (event: React.FormEvent) => {
         event.preventDefault();
-        void currentUser.login(username, password);
+        void currentUser.login(username, password, mfaCode);
     };
 
     return (
@@ -104,6 +105,17 @@ const Login = observer(() => {
                                     onChange={(event) => setPassword(event.target.value)}
                                     fullWidth
                                 />
+                                {currentUser.mfaRequired && (
+                                    <TextField
+                                        autoFocus
+                                        id="mfa-code"
+                                        label="Authenticator or recovery code"
+                                        value={mfaCode}
+                                        onChange={(event) => setMfaCode(event.target.value)}
+                                        autoComplete="one-time-code"
+                                        fullWidth
+                                    />
+                                )}
                                 <Button
                                     type="submit"
                                     startIcon={<LockOutlined />}
