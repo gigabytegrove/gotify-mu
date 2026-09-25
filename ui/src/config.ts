@@ -8,6 +8,8 @@ export interface IConfig {
     oidcAutoRedirect: boolean;
     localAuth: boolean;
     oidcIdpName: string;
+    ldap: boolean;
+    ldapIdpName: string;
 }
 
 declare global {
@@ -24,6 +26,8 @@ const config: IConfig = {
     oidcAutoRedirect: false,
     localAuth: true,
     oidcIdpName: 'OIDC',
+    ldap: false,
+    ldapIdpName: 'Directory',
     ...window.config,
 };
 
