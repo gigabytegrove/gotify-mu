@@ -7,8 +7,12 @@ type WebhookRoute struct {
 	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	Name            string    `gorm:"type:text" json:"name"`
 	ApplicationID   uint      `gorm:"index" json:"applicationId"`
-	Secret          string    `gorm:"type:varchar(96);uniqueIndex" json:"-"`
+	Secret          string    `gorm:"type:text" json:"-"`
+	SecretHash      string    `gorm:"type:varchar(64);uniqueIndex" json:"-"`
 	Enabled         bool      `json:"enabled"`
+	RequireSignature bool     `json:"requireSignature"`
+	AllowedCIDRs    string    `gorm:"type:text" json:"allowedCidrs"`
+	RateLimitPerMinute int    `json:"rateLimitPerMinute"`
 	TitleField      string    `gorm:"type:text" json:"titleField"`
 	MessageField    string    `gorm:"type:text" json:"messageField"`
 	PriorityField   string    `gorm:"type:text" json:"priorityField"`
@@ -24,6 +28,9 @@ type WebhookRouteView struct {
 	Name            string    `json:"name"`
 	ApplicationID   uint      `json:"applicationId"`
 	Enabled         bool      `json:"enabled"`
+	RequireSignature bool     `json:"requireSignature"`
+	AllowedCIDRs    string    `json:"allowedCidrs"`
+	RateLimitPerMinute int    `json:"rateLimitPerMinute"`
 	Path            string    `json:"path"`
 	TitleField      string    `json:"titleField"`
 	MessageField    string    `json:"messageField"`
