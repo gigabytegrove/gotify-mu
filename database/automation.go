@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"time"
 
 	"github.com/gotify/server/v3/model"
@@ -186,4 +187,74 @@ func (d *GormDatabase) IsMessageAcknowledged(messageID uint) (bool, error) {
 }
 func (d *GormDatabase) DeleteMessageAcknowledgements(messageID uint) error {
 	return d.DB.Where("message_id = ?", messageID).Delete(&model.MessageAcknowledgement{}).Error
+}
+
+
+func (d *GormDatabase) AcquireAutomationLease(key, owner string, now time.Time, ttl time.Duration) (bool, error) {
+	expires := now.Add(ttl)
+	result := d.DB.Model(&model.AutomationLease{}).
+		Where("key = ? AND (expires_at < ? OR owner = ?)", key, now, owner).
+		Updates(map[string]any{"owner": owner, "expires_at": expires, "updated_at": now})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if result.RowsAffected > 0 {
+		return true, nil
+	}
+	item := &model.AutomationLease{Key:key, Owner:owner, ExpiresAt:expires, UpdatedAt:now}
+	if err := d.DB.Create(item).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (d *GormDatabase) ReleaseAutomationLease(key, owner string) error {
+	return d.DB.Where("key = ? AND owner = ?", key, owner).Delete(&model.AutomationLease{}).Error
+}
+
+func (d *GormDatabase) CreateAutomationRun(item *model.AutomationRun) (bool, error) {
+	if err := d.DB.Create(item).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (d *GormDatabase) SaveAutomationRun(item *model.AutomationRun) error {
+	return d.DB.Save(item).Error
+}
+
+func (d *GormDatabase) GetAutomationRuns(kind string, objectID uint, limit int) ([]*model.AutomationRun, error) {
+	if limit <= 0 || limit > 500 { limit = 100 }
+	query := d.DB.Model(&model.AutomationRun{})
+	if kind != "" { query = query.Where("kind = ?", kind) }
+	if objectID != 0 { query = query.Where("object_id = ?", objectID) }
+	var items []*model.AutomationRun
+	err := query.Order("started_at desc, id desc").Limit(limit).Find(&items).Error
+	return items, err
+}
+
+func (d *GormDatabase) DeleteAutomationRunsBefore(before time.Time) error {
+	return d.DB.Where("started_at < ?", before).Delete(&model.AutomationRun{}).Error
+}
+
+func (d *GormDatabase) SaveIntegrationStatus(item *model.IntegrationStatus) error {
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"kind"},{Name:"object_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"state","last_connected_at","last_activity_at","last_error","updated_at"}),
+	}).Create(item).Error
+}
+
+func (d *GormDatabase) GetIntegrationStatuses() ([]*model.IntegrationStatus, error) {
+	var items []*model.IntegrationStatus
+	return items, d.DB.Order("kind asc, object_id asc").Find(&items).Error
+}
+
+func (d *GormDatabase) DeleteIntegrationStatus(kind string, objectID uint) error {
+	return d.DB.Where("kind = ? AND object_id = ?", kind, objectID).Delete(&model.IntegrationStatus{}).Error
 }
