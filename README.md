@@ -55,6 +55,7 @@ The Web UI uses **Channels** as the user-facing term and provides:
 - Channel status cards and membership management
 - Global Channel administration
 - User, Client, and Plugin administration
+- Elevated administrator plugin installation directly from the Web UI
 - Standardized light, dark, and system themes
 - Responsive desktop and mobile-web navigation
 - Consistent dialogs, tables, cards, status indicators, and destructive-action language
@@ -62,6 +63,8 @@ The Web UI uses **Channels** as the user-facing term and provides:
 The underlying `/application` API naming remains in place to avoid breaking existing clients and integrations.
 
 The official Gotify Android app is not modified by the Web UI rewrite.
+
+Administrators can install compatible Linux Go plugin binaries from **Plugins → Install Plugin**. Uploaded plugins are stored under the configured `GOTIFY_PLUGINSDIR` (the default Docker data volume resolves to `/app/data/plugins`) and are loaded immediately. Plugin binaries execute native code inside the Gotify MU process, so only trusted plugins built for the matching Gotify MU/Go ABI and server architecture should be installed.
 
 Authentication/security work such as MFA/2FA, passkeys, and LDAP/Active Directory is tracked separately in [docs/ROADMAP.md](docs/ROADMAP.md). Those features are planned and are not implied to be active by the redesigned UI.
 
