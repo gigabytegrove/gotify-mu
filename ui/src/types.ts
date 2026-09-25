@@ -165,10 +165,24 @@ export interface IWebhookRoute {
     titleField: string;
     messageField: string;
     priorityField: string;
+    matchField: string;
+    matchValue: string;
+    titleTemplate: string;
+    messageTemplate: string;
     defaultTitle: string;
     defaultPriority: number;
     createdAt: string;
     updatedAt: string;
+}
+
+export interface IWebhookDelivery {
+    id: number;
+    webhookRouteId: number;
+    ipAddress?: string;
+    status: string;
+    detail?: string;
+    messageId?: number;
+    createdAt: string;
 }
 
 export interface IMQTTIntegration {
