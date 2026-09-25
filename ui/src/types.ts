@@ -490,3 +490,14 @@ export interface ISavedMessageSearch {
     createdAt: string;
     updatedAt: string;
 }
+
+
+export interface INotificationAction {
+    label: string;
+    url: string;
+}
+
+export interface INotificationField {
+    label: string;
+    value: string;
+}
