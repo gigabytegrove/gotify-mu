@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gotify/server/v3/model"
+	"gorm.io/gorm"
 )
 
 // CreateAuditEvent persists an administrative/security audit event.
@@ -37,13 +38,13 @@ func (d *GormDatabase) DeleteAuditEventsBefore(before time.Time) error {
 
 
 func (d *GormDatabase) GetAuditSettings() (*model.AuditSettings, error) {
-	item := &model.AuditSettings{ID: 1, RetentionDays: 180}
+	item := &model.AuditSettings{}
 	err := d.DB.First(item, 1).Error
 	if err == nil {
 		return item, nil
 	}
-	if err != nil && err.Error() != "" {
-		// GORM's translated record-not-found error is handled by creating defaults below.
+	if err != gorm.ErrRecordNotFound {
+		return nil, err
 	}
 	item = &model.AuditSettings{ID: 1, RetentionDays: 180}
 	if createErr := d.DB.Create(item).Error; createErr != nil {
