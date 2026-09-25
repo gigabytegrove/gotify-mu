@@ -159,6 +159,11 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		WebhookLimiter: security.NewDynamicLimiter(),
 		WebhookReplay: security.NewReplayCache(),
 	}
+	collaborationHandler := api.CollaborationAPI{
+		DB: db,
+		Dispatcher: automationEngine,
+		AttachmentDir: filepath.Join(filepath.Dir(conf.UploadedImagesDir), "attachments"),
+	}
 	connectorHandler := api.ConnectorAPI{DB: db, Runtime: connectorManager}
 	serviceHandler := api.ServiceAccountAPI{DB: db, Publisher: automationEngine}
 	loginLimiter := security.NewFixedWindowLimiter(10, 5*time.Minute)
@@ -324,6 +329,17 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		message.GET("/:id/acknowledgement", automationHandler.GetAcknowledgement)
 		message.POST("/:id/acknowledgement", automationHandler.AcknowledgeMessage)
 		message.DELETE("/:id/acknowledgement", automationHandler.UnacknowledgeMessage)
+		message.GET("/:id/thread", collaborationHandler.Thread)
+		message.POST("/:id/reply", collaborationHandler.Reply)
+		message.POST("/:id/reaction", collaborationHandler.AddReaction)
+		message.DELETE("/:id/reaction", collaborationHandler.DeleteReaction)
+		message.PUT("/:id/assignment", collaborationHandler.Assign)
+		message.PUT("/:id/status", collaborationHandler.SetStatus)
+		message.POST("/:id/read", collaborationHandler.MarkRead)
+		message.DELETE("/:id/read", collaborationHandler.MarkUnread)
+		message.POST("/:id/attachment", collaborationHandler.UploadAttachment)
+		message.GET("/:id/attachment/:attachmentId", collaborationHandler.DownloadAttachment)
+		message.DELETE("/:id/attachment/:attachmentId", collaborationHandler.DeleteAttachment)
 		}
 
 		clientAuth.GET("/stream", streamHandler.Handle)
@@ -340,6 +356,15 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientAuth.PUT("/automation/quiet-hours", automationHandler.SaveQuietHours)
 		clientAuth.GET("/automation/digest", automationHandler.GetDigest)
 		clientAuth.PUT("/automation/digest", automationHandler.SaveDigest)
+		clientAuth.GET("/message/search", collaborationHandler.Search)
+		clientAuth.GET("/message-template", collaborationHandler.GetTemplates)
+		clientAuth.POST("/message-template", collaborationHandler.SaveTemplate)
+		clientAuth.PUT("/message-template/:id", collaborationHandler.UpdateTemplate)
+		clientAuth.DELETE("/message-template/:id", collaborationHandler.DeleteTemplate)
+		clientAuth.GET("/saved-search", collaborationHandler.GetSavedSearches)
+		clientAuth.POST("/saved-search", collaborationHandler.SaveSearch)
+		clientAuth.PUT("/saved-search/:id", collaborationHandler.UpdateSearch)
+		clientAuth.DELETE("/saved-search/:id", collaborationHandler.DeleteSearch)
 	}
 
 	clientElevated := g.Group("")
@@ -542,6 +567,15 @@ func shouldAuditMutation(path string) bool {
 	case strings.HasPrefix(path, "/automation"):
 		return true
 	case strings.Contains(path, "/acknowledgement"):
+		return true
+	case strings.HasPrefix(path, "/message-template"):
+		return true
+	case strings.HasPrefix(path, "/saved-search"):
+		return true
+	case strings.HasPrefix(path, "/message/") &&
+		(strings.Contains(path, "/reply") || strings.Contains(path, "/reaction") ||
+			strings.Contains(path, "/assignment") || strings.Contains(path, "/status") ||
+			strings.Contains(path, "/read") || strings.Contains(path, "/attachment")):
 		return true
 	default:
 		return false
