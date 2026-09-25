@@ -144,6 +144,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
 	mfaHandler := api.MFAAPI{DB: db}
+	passkeyHandler := api.PasskeyAPI{DB: db, SecureCookie: conf.Server.SecureCookie}
 	var ldapHandler *api.LDAPAPI
 	if conf.LDAP.Enabled {
 		ldapHandler = api.NewLDAP(conf, db, userChangeNotifier)
@@ -182,6 +183,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		conf.LDAP.Enabled, conf.LDAP.IDPName,
 	)
 
+	g.POST("/auth/passkey/login/options", passkeyHandler.LoginOptions)
+	g.POST("/auth/passkey/login/verify", passkeyHandler.LoginVerify)
 	if conf.LDAP.Enabled {
 		g.POST("/auth/ldap/login", ldapHandler.Login)
 	}
@@ -320,6 +323,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientAuth.GET("/stream", streamHandler.Handle)
 		clientAuth.GET("current/user", userHandler.GetCurrentUser)
 		clientAuth.GET("/current/user/mfa/status", mfaHandler.Status)
+		clientAuth.GET("/current/user/passkeys", passkeyHandler.List)
+		clientAuth.POST("/current/user/passkeys/elevate/options", passkeyHandler.ElevationOptions)
+		clientAuth.POST("/current/user/passkeys/elevate/verify", passkeyHandler.ElevationVerify)
 		if conf.LDAP.Enabled {
 			clientAuth.POST("/auth/ldap/elevate", ldapHandler.Elevate)
 		}
@@ -353,6 +359,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.POST("/current/user/mfa/enable", mfaHandler.Enable)
 		clientElevated.POST("/current/user/mfa/disable", mfaHandler.Disable)
 		clientElevated.POST("/current/user/mfa/recovery-codes", mfaHandler.RegenerateRecoveryCodes)
+		clientElevated.POST("/current/user/passkeys/options", passkeyHandler.RegistrationOptions)
+		clientElevated.POST("/current/user/passkeys", passkeyHandler.RegistrationVerify)
+		clientElevated.DELETE("/current/user/passkeys/:id", passkeyHandler.Delete)
 	}
 
 	authAdmin := g.Group("/user")
