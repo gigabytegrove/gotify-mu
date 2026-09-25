@@ -1,419 +1,195 @@
 # Gotify MU Product Roadmap
 
-Gotify MU is the permanent product name. The project keeps Gotify protocol/API compatibility where it is useful, but new Gotify MU capabilities are allowed to move beyond upstream Gotify's original scope.
+Gotify MU keeps Gotify REST/WebSocket and token compatibility where practical while extending the server into a multi-user notification and operations platform.
 
-The official Gotify Android app remains supported for normal receive-only notification workflows. A Gotify MU Android fork is planned for features that require client-side support such as Chat Channels, replies, acknowledgements, attachments, and richer interaction.
+## v0.5 platform
 
-## Current foundation
+The following capabilities are implemented in the v0.5 preview branch.
 
-Implemented or in active development:
+### Identity and security
 
-- Multi-user/shared Channels
+- local username/password authentication
+- OIDC
+- LDAP / Active Directory
+- TOTP MFA
+- recovery codes
+- WebAuthn/passkeys
+- administrator MFA policy
+- configurable session/elevation policy
+- login throttling
+- active-session visibility and revocation
+- scoped service accounts/API credentials
+- encrypted server-side secret storage
+- sensitive request/log redaction
+- security/admin Audit Log with export and retention
+
+### Channels and permissions
+
+- shared Channels
 - Global Channels
-- Channel ownership transfer
-- Per-user notification mute
-- Per-user archive/restore
-- Global Channel destructive-action protections
-- Experimental server/Web Chat Channels
-- Redesigned Gotify MU Web UI
-- Runtime plugin upload/install from the Web UI
-- User display names
-- User Groups foundation
-- Administrative/security audit log foundation
-- Native Webhook routing
-- Native MQTT broker/topic subscriptions
-- Native Home Assistant event integration
-- Scheduled Notifications
-- Per-user Quiet Hours
-- Per-user Digest delivery
-- Acknowledgement-aware Escalations
-- Per-user message acknowledgement
-- Existing Gotify local auth, OIDC, client tokens, application tokens, REST and WebSocket compatibility
+- ownership transfer
+- Owner / Manager / Publisher / Member / Read Only roles
+- Group-to-Channel assignment
+- per-user notification preference
+- per-user archive/restore
+- Chat Channel posting
+- safe destructive-action rules
 
-## Identity, authorization, and security
+### Collaboration
 
-### User identity
-
-Planned:
-
-- display names
-- avatars
-- user profiles
-- authentication-source indication
-- service accounts
-- scoped API credentials
-- user Groups
-- group-to-Channel assignment
-- group-to-policy assignment
-- channel roles: Owner, Manager, Publisher, Member, Read Only
-- explicit permission checks instead of inferring all permissions from ownership/admin state
-
-### MFA / 2FA
-
-Planned local-account MFA:
-
-- TOTP authenticator applications using RFC 6238
-- one-time recovery codes stored hashed
-- enrollment/revocation
-- administrator enrollment visibility
-- administrator reset workflow
-- require MFA for administrators
-- require MFA for all local users
-- MFA-aware elevation/re-authentication
-- session invalidation after password/MFA reset
-- WebAuthn/passkeys after TOTP is stable
-
-Secrets, passwords, recovery codes, LDAP bind credentials, and private authentication material must never be written to logs or committed to the repository.
-
-### LDAP / Active Directory
-
-Planned:
-
-- LDAP
-- LDAPS
-- StartTLS
-- service/bind account or direct-bind modes
-- configurable search base/filter
-- configurable username/display-name attributes
-- directory group lookup
-- directory-group-to-admin mapping
-- optional directory-group-to-Gotify-MU-group mapping
-- bounded queries/timeouts
-- certificate validation
-- connection diagnostics in the Web UI
-- local emergency-admin fallback
-
-OIDC remains a first-class supported provider.
-
-### Security administration
-
-Planned:
-
-- authentication-provider UI
-- MFA policy
-- session lifetime
-- elevated-session lifetime
-- account lockout/rate limiting
-- active-session visibility/revocation
-- security event audit log
-- trusted-proxy-aware source information
-- server-side encryption key management for stored authentication secrets
-
-## Channels and communication
-
-### Channel permissions
-
-Planned:
-
-- Owner
-- Manager
-- Publisher
-- Member
-- Read Only
-- role-based member management
-- role-aware destructive actions
-- group assignment
-- per-role publishing permissions
-
-### Interactive messages and Chat Channels
-
-Server support begins with the existing experimental Chat Channel capability. Full implementation requires the Gotify MU Android client.
-
-Planned:
-
-- mobile compose/send
-- replies
-- lightweight threads
+- replies and threads
 - reactions
-- @mentions
-- unread/read state
-- message acknowledgement
-- assignment/"I'm handling this"
-- resolve/reopen state
+- mentions
+- message acknowledgement and acknowledgement history
+- assignment
+- resolve/reopen
+- read/unread state
 - attachments
-- inline images
-- richer sender identity
-- channel topic/description presentation
-
-The goal is **alerts + collaboration**, not a general-purpose Slack replacement.
-
-## Notification intelligence
-
-These are native Gotify MU capabilities, not plugins, because they directly affect message delivery behavior.
-
-Implemented in the v0.3.0 preview:
-
-- per-user Quiet Hours
-- priority-based Quiet Hours exceptions
-- timezone-aware overnight Quiet Hours
-- one-time Scheduled Notifications
-- hourly Scheduled Notifications
-- daily Scheduled Notifications
-- weekly Scheduled Notifications
-- timezone-aware schedules
-- schedule enable/disable
-- per-user Digest mode
-- configurable Digest intervals
-- immediate-delivery priority exceptions
-- Channel-to-Channel Escalation rules
-- acknowledgement-based Escalation cancellation
-- per-user message acknowledgement
-
-Planned enhancements:
-
-- per-Channel Quiet Hours
-- hold/defer queues in addition to realtime suppression
-- per-Channel priority thresholds
-- per-device notification preferences
-- snooze
-- richer schedule history
-- custom/cron-style schedules
-- per-Channel Digest rules
-- multi-stage Escalation paths
-- acknowledgement deadlines
-- user and Group escalation targets
-- repeat-until-acknowledged
-- resolve/reopen-aware escalation
-- notification templates
-
-## Rich messages
-
-Planned:
-
-- attachments
-- images
-- action buttons
-- canonical URLs
-- structured fields
-- improved Markdown
 - message templates
-- reusable message layouts
-- safe rendering/sanitization
-- attachment retention controls
+- saved searches
 
-## Automation and integrations
+### Notification intelligence
 
-### Native integration framework
+- Quiet Hours suppression
+- deferred Quiet Hours delivery
+- priority bypass
+- Digests
+- stored Digest summaries
+- one-time/hourly/daily/weekly schedules
+- cron schedules
+- timezone-aware scheduling
+- excluded dates
+- end dates and maximum runs
+- misfire policy
+- schedule run history
+- Channel/user/Group Escalation targets
+- repeat Escalations
+- acknowledgement cancellation
+- structured escalation lineage
+- multi-instance scheduler leases and delivery deduplication
 
-The following integrations are built into Gotify MU because they are foundational notification transports or participate directly in routing and delivery behavior. The initial implementation is present in the v0.3.0 preview, with additional routing and diagnostics planned.
+### Native integrations
 
 #### Webhook Router
 
-Implemented in the v0.3.0 preview:
-
-- named inbound Webhook endpoints
-- generated secret URLs
-- route incoming requests to a Channel
-- JSON field mapping for title, message, and priority
-- default title/priority
-- enable/disable
-- URL regeneration
-- request-size limit
-
-Planned enhancements:
-
-- generic outbound Webhooks
-- richer routing rules
-- transformation/conditional rules
-- reusable templates
-- retry policy
-- delivery history/errors
-- optional request signing
+- generated inbound URLs
+- encrypted secrets and hashed lookup
+- HMAC request signing
+- replay protection
+- source CIDR restrictions
+- per-route/per-source rate limiting
+- JSON title/message/priority extraction
+- array-aware field paths
+- conditional field/value matching
+- title/message templates
+- explicit request-size limit
+- retained delivery history
 
 #### MQTT
 
-Implemented in the v0.3.0 preview:
-
-- multiple MQTT broker connections
-- mqtt/mqtts/tcp/tls connection schemes
-- optional credentials and client IDs
-- broker topic subscriptions
+- MQTT 5
+- MQTT 3.1.1
+- QoS 0/1/2 receive flows
+- bounded packet size
+- username/password authentication
+- custom CA certificates
+- mutual TLS client certificates
+- topic subscriptions
 - reconnect behavior
-- route received topic messages into Channels
-- JSON title/message/priority extraction
-
-Planned enhancements:
-
-- richer topic/payload filters
-- reusable payload templates
-- publishing from Gotify MU where appropriate
-- per-connection health/status in the Web UI
+- connection testing
+- status/last-connect/last-message/error visibility
 
 #### Home Assistant
 
-Implemented in the v0.3.0 preview:
+- WebSocket event subscriptions
+- event-type filtering
+- entity filtering
+- event-data field/value filtering
+- Channel routing
+- outbound events
+- test action
+- reconnect and health/error visibility
 
-- direct Home Assistant integration
-- long-lived access-token authentication
-- WebSocket event subscription
-- subscribe to all events or one selected event type
-- route received events into a Channel
-- send events back to Home Assistant
-- Web UI test-event action
-- automatic reconnect
+### First-party connectors
 
-Planned enhancements:
+- Email Delivery
+- SMTP Receiver
+- RSS / Atom Monitor
+- Syslog Receiver
+- Calendar / iCal
 
-- entity-level filters
-- richer event filters
-- connection/status visibility in the Web UI
-- reusable outbound actions
+These are native first-party connectors rather than optional third-party plugins because they are supported as part of the Gotify MU server.
 
-The native integration framework should share consistent configuration, health/status, secrets handling, routing, retry, and audit behavior.
+### Plugin platform
 
-## Plugin ecosystem
-
-Plugins are intended for optional external sources and specialized integrations that do not need to control Gotify MU's core message-delivery behavior.
-
-Current:
-
-- plugin list/configuration
-- enable/disable
-- administrator upload/install from the Web UI
-
-### Approved first-party plugins
-
-- **Email Gateway**
-  - connect to supported mailboxes
-  - turn matching incoming email into Channel messages
-  - rules by sender, recipient, subject, and mailbox
-  - attachment handling where practical
-
-- **SMTP Receiver**
-  - receive SMTP directly from devices and services
-  - intended for systems that can only send email alerts
-  - recipient-to-Channel routing
-  - sender and subject rules
-  - configurable size and attachment limits
-
-- **RSS / Atom Monitor**
-  - monitor RSS and Atom feeds
-  - post newly discovered entries to Channels
-  - per-feed polling interval
-  - duplicate protection
-  - optional title/category filtering
-
-- **Syslog Receiver**
-  - receive syslog messages
-  - source/facility/severity filtering
-  - route matching events into Channels
-  - duplicate/noise controls
-
-- **Calendar / iCal**
-  - subscribe to iCal-compatible calendars
-  - notify before upcoming events
-  - per-calendar and per-event reminder rules
-  - duplicate-event protection
-
-### Under consideration
-
-These are not committed roadmap items yet:
-
-- **Uptime Monitor**
-- **Heartbeat Monitor**
-
-Dedicated uptime/heartbeat monitoring remains optional because established tools already cover that use case well. Gotify MU should integrate cleanly with those tools through Webhooks unless a clear need emerges for native monitoring.
-
-### Not currently planned
-
-From the current integration/plugin proposal, the following are intentionally not on the roadmap:
-
-- Discord bridge
-- Slack bridge
-- Microsoft Teams bridge
-- Prometheus Alertmanager bridge
-- Grafana alerts plugin
-- GitHub integration
-- GitLab integration
-- ntfy bridge
-- Gotify-to-Gotify bridge
-- SNMP trap receiver
-- standalone message formatter plugin
-- standalone rate-limit/deduplication plugin
-
-### Plugin platform roadmap
-
-Planned:
-
+- existing compatible Gotify Go plugin support
+- administrator Web UI install
+- SHA-256 verification
+- Ed25519 signatures and trusted signing keys
+- unsigned installation disabled by default
 - Plugin Catalog
-- first-party / third-party publisher identification
-- custom catalog/repository URLs
-- icons and metadata
-- screenshots
-- compatible Gotify MU version metadata
-- server architecture/Go ABI compatibility checks
-- checksums
-- signatures/trust state
-- one-click install
-- update
-- rollback
+- catalog install/update
+- verified manual update staging
 - uninstall
-- automatic update policy
-- plugin permission/capability presentation
-- standardized event hooks for message ingest and optional integration extensions
-- isolated plugin/service interface for plugins that should not execute inside the main Gotify MU process
+- plugin-created messages routed through Gotify MU delivery policy
 
-## Search, archive, and retention
+Native Go plugins remain trusted in-process extensions. They are not a sandbox boundary.
 
-Planned:
+### Operations
 
-- server-side full-text search
-- date range filters
-- Channel filters
-- sender filters
-- priority filters
-- acknowledgement/resolution filters
-- saved searches
-- saved views
-- message retention policies
-- Channel-specific retention
-- archive policies
-- export
-- bulk archive/delete controls
-
-## Server administration and operations
-
-Planned:
-
-- richer system health dashboard
-- database status
-- storage usage
-- message/attachment counts
-- connected-client visibility
-- WebSocket/session visibility
-- plugin health
-- queue/delivery diagnostics
-- backup creation
-- backup download
-- restore workflow
+- system/operations dashboard
+- database and storage information
+- queue/automation counters
+- active sessions
+- backup creation/download
+- restore staging
 - configuration export
-- server update information
-- safe update controls
-- diagnostics bundle
-- audit retention controls
+- diagnostics
+- audit export/retention
+- message/attachment/automation/connector cleanup policies
+- managed in-app Docker updates with checksum verification, full-test build gate, health verification, and rollback
+
+### Release engineering
+
+- read-only pull-request CI
+- SHA-pinned GitHub Actions
+- Web UI build
+- Go lint
+- full Go tests
+- repository checks
+- production Docker build with tests enabled
+- dependency/filesystem vulnerability scanning
+- container vulnerability scanning
+- SPDX SBOM
+- release SHA-256 checksums
+- build provenance attestation
+
+## After v0.5
+
+The v0.5 goal is to close the server-side audit backlog rather than continuously add unrelated scope. Future work should be driven by real operational feedback.
+
+Potential later work:
+
+- an isolated out-of-process extension protocol for integrations that should not execute as trusted native Go plugins
+- more advanced outbound integration workflow composition if real use cases require it
+- larger-scale performance tuning based on measured installations
+- additional first-party connectors only when there is a demonstrated need
 
 ## Gotify MU Android
 
-A dedicated Android fork becomes necessary for interactive Gotify MU features while retaining compatibility with normal notification delivery.
+A dedicated Android client remains a separate client project. The server preserves normal official Gotify Android receive/display compatibility.
 
-Planned:
+A Gotify MU Android client can later expose MU-specific features such as:
 
-- Gotify MU branding/design system
-- Channels
-- Messages
-- Archive
-- full search
-- Chat Channels
-- compose
-- replies/threads
+- Channel management
+- compose/send
+- threads/replies
 - reactions
 - acknowledgements
-- resolve/reopen
+- assignment and resolve/reopen
 - attachments
-- per-device preferences
-- quiet hours
-- user profile/security
-- MFA enrollment/elevation
-- multiple-server support where practical
+- Quiet Hours/Digest controls
+- account security/MFA
+- multiple-server support
 
-The Android fork should continue using the compatible Gotify REST/WebSocket behavior for existing features and layer Gotify MU endpoints on top.
+The Android client should continue using compatible Gotify REST/WebSocket behavior for existing functions and layer Gotify MU endpoints on top.
