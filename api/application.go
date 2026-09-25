@@ -62,6 +62,8 @@ type ApplicationParams struct {
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
 	// Whether assigned users may publish messages to this Gotify MU channel.
 	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
+	// Number of days to retain message history. Zero keeps messages indefinitely.
+	RetentionDays int `form:"retentionDays" query:"retentionDays" json:"retentionDays" binding:"min=0,max=36500"`
 }
 
 // CreateApplication creates an application and returns the access token.
@@ -124,6 +126,7 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			Internal:        false,
 			AutoAssign:      applicationParams.AutoAssign,
 			AllowMemberPost: applicationParams.AllowMemberPost,
+			RetentionDays: applicationParams.RetentionDays,
 		}
 
 		if err := a.DB.CreateApplication(&app); err != nil {
@@ -323,6 +326,7 @@ func (a *ApplicationAPI) UpdateApplication(ctx *gin.Context) {
 				app.Description = applicationParams.Description
 				app.Name = applicationParams.Name
 				app.DefaultPriority = applicationParams.DefaultPriority
+				app.RetentionDays = applicationParams.RetentionDays
 				if applicationParams.SortKey != "" {
 					app.SortKey = applicationParams.SortKey
 				}
