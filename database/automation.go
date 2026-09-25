@@ -140,7 +140,7 @@ func (d *GormDatabase) GetScheduledNotificationByID(id uint) (*model.ScheduledNo
 	return item, nil
 }
 func (d *GormDatabase) SaveScheduledNotification(item *model.ScheduledNotification) error { return d.DB.Save(item).Error }
-func (d *GormDatabase) DeleteScheduledNotification(id uint) error { return d.DB.Delete(&model.ScheduledNotification{}, id).Error }
+func (d *GormDatabase) DeleteScheduledNotification(id uint) error { return d.DeleteScheduledNotificationWithRuns(id) }
 func (d *GormDatabase) GetDueScheduledNotifications(now time.Time) ([]*model.ScheduledNotification, error) {
 	var items []*model.ScheduledNotification
 	return items, d.DB.Where("enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ?", true, now).Find(&items).Error
@@ -367,4 +367,36 @@ func (d *GormDatabase) UpdateHomeAssistantIntegrationStatus(id uint, status stri
 	if eventAt != nil { updates["last_event_at"] = eventAt }
 	if incrementReconnect { updates["reconnect_count"] = gorm.Expr("reconnect_count + ?", 1) }
 	return d.DB.Model(&model.HomeAssistantIntegration{}).Where("id = ?", id).Updates(updates).Error
+}
+
+
+func (d *GormDatabase) CreateScheduledNotificationRun(item *model.ScheduledNotificationRun) error {
+	return d.DB.Create(item).Error
+}
+
+func (d *GormDatabase) SaveScheduledNotificationRun(item *model.ScheduledNotificationRun) error {
+	return d.DB.Save(item).Error
+}
+
+func (d *GormDatabase) GetScheduledNotificationRuns(scheduleID uint, limit int) ([]*model.ScheduledNotificationRun, error) {
+	if limit <= 0 || limit > 200 { limit = 50 }
+	var items []*model.ScheduledNotificationRun
+	err := d.DB.Where("schedule_id = ?", scheduleID).
+		Order("scheduled_for desc, id desc").
+		Limit(limit).
+		Find(&items).Error
+	return items, err
+}
+
+func (d *GormDatabase) DeleteScheduledNotificationRuns(scheduleID uint) error {
+	return d.DB.Where("schedule_id = ?", scheduleID).Delete(&model.ScheduledNotificationRun{}).Error
+}
+
+func (d *GormDatabase) DeleteScheduledNotificationWithRuns(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("schedule_id = ?", id).Delete(&model.ScheduledNotificationRun{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&model.ScheduledNotification{}, id).Error
+	})
 }
