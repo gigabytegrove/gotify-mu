@@ -6,11 +6,13 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/fracdex"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -108,7 +110,33 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.EscalationRule),
 		new(model.EscalationState),
 		new(model.MessageAcknowledgement),
+		new(model.AutomationLease),
 	); err != nil {
+		return nil, err
+	}
+
+	var secretStore *security.SecretStore
+	if dialect == "sqlite3" && strings.Contains(connection, "mode=memory") {
+		secretStore = security.NewTestSecretStore()
+	} else {
+		keyPath := filepath.Join("data", ".gotify-mu-secrets.key")
+		if dialect == "sqlite3" {
+			candidate := strings.TrimPrefix(connection, "file:")
+			if query := strings.IndexByte(candidate, '?'); query >= 0 {
+				candidate = candidate[:query]
+			}
+			if candidate != "" && candidate != ":memory:" {
+				keyPath = filepath.Join(filepath.Dir(candidate), ".gotify-mu-secrets.key")
+			}
+		}
+		var secretErr error
+		secretStore, secretErr = security.LoadOrCreateSecretStore(keyPath)
+		if secretErr != nil {
+			return nil, secretErr
+		}
+	}
+	wrapper := &GormDatabase{DB: db, Secrets: secretStore}
+	if err := wrapper.migrateIntegrationSecrets(); err != nil {
 		return nil, err
 	}
 
@@ -134,7 +162,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
-	return &GormDatabase{DB: db}, nil
+	return wrapper, nil
 }
 
 func fillMissingCreatedAt(db *gorm.DB, now time.Time) error {
@@ -197,7 +225,8 @@ func createDirectoryIfSqlite(dialect, connection string) {
 
 // GormDatabase is a wrapper for the gorm framework.
 type GormDatabase struct {
-	DB *gorm.DB
+	DB      *gorm.DB
+	Secrets *security.SecretStore
 }
 
 // Close closes the gorm database connection.
