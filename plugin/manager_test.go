@@ -9,6 +9,7 @@ import (
 	"os"
 	"os/exec"
 	"path"
+	"strings"
 	"testing"
 	"time"
 
@@ -540,6 +541,29 @@ func TestNewManager_MessengerAddedAfterInit_updatePluginConfError(t *testing.T) 
 	// Persisting the back-filled ApplicationID may fail; that error must be
 	// propagated as well.
 	assert.EqualError(t, manager.InitializeForUserID(1), "update plugin conf failed")
+}
+
+func TestInstallPlugin_NoDirectory_expectError(t *testing.T) {
+	db := testdb.NewDBWithDefaultUser(t)
+	manager, err := NewManager(db, "", nil, nil)
+	assert.NoError(t, err)
+
+	_, _, err = manager.InstallPlugin("example.so", strings.NewReader("not a plugin"))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "no plugin directory")
+}
+
+func TestInstallPlugin_InvalidExtension_expectError(t *testing.T) {
+	tmpDir := test.NewTmpDir("gotify_installplugin_extension")
+	defer tmpDir.Clean()
+
+	db := testdb.NewDBWithDefaultUser(t)
+	manager, err := NewManager(db, tmpDir.Path(), nil, nil)
+	assert.NoError(t, err)
+
+	_, _, err = manager.InstallPlugin("example.txt", strings.NewReader("not a plugin"))
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), ".so")
 }
 
 func TestPluginFileLoadError(t *testing.T) {
