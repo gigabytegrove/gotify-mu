@@ -16,6 +16,9 @@ import Security from '@mui/icons-material/Security';
 import Devices from '@mui/icons-material/Devices';
 import Assessment from '@mui/icons-material/Assessment';
 import Download from '@mui/icons-material/Download';
+import Upload from '@mui/icons-material/Upload';
+import Backup from '@mui/icons-material/Backup';
+import BugReport from '@mui/icons-material/BugReport';
 import Delete from '@mui/icons-material/Delete';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
@@ -32,6 +35,9 @@ const SystemAdministration = () => {
     const [sessions, setSessions] = React.useState<IAdminSession[]>([]);
     const [loading, setLoading] = React.useState(false);
     const [saving, setSaving] = React.useState(false);
+    const [restoreStaged, setRestoreStaged] = React.useState(false);
+    const [restoring, setRestoring] = React.useState(false);
+    const restoreInput = React.useRef<HTMLInputElement | null>(null);
 
     const refresh = React.useCallback(async () => {
         setLoading(true);
@@ -70,6 +76,23 @@ const SystemAdministration = () => {
 
     const downloadAudit = (format: 'csv' | 'json') => {
         window.location.href = api('audit/export?format=' + format);
+    };
+
+    const stageRestore = async (file?: File) => {
+        if (!file) return;
+        setRestoring(true);
+        try {
+            const form = new FormData();
+            form.append('backup', file);
+            await axios.post(api('admin/restore'), form, {
+                headers: {'Content-Type': 'multipart/form-data'},
+            });
+            setRestoreStaged(true);
+            snackManager.snack('Backup staged. Restart Gotify MU to apply it.');
+        } finally {
+            setRestoring(false);
+            if (restoreInput.current) restoreInput.current.value = '';
+        }
     };
 
     return (
@@ -294,6 +317,68 @@ const SystemAdministration = () => {
                         ))}
                     </Stack>
                 )}
+            </SurfaceCard>
+
+            <SurfaceCard
+                title="Backup & Recovery"
+                subtitle="Download a complete recovery bundle or stage a verified restore for the next restart."
+                action={<Backup color="action" />}>
+                <Stack spacing={1.5}>
+                    {restoreStaged && (
+                        <Alert
+                            severity="warning"
+                            action={
+                                <Button
+                                    color="inherit"
+                                    size="small"
+                                    onClick={async () => {
+                                        await axios.delete(api('admin/restore'));
+                                        setRestoreStaged(false);
+                                        snackManager.snack('Staged restore cancelled');
+                                    }}>
+                                    Cancel Restore
+                                </Button>
+                            }>
+                            A restore is staged. Restart Gotify MU to apply it before the database
+                            opens. A pre-restore safety backup will be created automatically.
+                        </Alert>
+                    )}
+                    <Stack direction={{xs: 'column', sm: 'row'}} spacing={1}>
+                        <Button
+                            variant="contained"
+                            startIcon={<Download />}
+                            component="a"
+                            href={api('admin/backup')}>
+                            Download Full Backup
+                        </Button>
+                        <input
+                            hidden
+                            type="file"
+                            accept=".zip,application/zip"
+                            ref={restoreInput}
+                            onChange={(event) => void stageRestore(event.target.files?.[0])}
+                        />
+                        <Button
+                            variant="outlined"
+                            startIcon={<Upload />}
+                            disabled={restoring}
+                            onClick={() => restoreInput.current?.click()}>
+                            {restoring ? 'Validating Backup…' : 'Stage Restore'}
+                        </Button>
+                        <Button
+                            variant="outlined"
+                            startIcon={<BugReport />}
+                            component="a"
+                            href={api('admin/diagnostics')}>
+                            Download Diagnostics
+                        </Button>
+                    </Stack>
+                    <Typography variant="body2" color="text.secondary">
+                        Full backups include the database snapshot, encrypted-integration key,
+                        uploaded images, attachments, plugins, and other persistent data. Restore
+                        files are validated before they are accepted.
+                    </Typography>
+                </Stack>
             </SurfaceCard>
 
             <SurfaceCard
