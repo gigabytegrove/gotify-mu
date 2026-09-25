@@ -50,6 +50,7 @@ type Database interface {
 	SaveCalendarMonitor(item *model.CalendarMonitor) error
 
 	MarkConnectorItemSeen(connectorType string, connectorID uint, itemKey string, now time.Time) (bool, error)
+	MarkConnectorItemSeenWithin(connectorType string, connectorID uint, itemKey string, now time.Time, window time.Duration) (bool, error)
 	CleanupConnectorSeenItems(before time.Time) error
 	TryAcquireAutomationLease(name, holder string, now time.Time, ttl time.Duration) (bool, error)
 	ReleaseAutomationLease(name, holder string) error
@@ -232,6 +233,7 @@ type rssDocument struct {
 			GUID string `xml:"guid"`
 			Description string `xml:"description"`
 			PubDate string `xml:"pubDate"`
+			Categories []string `xml:"category"`
 		} `xml:"item"`
 	} `xml:"channel"`
 }
@@ -273,7 +275,7 @@ func parseFeed(body []byte) ([]feedItem,error) {
 			key:=strings.TrimSpace(item.GUID); if key=="" { key=strings.TrimSpace(item.Link) }; if key=="" { key=item.Title+"|"+item.PubDate }
 			bodyText:=strings.TrimSpace(item.Description)
 			if item.Link!="" { bodyText += "\n"+item.Link }
-			result=append(result,feedItem{Key:key,Title:item.Title,Body:bodyText})
+			result=append(result,feedItem{Key:key,Title:item.Title,Body:bodyText,Categories:item.Categories})
 		}
 		return result,nil
 	}
@@ -284,7 +286,8 @@ func parseFeed(body []byte) ([]feedItem,error) {
 		link:=""; if len(item.Links)>0 { link=item.Links[0].Href }
 		key:=strings.TrimSpace(item.ID); if key=="" { key=link }; if key=="" { key=item.Title+"|"+item.Updated }
 		bodyText:=strings.TrimSpace(item.Summary); if bodyText=="" { bodyText=strings.TrimSpace(item.Content) }; if link!="" { bodyText+="\n"+link }
-		result=append(result,feedItem{Key:key,Title:item.Title,Body:bodyText})
+		categories:=make([]string,0,len(item.Categories));for _,category:=range item.Categories{if strings.TrimSpace(category.Term)!=""{categories=append(categories,category.Term)}}
+		result=append(result,feedItem{Key:key,Title:item.Title,Body:bodyText,Categories:categories})
 	}
 	return result,nil
 }
@@ -303,10 +306,16 @@ func (m *Manager) pollRSS(item *model.RSSMonitor, now time.Time) {
 	if err!=nil { item.Status="error";item.LastError=err.Error();item.LastErrorAt=&now;_=m.db.UpdateRSSMonitorStatus(item);return }
 	for i:=len(feed)-1;i>=0;i-- {
 		entry:=feed[i]
+		if filter:=strings.ToLower(strings.TrimSpace(item.TitleContains));filter!=""&&!strings.Contains(strings.ToLower(entry.Title),filter){continue}
+		if filter:=strings.ToLower(strings.TrimSpace(item.CategoryContains));filter!=""{
+			matched:=false
+			for _,category:=range entry.Categories{if strings.Contains(strings.ToLower(category),filter){matched=true;break}}
+			if !matched{continue}
+		}
 		fresh,err:=m.db.MarkConnectorItemSeen("rss",item.ID,entry.Key,now)
 		if err!=nil || !fresh { continue }
 		title:=entry.Title; if title=="" { title=item.Name }
-		if _,err:=m.publisher.Publish(item.ApplicationID,title,entry.Body,0);err==nil {
+		if _,err:=m.publisher.Publish(item.ApplicationID,title,entry.Body,item.Priority);err==nil {
 			t:=now; item.LastItemAt=&t
 		}
 	}
@@ -364,6 +373,8 @@ func (m *Manager) pollCalendar(item *model.CalendarMonitor, now time.Time) {
 	windowEnd:=now.Add(time.Duration(ahead)*time.Minute)
 	for _,event:=range parseCalendar(body) {
 		if event.Start.Before(now.Add(-time.Minute)) || event.Start.After(windowEnd) { continue }
+		if filter:=strings.ToLower(strings.TrimSpace(item.TitleContains));filter!=""&&!strings.Contains(strings.ToLower(event.Summary),filter){continue}
+		if filter:=strings.ToLower(strings.TrimSpace(item.LocationContains));filter!=""&&!strings.Contains(strings.ToLower(event.Location),filter){continue}
 		key:=event.UID+"|"+event.Start.UTC().Format(time.RFC3339)
 		if event.UID=="" { key=event.Summary+"|"+event.Start.UTC().Format(time.RFC3339) }
 		fresh,seenErr:=m.db.MarkConnectorItemSeen("ical",item.ID,key,now)
@@ -371,7 +382,7 @@ func (m *Manager) pollCalendar(item *model.CalendarMonitor, now time.Time) {
 		text:=event.Description
 		if event.Location!="" { if text!=""{text+="\n"};text+="Location: "+event.Location }
 		if text!=""{text+="\n"};text+="Starts: "+event.Start.Format(time.RFC1123)
-		if _,publishErr:=m.publisher.Publish(item.ApplicationID,event.Summary,text,0);publishErr==nil{t:=now;item.LastEventAt=&t}
+		if _,publishErr:=m.publisher.Publish(item.ApplicationID,event.Summary,text,item.Priority);publishErr==nil{t:=now;item.LastEventAt=&t}
 	}
 	_ = m.db.SaveCalendarMonitor(item)
 }
@@ -418,7 +429,7 @@ func (m *Manager) handleSMTP(conn net.Conn) {
 	reader:=bufio.NewReader(conn);writer:=bufio.NewWriter(conn)
 	reply:=func(code int,text string){fmt.Fprintf(writer,"%d %s\r\n",code,text);_=writer.Flush()}
 	reply(220,"Gotify MU SMTP Receiver")
-	var recipient,user,pass string
+	var recipient,user,pass,envelopeSender string
 	authenticated:=false
 	for {
 		line,err:=reader.ReadString('\n');if err!=nil{return}
@@ -432,7 +443,9 @@ func (m *Manager) handleSMTP(conn net.Conn) {
 			if decodeErr!=nil{reply(535,"Authentication failed");continue}
 			parts:=strings.Split(string(raw),"\x00")
 			if len(parts)>=3{user=parts[len(parts)-2];pass=parts[len(parts)-1];authenticated=true;reply(235,"Authenticated")}else{reply(535,"Authentication failed")}
-		case strings.HasPrefix(upper,"MAIL FROM:"):reply(250,"OK")
+		case strings.HasPrefix(upper,"MAIL FROM:"):
+			envelopeSender=strings.Trim(strings.TrimSpace(line[len("MAIL FROM:"):]),"<>")
+			reply(250,"OK")
 		case strings.HasPrefix(upper,"RCPT TO:"):
 			recipient=strings.Trim(strings.TrimSpace(line[len("RCPT TO:"):]),"<>")
 			route,routeErr:=m.db.MatchSMTPRoute(recipient)
@@ -442,23 +455,26 @@ func (m *Manager) handleSMTP(conn net.Conn) {
 		case upper=="DATA":
 			if recipient==""{reply(503,"Valid recipient required");continue}
 			reply(354,"End data with <CRLF>.<CRLF>")
+			route,_:=m.db.MatchSMTPRoute(recipient);if route==nil{reply(550,"Recipient unavailable");continue}
+			if filter:=strings.ToLower(strings.TrimSpace(route.SenderContains));filter!=""&&!strings.Contains(strings.ToLower(envelopeSender),filter){reply(550,"Sender not allowed");continue}
+			maxBytes:=route.MaxMessageBytes;if maxBytes<=0{maxBytes=5<<20}
 			var data strings.Builder
 			for {
 				part,readErr:=reader.ReadString('\n');if readErr!=nil{return}
 				if strings.TrimSpace(part)=="."{break}
 				if strings.HasPrefix(part,".."){part=part[1:]}
-				if data.Len()+(len(part))>5<<20{reply(552,"Message too large");return}
+				if data.Len()+(len(part))>maxBytes{reply(552,"Message too large");return}
 				data.WriteString(part)
 			}
-			route,_:=m.db.MatchSMTPRoute(recipient);if route==nil{reply(550,"Recipient unavailable");continue}
 			msg,parseErr:=mail.ReadMessage(strings.NewReader(data.String()))
 			if parseErr!=nil{reply(554,"Invalid message");continue}
 			body,readErr:=io.ReadAll(io.LimitReader(msg.Body,4<<20));if readErr!=nil{reply(451,"Read failed");continue}
 			title:=msg.Header.Get("Subject");if title==""{title=route.Name}
+			if filter:=strings.ToLower(strings.TrimSpace(route.SubjectContains));filter!=""&&!strings.Contains(strings.ToLower(title),filter){reply(550,"Message subject not allowed");recipient="";continue}
 			content:=strings.TrimSpace(string(body));from:=msg.Header.Get("From");if from!=""{content="From: "+from+"\n\n"+content}
 			if _,publishErr:=m.publisher.Publish(route.ApplicationID,title,content,0);publishErr!=nil{reply(451,"Delivery failed");continue}
-			reply(250,"Accepted");recipient=""
-		case upper=="RSET":recipient="";reply(250,"OK")
+			reply(250,"Accepted");recipient="";envelopeSender=""
+		case upper=="RSET":recipient="";envelopeSender="";reply(250,"OK")
 		case upper=="NOOP":reply(250,"OK")
 		case upper=="QUIT":reply(221,"Bye");return
 		default:reply(502,"Command not implemented")
@@ -502,6 +518,11 @@ func (m *Manager) handleSyslog(ip net.IP, raw string) {
 		if !route.Enabled||!ipAllowed(ip,route.AllowedCIDRs){continue}
 		if route.Facility>=0&&facility!=route.Facility{continue}
 		max:=route.MaxSeverity;if max<0||max>7{max=7};if severity>max{continue}
+		if route.DeduplicateSeconds>0 {
+			key:=fmt.Sprintf("%s|%d|%d|%s",ip.String(),facility,severity,body)
+			fresh,seenErr:=m.db.MarkConnectorItemSeenWithin("syslog",route.ID,key,time.Now(),time.Duration(route.DeduplicateSeconds)*time.Second)
+			if seenErr!=nil||!fresh{continue}
+		}
 		priority:=0;if severity<=3{priority=8}else if severity<=4{priority=4}
 		_,_=m.publisher.Publish(route.ApplicationID,route.Name,body,priority)
 	}
