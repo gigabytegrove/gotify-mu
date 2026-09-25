@@ -125,6 +125,8 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.ConnectorSeenItem),
 		new(model.PasskeyCredential),
 		new(model.WebAuthnChallenge),
+		new(model.ServiceAccount),
+		new(model.ServiceAccountToken),
 	); err != nil {
 		return nil, err
 	}
