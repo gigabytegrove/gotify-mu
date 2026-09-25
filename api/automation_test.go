@@ -66,3 +66,31 @@ func TestURLValidation(t *testing.T) {
 		t.Fatal("https URL should be valid for Home Assistant")
 	}
 }
+
+
+func TestLookupPayloadSupportsArrays(t *testing.T) {
+	payload := map[string]any{
+		"items": []any{
+			map[string]any{"name":"first"},
+			map[string]any{"name":"second"},
+		},
+	}
+	value, ok := lookupPayload(payload, "items.1.name")
+	if !ok || value != "second" {
+		t.Fatalf("unexpected array lookup: %#v ok=%v", value, ok)
+	}
+}
+
+func TestRenderPayloadTemplate(t *testing.T) {
+	payload := map[string]any{
+		"alert": map[string]any{"title":"Disk full"},
+		"items": []any{map[string]any{"name":"server-1"}},
+	}
+	got := renderPayloadTemplate("{{alert.title}} on {{items.0.name}}", payload, "raw")
+	if got != "Disk full on server-1" {
+		t.Fatalf("unexpected template output %q", got)
+	}
+	if raw := renderPayloadTemplate("body={{raw}}", payload, "original"); raw != "body=original" {
+		t.Fatalf("unexpected raw template output %q", raw)
+	}
+}
