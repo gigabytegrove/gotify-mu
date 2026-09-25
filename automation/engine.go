@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,6 +34,7 @@ type Notifier interface {
 // Database is the storage contract required by the native integration engine.
 type Database interface {
 	CreateMessage(message *model.Message) error
+	CreateMessageOnce(message *model.Message) (*model.Message, bool, error)
 	GetMessageByID(id uint) (*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
@@ -60,6 +63,13 @@ type Database interface {
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
 	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
 	SaveHomeAssistantIntegration(item *model.HomeAssistantIntegration) error
+
+	AcquireAutomationLease(key, owner string, now time.Time, ttl time.Duration) (bool, error)
+	ReleaseAutomationLease(key, owner string) error
+	CreateAutomationRun(item *model.AutomationRun) (bool, error)
+	GetAutomationRunByTrigger(triggerKey string) (*model.AutomationRun, error)
+	SaveAutomationRun(item *model.AutomationRun) error
+	SaveIntegrationStatus(item *model.IntegrationStatus) error
 }
 
 // Engine runs scheduled work and persistent native integrations.
@@ -75,6 +85,7 @@ type Engine struct {
 	integrationCancels []context.CancelFunc
 	integrationWG      sync.WaitGroup
 	reload             chan struct{}
+	instanceID         string
 }
 
 func New(db Database, notifier Notifier) *Engine {
@@ -85,6 +96,7 @@ func New(db Database, notifier Notifier) *Engine {
 		ctx: ctx,
 		cancel: cancel,
 		reload: make(chan struct{}, 1),
+		instanceID: newInstanceID(),
 	}
 	e.wg.Add(2)
 	go e.schedulerLoop()
@@ -135,11 +147,36 @@ func (e *Engine) StoreAndDeliver(msg *model.Message) (*model.MessageExternal, er
 	return e.storeAndDeliver(msg, true)
 }
 
+func (e *Engine) publishWithKey(applicationID uint, title, message string, priority int, dedupKey string, parentMessageID uint) (*model.Message, error) {
+	app, err := e.db.GetApplicationByID(applicationID)
+	if err != nil { return nil, err }
+	if app == nil { return nil, errors.New("channel not found") }
+	if strings.TrimSpace(title) == "" { title = app.Name }
+	msg := &model.Message{
+		ApplicationID: applicationID,
+		Title: title,
+		Message: message,
+		Priority: priority,
+		Date: time.Now(),
+		DedupKey: dedupKey,
+		ParentMessageID: parentMessageID,
+	}
+	if _, err := e.storeAndDeliver(msg, true); err != nil { return nil, err }
+	return msg, nil
+}
+
 func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*model.MessageExternal, error) {
 	if msg.Date.IsZero() {
 		msg.Date = time.Now()
 	}
-	if err := e.db.CreateMessage(msg); err != nil {
+	if msg.DedupKey != "" {
+		stored, created, err := e.db.CreateMessageOnce(msg)
+		if err != nil { return nil, err }
+		if !created {
+			return externalMessage(stored), nil
+		}
+		msg = stored
+	} else if err := e.db.CreateMessage(msg); err != nil {
 		return nil, err
 	}
 	recipients, err := e.db.GetApplicationRecipientUserIDs(msg.ApplicationID)
@@ -234,13 +271,19 @@ func (e *Engine) schedulerLoop() {
 	defer e.wg.Done()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	e.runDue(time.Now())
 	for {
+		now := time.Now()
+		acquired, err := e.db.AcquireAutomationLease("scheduler", e.instanceID, now, 25*time.Second)
+		if err != nil {
+			log.Error().Err(err).Msg("Could not acquire automation scheduler lease")
+		} else if acquired {
+			e.runDue(now)
+			_ = e.db.ReleaseAutomationLease("scheduler", e.instanceID)
+		}
 		select {
 		case <-e.ctx.Done():
 			return
-		case now := <-ticker.C:
-			e.runDue(now)
+		case <-ticker.C:
 		}
 	}
 }
@@ -258,17 +301,43 @@ func (e *Engine) runSchedules(now time.Time) {
 		return
 	}
 	for _, item := range items {
-		if _, err := e.Publish(item.ApplicationID, item.Title, item.Message, item.Priority); err != nil {
-			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
+		if item.NextRunAt == nil { continue }
+		triggerTime := item.NextRunAt.UTC()
+		triggerKey := fmt.Sprintf("schedule:%d:%d", item.ID, triggerTime.UnixNano())
+		run, err := e.db.GetAutomationRunByTrigger(triggerKey)
+		if err != nil {
+			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not inspect schedule run")
 			continue
 		}
+		if run == nil {
+			run = &model.AutomationRun{Kind:"schedule", ObjectID:item.ID, TriggerKey:triggerKey, Status:"running", StartedAt:now}
+			if _, err := e.db.CreateAutomationRun(run); err != nil {
+				log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not create schedule run")
+				continue
+			}
+		}
+		msg, publishErr := e.publishWithKey(item.ApplicationID, item.Title, item.Message, item.Priority, triggerKey, 0)
+		finished := time.Now()
+		run.FinishedAt = &finished
+		if publishErr != nil {
+			run.Status = "failed"
+			run.Error = publishErr.Error()
+			_ = e.db.SaveAutomationRun(run)
+			log.Error().Err(publishErr).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
+			continue
+		}
+		run.Status = "completed"
+		run.MessageID = msg.ID
+		run.Error = ""
+		_ = e.db.SaveAutomationRun(run)
+
 		runAt := now
 		item.LastRunAt = &runAt
 		if item.ScheduleType == "once" {
 			item.Enabled = false
 			item.NextRunAt = nil
 		} else {
-			item.NextRunAt = NextScheduleRun(item, now.Add(time.Second))
+			item.NextRunAt = NextScheduleRun(item, triggerTime.Add(time.Second))
 		}
 		if err := e.db.SaveScheduledNotification(item); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not update schedule")
@@ -403,11 +472,33 @@ func (e *Engine) runEscalations(now time.Time) {
 						title = "Escalated: " + title
 					}
 					body := msg.Message + "\n\nThis notification was escalated because it was not acknowledged."
-					escalated := &model.Message{ApplicationID:rule.TargetApplicationID,Title:title,Message:body,Priority:msg.Priority,Date:time.Now()}
-					if _, publishErr := e.storeAndDeliver(escalated, false); publishErr != nil {
+					triggerKey := fmt.Sprintf("escalation:%d", state.ID)
+					run, runErr := e.db.GetAutomationRunByTrigger(triggerKey)
+					if runErr != nil {
+						log.Error().Err(runErr).Uint("rule_id", rule.ID).Msg("Could not inspect escalation run")
+						continue
+					}
+					if run == nil {
+						run = &model.AutomationRun{Kind:"escalation", ObjectID:rule.ID, TriggerKey:triggerKey, Status:"running", StartedAt:now}
+						if _, createErr := e.db.CreateAutomationRun(run); createErr != nil {
+							log.Error().Err(createErr).Uint("rule_id", rule.ID).Msg("Could not create escalation run")
+							continue
+						}
+					}
+					escalated, publishErr := e.publishWithKey(rule.TargetApplicationID, title, body, msg.Priority, triggerKey, msg.ID)
+					finished := time.Now()
+					run.FinishedAt = &finished
+					if publishErr != nil {
+						run.Status = "failed"
+						run.Error = publishErr.Error()
+						_ = e.db.SaveAutomationRun(run)
 						log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
 						continue
 					}
+					run.Status = "completed"
+					run.MessageID = escalated.ID
+					run.Error = ""
+					_ = e.db.SaveAutomationRun(run)
 					state.Completed = true
 				}
 			}
@@ -929,6 +1020,14 @@ func numberAsInt(value any) (int, bool) {
 	default:
 		return 0, false
 	}
+}
+
+func newInstanceID() string {
+	raw := make([]byte, 8)
+	if _, err := rand.Read(raw); err != nil {
+		return fmt.Sprintf("instance-%d", time.Now().UnixNano())
+	}
+	return "instance-" + hex.EncodeToString(raw)
 }
 
 func clamp(value, min, max int) int {
