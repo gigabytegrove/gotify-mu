@@ -1,0 +1,96 @@
+name: verify
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Full validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.26.x
+
+      - name: Set up Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+          cache: yarn
+          cache-dependency-path: ui/yarn.lock
+
+      - name: Install Web UI dependencies
+        run: (cd ui && yarn --frozen-lockfile)
+
+      - name: Build Web UI
+        run: make build-js
+
+      - name: Go lint
+        uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
+        with:
+          version: v2.13.0
+          args: --timeout=5m
+          skip-cache: true
+
+      - name: Download Go dependencies
+        run: go mod download
+
+      - name: Download project tools
+        run: make download-tools
+
+      - name: Full test suite
+        run: make test
+
+      - name: Repository checks
+        run: make check-ci
+
+      - name: Build production Docker image with tests enabled
+        run: |
+          docker build             --build-arg BUILD_JS=1             --build-arg RUN_TESTS=1             --build-arg GO_VERSION=1.26.0             --build-arg GOTIFY_MU_VERSION=pr-${{ github.event.pull_request.number }}             --build-arg GOTIFY_MU_COMMIT=${{ github.sha }}             -f docker/Dockerfile             -t gotify-mu:verify             .
+
+      - name: Scan repository and dependencies
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          scan-type: fs
+          scan-ref: .
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Scan built container
+        uses: aquasecurity/trivy-action@b6643a29fecd7f34b3597bc6acb0a98b03d33ff8 # v0.33.1
+        with:
+          image-ref: gotify-mu:verify
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Generate SPDX SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          image: gotify-mu:verify
+          format: spdx-json
+          output-file: gotify-mu.spdx.json
+          upload-artifact: true
+
+      - name: Upload coverage
+        uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false
