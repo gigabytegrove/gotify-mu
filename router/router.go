@@ -45,7 +45,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		}
 	})
 
-	g.Use(accessLogger(), auditMutations(db), gin.Recovery(), gerror.Handler(), location.Default())
+	g.Use(accessLogger(), auditAuthentication(db), auditMutations(db), gin.Recovery(), gerror.Handler(), location.Default())
 	g.NoRoute(gerror.NotFound())
 
 	if conf.Server.SSL.Enabled && conf.Server.SSL.RedirectToHTTPS {
@@ -522,6 +522,51 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		connectorManager.Close()
 		automationEngine.Close()
 		streamHandler.Close()
+	}
+}
+
+func auditAuthentication(db *database.GormDatabase) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		path := ctx.Request.URL.Path
+		isAuthAttempt := path == "/auth/local/login" ||
+			path == "/auth/ldap/login" ||
+			path == "/auth/passkey/login/verify" ||
+			path == "/auth/oidc/callback"
+		if !isAuthAttempt {
+			ctx.Next()
+			return
+		}
+
+		ctx.Next()
+
+		status := ctx.Writer.Status()
+		action := "auth.login"
+		if status >= 400 {
+			action = "auth.failed"
+		}
+		target := path
+		if strings.HasPrefix(target, "/auth/oidc/") {
+			target = "/auth/oidc"
+		}
+		event := &model.AuditEvent{
+			Action:    action,
+			Target:    target,
+			IPAddress: ctx.ClientIP(),
+			Details:   fmt.Sprintf("status=%d", status),
+		}
+		if userID := auth.TryGetUserID(ctx); userID != nil {
+			event.UserID = *userID
+			if user, err := db.GetUserByID(*userID); err == nil && user != nil {
+				event.Username = user.Name
+			}
+		} else if path == "/auth/local/login" {
+			if username, _, ok := ctx.Request.BasicAuth(); ok {
+				event.Username = username
+			}
+		}
+		if err := db.CreateAuditEvent(event); err != nil {
+			log.Error().Err(err).Str("target", target).Msg("Could not persist authentication audit event")
+		}
 	}
 }
 
