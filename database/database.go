@@ -114,6 +114,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.AutomationRun),
 		new(model.IntegrationStatus),
 		new(model.SecurityPolicy),
+		new(model.ServiceAccount),
 		new(model.UserMFA),
 		new(model.RSSIntegration),
 		new(model.CalendarIntegration),
