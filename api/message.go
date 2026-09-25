@@ -602,6 +602,14 @@ func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
 		isAdmin := user != nil && user.Admin
 
 		allowed := app.UserID == userID || isAdmin
+		if !allowed {
+			membership, membershipErr := a.DB.GetApplicationMembership(id, userID)
+			if membershipErr != nil {
+				ctx.AbortWithError(500, membershipErr)
+				return
+			}
+			allowed = membership != nil && membership.EffectiveRole == model.ChannelRoleManager
+		}
 		if app.AutoAssign {
 			allowed = isAdmin
 		}
@@ -685,29 +693,29 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		}
 
 		if fetchedApp.UserID != userID {
-			if !fetchedApp.AllowMemberPost {
-				ctx.AbortWithError(400, errors.New("appid not found"))
-				return
-			}
 			membership, err := a.DB.GetApplicationMembership(fetchedApp.ID, userID)
-			if success := successOrAbort(ctx, 500, err); !success {
-				return
-			}
+			if success := successOrAbort(ctx, 500, err); !success { return }
 			if membership == nil {
 				ctx.AbortWithError(400, errors.New("appid not found"))
 				return
 			}
-		}
-
-		if fetchedApp.AllowMemberPost {
-			postingUser, err = a.DB.GetUserByID(userID)
-			if success := successOrAbort(ctx, 500, err); !success {
+			role := membership.EffectiveRole
+			canPost := role == model.ChannelRoleManager ||
+				role == model.ChannelRolePublisher ||
+				(role == model.ChannelRoleMember && fetchedApp.AllowMemberPost)
+			if !canPost {
+				ctx.AbortWithError(403, errors.New("your Channel role does not allow posting"))
 				return
 			}
+			postingUser, err = a.DB.GetUserByID(userID)
+			if success := successOrAbort(ctx, 500, err); !success { return }
 			if postingUser == nil {
 				ctx.AbortWithError(400, errors.New("user not found"))
 				return
 			}
+		} else if fetchedApp.AllowMemberPost {
+			postingUser, err = a.DB.GetUserByID(userID)
+			if success := successOrAbort(ctx, 500, err); !success { return }
 		}
 		app = fetchedApp
 	}
