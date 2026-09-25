@@ -126,7 +126,7 @@ For a release checkout:
 ```bash
 git clone https://github.com/gigabytegrove/gotify-mu.git
 cd gotify-mu
-git checkout v0.2.0
+git checkout v0.2.1
 ```
 
 Release builds inject the release version, commit, and build date into the server binary. Development builds continue to use `master-<commit>`, `master-local`, or `dev-<commit>` identities as appropriate.
@@ -271,7 +271,7 @@ docker compose up -d --build
 
 Your `./data` directory remains in place.
 
-### Building the v0.2.0 release manually
+### Building the v0.2.1 release manually
 
 After checking out the release tag, build with explicit release identity:
 
@@ -283,10 +283,10 @@ COMMIT="$(git rev-parse --short HEAD)"
 docker build --no-cache \
   --build-arg BUILD_JS=1 \
   --build-arg GO_VERSION=1.26.0 \
-  --build-arg GOTIFY_MU_VERSION="0.2.0" \
+  --build-arg GOTIFY_MU_VERSION="0.2.1" \
   --build-arg GOTIFY_MU_COMMIT="${COMMIT}" \
   -f docker/Dockerfile \
-  -t gotify-mu:0.2.0 \
+  -t gotify-mu:0.2.1 \
   .
 ```
 
