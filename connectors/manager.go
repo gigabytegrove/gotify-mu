@@ -3,6 +3,7 @@ package connectors
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
 	"crypto/tls"
 	"encoding/base64"
 	"encoding/xml"
@@ -519,7 +520,9 @@ func (m *Manager) handleSyslog(ip net.IP, raw string) {
 		if route.Facility>=0&&facility!=route.Facility{continue}
 		max:=route.MaxSeverity;if max<0||max>7{max=7};if severity>max{continue}
 		if route.DeduplicateSeconds>0 {
-			key:=fmt.Sprintf("%s|%d|%d|%s",ip.String(),facility,severity,body)
+			fingerprint:=fmt.Sprintf("%s|%d|%d|%s",ip.String(),facility,severity,body)
+			sum:=sha256.Sum256([]byte(fingerprint))
+			key:=fmt.Sprintf("%x",sum[:])
 			fresh,seenErr:=m.db.MarkConnectorItemSeenWithin("syslog",route.ID,key,time.Now(),time.Duration(route.DeduplicateSeconds)*time.Second)
 			if seenErr!=nil||!fresh{continue}
 		}
