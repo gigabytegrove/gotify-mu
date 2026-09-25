@@ -25,6 +25,8 @@ type AutomationEngine interface {
 	Publish(applicationID uint, title, message string, priority int) (*model.Message, error)
 	ReloadIntegrations()
 	SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error
+	TestMQTT(id uint) error
+	GetIntegrationStatuses() []model.IntegrationRuntimeStatus
 }
 
 type AutomationDatabase interface {
@@ -231,6 +233,17 @@ type mqttParams struct {
 	Password      string `json:"password"`
 	Topic         string `json:"topic" binding:"required"`
 	Enabled       bool   `json:"enabled"`
+}
+
+func (a *AutomationAPI) GetIntegrationStatus(ctx *gin.Context) {
+	ctx.JSON(200, a.Engine.GetIntegrationStatuses())
+}
+
+func (a *AutomationAPI) TestMQTT(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 502, a.Engine.TestMQTT(id)) { return }
+		ctx.JSON(200, gin.H{"connected": true})
+	})
 }
 
 func (a *AutomationAPI) GetMQTT(ctx *gin.Context) {
