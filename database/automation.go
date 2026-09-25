@@ -3,6 +3,7 @@ package database
 import (
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/gotify/server/v3/auth"
@@ -399,4 +400,113 @@ func (d *GormDatabase) DeleteScheduledNotificationWithRuns(id uint) error {
 		}
 		return tx.Delete(&model.ScheduledNotification{}, id).Error
 	})
+}
+
+
+func (d *GormDatabase) ResolveEscalationTargetApplication(rule *model.EscalationRule) (*model.Application, error) {
+	targetType := strings.ToLower(strings.TrimSpace(rule.TargetType))
+	if targetType == "" || targetType == "channel" {
+		targetID := rule.TargetApplicationID
+		if targetID == 0 { targetID = rule.TargetID }
+		return d.GetApplicationByID(targetID)
+	}
+	if targetType != "user" && targetType != "group" {
+		return nil, fmt.Errorf("unsupported escalation target type %q", rule.TargetType)
+	}
+	if rule.TargetID == 0 {
+		return nil, errors.New("escalation target is required")
+	}
+
+	mapping := new(model.EscalationTargetApplication)
+	err := d.DB.Where("target_type = ? AND target_id = ?", targetType, rule.TargetID).First(mapping).Error
+	if err != nil && !errors.Is(err, gorm.ErrRecordNotFound) { return nil, err }
+
+	var app *model.Application
+	if err == nil {
+		app, err = d.GetApplicationByID(mapping.ApplicationID)
+		if err != nil { return nil, err }
+	}
+
+	if app == nil {
+		name := "Escalations"
+		description := "Escalated notifications"
+		ownerID := uint(0)
+		if targetType == "user" {
+			user, userErr := d.GetUserByID(rule.TargetID)
+			if userErr != nil { return nil, userErr }
+			if user == nil { return nil, errors.New("escalation user not found") }
+			ownerID = user.ID
+			name = "Escalations · " + user.Name
+			description = "Escalated notifications for " + user.Name
+		} else {
+			group, groupErr := d.GetUserGroupByID(rule.TargetID)
+			if groupErr != nil { return nil, groupErr }
+			if group == nil { return nil, errors.New("escalation Group not found") }
+			name = "Escalations · " + group.Name
+			description = "Escalated notifications for Group " + group.Name
+		}
+
+		publicToken, _ := auth.GenerateApplicationToken()
+		app = &model.Application{
+			UserID:ownerID,
+			Name:name,
+			Description:description,
+			Token:publicToken,
+			Internal:true,
+		}
+		if err := d.CreateApplication(app); err != nil { return nil, err }
+		mapping = &model.EscalationTargetApplication{
+			TargetType:targetType,
+			TargetID:rule.TargetID,
+			ApplicationID:app.ID,
+		}
+		if err := d.DB.Save(mapping).Error; err != nil {
+			_ = d.DeleteApplicationByID(app.ID)
+			return nil, err
+		}
+	}
+
+	if targetType == "user" {
+		if err := d.UpsertApplicationMembership(&model.ApplicationMembership{
+			ApplicationID:app.ID,
+			UserID:rule.TargetID,
+			ReceiveNotifications:true,
+		}); err != nil { return nil, err }
+		return app, nil
+	}
+
+	members, err := d.GetUserGroupMembers(rule.TargetID)
+	if err != nil { return nil, err }
+	desired := make(map[uint]struct{}, len(members))
+	for _, user := range members {
+		desired[user.ID] = struct{}{}
+		if err := d.UpsertApplicationMembership(&model.ApplicationMembership{
+			ApplicationID:app.ID,
+			UserID:user.ID,
+			ReceiveNotifications:true,
+		}); err != nil { return nil, err }
+	}
+	current, err := d.GetApplicationMemberships(app.ID)
+	if err != nil { return nil, err }
+	for _, membership := range current {
+		if _, ok := desired[membership.UserID]; !ok {
+			if err := d.DeleteApplicationMembership(app.ID, membership.UserID); err != nil { return nil, err }
+		}
+	}
+	return app, nil
+}
+
+func (d *GormDatabase) DeleteEscalationTargetApplication(targetType string, targetID uint) error {
+	mapping := new(model.EscalationTargetApplication)
+	err := d.DB.Where("target_type = ? AND target_id = ?", targetType, targetID).First(mapping).Error
+	if errors.Is(err, gorm.ErrRecordNotFound) { return nil }
+	if err != nil { return err }
+	if err := d.DB.Where("target_type = ? AND target_id = ?", targetType, targetID).
+		Delete(&model.EscalationTargetApplication{}).Error; err != nil {
+		return err
+	}
+	if mapping.ApplicationID != 0 {
+		return d.DeleteApplicationByID(mapping.ApplicationID)
+	}
+	return nil
 }
