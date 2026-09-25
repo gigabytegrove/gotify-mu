@@ -24,6 +24,7 @@ type SessionAPI struct {
 	NotifyDeleted    func(uint, string)
 	SecureCookie     bool
 	LocalAuthEnabled bool
+	Policy           func() *model.SecurityPolicy
 }
 
 // swagger:operation POST /auth/local/login auth localLogin
@@ -85,20 +86,28 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		return
 	}
 
-	elevatedUntil := time.Now().Add(model.DefaultElevationDuration)
+	policy := model.DefaultSecurityPolicy()
+	if a.Policy != nil {
+		if configured := a.Policy(); configured != nil { policy = configured }
+	}
+	sessionSeconds := policy.SessionLifetimeHours * 60 * 60
+	if sessionSeconds <= 0 { sessionSeconds = auth.CookieMaxAge }
+	elevation := time.Duration(policy.ElevationMinutes) * time.Minute
+	if elevation <= 0 { elevation = model.DefaultElevationDuration }
+	elevatedUntil := time.Now().Add(elevation)
 	tokenPublic, tokenPrivate := generateClientToken()
 	client := model.Client{
 		Name:                          clientParams.Name,
 		Token:                         tokenPublic,
 		UserID:                        user.ID,
 		ElevatedUntil:                 &elevatedUntil,
-		ExpiresAfterInactivitySeconds: auth.CookieMaxAge,
+		ExpiresAfterInactivitySeconds: uint(sessionSeconds),
 	}
 	if success := successOrAbort(ctx, 500, a.DB.CreateClient(&client)); !success {
 		return
 	}
 
-	auth.SetCookie(ctx.Writer, tokenPrivate, auth.CookieMaxAge, a.SecureCookie)
+	auth.SetCookie(ctx.Writer, tokenPrivate, sessionSeconds, a.SecureCookie)
 
 	ctx.JSON(200, &model.CurrentUserExternal{
 		ID:            user.ID,
