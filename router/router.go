@@ -160,6 +160,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		WebhookReplay: security.NewReplayCache(),
 	}
 	connectorHandler := api.ConnectorAPI{DB: db, Runtime: connectorManager}
+	serviceHandler := api.ServiceAccountAPI{DB: db, Publisher: automationEngine}
 	loginLimiter := security.NewFixedWindowLimiter(10, 5*time.Minute)
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
@@ -206,6 +207,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	g.StaticFS("/image", &onlyImageFS{inner: gin.Dir(conf.UploadedImagesDir, false)})
 
 	g.GET("/docs", docs.UI)
+
+	g.GET("/service/channels", auth.RequireServiceScope(db, "channel:read"), serviceHandler.GetChannels)
+	g.POST("/service/application/:id/message", auth.RequireServiceScope(db, "message:write"), serviceHandler.PublishMessage)
+	g.GET("/service/application/:id/message", auth.RequireServiceScope(db, "message:read"), serviceHandler.GetMessages)
 
 	g.Use(func(ctx *gin.Context) {
 		ctx.Header("Content-Type", "application/json")
@@ -385,6 +390,13 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/admin/operations", systemHandler.GetOperations)
 		adminPlatform.GET("/admin/sessions", systemHandler.GetSessions)
 		adminPlatform.DELETE("/admin/sessions/:id", systemHandler.RevokeSession)
+		adminPlatform.GET("/admin/service-accounts", serviceHandler.GetAccounts)
+		adminPlatform.POST("/admin/service-accounts", serviceHandler.CreateAccount)
+		adminPlatform.PUT("/admin/service-accounts/:id", serviceHandler.UpdateAccount)
+		adminPlatform.DELETE("/admin/service-accounts/:id", serviceHandler.DeleteAccount)
+		adminPlatform.GET("/admin/service-accounts/:id/tokens", serviceHandler.GetTokens)
+		adminPlatform.POST("/admin/service-accounts/:id/tokens", serviceHandler.CreateToken)
+		adminPlatform.DELETE("/admin/service-accounts/:id/tokens/:tokenId", serviceHandler.DeleteToken)
 		adminPlatform.GET("/group", groupHandler.GetGroups)
 		adminPlatform.POST("/group", groupHandler.CreateGroup)
 		adminPlatform.PUT("/group/:id", groupHandler.UpdateGroup)
