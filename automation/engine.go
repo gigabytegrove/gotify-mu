@@ -65,6 +65,15 @@ type Database interface {
 	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
 	SaveHomeAssistantIntegration(item *model.HomeAssistantIntegration) error
 
+	GetRSSIntegrations() ([]*model.RSSIntegration, error)
+	SaveRSSIntegration(item *model.RSSIntegration) error
+	GetCalendarIntegrations() ([]*model.CalendarIntegration, error)
+	GetEmailGatewaysForMessage(applicationID uint, priority int) ([]*model.EmailGateway, error)
+	GetSMTPReceiver() (*model.SMTPReceiver, error)
+	SaveSMTPReceiver(item *model.SMTPReceiver) error
+	GetSMTPRouteByRecipient(recipient string) (*model.SMTPRoute, error)
+	GetSyslogReceivers() ([]*model.SyslogReceiver, error)
+
 	AcquireAutomationLease(key, owner string, now time.Time, ttl time.Duration) (bool, error)
 	ReleaseAutomationLease(key, owner string) error
 	CreateAutomationRun(item *model.AutomationRun) (bool, error)
@@ -88,6 +97,7 @@ type Engine struct {
 	integrationWG      sync.WaitGroup
 	reload             chan struct{}
 	instanceID         string
+	emailQueue         chan model.Message
 }
 
 func New(db Database, notifier Notifier) *Engine {
@@ -99,10 +109,12 @@ func New(db Database, notifier Notifier) *Engine {
 		cancel: cancel,
 		reload: make(chan struct{}, 1),
 		instanceID: newInstanceID(),
+		emailQueue: make(chan model.Message, 256),
 	}
-	e.wg.Add(2)
+	e.wg.Add(3)
 	go e.schedulerLoop()
 	go e.integrationLoop()
+	go e.emailLoop()
 	return e
 }
 
@@ -209,6 +221,7 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 			log.Error().Err(err).Uint("message_id", msg.ID).Msg("Could not queue escalation")
 		}
 	}
+	e.queueEmailGateways(msg)
 	return external, nil
 }
 
@@ -561,6 +574,14 @@ func (e *Engine) restartIntegrations() {
 	if haErr != nil {
 		log.Error().Err(haErr).Msg("Could not load Home Assistant integrations")
 	}
+	rssItems, rssErr := e.db.GetRSSIntegrations()
+	if rssErr != nil { log.Error().Err(rssErr).Msg("Could not load RSS integrations") }
+	calendarItems, calendarErr := e.db.GetCalendarIntegrations()
+	if calendarErr != nil { log.Error().Err(calendarErr).Msg("Could not load Calendar integrations") }
+	syslogItems, syslogErr := e.db.GetSyslogReceivers()
+	if syslogErr != nil { log.Error().Err(syslogErr).Msg("Could not load Syslog integrations") }
+	smtpReceiver, smtpErr := e.db.GetSMTPReceiver()
+	if smtpErr != nil { log.Error().Err(smtpErr).Msg("Could not load SMTP Receiver") }
 
 	e.integrationMu.Lock()
 	defer e.integrationMu.Unlock()
@@ -617,6 +638,61 @@ func (e *Engine) restartIntegrations() {
 			defer e.integrationWG.Done()
 			e.runHomeAssistantLoop(ctx, &integration)
 		}(runtimeItem)
+	}
+}
+	for _, item := range rssItems {
+		if !item.Enabled { continue }
+		ctx, cancel := context.WithCancel(e.ctx)
+		e.integrationCancels = append(e.integrationCancels, cancel)
+		e.integrationWG.Add(1)
+		go func(integration model.RSSIntegration) {
+			defer e.integrationWG.Done()
+			e.runRSSLoop(ctx, &integration)
+		}(*item)
+	}
+	for _, item := range calendarItems {
+		if !item.Enabled { continue }
+		ctx, cancel := context.WithCancel(e.ctx)
+		e.integrationCancels = append(e.integrationCancels, cancel)
+		e.integrationWG.Add(1)
+		go func(integration model.CalendarIntegration) {
+			defer e.integrationWG.Done()
+			e.runCalendarLoop(ctx, &integration)
+		}(*item)
+	}
+	for _, item := range syslogItems {
+		if !item.Enabled { continue }
+		ctx, cancel := context.WithCancel(e.ctx)
+		e.integrationCancels = append(e.integrationCancels, cancel)
+		e.integrationWG.Add(1)
+		go func(integration model.SyslogReceiver) {
+			defer e.integrationWG.Done()
+			e.runSyslogLoop(ctx, &integration)
+		}(*item)
+	}
+	if smtpReceiver != nil && smtpReceiver.Enabled {
+		password, revealErr := security.Reveal(smtpReceiver.Password)
+		if revealErr != nil {
+			log.Error().Err(revealErr).Msg("SMTP Receiver credentials could not be decrypted")
+		} else {
+			if smtpReceiver.Password != "" && !strings.HasPrefix(smtpReceiver.Password, "enc:v1:") {
+				if protected, protectErr := security.Protect(smtpReceiver.Password); protectErr == nil {
+					smtpReceiver.Password = protected
+					if saveErr := e.db.SaveSMTPReceiver(smtpReceiver); saveErr != nil {
+						log.Warn().Err(saveErr).Msg("Could not migrate SMTP Receiver credentials")
+					}
+				}
+			}
+			runtimeReceiver := *smtpReceiver
+			runtimeReceiver.Password = password
+			ctx, cancel := context.WithCancel(e.ctx)
+			e.integrationCancels = append(e.integrationCancels, cancel)
+			e.integrationWG.Add(1)
+			go func(receiver model.SMTPReceiver) {
+				defer e.integrationWG.Done()
+				e.runSMTPReceiverLoop(ctx, &receiver)
+			}(runtimeReceiver)
+		}
 	}
 }
 
