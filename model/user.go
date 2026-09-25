@@ -15,6 +15,8 @@ type User struct {
 	Plugins      []PluginConf
 	// Format: OIDC claims combined as "<iss>#<sub>".
 	OIDCID *string `gorm:"column:oidc_id;type:text;uniqueIndex:uix_users_oidc_id,length:512"`
+	// LDAPID stores the normalized directory DN for linked LDAP/Active Directory accounts.
+	LDAPID *string `gorm:"column:ldap_id;type:text;uniqueIndex:uix_users_ldap_id,length:1024"`
 }
 
 // UserExternal Model
