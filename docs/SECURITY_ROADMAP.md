@@ -1,88 +1,169 @@
-# Gotify MU Security Roadmap
+# Gotify MU Security Status
 
-This document tracks authentication and account-security work that is intentionally separate from the Web UI rewrite.
+This document tracks the security controls implemented in the Gotify MU v0.5 preview and the remaining architectural boundaries administrators should understand.
 
-## Goals
+## Authentication providers
 
-Gotify MU should support stronger authentication without breaking existing Gotify client-token, application-token, or API compatibility.
-
-The security work should be additive and migration-safe. Existing local accounts must continue to work unless an administrator explicitly changes authentication policy.
-
-## Planned authentication capabilities
-
-### Multi-factor authentication
-
-Initial MFA work should focus on standards that do not require a proprietary service:
-
-- TOTP authenticator apps
-- recovery codes
-- per-user MFA enrollment and removal
-- administrator visibility into enrollment status
-- optional administrator-enforced MFA policy
-- step-up authentication for destructive administrative operations
-
-A later phase may add WebAuthn/passkeys as a stronger phishing-resistant option.
-
-MFA secrets and recovery codes must never be returned after initial enrollment and must never be written to logs.
-
-### LDAP / Active Directory
-
-Directory authentication should be implemented as a server authentication provider rather than replacing Gotify MU's authorization model.
-
-Expected configuration includes:
-
-- LDAP or LDAPS server URI
-- bind DN/service account support
-- configurable user search base and filter
-- username and display-name attributes
-- optional group-to-admin mapping
-- TLS certificate validation controls
-- connection and authentication diagnostics
-- explicit timeout behavior
-- optional local-account fallback
-
-Directory passwords must never be stored by Gotify MU.
-
-### Existing providers
-
-Gotify MU should continue to support:
+Gotify MU supports:
 
 - local username/password authentication
 - OIDC
+- LDAP / Active Directory
 - Gotify client tokens
 - Gotify application tokens
+- scoped Gotify MU service-account credentials
 
-Authentication providers should be selectable independently so an administrator can run local + LDAP, local + OIDC, or another supported combination during migration.
+Authentication providers can coexist during migration.
 
-## Security policy controls
+## Multi-factor authentication
 
-Future administrative settings should support:
+Implemented:
 
-- require MFA for administrators
-- require MFA for all local users
-- disable local password login after external authentication is validated
-- session lifetime
-- elevated-session lifetime
-- account lockout / rate limiting
-- trusted proxy awareness for authentication logs
-- security-event audit log (foundation implemented; event coverage/retention controls will continue expanding)
+- TOTP authenticator applications
+- hashed one-time recovery codes
+- per-user enrollment/removal
+- administrator enrollment visibility
+- administrator reset workflows
+- optional MFA requirement for administrators
+- optional MFA requirement for local users
+- MFA-aware elevated/re-authentication flows
+- WebAuthn/passkeys
 
-## Recovery and migration
+MFA secrets and recovery material are never returned after their intended enrollment/recovery step and are excluded from ordinary logs/audit details.
 
-Authentication changes must not create an easy administrator lockout path.
+## LDAP / Active Directory
 
-Before enabling a policy that could disable the final usable administrator login, Gotify MU should verify that another usable administrative authentication method exists.
+Implemented:
 
-Recovery codes and emergency local-admin recovery should be designed before MFA can be globally enforced.
+- LDAP and LDAPS
+- service/bind credentials
+- configurable user search base/filter
+- configurable display-name and group attributes
+- directory group-to-admin policy
+- optional allowed-user group
+- auto-registration
+- optional username linking
+- custom CA support
+- bounded operations/timeouts
+- connection/authentication diagnostics
+- local/OIDC coexistence
 
-## UI direction
+TLS certificate verification is enabled by default. The insecure-skip-verify option exists only as an explicit diagnostic escape hatch and should not be used in normal deployments.
 
-The Web UI should eventually expose authentication under **Settings → Security** with separate sections for:
+## Password and session policy
 
-- Authentication providers
+Administrator policy includes:
+
+- configurable minimum password length
+- bcrypt password hashing
+- configurable session inactivity
+- configurable elevated-session lifetime
+- active-session visibility
+- administrator session revocation
+- login throttling
 - MFA policy
-- User enrollment status
-- Sessions
-- Audit / security events
 
-The UI must not imply a security capability is active before the corresponding backend support exists. The Audit Log foundation is now active; MFA and LDAP/AD remain planned until their backend implementations land.
+Session cookies are HttpOnly and SameSite=Strict. Deployments served over HTTPS should enable Secure cookies.
+
+## Stored secrets
+
+Protected Gotify MU secrets are encrypted at rest using AES-GCM with a persistent 32-byte server key.
+
+The key can be supplied by:
+
+- `GOTIFY_MU_SECRET_KEY`
+- `GOTIFY_MU_SECRET_KEY_FILE`
+
+If neither is supplied, Gotify MU creates a private key file in persistent data with mode 0600.
+
+The encryption key must be included in disaster-recovery planning. A database backup containing encrypted values is not sufficient by itself if the corresponding encryption key is lost.
+
+## Logging and audit safety
+
+Implemented:
+
+- sensitive query/path value redaction
+- Webhook secret path masking
+- updater Docker argument/environment redaction
+- recursive redaction of password/token/secret/private-key/API-key fields from administrative request summaries
+- successful administrative mutation audit events
+- login/security-event auditing
+- audit export and configurable retention
+
+Audit details intentionally avoid full Webhook payload storage.
+
+## Webhook security
+
+Inbound Webhooks can use:
+
+- high-entropy generated secret URLs
+- encrypted secret storage
+- hashed secret lookup
+- HMAC-SHA256 request signatures
+- timestamp validation
+- replay protection
+- source CIDR restrictions
+- rate limiting
+- explicit payload-size limits
+- retained outcome history without payload/credential retention
+
+## Plugin trust boundary
+
+Native Gotify-compatible Go plugins execute inside the Gotify MU process. They must therefore be treated as trusted server code.
+
+v0.5 reduces plugin supply-chain risk through:
+
+- SHA-256 verification
+- Ed25519 signatures
+- administrator-configured trusted public keys
+- unsigned installation disabled by default
+- HTTPS-only catalog/download requirements
+- verified update staging
+
+These controls establish authenticity/integrity. They do **not** sandbox native Go code.
+
+An isolated out-of-process extension protocol may be considered in a later release for integrations that should not be trusted with in-process execution.
+
+## Updater trust boundary
+
+The managed updater requires Docker socket access and therefore has host-level container-management authority.
+
+Mitigations include:
+
+- no published updater host port
+- private shared server/updater token
+- release checksum verification
+- full server test suite during release builds
+- sensitive Docker argument redaction
+- runtime configuration preservation
+- required application health verification
+- automatic container rollback on replacement failure
+
+The updater should only be enabled where managed in-app Docker updates are desired.
+
+## CI and release integrity
+
+v0.5 uses:
+
+- read-only pull-request workflow permissions
+- SHA-pinned GitHub Actions
+- lint and full tests
+- production Docker build with tests enabled
+- filesystem/dependency vulnerability scanning
+- container vulnerability scanning
+- SPDX SBOM generation
+- release checksums
+- build-provenance attestation
+
+## Recovery
+
+Security-policy changes must not silently remove the final usable administrator authentication path.
+
+Backups must preserve:
+
+- database/application data
+- the Gotify MU encryption key
+- relevant TLS/certificate material
+- external authentication configuration
+
+See `docs/DEPLOYMENT.md` for deployment and rollback procedures.
