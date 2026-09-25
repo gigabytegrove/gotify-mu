@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -24,9 +25,16 @@ func (d *GormDatabase) GetWebhookRouteByID(id uint) (*model.WebhookRoute, error)
 
 func (d *GormDatabase) GetWebhookRouteBySecret(secret string) (*model.WebhookRoute, error) {
 	item := new(model.WebhookRoute)
-	if err := d.DB.Where("secret = ? AND enabled = ?", secret, true).First(item).Error; err != nil {
+	verifier := security.WebhookVerifier(secret)
+	if err := d.DB.Where("(secret = ? OR secret = ?) AND enabled = ?", secret, verifier, true).First(item).Error; err != nil {
 		if err == gorm.ErrRecordNotFound { return nil, nil }
 		return nil, err
+	}
+	if item.Secret == secret {
+		item.Secret = verifier
+		if err := d.DB.Model(item).Update("secret", verifier).Error; err != nil {
+			return nil, err
+		}
 	}
 	return item, nil
 }
