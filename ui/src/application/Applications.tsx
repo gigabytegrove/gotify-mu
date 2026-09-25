@@ -254,12 +254,19 @@ const Applications = observer(() => {
             {toUpdateApp && (
                 <UpdateApplicationDialog
                     fClose={() => setToUpdateApp(undefined)}
-                    fOnSubmit={(name, description, defaultPriority) =>
-                        appStore.update({...toUpdateApp, name, description, defaultPriority})
+                    fOnSubmit={(name, description, defaultPriority, retentionDays) =>
+                        appStore.update({
+                            ...toUpdateApp,
+                            name,
+                            description,
+                            defaultPriority,
+                            retentionDays,
+                        })
                     }
                     initialDescription={toUpdateApp.description}
                     initialName={toUpdateApp.name}
                     initialDefaultPriority={toUpdateApp.defaultPriority}
+                    initialRetentionDays={toUpdateApp.retentionDays || 0}
                 />
             )}
 
