@@ -245,14 +245,19 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 }
 
 type mqttParams struct {
-	Name          string `json:"name" binding:"required"`
-	ApplicationID uint   `json:"applicationId" binding:"required"`
-	BrokerURL     string `json:"brokerUrl" binding:"required"`
-	ClientID      string `json:"clientId"`
-	Username      string `json:"username"`
-	Password      string `json:"password"`
-	Topic         string `json:"topic" binding:"required"`
-	Enabled       bool   `json:"enabled"`
+	Name              string `json:"name" binding:"required"`
+	ApplicationID     uint   `json:"applicationId" binding:"required"`
+	BrokerURL         string `json:"brokerUrl" binding:"required"`
+	ClientID          string `json:"clientId"`
+	Username          string `json:"username"`
+	Password          string `json:"password"`
+	ProtocolVersion   int    `json:"protocolVersion"`
+	QoS               int    `json:"qos"`
+	CACertificate     string `json:"caCertificate"`
+	ClientCertificate string `json:"clientCertificate"`
+	ClientKey         string `json:"clientKey"`
+	Topic             string `json:"topic" binding:"required"`
+	Enabled           bool   `json:"enabled"`
 }
 
 func (a *AutomationAPI) GetMQTT(ctx *gin.Context) {
@@ -268,9 +273,22 @@ func (a *AutomationAPI) CreateMQTT(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&params); err != nil { return }
 	if !a.channelExists(ctx, params.ApplicationID) { return }
 	if !validMQTTURL(params.BrokerURL) { ctx.AbortWithError(400, errors.New("broker URL must use mqtt, mqtts, tcp, or tls")); return }
+	if params.ProtocolVersion == 0 { params.ProtocolVersion = 5 }
+	if params.ProtocolVersion != 4 && params.ProtocolVersion != 5 {
+		ctx.AbortWithError(400, errors.New("MQTT protocol version must be 4 (3.1.1) or 5")); return
+	}
+	if params.QoS < 0 || params.QoS > 2 {
+		ctx.AbortWithError(400, errors.New("MQTT QoS must be 0, 1, or 2")); return
+	}
+	if (strings.TrimSpace(params.ClientCertificate) == "") != (strings.TrimSpace(params.ClientKey) == "") {
+		ctx.AbortWithError(400, errors.New("MQTT client certificate and private key must be provided together")); return
+	}
 	item := &model.MQTTIntegration{
 		Name: params.Name, ApplicationID: params.ApplicationID, BrokerURL: params.BrokerURL,
-		ClientID: params.ClientID, Username: params.Username, Password: params.Password, Topic: params.Topic, Enabled: params.Enabled,
+		ClientID: params.ClientID, Username: params.Username, Password: params.Password,
+		ProtocolVersion: params.ProtocolVersion, QoS: params.QoS,
+		CACertificate: params.CACertificate, ClientCertificate: params.ClientCertificate, ClientKey: params.ClientKey,
+		Topic: params.Topic, Enabled: params.Enabled,
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 	a.Engine.ReloadIntegrations()
@@ -286,9 +304,24 @@ func (a *AutomationAPI) UpdateMQTT(ctx *gin.Context) {
 		if err := ctx.ShouldBindJSON(&params); err != nil { return }
 		if !a.channelExists(ctx, params.ApplicationID) { return }
 		if !validMQTTURL(params.BrokerURL) { ctx.AbortWithError(400, errors.New("broker URL must use mqtt, mqtts, tcp, or tls")); return }
+		if params.ProtocolVersion == 0 { params.ProtocolVersion = item.ProtocolVersion }
+		if params.ProtocolVersion == 0 { params.ProtocolVersion = 5 }
+		if params.ProtocolVersion != 4 && params.ProtocolVersion != 5 {
+			ctx.AbortWithError(400, errors.New("MQTT protocol version must be 4 (3.1.1) or 5")); return
+		}
+		if params.QoS < 0 || params.QoS > 2 {
+			ctx.AbortWithError(400, errors.New("MQTT QoS must be 0, 1, or 2")); return
+		}
+		if strings.TrimSpace(params.ClientCertificate) != "" && strings.TrimSpace(params.ClientKey) == "" && item.ClientKey == "" {
+			ctx.AbortWithError(400, errors.New("MQTT client private key is required with a client certificate")); return
+		}
 		item.Name, item.ApplicationID, item.BrokerURL, item.ClientID = params.Name, params.ApplicationID, params.BrokerURL, params.ClientID
 		item.Username, item.Topic, item.Enabled = params.Username, params.Topic, params.Enabled
+		item.ProtocolVersion, item.QoS = params.ProtocolVersion, params.QoS
+		item.CACertificate = params.CACertificate
+		item.ClientCertificate = params.ClientCertificate
 		if params.Password != "" { item.Password = params.Password }
+		if params.ClientKey != "" { item.ClientKey = params.ClientKey }
 		if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, mqttView(item))
@@ -743,7 +776,10 @@ func webhookView(item *model.WebhookRoute) model.WebhookRouteView {
 func mqttView(item *model.MQTTIntegration) model.MQTTIntegrationView {
 	return model.MQTTIntegrationView{
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,BrokerURL:item.BrokerURL,ClientID:item.ClientID,
-		Username:item.Username,PasswordConfigured:item.Password!="",Topic:item.Topic,Enabled:item.Enabled,
+		Username:item.Username,PasswordConfigured:item.Password!="",
+		ProtocolVersion:item.ProtocolVersion,QoS:item.QoS,
+		CACertificate:item.CACertificate,ClientCertificate:item.ClientCertificate,ClientKeyConfigured:item.ClientKey!="",
+		Topic:item.Topic,Enabled:item.Enabled,
 		Status:item.Status,LastConnectedAt:item.LastConnectedAt,LastMessageAt:item.LastMessageAt,
 		LastError:item.LastError,LastErrorAt:item.LastErrorAt,ReconnectCount:item.ReconnectCount,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
