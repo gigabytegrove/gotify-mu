@@ -28,6 +28,43 @@ type PluginAPI struct {
 	DB       PluginDatabase
 }
 
+// InstallPlugin installs a server-wide plugin binary uploaded by an administrator.
+// The route is protected by elevated administrator authentication in router.Create.
+func (c *PluginAPI) InstallPlugin(ctx *gin.Context) {
+	header, err := ctx.FormFile("plugin")
+	if err != nil {
+		ctx.AbortWithError(400, errors.New("plugin file is required"))
+		return
+	}
+	if header.Size <= 0 {
+		ctx.AbortWithError(400, errors.New("plugin file is empty"))
+		return
+	}
+	if header.Size > plugin.MaxPluginUploadBytes {
+		ctx.AbortWithError(400, fmt.Errorf("plugin exceeds the %d MiB upload limit", plugin.MaxPluginUploadBytes>>20))
+		return
+	}
+
+	file, err := header.Open()
+	if err != nil {
+		ctx.AbortWithError(500, err)
+		return
+	}
+	defer file.Close()
+
+	info, warnings, err := c.Manager.InstallPlugin(header.Filename, file)
+	if err != nil {
+		ctx.AbortWithError(400, err)
+		return
+	}
+
+	ctx.JSON(201, gin.H{
+		"name":       info.String(),
+		"modulePath": info.ModulePath,
+		"warnings":   warnings,
+	})
+}
+
 // GetPlugins returns all plugins a user has.
 // swagger:operation GET /plugin plugin getPlugins
 //
