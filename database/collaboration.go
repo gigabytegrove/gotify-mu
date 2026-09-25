@@ -344,3 +344,10 @@ func (d *GormDatabase) SearchMessages(userID uint, filter model.MessageSearchFil
 	}
 	return items, nil
 }
+
+
+func (d *GormDatabase) GetAttachmentStorageNames() ([]string, error) {
+	var names []string
+	err := d.DB.Model(&model.MessageAttachment{}).Where("storage_name <> ''").Pluck("storage_name", &names).Error
+	return names, err
+}
