@@ -2,6 +2,8 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -251,10 +253,23 @@ func (m *manager) performInstall(version string, started time.Time) {
 	}
 
 	archivePath := filepath.Join(tempDir, "source.zip")
-	sourceURL := fmt.Sprintf("https://github.com/%s/archive/refs/tags/v%s.zip", m.repository, version)
+	assetName := fmt.Sprintf("gotify-mu-v%s-source.zip", version)
+	releaseBase := fmt.Sprintf("https://github.com/%s/releases/download/v%s", m.repository, version)
+	sourceURL := releaseBase + "/" + assetName
+	checksumURL := releaseBase + "/SHA256SUMS"
 	m.updateProgress("downloading", "Downloading update", "Downloading update", 10)
-	if err := m.downloadFile(sourceURL, archivePath, 10, 24); err != nil {
+	if err := m.downloadFile(sourceURL, archivePath, 10, 21); err != nil {
 		m.fail(version, started, "The update could not be downloaded.", err)
+		return
+	}
+	m.updateProgress("preparing", "Verifying update", "Verifying update", 23)
+	expectedHash, err := m.downloadChecksum(checksumURL, assetName)
+	if err != nil {
+		m.fail(version, started, "The update checksum could not be verified.", err)
+		return
+	}
+	if err := verifySHA256(archivePath, expectedHash); err != nil {
+		m.fail(version, started, "The downloaded update did not pass integrity verification.", err)
 		return
 	}
 
@@ -513,11 +528,30 @@ func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 	return errors.New("replacement service did not become healthy before timeout")
 }
 
+func redactDockerArgs(args []string) []string {
+	result := append([]string(nil), args...)
+	for i := 0; i < len(result); i++ {
+		if result[i] == "--env" || result[i] == "-e" {
+			if i+1 < len(result) {
+				value := result[i+1]
+				if eq := strings.IndexByte(value, '='); eq >= 0 {
+					result[i+1] = value[:eq+1] + "[masked]"
+				} else {
+					result[i+1] = "[masked]"
+				}
+				i++
+			}
+		}
+	}
+	return result
+}
+
 func runDocker(args ...string) (string, error) {
 	command := exec.Command("docker", args...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+		safeArgs := redactDockerArgs(args)
+		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(safeArgs, " "), err, strings.TrimSpace(string(output)))
 	}
 	return string(output), nil
 }
@@ -569,6 +603,45 @@ func (m *manager) downloadFile(url, path string, startProgress, endProgress int)
 		if readErr != nil {
 			return readErr
 		}
+	}
+	return nil
+}
+
+func (m *manager) downloadChecksum(rawURL, assetName string) (string, error) {
+	request, err := http.NewRequest(http.MethodGet, rawURL, nil)
+	if err != nil { return "", err }
+	request.Header.Set("User-Agent", "gotify-mu-updater")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil { return "", err }
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("checksum download returned HTTP %d", response.StatusCode)
+	}
+	body, err := io.ReadAll(io.LimitReader(response.Body, 64*1024))
+	if err != nil { return "", err }
+	for _, line := range strings.Split(string(body), "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 2 { continue }
+		name := strings.TrimPrefix(fields[len(fields)-1], "*")
+		if filepath.Base(name) == assetName {
+			hash := strings.ToLower(fields[0])
+			if len(hash) != 64 { return "", errors.New("release checksum is invalid") }
+			if _, err := hex.DecodeString(hash); err != nil { return "", errors.New("release checksum is invalid") }
+			return hash, nil
+		}
+	}
+	return "", errors.New("release checksum did not contain the source asset")
+}
+
+func verifySHA256(path, expected string) error {
+	file, err := os.Open(path)
+	if err != nil { return err }
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil { return err }
+	actual := hex.EncodeToString(hash.Sum(nil))
+	if !strings.EqualFold(actual, expected) {
+		return fmt.Errorf("SHA-256 mismatch: expected %s, got %s", expected, actual)
 	}
 	return nil
 }
@@ -669,6 +742,7 @@ func (m *manager) buildRelease(root, image, version, commit, buildDate string) e
 		"--progress=plain",
 		"--pull",
 		"--build-arg", "BUILD_JS=1",
+		"--build-arg", "RUN_TESTS=1",
 		"--build-arg", "GO_VERSION=1.26.0",
 		"--build-arg", "GOTIFY_MU_VERSION="+version,
 		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
