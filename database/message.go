@@ -51,14 +51,29 @@ func (d *GormDatabase) markAcknowledged(userID uint, messages []*model.Message) 
 	return nil
 }
 
+func accessibleMessageQuery(db *gorm.DB, userID uint) *gorm.DB {
+	return db.Where(`
+		EXISTS (
+			SELECT 1 FROM application_memberships am
+			WHERE am.application_id = messages.application_id AND am.user_id = ?
+		)
+		OR EXISTS (
+			SELECT 1
+			FROM application_group_grants agg
+			JOIN user_group_memberships ugm ON ugm.group_id = agg.group_id
+			WHERE agg.application_id = messages.application_id AND ugm.user_id = ?
+		)
+	`, userID, userID)
+}
+
 func visibleMessages(db *gorm.DB, userID uint) *gorm.DB {
-	return db.Joins("JOIN application_memberships AS am ON am.application_id = messages.application_id AND am.user_id = ?", userID).
+	return accessibleMessageQuery(db, userID).
 		Joins("LEFT JOIN message_dismissals AS md ON md.message_id = messages.id AND md.user_id = ?", userID).
 		Where("md.message_id IS NULL")
 }
 
 func archivedMessages(db *gorm.DB, userID uint) *gorm.DB {
-	return db.Joins("JOIN application_memberships AS am ON am.application_id = messages.application_id AND am.user_id = ?", userID).
+	return accessibleMessageQuery(db, userID).
 		Joins("JOIN message_dismissals AS md ON md.message_id = messages.id AND md.user_id = ?", userID).
 		Where("md.archived = ?", true)
 }
