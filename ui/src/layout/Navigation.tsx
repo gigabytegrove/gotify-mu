@@ -27,6 +27,7 @@ import Extension from '@mui/icons-material/Extension';
 import Settings from '@mui/icons-material/Settings';
 import Hub from '@mui/icons-material/Hub';
 import AutoMode from '@mui/icons-material/AutoMode';
+import AdminPanelSettings from '@mui/icons-material/AdminPanelSettings';
 import Public from '@mui/icons-material/Public';
 import NotificationsOff from '@mui/icons-material/NotificationsOff';
 import {Link, useLocation} from 'react-router';
@@ -66,6 +67,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
         {label: 'Groups', to: '/groups', icon: <GroupWork />, adminOnly: true},
         {label: 'Integrations', to: '/integrations', icon: <Hub />, adminOnly: true},
         {label: 'Automation', to: '/automation', icon: <AutoMode />, adminOnly: true},
+        {label: 'Security & Operations', to: '/system', icon: <AdminPanelSettings />, adminOnly: true},
         {label: 'Audit Log', to: '/audit', icon: <FactCheck />, adminOnly: true},
         {label: 'Clients', to: '/clients', icon: <DevicesOther />},
         {label: 'Plugins', to: '/plugins', icon: <Extension />},
