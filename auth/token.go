@@ -24,6 +24,7 @@ var (
 	errNoPrivateKey     = errors.New("no private key")
 	tokenCharacters     = []byte("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_")
 	pluginPrefix        = "P"
+	servicePrefix       = "S"
 	enhancedTokenPrefix = "gtfy"
 
 	randReader = rand.Reader
@@ -187,6 +188,11 @@ func GenerateClientToken() (publicForm, privateForm string) {
 // GeneratePluginToken generates a plugin token.
 func GeneratePluginToken() string {
 	return pluginPrefix + generateRandomString(randomTokenLength)
+}
+
+// GenerateServiceToken generates a one-time non-human service credential.
+func GenerateServiceToken() string {
+	return servicePrefix + generateRandomString(43)
 }
 
 // GenerateImageName generates an image name.
