@@ -492,6 +492,10 @@ func shouldAuditMutation(path string) bool {
 		return true
 	case strings.HasPrefix(path, "/integration"):
 		return true
+	case strings.HasPrefix(path, "/connector"):
+		return true
+	case strings.HasPrefix(path, "/admin"):
+		return true
 	case strings.HasPrefix(path, "/automation"):
 		return true
 	case strings.Contains(path, "/acknowledgement"):
