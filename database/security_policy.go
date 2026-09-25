@@ -37,7 +37,8 @@ func (d *GormDatabase) SaveSecurityPolicy(item *model.SecurityPolicy) error {
 		DoUpdates: clause.AssignmentColumns([]string{
 			"min_password_length","session_lifetime_hours","elevation_minutes",
 			"audit_retention_days","automation_retention_days",
-			"allow_native_plugin_uploads","require_mfa_admins","require_mfa_all","updated_at",
+			"allow_native_plugin_uploads","require_plugin_checksum","require_plugin_signature",
+			"require_mfa_admins","require_mfa_all","updated_at",
 		}),
 	}).Create(item).Error
 }
