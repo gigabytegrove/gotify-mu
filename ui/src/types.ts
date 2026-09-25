@@ -49,6 +49,10 @@ export interface IMessage {
     senderUserId?: number;
     senderName?: string;
     acknowledged?: boolean;
+    acknowledgedByAnyone?: boolean;
+    acknowledgementCount?: number;
+    lastAcknowledgedBy?: string;
+    lastAcknowledgedAt?: string;
     image?: string;
     extras?: IMessageExtras;
 }
@@ -130,6 +134,9 @@ export interface IWebhookRoute {
     name: string;
     applicationId: number;
     enabled: boolean;
+    requireSignature: boolean;
+    allowedCidrs: string;
+    rateLimitPerMinute: number;
     path: string;
     titleField: string;
     messageField: string;
@@ -150,6 +157,12 @@ export interface IMQTTIntegration {
     passwordConfigured: boolean;
     topic: string;
     enabled: boolean;
+    status: string;
+    lastConnectedAt?: string;
+    lastMessageAt?: string;
+    lastError?: string;
+    lastErrorAt?: string;
+    reconnectCount: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -162,6 +175,12 @@ export interface IHomeAssistantIntegration {
     tokenConfigured: boolean;
     eventType: string;
     enabled: boolean;
+    status: string;
+    lastConnectedAt?: string;
+    lastEventAt?: string;
+    lastError?: string;
+    lastErrorAt?: string;
+    reconnectCount: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -194,6 +213,7 @@ export interface IQuietHoursPolicy {
     endMinute: number;
     timezone: string;
     allowPriority: number;
+    mode: 'suppress' | 'defer';
 }
 
 export interface IDigestPolicy {
@@ -216,4 +236,12 @@ export interface IEscalationRule {
     enabled: boolean;
     createdAt: string;
     updatedAt: string;
+}
+
+
+export interface IMessageAcknowledgement {
+    userId: number;
+    username: string;
+    displayName?: string;
+    acknowledgedAt: string;
 }
