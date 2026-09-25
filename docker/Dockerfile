@@ -61,10 +61,16 @@ RUN cd /src/gotify && \
 
 FROM debian:${DEBIAN}
 
+ARG GOTIFY_MU_VERSION=master-local
+ARG GOTIFY_MU_COMMIT=local
+
 LABEL org.opencontainers.image.documentation=https://github.com/gigabytegrove/gotify-mu
 LABEL org.opencontainers.image.source=https://github.com/gigabytegrove/gotify-mu
 LABEL org.opencontainers.image.title="Gotify MU"
 LABEL org.opencontainers.image.description="Gotify-compatible multi-user notification server"
+LABEL org.opencontainers.image.version=${GOTIFY_MU_VERSION}
+LABEL org.opencontainers.image.revision=${GOTIFY_MU_COMMIT}
+LABEL org.opencontainers.image.licenses="MIT"
 
 # Build-time configurables
 ARG GOTIFY_SERVER_EXPOSE=80
