@@ -69,6 +69,9 @@ func (d *GormDatabase) GetMQTTIntegrations() ([]*model.MQTTIntegration, error) {
 		plain, err := d.Secrets.Decrypt(item.Password)
 		if err != nil { return nil, err }
 		item.Password = plain
+		key, err := d.Secrets.Decrypt(item.ClientKey)
+		if err != nil { return nil, err }
+		item.ClientKey = key
 	}
 	return items, nil
 }
@@ -81,6 +84,9 @@ func (d *GormDatabase) GetMQTTIntegrationByID(id uint) (*model.MQTTIntegration, 
 	plain, err := d.Secrets.Decrypt(item.Password)
 	if err != nil { return nil, err }
 	item.Password = plain
+	key, err := d.Secrets.Decrypt(item.ClientKey)
+	if err != nil { return nil, err }
+	item.ClientKey = key
 	return item, nil
 }
 func (d *GormDatabase) SaveMQTTIntegration(item *model.MQTTIntegration) error {
@@ -88,9 +94,15 @@ func (d *GormDatabase) SaveMQTTIntegration(item *model.MQTTIntegration) error {
 	if err != nil { return err }
 	encrypted, err := d.Secrets.Encrypt(plain)
 	if err != nil { return err }
+	keyPlain, err := d.Secrets.Decrypt(item.ClientKey)
+	if err != nil { return err }
+	keyEncrypted, err := d.Secrets.Encrypt(keyPlain)
+	if err != nil { return err }
 	item.Password = encrypted
+	item.ClientKey = keyEncrypted
 	err = d.DB.Save(item).Error
 	item.Password = plain
+	item.ClientKey = keyPlain
 	return err
 }
 func (d *GormDatabase) DeleteMQTTIntegration(id uint) error { return d.DB.Delete(&model.MQTTIntegration{}, id).Error }
