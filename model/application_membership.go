@@ -9,6 +9,7 @@ type ApplicationMembership struct {
 	ApplicationID        uint `gorm:"primaryKey;autoIncrement:false"`
 	UserID               uint `gorm:"primaryKey;autoIncrement:false;index"`
 	ReceiveNotifications bool   `gorm:"not null"`
+	NotificationOverride *bool  `json:"-"`
 	AutoAssigned         bool   `gorm:"not null"`
 	Role                 string `gorm:"type:varchar(16)"`
 	GroupRole                 string `gorm:"type:varchar(16)"`
