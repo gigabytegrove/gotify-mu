@@ -324,6 +324,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/integration/mqtt", automationHandler.GetMQTT)
 		adminPlatform.POST("/integration/mqtt", automationHandler.CreateMQTT)
 		adminPlatform.PUT("/integration/mqtt/:id", automationHandler.UpdateMQTT)
+		adminPlatform.POST("/integration/mqtt/:id/test", automationHandler.TestMQTT)
 		adminPlatform.DELETE("/integration/mqtt/:id", automationHandler.DeleteMQTT)
 
 		adminPlatform.GET("/integration/home-assistant", automationHandler.GetHomeAssistant)
