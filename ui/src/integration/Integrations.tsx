@@ -790,13 +790,16 @@ const HomeAssistantDialog = ({
     const [baseUrl, setBaseUrl] = React.useState(item?.baseUrl || 'http://');
     const [token, setToken] = React.useState('');
     const [eventType, setEventType] = React.useState(item?.eventType || '');
+    const [entityIds, setEntityIds] = React.useState(item?.entityIds || '');
+    const [dataField, setDataField] = React.useState(item?.dataField || '');
+    const [dataValue, setDataValue] = React.useState(item?.dataValue || '');
     const [enabled, setEnabled] = React.useState(item?.enabled ?? true);
     const [saving, setSaving] = React.useState(false);
 
     const save = async () => {
         setSaving(true);
         try {
-            const payload = {name, applicationId, baseUrl, token, eventType, enabled};
+            const payload = {name, applicationId, baseUrl, token, eventType, entityIds, dataField, dataValue, enabled};
             if (item) {
                 await axios.put(api(`integration/home-assistant/${item.id}`), payload);
             } else {
@@ -835,6 +838,26 @@ const HomeAssistantDialog = ({
                         onChange={(e) => setEventType(e.target.value)}
                         placeholder="state_changed"
                         helperText="Leave blank to receive all Home Assistant events."
+                    />
+                    <TextField
+                        label="Entity IDs"
+                        value={entityIds}
+                        onChange={(e) => setEntityIds(e.target.value)}
+                        placeholder="binary_sensor.front_door, alarm_control_panel.home"
+                        helperText="Optional. Only route events whose data.entity_id matches one of these values."
+                    />
+                    <TextField
+                        label="Event data field"
+                        value={dataField}
+                        onChange={(e) => setDataField(e.target.value)}
+                        placeholder="new_state.state"
+                        helperText="Optional dotted event-data path that must exist."
+                    />
+                    <TextField
+                        label="Required field value"
+                        value={dataValue}
+                        onChange={(e) => setDataValue(e.target.value)}
+                        helperText="Optional exact value required for the event-data field."
                     />
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
