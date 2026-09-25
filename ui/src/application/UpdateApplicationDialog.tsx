@@ -14,27 +14,30 @@ import {NumberField} from '../common/NumberField';
 
 interface IProps {
     fClose: VoidFunction;
-    fOnSubmit: (name: string, description: string, defaultPriority: number) => Promise<void>;
+    fOnSubmit: (name: string, description: string, defaultPriority: number, retentionDays: number) => Promise<void>;
     initialName: string;
     initialDescription: string;
     initialDefaultPriority: number;
+    initialRetentionDays: number;
 }
 
 export const UpdateApplicationDialog = ({
     initialName,
     initialDescription,
     initialDefaultPriority,
+    initialRetentionDays,
     fClose,
     fOnSubmit,
 }: IProps) => {
     const [name, setName] = useState(initialName);
     const [description, setDescription] = useState(initialDescription);
     const [defaultPriority, setDefaultPriority] = useState(initialDefaultPriority);
+    const [retentionDays, setRetentionDays] = useState(initialRetentionDays);
 
     const submitEnabled = name.trim().length !== 0;
 
     const submitAndClose = async () => {
-        await fOnSubmit(name.trim(), description, defaultPriority);
+        await fOnSubmit(name.trim(), description, defaultPriority, retentionDays);
         fClose();
     };
 
@@ -69,6 +72,17 @@ export const UpdateApplicationDialog = ({
                         label="Default priority"
                         value={defaultPriority}
                         onChange={setDefaultPriority}
+                        fullWidth
+                    />
+                    <TextField
+                        type="number"
+                        label="Message retention"
+                        value={retentionDays}
+                        onChange={(event) =>
+                            setRetentionDays(Math.max(0, Number(event.target.value)))
+                        }
+                        helperText="Days to keep Channel message history. Use 0 to keep messages indefinitely."
+                        slotProps={{htmlInput: {min: 0, max: 36500}}}
                         fullWidth
                     />
                 </Stack>
