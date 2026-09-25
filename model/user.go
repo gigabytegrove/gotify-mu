@@ -137,8 +137,9 @@ type CurrentUserExternal struct {
 	//
 	// read only: true
 	ElevatedUntil *time.Time `json:"elevatedUntil,omitempty"`
-	MFAEnabled bool `json:"mfaEnabled"`
-	MFARequired bool `json:"mfaRequired"`
+	MFAEnabled  bool   `json:"mfaEnabled"`
+	MFARequired bool   `json:"mfaRequired"`
+	AuthProvider string `json:"authProvider,omitempty"`
 }
 
 // UserExternalPass Model
