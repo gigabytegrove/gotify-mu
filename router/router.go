@@ -22,6 +22,7 @@ import (
 	gerror "github.com/gotify/server/v3/error"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/plugin"
+	"github.com/gotify/server/v3/security"
 	"github.com/gotify/server/v3/ui"
 	"github.com/rs/zerolog/log"
 )
@@ -87,11 +88,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			}
 		}
 	}()
+	loginLimiter := security.NewLimiter(12, 5)
+	webhookLimiter := security.NewLimiter(240, 30)
 	authentication := auth.Auth{
 		DB:               db,
 		SecureCookie:     conf.Server.SecureCookie,
 		LocalAuthEnabled: conf.LocalAuthEnabled,
 		CrossOrigin:      http.NewCrossOriginProtection(),
+		LoginLimiter:     loginLimiter,
 	}
 	automationEngine := automation.New(db, streamHandler)
 	messageHandler := api.MessageAPI{Notifier: streamHandler, DB: db, Dispatcher: automationEngine}
@@ -144,7 +148,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}
 
 	g.Match([]string{"GET", "HEAD"}, "/health", healthHandler.Health)
-	g.POST("/integrations/webhook/:secret", automationHandler.ReceiveWebhook)
+	g.POST("/integrations/webhook/:secret", func(ctx *gin.Context) {
+		if !webhookLimiter.Allow(ctx.ClientIP()) {
+			ctx.Header("Retry-After", "60")
+			ctx.AbortWithStatus(http.StatusTooManyRequests)
+			return
+		}
+		automationHandler.ReceiveWebhook(ctx)
+	})
 	g.GET("/swagger", docs.Serve)
 	g.StaticFS("/image", &onlyImageFS{inner: gin.Dir(conf.UploadedImagesDir, false)})
 
