@@ -112,6 +112,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled}
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
+	mfaHandler := api.MFAAPI{DB: db}
 	auditHandler := api.AuditAPI{DB: db}
 	systemHandler := api.SystemAPI{DB: db, Dialect: conf.Database.Dialect, NotifyDeleted: streamHandler.NotifyDeletedClient}
 	groupHandler := api.UserGroupAPI{DB: db}
@@ -268,6 +269,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 		clientAuth.GET("/stream", streamHandler.Handle)
 		clientAuth.GET("current/user", userHandler.GetCurrentUser)
+		clientAuth.GET("/current/user/mfa/status", mfaHandler.Status)
 		clientAuth.POST("/auth/logout", sessionHandler.Logout)
 		clientAuth.GET("/automation/quiet-hours", automationHandler.GetQuietHours)
 		clientAuth.PUT("/automation/quiet-hours", automationHandler.SaveQuietHours)
@@ -294,6 +296,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.DELETE("/application/:id/message/all", messageHandler.DeleteMessagesForEveryone)
 		clientElevated.DELETE("/client/:id", clientHandler.DeleteClient)
 		clientElevated.POST("/current/user/password", userHandler.ChangePassword)
+		clientElevated.POST("/current/user/mfa/setup", mfaHandler.Setup)
+		clientElevated.POST("/current/user/mfa/enable", mfaHandler.Enable)
+		clientElevated.POST("/current/user/mfa/disable", mfaHandler.Disable)
+		clientElevated.POST("/current/user/mfa/recovery-codes", mfaHandler.RegenerateRecoveryCodes)
 	}
 
 	authAdmin := g.Group("/user")
