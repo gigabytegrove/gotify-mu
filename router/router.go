@@ -114,6 +114,30 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
 	auditHandler := api.AuditAPI{DB: db}
+	auditStop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(24 * time.Hour)
+		defer ticker.Stop()
+		cleanup := func() {
+			settings, err := db.GetAuditSettings()
+			if err != nil {
+				log.Error().Err(err).Msg("Could not load audit retention settings")
+				return
+			}
+			if err := db.DeleteAuditEventsBefore(time.Now().AddDate(0, 0, -settings.RetentionDays)); err != nil {
+				log.Error().Err(err).Msg("Could not apply audit retention policy")
+			}
+		}
+		cleanup()
+		for {
+			select {
+			case <-auditStop:
+				return
+			case <-ticker.C:
+				cleanup()
+			}
+		}
+	}()
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
@@ -300,6 +324,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	{
 		adminPlatform.Use(authentication.RequireAdmin)
 		adminPlatform.GET("/audit", auditHandler.GetAuditEvents)
+		adminPlatform.GET("/audit/export", auditHandler.ExportCSV)
+		adminPlatform.GET("/audit/settings", auditHandler.GetSettings)
+		adminPlatform.PUT("/audit/settings", auditHandler.SaveSettings)
 		adminPlatform.GET("/group", groupHandler.GetGroups)
 		adminPlatform.POST("/group", groupHandler.CreateGroup)
 		adminPlatform.PUT("/group/:id", groupHandler.UpdateGroup)
@@ -340,6 +367,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.DELETE("/automation/escalation/:id", automationHandler.DeleteEscalation)
 	}
 	return g, func() {
+		close(auditStop)
 		automationEngine.Close()
 		streamHandler.Close()
 	}
