@@ -1,12 +1,17 @@
 package api
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +20,7 @@ import (
 	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/automation"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 )
 
 type AutomationEngine interface {
@@ -64,8 +70,10 @@ type AutomationDatabase interface {
 }
 
 type AutomationAPI struct {
-	DB     AutomationDatabase
-	Engine AutomationEngine
+	DB             AutomationDatabase
+	Engine         AutomationEngine
+	WebhookLimiter *security.DynamicLimiter
+	WebhookReplay  *security.ReplayCache
 }
 
 type webhookParams struct {
@@ -76,7 +84,10 @@ type webhookParams struct {
 	MessageField    string `json:"messageField"`
 	PriorityField   string `json:"priorityField"`
 	DefaultTitle    string `json:"defaultTitle"`
-	DefaultPriority int    `json:"defaultPriority"`
+	DefaultPriority    int    `json:"defaultPriority"`
+	RequireSignature   bool   `json:"requireSignature"`
+	AllowedCIDRs       string `json:"allowedCidrs"`
+	RateLimitPerMinute int    `json:"rateLimitPerMinute"`
 }
 
 func (a *AutomationAPI) GetWebhookRoutes(ctx *gin.Context) {
@@ -98,6 +109,9 @@ func (a *AutomationAPI) CreateWebhookRoute(ctx *gin.Context) {
 		TitleField: valueOr(params.TitleField, "title"), MessageField: valueOr(params.MessageField, "message"),
 		PriorityField: valueOr(params.PriorityField, "priority"), DefaultTitle: params.DefaultTitle,
 		DefaultPriority: params.DefaultPriority,
+		RequireSignature: params.RequireSignature,
+		AllowedCIDRs: strings.TrimSpace(params.AllowedCIDRs),
+		RateLimitPerMinute: normalizedWebhookRateLimit(params.RateLimitPerMinute),
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
 	ctx.JSON(201, webhookView(item))
@@ -114,6 +128,9 @@ func (a *AutomationAPI) UpdateWebhookRoute(ctx *gin.Context) {
 		item.Name, item.ApplicationID, item.Enabled = params.Name, params.ApplicationID, params.Enabled
 		item.TitleField, item.MessageField = valueOr(params.TitleField, "title"), valueOr(params.MessageField, "message")
 		item.PriorityField, item.DefaultTitle, item.DefaultPriority = valueOr(params.PriorityField, "priority"), params.DefaultTitle, params.DefaultPriority
+		item.RequireSignature = params.RequireSignature
+		item.AllowedCIDRs = strings.TrimSpace(params.AllowedCIDRs)
+		item.RateLimitPerMinute = normalizedWebhookRateLimit(params.RateLimitPerMinute)
 		if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
 		ctx.JSON(200, webhookView(item))
 	})
@@ -140,10 +157,48 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 	secret := strings.TrimSpace(ctx.Param("secret"))
 	item, err := a.DB.GetWebhookRouteBySecret(secret)
 	if !successOrAbort(ctx, 500, err) { return }
-	if item == nil { ctx.AbortWithStatus(404); return }
+	if item == nil { ctx.AbortWithStatus(http.StatusNotFound); return }
 
-	body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, 1024*1024))
+	if !webhookIPAllowed(ctx.ClientIP(), item.AllowedCIDRs) {
+		ctx.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+
+	limit := normalizedWebhookRateLimit(item.RateLimitPerMinute)
+	if a.WebhookLimiter != nil {
+		key := fmt.Sprintf("%d|%s", item.ID, ctx.ClientIP())
+		if allowed, retry := a.WebhookLimiter.Allow(key, limit, time.Minute); !allowed {
+			seconds := int(retry.Round(time.Second).Seconds())
+			if seconds < 1 { seconds = 1 }
+			ctx.Header("Retry-After", strconv.Itoa(seconds))
+			ctx.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error":"webhook rate limit exceeded"})
+			return
+		}
+	}
+
+	const maxWebhookBytes = 1 << 20
+	body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, maxWebhookBytes+1))
 	if !successOrAbort(ctx, 400, err) { return }
+	if len(body) > maxWebhookBytes {
+		ctx.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, gin.H{"error":"webhook payload exceeds 1 MiB"})
+		return
+	}
+
+	if item.RequireSignature {
+		timestamp := strings.TrimSpace(ctx.GetHeader("X-Gotify-MU-Timestamp"))
+		signature := strings.TrimSpace(ctx.GetHeader("X-Gotify-MU-Signature"))
+		if !validWebhookSignature(secret, timestamp, signature, body, time.Now()) {
+			ctx.AbortWithStatus(http.StatusUnauthorized)
+			return
+		}
+		if a.WebhookReplay != nil {
+			replayKey := security.HashSecret(secret + "|" + timestamp + "|" + signature)
+			if !a.WebhookReplay.Remember(replayKey, 10*time.Minute) {
+				ctx.AbortWithStatusJSON(http.StatusConflict, gin.H{"error":"duplicate webhook request"})
+				return
+			}
+		}
+	}
 
 	title := item.DefaultTitle
 	message := strings.TrimSpace(string(body))
@@ -168,7 +223,7 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 	}
 	msg, err := a.Engine.Publish(item.ApplicationID, title, message, priority)
 	if !successOrAbort(ctx, 500, err) { return }
-	ctx.JSON(202, gin.H{"accepted": true, "messageId": msg.ID})
+	ctx.JSON(http.StatusAccepted, gin.H{"accepted": true, "messageId": msg.ID})
 }
 
 type mqttParams struct {
@@ -534,6 +589,7 @@ func validateSchedule(item *model.ScheduledNotification) error {
 func webhookView(item *model.WebhookRoute) model.WebhookRouteView {
 	return model.WebhookRouteView{
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,Enabled:item.Enabled,
+		RequireSignature:item.RequireSignature,AllowedCIDRs:item.AllowedCIDRs,RateLimitPerMinute:normalizedWebhookRateLimit(item.RateLimitPerMinute),
 		Path:"/integrations/webhook/"+item.Secret,TitleField:item.TitleField,MessageField:item.MessageField,
 		PriorityField:item.PriorityField,DefaultTitle:item.DefaultTitle,DefaultPriority:item.DefaultPriority,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
@@ -599,6 +655,44 @@ func payloadInt(value any) (int, bool) {
 func valueOr(value, fallback string) string {
 	if strings.TrimSpace(value) == "" { return fallback }
 	return strings.TrimSpace(value)
+}
+
+func normalizedWebhookRateLimit(value int) int {
+	if value <= 0 { return 120 }
+	if value > 10000 { return 10000 }
+	return value
+}
+
+func webhookIPAllowed(clientIP, allowed string) bool {
+	allowed = strings.TrimSpace(allowed)
+	if allowed == "" { return true }
+	ip := net.ParseIP(strings.TrimSpace(clientIP))
+	if ip == nil { return false }
+	for _, raw := range strings.FieldsFunc(allowed, func(r rune) bool { return r == ',' || r == ';' || r == '\n' || r == ' ' || r == '\t' }) {
+		raw = strings.TrimSpace(raw)
+		if raw == "" { continue }
+		if candidate := net.ParseIP(raw); candidate != nil && candidate.Equal(ip) { return true }
+		if _, network, err := net.ParseCIDR(raw); err == nil && network.Contains(ip) { return true }
+	}
+	return false
+}
+
+func validWebhookSignature(secret, timestamp, signature string, body []byte, now time.Time) bool {
+	if secret == "" || timestamp == "" || signature == "" { return false }
+	seconds, err := strconv.ParseInt(timestamp, 10, 64)
+	if err != nil { return false }
+	signedAt := time.Unix(seconds, 0)
+	delta := now.Sub(signedAt)
+	if delta < 0 { delta = -delta }
+	if delta > 5*time.Minute { return false }
+	signature = strings.TrimPrefix(strings.ToLower(signature), "sha256=")
+	provided, err := hex.DecodeString(signature)
+	if err != nil { return false }
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(timestamp))
+	_, _ = mac.Write([]byte("."))
+	_, _ = mac.Write(body)
+	return hmac.Equal(provided, mac.Sum(nil))
 }
 
 func validMQTTURL(raw string) bool {
