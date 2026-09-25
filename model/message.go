@@ -20,6 +20,9 @@ type Message struct {
 	RootMessageID    uint       `gorm:"index" json:"-"`
 	EscalationRuleID uint       `gorm:"index" json:"-"`
 	EscalationDepth  int        `json:"-"`
+	ReplyToMessageID uint       `gorm:"index" json:"-"`
+	ThreadRootMessageID uint    `gorm:"index" json:"-"`
+	Collaboration   MessageCollaboration `gorm:"-" json:"-"`
 	Acknowledged     bool       `gorm:"-" json:"-"`
 	AcknowledgedByAnyone bool   `gorm:"-" json:"-"`
 	AcknowledgementCount int    `gorm:"-" json:"-"`
@@ -91,6 +94,12 @@ type MessageExternal struct {
 	EscalationRuleID uint `json:"escalationRuleId,omitempty"`
 	// The escalation stage depth.
 	EscalationDepth int `json:"escalationDepth,omitempty"`
+	// Message this item replies to in a conversation thread.
+	ReplyToMessageID uint `json:"replyToMessageId,omitempty"`
+	// Root message of a conversation thread.
+	ThreadRootMessageID uint `json:"threadRootMessageId,omitempty"`
+	// Rich Gotify MU collaboration state. Official Gotify clients may ignore it.
+	Collaboration MessageCollaboration `json:"collaboration,omitempty"`
 	// Whether the current requesting user has acknowledged this message.
 	Acknowledged bool `json:"acknowledged,omitempty"`
 	// Whether anyone with access to the Channel has acknowledged this message.
