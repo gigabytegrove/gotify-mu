@@ -347,6 +347,9 @@ type homeAssistantParams struct {
 	BaseURL       string `json:"baseUrl" binding:"required"`
 	Token         string `json:"token"`
 	EventType     string `json:"eventType"`
+	EntityIDs     string `json:"entityIds"`
+	DataField     string `json:"dataField"`
+	DataValue     string `json:"dataValue"`
 	Enabled       bool   `json:"enabled"`
 }
 
@@ -366,7 +369,9 @@ func (a *AutomationAPI) CreateHomeAssistant(ctx *gin.Context) {
 	if strings.TrimSpace(params.Token) == "" { ctx.AbortWithError(400, errors.New("access token is required")); return }
 	item := &model.HomeAssistantIntegration{
 		Name: params.Name, ApplicationID: params.ApplicationID, BaseURL: strings.TrimRight(params.BaseURL, "/"),
-		Token: params.Token, EventType: params.EventType, Enabled: params.Enabled,
+		Token: params.Token, EventType: strings.TrimSpace(params.EventType),
+		EntityIDs: strings.TrimSpace(params.EntityIDs), DataField: strings.TrimSpace(params.DataField), DataValue: params.DataValue,
+		Enabled: params.Enabled,
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 	a.Engine.ReloadIntegrations()
@@ -383,7 +388,11 @@ func (a *AutomationAPI) UpdateHomeAssistant(ctx *gin.Context) {
 		if !a.channelExists(ctx, params.ApplicationID) { return }
 		if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("Home Assistant URL must use http or https")); return }
 		item.Name, item.ApplicationID, item.BaseURL = params.Name, params.ApplicationID, strings.TrimRight(params.BaseURL, "/")
-		item.EventType, item.Enabled = params.EventType, params.Enabled
+		item.EventType = strings.TrimSpace(params.EventType)
+		item.EntityIDs = strings.TrimSpace(params.EntityIDs)
+		item.DataField = strings.TrimSpace(params.DataField)
+		item.DataValue = params.DataValue
+		item.Enabled = params.Enabled
 		if params.Token != "" { item.Token = params.Token }
 		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
@@ -789,7 +798,7 @@ func mqttView(item *model.MQTTIntegration) model.MQTTIntegrationView {
 func homeAssistantView(item *model.HomeAssistantIntegration) model.HomeAssistantIntegrationView {
 	return model.HomeAssistantIntegrationView{
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,BaseURL:item.BaseURL,
-		TokenConfigured:item.Token!="",EventType:item.EventType,Enabled:item.Enabled,
+		TokenConfigured:item.Token!="",EventType:item.EventType,EntityIDs:item.EntityIDs,DataField:item.DataField,DataValue:item.DataValue,Enabled:item.Enabled,
 		Status:item.Status,LastConnectedAt:item.LastConnectedAt,LastEventAt:item.LastEventAt,
 		LastError:item.LastError,LastErrorAt:item.LastErrorAt,ReconnectCount:item.ReconnectCount,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
