@@ -185,6 +185,22 @@ func (d *GormDatabase) MarkConnectorItemSeen(connectorType string, connectorID u
 	return result.RowsAffected > 0, result.Error
 }
 
+func (d *GormDatabase) MarkConnectorItemSeenWithin(connectorType string, connectorID uint, itemKey string, now time.Time, window time.Duration) (bool, error) {
+	if window <= 0 {
+		return true, nil
+	}
+	cutoff := now.Add(-window)
+	result := d.DB.Model(&model.ConnectorSeenItem{}).
+		Where("connector_type = ? AND connector_id = ? AND item_key = ? AND seen_at <= ?", connectorType, connectorID, itemKey, cutoff).
+		Update("seen_at", now)
+	if result.Error != nil { return false, result.Error }
+	if result.RowsAffected > 0 { return true, nil }
+	item := &model.ConnectorSeenItem{ConnectorType:connectorType,ConnectorID:connectorID,ItemKey:itemKey,SeenAt:now}
+	created := d.DB.Clauses(clause.OnConflict{DoNothing:true}).Create(item)
+	if created.Error != nil { return false, created.Error }
+	return created.RowsAffected > 0, nil
+}
+
 func (d *GormDatabase) CleanupConnectorSeenItems(before time.Time) error {
 	return d.DB.Where("seen_at < ?", before).Delete(&model.ConnectorSeenItem{}).Error
 }
