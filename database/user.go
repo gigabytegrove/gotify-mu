@@ -104,6 +104,9 @@ func (d *GormDatabase) DeleteUserByID(id uint) error {
 	if err := d.DB.Where("user_id = ?", id).Delete(&model.MessageDismissal{}).Error; err != nil {
 		return err
 	}
+	if err := d.DeleteUserGroupMembershipsForUser(id); err != nil {
+		return err
+	}
 	return d.DB.Where("id = ?", id).Delete(&model.User{}).Error
 }
 
