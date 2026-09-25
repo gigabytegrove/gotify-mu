@@ -502,7 +502,7 @@ func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 				return fmt.Errorf("replacement service entered state %s", status)
 			}
 		}
-		elapsed := 120*time.Second - time.Until(deadline)
+		elapsed := timeout - time.Until(deadline)
 		progress := 96 + int(elapsed.Seconds()/30)
 		if progress > 99 {
 			progress = 99
@@ -697,9 +697,9 @@ func (m *manager) handleBuildProgress(line string) {
 	case strings.Contains(line, "load metadata"):
 		m.updateProgress("building", "Checking required components", "Checking required components", 37)
 	case strings.Contains(line, "js-builder"):
-		m.updateProgress("building", "Preparing web interface", "Preparing web interface", 47)
+		m.updateProgress("building", "Preparing interface", "Preparing interface", 47)
 	case strings.Contains(line, "[builder "):
-		m.updateProgress("building", "Preparing server", "Preparing server", 62)
+		m.updateProgress("building", "Preparing application", "Preparing application", 62)
 	case strings.Contains(line, "[stage-2 "):
 		m.updateProgress("building", "Assembling update", "Assembling update", 73)
 	case strings.Contains(line, "exporting to image"):
