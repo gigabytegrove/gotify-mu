@@ -1,6 +1,11 @@
 import {
     Box,
+    Button,
     CssBaseline,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     Paper,
     StyledEngineProvider,
     ThemeProvider,
@@ -44,6 +49,7 @@ const Layout = observer(() => {
             connectionErrorMessage,
             refreshKey,
         },
+        elevateStore,
     } = useStores();
 
     const [currentTheme, setCurrentTheme] = React.useState<ThemeKey>(() => {
@@ -162,6 +168,9 @@ const Layout = observer(() => {
                             </Box>
                         </Box>
 
+                        <GlobalElevationDialog
+                            open={loggedIn && elevateStore.reauthenticationRequired}
+                        />
                         <ScrollUpButton />
                         <SnackbarProvider />
                     </div>
@@ -193,6 +202,27 @@ const RequireAuth: React.FC<
     }
     return <>{children}</>;
 };
+
+const GlobalElevationDialog = observer(({open}: {open: boolean}) => {
+    const {elevateStore} = useStores();
+
+    const close = () => {
+        elevateStore.cleanupOidcElevate();
+        elevateStore.dismissReauthentication();
+    };
+
+    return (
+        <Dialog open={open} onClose={close} fullWidth maxWidth="sm">
+            <DialogTitle>Authentication Required</DialogTitle>
+            <DialogContent>
+                <ElevationForm />
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={close}>Cancel</Button>
+            </DialogActions>
+        </Dialog>
+    );
+});
 
 export const RequireElevation = observer(({children}: React.PropsWithChildren) => {
     const {elevateStore} = useStores();
