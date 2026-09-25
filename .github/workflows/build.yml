@@ -130,6 +130,7 @@ jobs:
           make build
           sudo chown -R $UID build
           make package-zip
+          git archive             --format=zip             --prefix="gotify-mu-v${VERSION}/"             --output="build/gotify-mu-v${VERSION}-source.zip"             HEAD
           sha256sum build/*.zip > build/SHA256SUMS
           ls -lath build
 
