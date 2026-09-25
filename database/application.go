@@ -59,6 +59,7 @@ func (d *GormDatabase) CreateApplication(application *model.Application) error {
 				ApplicationID:        application.ID,
 				UserID:               application.UserID,
 				ReceiveNotifications: true,
+				Role:                 model.ChannelRoleOwner,
 			}
 			if err := tx.Create(membership).Error; err != nil {
 				return err
@@ -98,6 +99,7 @@ func (d *GormDatabase) DeleteApplicationByID(id uint) error {
 		if err := tx.Where("application_id = ?", id).Delete(&model.ScheduledNotification{}).Error; err != nil { return err }
 		if err := tx.Where("application_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
 		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationGroupAssignment{}).Error; err != nil { return err }
 		return tx.Where("id = ?", id).Delete(&model.Application{}).Error
 	})
 }
