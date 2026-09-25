@@ -432,18 +432,23 @@ func (a *AutomationAPI) DeleteHomeAssistant(ctx *gin.Context) {
 }
 
 type scheduleParams struct {
-	Name          string     `json:"name" binding:"required"`
-	ApplicationID uint       `json:"applicationId" binding:"required"`
-	Title         string     `json:"title"`
-	Message       string     `json:"message" binding:"required"`
-	Priority      int        `json:"priority"`
-	ScheduleType  string     `json:"scheduleType" binding:"required"`
-	RunAt         *time.Time `json:"runAt"`
-	Hour          int        `json:"hour"`
-	Minute        int        `json:"minute"`
-	Weekday       int        `json:"weekday"`
-	Timezone      string     `json:"timezone"`
-	Enabled       bool       `json:"enabled"`
+	Name           string     `json:"name" binding:"required"`
+	ApplicationID  uint       `json:"applicationId" binding:"required"`
+	Title          string     `json:"title"`
+	Message        string     `json:"message" binding:"required"`
+	Priority       int        `json:"priority"`
+	ScheduleType   string     `json:"scheduleType" binding:"required"`
+	RunAt          *time.Time `json:"runAt"`
+	Hour           int        `json:"hour"`
+	Minute         int        `json:"minute"`
+	Weekday        int        `json:"weekday"`
+	CronExpression string     `json:"cronExpression"`
+	Timezone       string     `json:"timezone"`
+	EndAt          *time.Time `json:"endAt"`
+	MaxRuns        int        `json:"maxRuns"`
+	MisfirePolicy  string     `json:"misfirePolicy"`
+	ExcludeDates   string     `json:"excludeDates"`
+	Enabled        bool       `json:"enabled"`
 }
 
 func (a *AutomationAPI) GetSchedules(ctx *gin.Context) {
@@ -473,7 +478,7 @@ func (a *AutomationAPI) UpdateSchedule(ctx *gin.Context) {
 		if err := ctx.ShouldBindJSON(&params); err != nil { return }
 		if !a.channelExists(ctx, params.ApplicationID) { return }
 		updated := scheduleFromParams(params)
-		updated.ID, updated.CreatedAt = item.ID, item.CreatedAt
+		updated.ID, updated.CreatedAt, updated.RunCount = item.ID, item.CreatedAt, item.RunCount
 		if err := validateSchedule(updated); err != nil { ctx.AbortWithError(400, err); return }
 		updated.NextRunAt = automation.NextScheduleRun(updated, time.Now())
 		if updated.Enabled && updated.NextRunAt == nil { ctx.AbortWithError(400, errors.New("schedule does not have a future run time")); return }
@@ -651,7 +656,9 @@ func scheduleFromParams(params scheduleParams) *model.ScheduledNotification {
 	return &model.ScheduledNotification{
 		Name:params.Name,ApplicationID:params.ApplicationID,Title:params.Title,Message:params.Message,Priority:params.Priority,
 		ScheduleType:params.ScheduleType,RunAt:params.RunAt,Hour:params.Hour,Minute:params.Minute,Weekday:params.Weekday,
-		Timezone:valueOr(params.Timezone,"UTC"),Enabled:params.Enabled,
+		CronExpression:strings.TrimSpace(params.CronExpression),Timezone:valueOr(params.Timezone,"UTC"),EndAt:params.EndAt,
+		MaxRuns:params.MaxRuns,MisfirePolicy:valueOr(params.MisfirePolicy,"send"),ExcludeDates:strings.TrimSpace(params.ExcludeDates),
+		Enabled:params.Enabled,
 	}
 }
 
@@ -665,10 +672,22 @@ func validateSchedule(item *model.ScheduledNotification) error {
 		if item.Hour < 0 || item.Hour > 23 || item.Minute < 0 || item.Minute > 59 { return errors.New("invalid daily time") }
 	case "weekly":
 		if item.Weekday < 0 || item.Weekday > 6 || item.Hour < 0 || item.Hour > 23 || item.Minute < 0 || item.Minute > 59 { return errors.New("invalid weekly schedule") }
+	case "cron":
+		if err := automation.ValidateCronExpression(item.CronExpression); err != nil { return err }
 	default:
-		return errors.New("schedule type must be once, hourly, daily, or weekly")
+		return errors.New("schedule type must be once, hourly, daily, weekly, or cron")
 	}
 	if _, err := time.LoadLocation(valueOr(item.Timezone,"UTC")); err != nil { return errors.New("invalid timezone") }
+	if item.MaxRuns < 0 { return errors.New("maximum runs cannot be negative") }
+	switch item.MisfirePolicy {
+	case "", "send", "skip":
+	default:
+		return errors.New("misfire policy must be send or skip")
+	}
+	if item.EndAt != nil && !item.EndAt.After(time.Now()) {
+		return errors.New("schedule end time must be in the future")
+	}
+	if err := automation.ValidateExcludeDates(item.ExcludeDates); err != nil { return err }
 	return nil
 }
 
