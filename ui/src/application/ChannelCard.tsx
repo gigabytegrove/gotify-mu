@@ -88,7 +88,7 @@ const ChannelCard = ({
                 transform: CSS.Transform.toString(transform),
                 transition,
             }}>
-            <Stack direction="row" spacing={2} alignItems="flex-start">
+            <Stack direction="row" spacing={2} sx={{alignItems: 'flex-start'}}>
                 <Box
                     {...attributes}
                     {...listeners}
@@ -113,7 +113,7 @@ const ChannelCard = ({
                     <Stack
                         direction={{xs: 'column', sm: 'row'}}
                         spacing={1}
-                        alignItems={{xs: 'flex-start', sm: 'center'}}>
+                        sx={{alignItems: {xs: 'flex-start', sm: 'center'}}}>
                         <Typography
                             className="channel-name"
                             variant="h6"
@@ -121,7 +121,7 @@ const ChannelCard = ({
                             sx={{maxWidth: '100%'}}>
                             {app.name}
                         </Typography>
-                        <Stack direction="row" spacing={0.75} flexWrap="wrap" useFlexGap>
+                        <Stack direction="row" spacing={0.75} sx={{flexWrap: 'wrap'}} useFlexGap>
                             {app.autoAssign && (
                                 <Chip size="small" icon={<Public />} label="Global" />
                             )}
@@ -159,7 +159,7 @@ const ChannelCard = ({
                     </Stack>
                 </Stack>
 
-                <Stack direction="row" spacing={0.5} alignItems="center">
+                <Stack direction="row" spacing={0.5} sx={{alignItems: 'center'}}>
                     <Tooltip
                         title={
                             app.receiveNotifications === false

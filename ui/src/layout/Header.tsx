@@ -121,8 +121,8 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                             anchorOrigin={{vertical: 'bottom', horizontal: 'right'}}
                             transformOrigin={{vertical: 'top', horizontal: 'right'}}>
                             <Box sx={{px: 2, py: 1.25}}>
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    <Typography fontWeight={700}>{name}</Typography>
+                                <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                                    <Typography sx={{fontWeight: 700}}>{name}</Typography>
                                     {admin && (
                                         <Chip
                                             icon={<Security fontSize="small" />}

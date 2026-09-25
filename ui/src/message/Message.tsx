@@ -89,7 +89,7 @@ const Message = ({
                     priority >= 8 ? 'error.main' : priority >= 4 ? 'warning.main' : 'divider',
             }}>
             <Stack spacing={1.5}>
-                <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                <Stack direction="row" spacing={1.5} sx={{alignItems: 'flex-start'}}>
                     {image && (
                         <Avatar
                             src={config.get('url') + image}

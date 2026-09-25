@@ -37,7 +37,7 @@ const memberStatus = (member: IApplicationMember | undefined, isOwner: boolean) 
     if (!member) return <Chip size="small" variant="outlined" label="Not assigned" />;
 
     return (
-        <Stack direction="row" spacing={0.5} flexWrap="wrap" useFlexGap>
+        <Stack direction="row" spacing={0.5} sx={{flexWrap: 'wrap'}} useFlexGap>
             <Chip
                 size="small"
                 variant="outlined"
@@ -134,7 +134,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                         />
                                     }
                                     label={
-                                        <Stack direction="row" spacing={1} alignItems="center">
+                                        <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
                                             <span>Global Channel</span>
                                             <Chip
                                                 size="small"
@@ -158,8 +158,8 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                     disableGutters
                                     sx={{border: 1, borderColor: 'divider'}}>
                                     <AccordionSummary expandIcon={<ExpandMore />}>
-                                        <Stack direction="row" spacing={1} alignItems="center">
-                                            <Typography fontWeight={600}>Advanced</Typography>
+                                        <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                                            <Typography sx={{fontWeight: 600}}>Advanced</Typography>
                                             <Chip
                                                 size="small"
                                                 icon={<Science fontSize="small" />}
@@ -213,7 +213,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                             <Stack
                                                 direction="row"
                                                 spacing={1}
-                                                alignItems="center">
+                                                sx={{alignItems: 'center'}}> 
                                                 {!isOwner && member && (
                                                     <Button
                                                         size="small"
@@ -237,10 +237,9 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                                 <Stack
                                                     direction="row"
                                                     spacing={1}
-                                                    alignItems="center"
-                                                    flexWrap="wrap"
-                                                    useFlexGap>
-                                                    <Typography fontWeight={600}>
+                                                    useFlexGap
+                                                    sx={{alignItems: 'center', flexWrap: 'wrap'}}> 
+                                                    <Typography sx={{fontWeight: 600}}>
                                                         {user.name}
                                                     </Typography>
                                                     {user.admin && (

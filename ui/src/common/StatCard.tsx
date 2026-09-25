@@ -13,7 +13,10 @@ interface IProps {
 
 const StatCard = ({label, value, icon, helper}: IProps) => (
     <Paper variant="outlined" sx={{p: 2.5, height: '100%', borderRadius: 3}}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" spacing={2}>
+        <Stack
+            direction="row"
+            spacing={2}
+            sx={{justifyContent: 'space-between', alignItems: 'flex-start'}}> 
             <Box>
                 <Typography variant="body2" color="text.secondary">
                     {label}

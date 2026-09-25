@@ -59,8 +59,8 @@ const Settings = ({themeMode, setTheme}: IProps) => (
             <Stack spacing={2}>
                 <Stack
                     direction={{xs: 'column', sm: 'row'}}
-                    justifyContent="space-between"
-                    spacing={1}>
+                    spacing={1}
+                    sx={{justifyContent: 'space-between'}}> 
                     <Typography>Local password authentication</Typography>
                     <Chip
                         size="small"
@@ -69,8 +69,8 @@ const Settings = ({themeMode, setTheme}: IProps) => (
                 </Stack>
                 <Stack
                     direction={{xs: 'column', sm: 'row'}}
-                    justifyContent="space-between"
-                    spacing={1}>
+                    spacing={1}
+                    sx={{justifyContent: 'space-between'}}> 
                     <Typography>OIDC authentication</Typography>
                     <Chip size="small" label={config.get('oidc') ? 'Enabled' : 'Disabled'} />
                 </Stack>
@@ -85,7 +85,7 @@ const Settings = ({themeMode, setTheme}: IProps) => (
             title="Planned Security"
             subtitle="Authentication capabilities tracked for future Gotify MU releases."
             action={<VpnKey color="action" />}>
-            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+            <Stack direction="row" spacing={1} sx={{flexWrap: 'wrap'}} useFlexGap>
                 <Chip label="TOTP MFA" variant="outlined" />
                 <Chip label="Recovery Codes" variant="outlined" />
                 <Chip label="WebAuthn / Passkeys" variant="outlined" />
