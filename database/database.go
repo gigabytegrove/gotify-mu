@@ -104,6 +104,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.MQTTIntegration),
 		new(model.HomeAssistantIntegration),
 		new(model.ScheduledNotification),
+		new(model.ScheduledNotificationRun),
 		new(model.QuietHoursPolicy),
 		new(model.DigestPolicy),
 		new(model.DigestItem),
