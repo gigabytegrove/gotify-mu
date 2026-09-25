@@ -62,6 +62,7 @@ func (a *UpdateAPI) Install(ctx *gin.Context) {
 
 	var request UpdateInstallRequest
 	if err := ctx.ShouldBindJSON(&request); err != nil {
+		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
 	request.Version = strings.TrimSpace(strings.TrimPrefix(request.Version, "v"))
