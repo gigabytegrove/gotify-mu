@@ -33,6 +33,8 @@ type AutomationEngine interface {
 
 type AutomationDatabase interface {
 	GetApplicationByID(id uint) (*model.Application, error)
+	GetUserByID(id uint) (*model.User, error)
+	GetUserGroupByID(id uint) (*model.UserGroup, error)
 	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	GetMessageByID(id uint) (*model.Message, error)
 
@@ -529,9 +531,13 @@ func (a *AutomationAPI) SaveDigest(ctx *gin.Context) {
 type escalationParams struct {
 	Name                string `json:"name" binding:"required"`
 	SourceApplicationID uint   `json:"sourceApplicationId" binding:"required"`
-	TargetApplicationID uint   `json:"targetApplicationId" binding:"required"`
+	TargetApplicationID uint   `json:"targetApplicationId"`
+	TargetType          string `json:"targetType"`
+	TargetID            uint   `json:"targetId"`
 	MinPriority         int    `json:"minPriority"`
 	DelayMinutes        int    `json:"delayMinutes" binding:"min=1,max=10080"`
+	RepeatMinutes       int    `json:"repeatMinutes"`
+	MaxRepeats          int    `json:"maxRepeats"`
 	Enabled             bool   `json:"enabled"`
 }
 
@@ -544,9 +550,18 @@ func (a *AutomationAPI) GetEscalations(ctx *gin.Context) {
 func (a *AutomationAPI) CreateEscalation(ctx *gin.Context) {
 	var params escalationParams
 	if err := ctx.ShouldBindJSON(&params); err != nil { return }
-	if params.SourceApplicationID == params.TargetApplicationID { ctx.AbortWithError(400, errors.New("source and target Channels must be different")); return }
-	if !a.channelExists(ctx, params.SourceApplicationID) || !a.channelExists(ctx, params.TargetApplicationID) { return }
-	item := &model.EscalationRule{Name:params.Name,SourceApplicationID:params.SourceApplicationID,TargetApplicationID:params.TargetApplicationID,MinPriority:params.MinPriority,DelayMinutes:params.DelayMinutes,Enabled:params.Enabled}
+	if !a.channelExists(ctx, params.SourceApplicationID) { return }
+	targetType, targetID, ok := a.validateEscalationTarget(ctx, params)
+	if !ok { return }
+	if params.RepeatMinutes < 0 || params.RepeatMinutes > 10080 || params.MaxRepeats < 0 || params.MaxRepeats > 1000 {
+		ctx.AbortWithError(400, errors.New("invalid escalation repeat settings")); return
+	}
+	item := &model.EscalationRule{
+		Name:params.Name,SourceApplicationID:params.SourceApplicationID,
+		TargetType:targetType,TargetID:targetID,MinPriority:params.MinPriority,
+		DelayMinutes:params.DelayMinutes,RepeatMinutes:params.RepeatMinutes,MaxRepeats:params.MaxRepeats,Enabled:params.Enabled,
+	}
+	if targetType == "channel" { item.TargetApplicationID = targetID }
 	if !successOrAbort(ctx, 500, a.DB.SaveEscalationRule(item)) { return }
 	ctx.JSON(201, item)
 }
@@ -558,13 +573,63 @@ func (a *AutomationAPI) UpdateEscalation(ctx *gin.Context) {
 		if item == nil { ctx.AbortWithError(404, errors.New("escalation not found")); return }
 		var params escalationParams
 		if err := ctx.ShouldBindJSON(&params); err != nil { return }
-		if params.SourceApplicationID == params.TargetApplicationID { ctx.AbortWithError(400, errors.New("source and target Channels must be different")); return }
-		if !a.channelExists(ctx, params.SourceApplicationID) || !a.channelExists(ctx, params.TargetApplicationID) { return }
-		item.Name, item.SourceApplicationID, item.TargetApplicationID = params.Name, params.SourceApplicationID, params.TargetApplicationID
-		item.MinPriority, item.DelayMinutes, item.Enabled = params.MinPriority, params.DelayMinutes, params.Enabled
+		if !a.channelExists(ctx, params.SourceApplicationID) { return }
+		targetType, targetID, ok := a.validateEscalationTarget(ctx, params)
+		if !ok { return }
+		if params.RepeatMinutes < 0 || params.RepeatMinutes > 10080 || params.MaxRepeats < 0 || params.MaxRepeats > 1000 {
+			ctx.AbortWithError(400, errors.New("invalid escalation repeat settings")); return
+		}
+		item.Name = params.Name
+		item.SourceApplicationID = params.SourceApplicationID
+		item.TargetType = targetType
+		item.TargetID = targetID
+		item.TargetApplicationID = 0
+		if targetType == "channel" { item.TargetApplicationID = targetID }
+		item.MinPriority = params.MinPriority
+		item.DelayMinutes = params.DelayMinutes
+		item.RepeatMinutes = params.RepeatMinutes
+		item.MaxRepeats = params.MaxRepeats
+		item.Enabled = params.Enabled
 		if !successOrAbort(ctx, 500, a.DB.SaveEscalationRule(item)) { return }
 		ctx.JSON(200, item)
 	})
+}
+
+func (a *AutomationAPI) validateEscalationTarget(ctx *gin.Context, params escalationParams) (string, uint, bool) {
+	targetType := strings.ToLower(strings.TrimSpace(params.TargetType))
+	if targetType == "" { targetType = "channel" }
+	targetID := params.TargetID
+	if targetID == 0 { targetID = params.TargetApplicationID }
+	if targetID == 0 {
+		ctx.AbortWithError(400, errors.New("escalation target is required"))
+		return "", 0, false
+	}
+	switch targetType {
+	case "channel":
+		if params.SourceApplicationID == targetID {
+			ctx.AbortWithError(400, errors.New("source and target Channels must be different"))
+			return "", 0, false
+		}
+		if !a.channelExists(ctx, targetID) { return "", 0, false }
+	case "user":
+		user, err := a.DB.GetUserByID(targetID)
+		if !successOrAbort(ctx, 500, err) { return "", 0, false }
+		if user == nil {
+			ctx.AbortWithError(400, errors.New("escalation user not found"))
+			return "", 0, false
+		}
+	case "group":
+		group, err := a.DB.GetUserGroupByID(targetID)
+		if !successOrAbort(ctx, 500, err) { return "", 0, false }
+		if group == nil {
+			ctx.AbortWithError(400, errors.New("escalation Group not found"))
+			return "", 0, false
+		}
+	default:
+		ctx.AbortWithError(400, errors.New("escalation target type must be channel, user, or group"))
+		return "", 0, false
+	}
+	return targetType, targetID, true
 }
 
 func (a *AutomationAPI) DeleteEscalation(ctx *gin.Context) {
