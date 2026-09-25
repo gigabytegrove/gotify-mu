@@ -192,15 +192,23 @@ export interface IScheduledNotification {
     title: string;
     message: string;
     priority: number;
-    scheduleType: 'once' | 'hourly' | 'daily' | 'weekly';
+    scheduleType: 'once' | 'hourly' | 'daily' | 'weekly' | 'cron';
     runAt?: string;
     hour: number;
     minute: number;
     weekday: number;
+    cronExpression?: string;
+    excludedDates?: string;
     timezone: string;
+    endAt?: string;
+    maxRuns: number;
+    runCount: number;
+    misfirePolicy: 'send' | 'skip';
     enabled: boolean;
     lastRunAt?: string;
     nextRunAt?: string;
+    lastStatus?: string;
+    lastError?: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -244,4 +252,16 @@ export interface IMessageAcknowledgement {
     username: string;
     displayName?: string;
     acknowledgedAt: string;
+}
+
+
+export interface IScheduledNotificationRun {
+    id: number;
+    scheduleId: number;
+    scheduledFor: string;
+    startedAt: string;
+    finishedAt?: string;
+    status: string;
+    messageId?: number;
+    error?: string;
 }
