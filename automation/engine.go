@@ -148,6 +148,18 @@ func (e *Engine) StoreAndDeliver(msg *model.Message) (*model.MessageExternal, er
 	return e.storeAndDeliver(msg, true)
 }
 
+func (e *Engine) StoreAndDeliverForUser(msg *model.Message, userID uint) (*model.MessageExternal, error) {
+	if msg.Date.IsZero() { msg.Date = time.Now() }
+	if err := e.db.CreateMessage(msg); err != nil { return nil, err }
+	external := externalMessage(msg)
+	if err := e.deliver(userID, msg, external); err != nil { return nil, err }
+	if err := e.queueEscalations(msg); err != nil {
+		log.Error().Err(err).Uint("message_id", msg.ID).Msg("Could not queue plugin escalation")
+	}
+	return external, nil
+}
+
+
 func (e *Engine) publishWithKey(applicationID uint, title, message string, priority int, dedupKey string, parentMessageID uint) (*model.Message, error) {
 	app, err := e.db.GetApplicationByID(applicationID)
 	if err != nil { return nil, err }
