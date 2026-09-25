@@ -55,6 +55,7 @@ type Database interface {
 
 	GetEscalationRulesForMessage(applicationID uint, priority int) ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
+	ResolveEscalationTargetApplication(rule *model.EscalationRule) (*model.Application, error)
 	QueueEscalation(item *model.EscalationState) error
 	GetDueEscalations(now time.Time) ([]*model.EscalationState, error)
 	SaveEscalationState(item *model.EscalationState) error
@@ -231,24 +232,40 @@ func quietNow(policy *model.QuietHoursPolicy, now time.Time) bool {
 }
 
 func (e *Engine) queueEscalations(msg *model.Message) error {
+	if msg.EscalationDepth >= 5 { return nil }
 	rules, err := e.db.GetEscalationRulesForMessage(msg.ApplicationID, msg.Priority)
-	if err != nil {
-		return err
-	}
+	if err != nil { return err }
 	for _, rule := range rules {
+		if e.escalationWouldCycle(msg, rule) { continue }
 		delay := rule.DelayMinutes
-		if delay < 1 {
-			delay = 1
-		}
+		if delay < 1 { delay = 1 }
 		if err := e.db.QueueEscalation(&model.EscalationState{
-			RuleID: rule.ID,
-			MessageID: msg.ID,
-			DueAt: time.Now().Add(time.Duration(delay) * time.Minute),
+			RuleID:rule.ID,
+			MessageID:msg.ID,
+			DueAt:time.Now().Add(time.Duration(delay)*time.Minute),
 		}); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+func (e *Engine) escalationWouldCycle(msg *model.Message, rule *model.EscalationRule) bool {
+	targetType := strings.ToLower(strings.TrimSpace(rule.TargetType))
+	if targetType != "" && targetType != "channel" { return false }
+	targetID := rule.TargetApplicationID
+	if targetID == 0 { targetID = rule.TargetID }
+	if targetID == 0 { return true }
+
+	current := msg
+	for depth := 0; current != nil && depth < 8; depth++ {
+		if current.ApplicationID == targetID { return true }
+		if current.ParentMessageID == 0 { break }
+		parent, err := e.db.GetMessageByID(current.ParentMessageID)
+		if err != nil || parent == nil { break }
+		current = parent
+	}
+	return false
 }
 
 func (e *Engine) schedulerLoop() {
@@ -539,49 +556,85 @@ func (e *Engine) runEscalations(now time.Time) {
 		return
 	}
 	for _, state := range states {
-		acknowledged, err := e.db.IsMessageAcknowledged(state.MessageID)
-		if err != nil {
-			log.Error().Err(err).Uint("message_id", state.MessageID).Msg("Could not inspect acknowledgement")
+		source, loadErr := e.db.GetMessageByID(state.MessageID)
+		if loadErr != nil || source == nil {
+			state.Completed = true
+			done := now
+			state.DoneAt = &done
+			_ = e.db.SaveEscalationState(state)
 			continue
 		}
-		if !acknowledged {
-			rule, err := e.db.GetEscalationRuleByID(state.RuleID)
-			if err != nil || rule == nil || !rule.Enabled {
-				state.Completed = true
-			} else {
-				msg, loadErr := e.db.GetMessageByID(state.MessageID)
-				if loadErr != nil || msg == nil {
-					state.Completed = true
-				} else {
-					title := msg.Title
-					if title == "" {
-						title = "Escalated notification"
-					} else {
-						title = "Escalated: " + title
-					}
-					body := msg.Message + "\n\nThis notification was escalated because it was not acknowledged."
-					escalated := &model.Message{
-						ApplicationID:rule.TargetApplicationID,
-						Title:title,
-						Message:body,
-						Priority:msg.Priority,
-						Date:time.Now(),
-						DeduplicationKey:fmt.Sprintf("escalation:%d", state.ID),
-					}
-					if _, publishErr := e.storeAndDeliver(escalated, false); publishErr != nil {
-						log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
-						continue
-					}
-					state.Completed = true
-				}
-			}
+
+		rootID := source.RootMessageID
+		if rootID == 0 { rootID = source.ID }
+		acknowledged, ackErr := e.db.IsMessageAcknowledged(source.ID)
+		if ackErr == nil && rootID != source.ID && !acknowledged {
+			acknowledged, ackErr = e.db.IsMessageAcknowledged(rootID)
+		}
+		if ackErr != nil {
+			log.Error().Err(ackErr).Uint("message_id", state.MessageID).Msg("Could not inspect acknowledgement")
+			continue
+		}
+		if acknowledged {
+			state.Completed = true
+			done := now
+			state.DoneAt = &done
+			_ = e.db.SaveEscalationState(state)
+			continue
+		}
+
+		rule, ruleErr := e.db.GetEscalationRuleByID(state.RuleID)
+		if ruleErr != nil || rule == nil || !rule.Enabled {
+			state.Completed = true
+			done := now
+			state.DoneAt = &done
+			_ = e.db.SaveEscalationState(state)
+			continue
+		}
+
+		targetApp, targetErr := e.db.ResolveEscalationTargetApplication(rule)
+		if targetErr != nil || targetApp == nil {
+			if targetErr == nil { targetErr = errors.New("escalation target is unavailable") }
+			log.Error().Err(targetErr).Uint("rule_id", rule.ID).Msg("Escalation target could not be resolved")
+			continue
+		}
+
+		title := source.Title
+		if title == "" { title = "Escalated notification" } else { title = "Escalated: " + title }
+		body := source.Message + "\n\nThis notification was escalated because it was not acknowledged."
+		child := &model.Message{
+			ApplicationID:targetApp.ID,
+			Title:title,
+			Message:body,
+			Priority:source.Priority,
+			Date:now,
+			ParentMessageID:source.ID,
+			RootMessageID:rootID,
+			EscalationRuleID:rule.ID,
+			EscalationDepth:source.EscalationDepth+1,
+			DeduplicationKey:fmt.Sprintf("escalation:%d:%d", state.ID, state.RepeatCount),
+		}
+		allowChain := state.RepeatCount == 0
+		external, publishErr := e.storeAndDeliver(child, allowChain)
+		if publishErr != nil {
+			log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
+			continue
+		}
+		if external != nil { state.LastEscalatedMessageID = external.ID }
+		state.RepeatCount++
+
+		repeatMinutes := rule.RepeatMinutes
+		if repeatMinutes > 0 && state.RepeatCount <= rule.MaxRepeats {
+			state.DueAt = now.Add(time.Duration(repeatMinutes) * time.Minute)
+			state.Completed = false
+			state.DoneAt = nil
 		} else {
 			state.Completed = true
+			done := now
+			state.DoneAt = &done
 		}
-		done := now
-		state.DoneAt = &done
 		if err := e.db.SaveEscalationState(state); err != nil {
-			log.Error().Err(err).Uint("escalation_id", state.ID).Msg("Could not complete escalation")
+			log.Error().Err(err).Uint("escalation_id", state.ID).Msg("Could not update escalation")
 		}
 	}
 }
@@ -1112,6 +1165,10 @@ func externalMessage(msg *model.Message) *model.MessageExternal {
 		Date: msg.Date,
 		SenderUserID: msg.SenderUserID,
 		SenderName: msg.SenderName,
+		ParentMessageID: msg.ParentMessageID,
+		RootMessageID: msg.RootMessageID,
+		EscalationRuleID: msg.EscalationRuleID,
+		EscalationDepth: msg.EscalationDepth,
 		Acknowledged: msg.Acknowledged,
 		AcknowledgedByAnyone: msg.AcknowledgedByAnyone,
 		AcknowledgementCount: msg.AcknowledgementCount,
