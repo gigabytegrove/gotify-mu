@@ -110,6 +110,9 @@ func (d *GormDatabase) DeleteUserByID(id uint) error {
 	if err := d.DB.Where("user_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil {
 		return err
 	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.DeferredNotification{}).Error; err != nil {
+		return err
+	}
 	if err := d.DB.Where("user_id = ?", id).Delete(&model.DigestPolicy{}).Error; err != nil {
 		return err
 	}
