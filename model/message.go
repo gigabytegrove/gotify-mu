@@ -15,7 +15,9 @@ type Message struct {
 	Date          time.Time
 	SenderUserID  uint `gorm:"index"`
 	SenderName    string `gorm:"type:text"`
-	Acknowledged  bool   `gorm:"-" json:"-"`
+	Acknowledged      bool `gorm:"-" json:"-"`
+	AcknowledgedByAny bool `gorm:"-" json:"-"`
+	AcknowledgedCount int  `gorm:"-" json:"-"`
 }
 
 // MessageExternal Model
@@ -76,6 +78,10 @@ type MessageExternal struct {
 	SenderName string `json:"senderName,omitempty"`
 	// Whether the current requesting user has acknowledged this message.
 	Acknowledged bool `json:"acknowledged,omitempty"`
+	// Whether at least one user has acknowledged this message.
+	AcknowledgedByAny bool `json:"acknowledgedByAny,omitempty"`
+	// Number of users who have acknowledged this message.
+	AcknowledgedCount int `json:"acknowledgedCount,omitempty"`
 }
 
 // CreateMessage Model
@@ -112,4 +118,13 @@ type CreateMessage struct {
 	//
 	// example: {"home::appliances::thermostat::change_temperature":{"temperature":23},"home::appliances::lighting::on":{"brightness":15}}
 	Extras map[string]any `form:"-" query:"-" json:"extras,omitempty"`
+}
+
+
+// MessageAcknowledgementView describes one user's acknowledgement of a message.
+type MessageAcknowledgementView struct {
+	UserID         uint      `json:"userId"`
+	Username       string    `json:"username"`
+	DisplayName    string    `json:"displayName,omitempty"`
+	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }
