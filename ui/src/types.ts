@@ -53,6 +53,10 @@ export interface IMessage {
     acknowledgementCount?: number;
     lastAcknowledgedBy?: string;
     lastAcknowledgedAt?: string;
+    parentMessageId?: number;
+    rootMessageId?: number;
+    escalationRuleId?: number;
+    escalationDepth?: number;
     image?: string;
     extras?: IMessageExtras;
 }
@@ -239,8 +243,12 @@ export interface IEscalationRule {
     name: string;
     sourceApplicationId: number;
     targetApplicationId: number;
+    targetType: 'channel' | 'user' | 'group';
+    targetId: number;
     minPriority: number;
     delayMinutes: number;
+    repeatMinutes: number;
+    maxRepeats: number;
     enabled: boolean;
     createdAt: string;
     updatedAt: string;
