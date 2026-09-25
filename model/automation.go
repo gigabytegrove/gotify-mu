@@ -74,10 +74,15 @@ type MQTTIntegrationView struct {
 	ApplicationID      uint      `json:"applicationId"`
 	BrokerURL           string    `json:"brokerUrl"`
 	ClientID            string    `json:"clientId"`
-	Username            string    `json:"username"`
-	PasswordConfigured bool      `json:"passwordConfigured"`
-	Topic               string     `json:"topic"`
-	Enabled             bool       `json:"enabled"`
+	Username             string     `json:"username"`
+	PasswordConfigured  bool       `json:"passwordConfigured"`
+	ProtocolVersion     int        `json:"protocolVersion"`
+	QoS                 int        `json:"qos"`
+	CACertificate       string     `json:"caCertificate,omitempty"`
+	ClientCertificate   string     `json:"clientCertificate,omitempty"`
+	ClientKeyConfigured bool       `json:"clientKeyConfigured"`
+	Topic                string     `json:"topic"`
+	Enabled              bool       `json:"enabled"`
 	Status              string     `json:"status"`
 	LastConnectedAt     *time.Time `json:"lastConnectedAt,omitempty"`
 	LastMessageAt       *time.Time `json:"lastMessageAt,omitempty"`
