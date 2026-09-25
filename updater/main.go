@@ -75,6 +75,7 @@ type inspectedContainer struct {
 		Env        []string          `json:"Env"`
 		User       string            `json:"User"`
 		WorkingDir string            `json:"WorkingDir"`
+		Image      string            `json:"Image"`
 		Labels     map[string]string `json:"Labels"`
 	} `json:"Config"`
 	HostConfig struct {
@@ -506,14 +507,17 @@ func inspectContainer(name string) (*inspectedContainer, error) {
 func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		output, err := runDocker("inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}", name)
+		output, err := runDocker("inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}", name)
 		if err == nil {
 			status := strings.TrimSpace(output)
-			if status == "healthy" || status == "running" {
+			if status == "healthy" {
 				m.updateProgress("verifying", "Final checks", "Final checks", 99)
 				return nil
 			}
-			if status == "unhealthy" || status == "exited" || status == "dead" {
+			if status == "missing" {
+				return errors.New("replacement image does not provide a Docker health check")
+			}
+			if status == "unhealthy" {
 				return fmt.Errorf("replacement service entered state %s", status)
 			}
 		}
