@@ -17,13 +17,21 @@ import {
     ListItemText,
     Stack,
     Switch,
+    TextField,
+    MenuItem,
     Typography,
 } from '@mui/material';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import Public from '@mui/icons-material/Public';
 import Science from '@mui/icons-material/Science';
 import {observer} from 'mobx-react-lite';
-import {IApplication, IApplicationMember, IUser} from '../types';
+import {
+    IApplication,
+    IApplicationGroupGrant,
+    IApplicationMember,
+    IChannelRole,
+    IUser,
+} from '../types';
 import {useStores} from '../stores';
 import ElevationForm from '../common/ElevationForm';
 
@@ -41,7 +49,17 @@ const memberStatus = (member: IApplicationMember | undefined, isOwner: boolean) 
             <Chip
                 size="small"
                 variant="outlined"
-                label={member.autoAssigned ? 'Global' : 'Member'}
+                label={
+                    member.autoAssigned
+                        ? 'Global'
+                        : member.role === 'manager'
+                          ? 'Manager'
+                          : member.role === 'publisher'
+                            ? 'Publisher'
+                            : member.role === 'read-only'
+                              ? 'Read Only'
+                              : 'Member'
+                }
             />
             {!member.receiveNotifications && (
                 <Chip size="small" variant="outlined" label="Muted" />
@@ -51,27 +69,31 @@ const memberStatus = (member: IApplicationMember | undefined, isOwner: boolean) 
 };
 
 const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
-    const {appStore, currentUser, elevateStore} = useStores();
+    const {appStore, currentUser, elevateStore, groupStore} = useStores();
     const [members, setMembers] = useState<IApplicationMember[]>([]);
     const [users, setUsers] = useState<IUser[]>([]);
     const [loading, setLoading] = useState(false);
     const [autoAssign, setAutoAssignState] = useState(Boolean(app.autoAssign));
     const [allowMemberPost, setAllowMemberPost] = useState(Boolean(app.allowMemberPost));
+    const [groupGrants, setGroupGrants] = useState<IApplicationGroupGrant[]>([]);
 
     const load = useCallback(async () => {
         if (!elevateStore.elevated) return;
         setLoading(true);
         try {
-            const [loadedMembers, loadedUsers] = await Promise.all([
+            await groupStore.refresh();
+            const [loadedMembers, loadedUsers, loadedGroups] = await Promise.all([
                 appStore.getMembers(app.id),
                 appStore.getAssignableUsers(app.id),
+                appStore.getGroupGrants(app.id),
             ]);
             setMembers(loadedMembers);
             setUsers(loadedUsers);
+            setGroupGrants(loadedGroups);
         } finally {
             setLoading(false);
         }
-    }, [app.id, appStore, elevateStore.elevated]);
+    }, [app.id, appStore, elevateStore.elevated, groupStore]);
 
     useEffect(() => void load(), [load]);
 
@@ -85,6 +107,28 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
         } else {
             await appStore.setMember(app.id, user.id, true);
         }
+        await load();
+    };
+
+    const setRole = async (
+        user: IUser,
+        role: Exclude<IChannelRole, 'owner'>
+    ) => {
+        const member = members.find((item) => item.userId === user.id);
+        await appStore.setMember(
+            app.id,
+            user.id,
+            member?.receiveNotifications ?? true,
+            role
+        );
+        await load();
+    };
+
+    const setGroupGrant = async (
+        groupId: number,
+        role: Exclude<IChannelRole, 'owner'>
+    ) => {
+        await appStore.setGroupGrant(app.id, groupId, role, true);
         await load();
     };
 
@@ -224,6 +268,31 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                                         Make Owner
                                                     </Button>
                                                 )}
+                                                {!isOwner && member && !member.autoAssigned && (
+                                                    <TextField
+                                                        select
+                                                        size="small"
+                                                        value={
+                                                            member.role === 'owner'
+                                                                ? 'manager'
+                                                                : member.role
+                                                        }
+                                                        onChange={(event) =>
+                                                            void setRole(
+                                                                user,
+                                                                event.target.value as Exclude<
+                                                                    IChannelRole,
+                                                                    'owner'
+                                                                >
+                                                            )
+                                                        }
+                                                        sx={{minWidth: 120}}>
+                                                        <MenuItem value="manager">Manager</MenuItem>
+                                                        <MenuItem value="publisher">Publisher</MenuItem>
+                                                        <MenuItem value="member">Member</MenuItem>
+                                                        <MenuItem value="read-only">Read Only</MenuItem>
+                                                    </TextField>
+                                                )}
                                                 <Checkbox
                                                     edge="end"
                                                     checked={assigned}
@@ -257,6 +326,94 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                 );
                             })}
                         </List>
+
+                        {currentUser.user.admin && (
+                            <Stack spacing={1.25}>
+                                <Stack spacing={0.25}>
+                                    <Typography variant="h6">Group Access</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Give an entire Group access to this Channel without creating
+                                        individual assignments.
+                                    </Typography>
+                                </Stack>
+                                {groupStore.getItems().length === 0 ? (
+                                    <Typography color="text.secondary">
+                                        No Groups have been created.
+                                    </Typography>
+                                ) : (
+                                    groupStore.getItems().map((group) => {
+                                        const grant = groupGrants.find(
+                                            (item) => item.groupId === group.id
+                                        );
+                                        return (
+                                            <Stack
+                                                key={group.id}
+                                                direction={{xs: 'column', sm: 'row'}}
+                                                spacing={1}
+                                                sx={{
+                                                    alignItems: {sm: 'center'},
+                                                    justifyContent: 'space-between',
+                                                    p: 1,
+                                                    border: 1,
+                                                    borderColor: 'divider',
+                                                    borderRadius: 1,
+                                                }}>
+                                                <Stack>
+                                                    <Typography sx={{fontWeight: 600}}>
+                                                        {group.name}
+                                                    </Typography>
+                                                    <Typography variant="body2" color="text.secondary">
+                                                        {group.memberCount} member
+                                                        {group.memberCount === 1 ? '' : 's'}
+                                                    </Typography>
+                                                </Stack>
+                                                <Stack direction="row" spacing={1}>
+                                                    {grant && (
+                                                        <TextField
+                                                            select
+                                                            size="small"
+                                                            value={grant.role}
+                                                            onChange={(event) =>
+                                                                void setGroupGrant(
+                                                                    group.id,
+                                                                    event.target.value as Exclude<
+                                                                        IChannelRole,
+                                                                        'owner'
+                                                                    >
+                                                                )
+                                                            }
+                                                            sx={{minWidth: 120}}>
+                                                            <MenuItem value="manager">Manager</MenuItem>
+                                                            <MenuItem value="publisher">Publisher</MenuItem>
+                                                            <MenuItem value="member">Member</MenuItem>
+                                                            <MenuItem value="read-only">Read Only</MenuItem>
+                                                        </TextField>
+                                                    )}
+                                                    <Button
+                                                        size="small"
+                                                        color={grant ? 'error' : 'primary'}
+                                                        onClick={() =>
+                                                            grant
+                                                                ? void appStore
+                                                                      .removeGroupGrant(
+                                                                          app.id,
+                                                                          group.id
+                                                                      )
+                                                                      .then(load)
+                                                                : void setGroupGrant(
+                                                                      group.id,
+                                                                      'member'
+                                                                  )
+                                                        }>
+                                                        {grant ? 'Remove' : 'Assign'}
+                                                    </Button>
+                                                </Stack>
+                                            </Stack>
+                                        );
+                                    })
+                                )}
+                            </Stack>
+                        )}
                     </Stack>
                 )}
             </DialogContent>
