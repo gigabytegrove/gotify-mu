@@ -1,4 +1,4 @@
-import {alpha, createTheme, PaletteMode} from '@mui/material/styles';
+import {createTheme, PaletteMode} from '@mui/material/styles';
 
 export type ThemeKey = 'dark' | 'light' | 'system';
 
@@ -6,6 +6,9 @@ export const isThemeKey = (value: string | null): value is ThemeKey =>
     value === 'light' || value === 'dark' || value === 'system';
 
 export const createGotifyMuTheme = (mode: PaletteMode) => {
+    const surfaceBorder = mode === 'dark' ? '#29323b' : '#dfe5eb';
+    const tableBorder = mode === 'dark' ? '#232b33' : '#e9edf1';
+
     const theme = createTheme({
         palette: {
             mode,
@@ -66,7 +69,7 @@ export const createGotifyMuTheme = (mode: PaletteMode) => {
                         backgroundImage: 'none',
                     },
                     outlined: {
-                        borderColor: alpha(theme.palette.divider, 0.85),
+                        borderColor: surfaceBorder,
                     },
                 },
             },
@@ -74,14 +77,14 @@ export const createGotifyMuTheme = (mode: PaletteMode) => {
                 styleOverrides: {
                     paper: {
                         borderRadius: 14,
-                        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+                        border: `1px solid ${surfaceBorder}`,
                     },
                 },
             },
             MuiTableCell: {
                 styleOverrides: {
                     root: {
-                        borderBottomColor: alpha(theme.palette.divider, 0.75),
+                        borderBottomColor: tableBorder,
                     },
                     head: {
                         fontWeight: 700,
@@ -129,7 +132,7 @@ export const createGotifyMuTheme = (mode: PaletteMode) => {
                 },
                 styleOverrides: {
                     paper: {
-                        border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                        border: `1px solid ${surfaceBorder}`,
                         borderRadius: 10,
                         minWidth: 220,
                     },
