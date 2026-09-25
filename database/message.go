@@ -360,17 +360,26 @@ func (d *GormDatabase) DismissMessagesByApplicationForUser(userID, applicationID
 // DeleteMessageByID deletes a message by its id.
 func (d *GormDatabase) DeleteMessageByID(id uint) error {
 	return d.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("message_id = ?", id).Delete(&model.MessageDismissal{}).Error; err != nil { return err }
-		if err := tx.Where("message_id = ?", id).Delete(&model.MessageAcknowledgement{}).Error; err != nil { return err }
-		if err := tx.Where("message_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
-		if err := tx.Where("message_id = ?", id).Delete(&model.EscalationState{}).Error; err != nil { return err }
-		if err := tx.Where("message_id = ?", id).Delete(&model.DeferredNotification{}).Error; err != nil { return err }
-		if err := tx.Where("message_id = ?", id).Delete(&model.MessageReaction{}).Error; err != nil { return err }
-		if err := tx.Where("message_id = ?", id).Delete(&model.MessageWorkflow{}).Error; err != nil { return err }
-		if err := tx.Where("message_id = ?", id).Delete(&model.MessageRead{}).Error; err != nil { return err }
-		if err := tx.Where("message_id = ?", id).Delete(&model.MessageMention{}).Error; err != nil { return err }
-		if err := tx.Where("message_id = ?", id).Delete(&model.MessageAttachment{}).Error; err != nil { return err }
-		return tx.Where("id = ? OR reply_to_message_id = ? OR thread_root_message_id = ?", id, id, id).Delete(&model.Message{}).Error
+		var ids []uint
+		if err := tx.Model(&model.Message{}).
+			Where("id = ? OR reply_to_message_id = ? OR thread_root_message_id = ?", id, id, id).
+			Pluck("id", &ids).Error; err != nil {
+			return err
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.MessageDismissal{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.MessageAcknowledgement{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.DigestItem{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.EscalationState{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.DeferredNotification{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.MessageReaction{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.MessageWorkflow{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.MessageRead{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.MessageMention{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN ?", ids).Delete(&model.MessageAttachment{}).Error; err != nil { return err }
+		return tx.Where("id IN ?", ids).Delete(&model.Message{}).Error
 	})
 }
 
