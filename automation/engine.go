@@ -82,6 +82,8 @@ type Engine struct {
 	reload             chan struct{}
 	leader             atomic.Bool
 	instanceID         string
+	statusMu           sync.RWMutex
+	integrationStatus  map[string]model.IntegrationRuntimeStatus
 }
 
 func New(db Database, notifier Notifier) *Engine {
@@ -93,6 +95,7 @@ func New(db Database, notifier Notifier) *Engine {
 		cancel: cancel,
 		reload: make(chan struct{}, 1),
 		instanceID: newInstanceID(),
+		integrationStatus: make(map[string]model.IntegrationRuntimeStatus),
 	}
 	e.wg.Add(3)
 	go e.leadershipLoop()
@@ -105,6 +108,69 @@ func (e *Engine) Close() {
 	e.cancel()
 	e.stopIntegrations()
 	e.wg.Wait()
+}
+
+func integrationStatusKey(kind string, id uint) string {
+	return fmt.Sprintf("%s:%d", kind, id)
+}
+
+func (e *Engine) setIntegrationStatus(kind string, id uint, state, message string, connected, received, failed bool) {
+	e.statusMu.Lock()
+	defer e.statusMu.Unlock()
+	key := integrationStatusKey(kind, id)
+	status := e.integrationStatus[key]
+	now := time.Now().UTC()
+	status.Kind = kind
+	status.ID = id
+	status.State = state
+	status.Message = message
+	status.UpdatedAt = now
+	if connected {
+		status.LastConnectedAt = &now
+	}
+	if received {
+		status.LastMessageAt = &now
+	}
+	if failed {
+		status.LastErrorAt = &now
+	}
+	e.integrationStatus[key] = status
+}
+
+func (e *Engine) GetIntegrationStatuses() []model.IntegrationRuntimeStatus {
+	e.statusMu.RLock()
+	defer e.statusMu.RUnlock()
+	out := make([]model.IntegrationRuntimeStatus, 0, len(e.integrationStatus))
+	for _, status := range e.integrationStatus {
+		out = append(out, status)
+	}
+	return out
+}
+
+func (e *Engine) TestMQTT(id uint) error {
+	items, err := e.db.GetMQTTIntegrations()
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if item.ID != id {
+			continue
+		}
+		ctx, cancel := context.WithTimeout(e.ctx, 10*time.Second)
+		defer cancel()
+		conn, err := dialMQTT(ctx, item.BrokerURL)
+		if err != nil {
+			return err
+		}
+		defer conn.Close()
+		reader := bufio.NewReader(conn)
+		clientID := item.ClientID
+		if clientID == "" {
+			clientID = fmt.Sprintf("gotify-mu-test-%d", item.ID)
+		}
+		return mqttConnect(conn, reader, clientID, item.Username, item.Password)
+	}
+	return errors.New("MQTT connection not found")
 }
 
 func (e *Engine) ReloadIntegrations() {
@@ -558,7 +624,9 @@ func (e *Engine) runMQTTLoop(ctx context.Context, integration *model.MQTTIntegra
 		if ctx.Err() != nil {
 			return
 		}
+		e.setIntegrationStatus("mqtt", integration.ID, "connecting", "Connecting", false, false, false)
 		if err := e.runMQTT(ctx, integration); err != nil && ctx.Err() == nil {
+			e.setIntegrationStatus("mqtt", integration.ID, "error", err.Error(), false, false, true)
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("MQTT connection interrupted")
 		}
 		select {
@@ -596,6 +664,7 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 	if err := mqttSubscribe(conn, reader, integration.Topic); err != nil {
 		return err
 	}
+	e.setIntegrationStatus("mqtt", integration.ID, "connected", "Connected", true, false, false)
 
 	for {
 		if ctx.Err() != nil {
@@ -636,6 +705,7 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 		if title == "" {
 			title = topic
 		}
+		e.setIntegrationStatus("mqtt", integration.ID, "connected", "Connected", false, true, false)
 		if _, err := e.Publish(integration.ApplicationID, title, message, priority); err != nil {
 			log.Error().Err(err).Uint("integration_id", integration.ID).Msg("MQTT message could not be published")
 		}
@@ -730,6 +800,8 @@ func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string) error {
 	return nil
 }
 
+const maxMQTTPacketBytes = 4 * 1024 * 1024
+
 func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 	header, err := reader.ReadByte()
 	if err != nil {
@@ -743,6 +815,9 @@ func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 		}
 		remaining += int(value&127) * multiplier
 		if value&128 == 0 {
+			if remaining < 0 || remaining > maxMQTTPacketBytes {
+				return 0, nil, fmt.Errorf("MQTT packet exceeds %d byte limit", maxMQTTPacketBytes)
+			}
 			body := make([]byte, remaining)
 			_, err = io.ReadFull(reader, body)
 			return header, body, err
@@ -837,7 +912,9 @@ func (e *Engine) runHomeAssistantLoop(ctx context.Context, integration *model.Ho
 		if ctx.Err() != nil {
 			return
 		}
+		e.setIntegrationStatus("home-assistant", integration.ID, "connecting", "Connecting", false, false, false)
 		if err := e.runHomeAssistant(ctx, integration); err != nil && ctx.Err() == nil {
+			e.setIntegrationStatus("home-assistant", integration.ID, "error", err.Error(), false, false, true)
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("Home Assistant connection interrupted")
 		}
 		select {
@@ -895,6 +972,7 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 	if authResponse["type"] != "auth_ok" {
 		return errors.New("Home Assistant authentication failed")
 	}
+	e.setIntegrationStatus("home-assistant", integration.ID, "connected", "Connected", true, false, false)
 
 	subscribe := map[string]any{"id":1,"type":"subscribe_events"}
 	if strings.TrimSpace(integration.EventType) != "" {
@@ -921,6 +999,7 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 			continue
 		}
 		eventType, _ := event["event_type"].(string)
+		e.setIntegrationStatus("home-assistant", integration.ID, "connected", "Connected", false, true, false)
 		data := event["data"]
 		encoded, _ := json.MarshalIndent(data, "", "  ")
 		title := integration.Name
