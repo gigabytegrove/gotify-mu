@@ -131,6 +131,9 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 	if err := db.Transaction(backfillApplicationMemberships, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {
 		return nil, err
 	}
+	if err := db.Transaction(backfillApplicationMembershipRoles, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {
+		return nil, err
+	}
 
 	if err := db.Transaction(fillMissingSortKeys, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {
 		return nil, err
@@ -159,6 +162,19 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 	}
 
 	return wrapped, nil
+}
+
+
+func backfillApplicationMembershipRoles(db *gorm.DB) error {
+	if err := db.Model(&model.ApplicationMembership{}).
+		Where("role IS NULL OR role = ''").
+		Update("role", model.ApplicationRoleMember).Error; err != nil {
+		return err
+	}
+	return db.Exec(
+		"UPDATE application_memberships SET role = ? WHERE EXISTS (SELECT 1 FROM applications WHERE applications.id = application_memberships.application_id AND applications.user_id = application_memberships.user_id)",
+		model.ApplicationRoleManager,
+	).Error
 }
 
 func fillMissingCreatedAt(db *gorm.DB, now time.Time) error {
