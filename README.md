@@ -61,6 +61,7 @@ The Web UI uses **Channels** as the user-facing term and provides:
 - Standardized light, dark, and system themes
 - Responsive desktop and mobile-web navigation
 - Consistent dialogs, tables, cards, status indicators, and destructive-action language
+- Administrator update discovery with Dashboard notices and direct release downloads from Settings
 
 The underlying `/application` API naming remains in place to avoid breaking existing clients and integrations.
 
@@ -134,7 +135,7 @@ Release builds inject the release version, commit, and build date into the serve
 
 Gotify MU currently follows the upstream Gotify configuration model. Existing `GOTIFY_*` environment variables are intentionally retained for compatibility.
 
-> **Container status:** source/Docker builds remain the baseline deployment method for v0.2.0. The repository release workflow is prepared to publish versioned GHCR images when GitHub Actions is enabled for the repository.
+> **Release automation:** the repository workflow publishes versioned release ZIPs and GHCR images from the version in `VERSION`. If GitHub Actions is disabled for the repository, source/Docker builds remain available as a fallback.
 
 ### Recommended: Docker Compose
 
