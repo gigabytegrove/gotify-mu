@@ -38,7 +38,7 @@ const Layout = observer(() => {
         currentUser: {
             loggedIn,
             authenticating,
-            user: {name, admin},
+            user: {name, displayName, admin},
             logout,
             tryReconnect,
             connectionErrorMessage,
@@ -85,7 +85,7 @@ const Layout = observer(() => {
 
                         <Header
                             admin={admin}
-                            name={name}
+                            name={displayName || name}
                             style={{top: 0}}
                             version={version}
                             loggedIn={loggedIn}
