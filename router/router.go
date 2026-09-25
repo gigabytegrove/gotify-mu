@@ -151,6 +151,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	{
 		g.GET("/plugin", authentication.RequireClient, pluginHandler.GetPlugins)
+		g.POST("/plugin/install", authentication.RequireAdmin, pluginHandler.InstallPlugin)
 		pluginRoute := g.Group("/plugin/", authentication.RequireClient)
 		{
 			pluginRoute.GET("/:id/config", pluginHandler.GetConfig)
