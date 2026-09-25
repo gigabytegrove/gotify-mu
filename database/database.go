@@ -118,6 +118,8 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.ApplicationNotificationPreference),
 		new(model.ServiceCredential),
 		new(model.UserMFA),
+		new(model.PasskeyCredential),
+		new(model.PasskeyChallenge),
 	); err != nil {
 		return nil, err
 	}
