@@ -1,9 +1,12 @@
 import React from 'react';
 import {
+    Box,
     Button,
     Chip,
     Grid,
+    InputAdornment,
     Stack,
+    TextField,
     Typography,
 } from '@mui/material';
 import Archive from '@mui/icons-material/Archive';
@@ -13,6 +16,7 @@ import Restore from '@mui/icons-material/Restore';
 import Public from '@mui/icons-material/Public';
 import Forum from '@mui/icons-material/Forum';
 import NotificationsOff from '@mui/icons-material/NotificationsOff';
+import Search from '@mui/icons-material/Search';
 import {useParams} from 'react-router';
 import {observer} from 'mobx-react-lite';
 import {Virtuoso} from 'react-virtuoso';
@@ -38,9 +42,20 @@ const Messages = observer(() => {
     const [pushMessageOpen, setPushMessageOpen] = React.useState(false);
     const [archivedView, setArchivedView] = React.useState(false);
     const [isLoadingMore, setLoadingMore] = React.useState(false);
+    const [query, setQuery] = React.useState('');
 
     const {messagesStore, appStore, currentUser} = useStores();
     const messages = archivedView ? messagesStore.getArchived(appId) : messagesStore.get(appId);
+    const normalizedQuery = query.trim().toLowerCase();
+    const filteredMessages = normalizedQuery
+        ? messages.filter(
+              (message) =>
+                  message.title.toLowerCase().includes(normalizedQuery) ||
+                  message.message.toLowerCase().includes(normalizedQuery) ||
+                  appStore.getName(message.appid).toLowerCase().includes(normalizedQuery) ||
+                  message.senderName?.toLowerCase().includes(normalizedQuery)
+          )
+        : messages;
     const hasMore = messagesStore.canLoadMore(appId, archivedView);
     const app = appId === -1 ? undefined : appStore.getByIDOrUndefined(appId);
     const name = appStore.getName(appId);
@@ -166,7 +181,7 @@ const Messages = observer(() => {
                 title={archivedView ? 'Archived Messages' : 'Message History'}
                 subtitle={
                     appId === -1
-                        ? 'Your combined message stream.'
+                        ? `${messages.length} loaded across all Channels`
                         : `${messages.length} message${messages.length === 1 ? '' : 's'} currently loaded`
                 }
                 action={
@@ -226,6 +241,39 @@ const Messages = observer(() => {
                         )}
                     </Stack>
                 }>
+                <Stack
+                    direction={{xs: 'column', sm: 'row'}}
+                    spacing={1}
+                    sx={{mb: 1.5, alignItems: {sm: 'center'}, justifyContent: 'space-between'}}>
+                    <TextField
+                        value={query}
+                        onChange={(event) => setQuery(event.target.value)}
+                        placeholder="Search loaded messages"
+                        aria-label="Search loaded messages"
+                        sx={{width: {xs: '100%', sm: 340}}}
+                        slotProps={{
+                            input: {
+                                startAdornment: (
+                                    <InputAdornment position="start">
+                                        <Search fontSize="small" />
+                                    </InputAdornment>
+                                ),
+                            },
+                        }}
+                    />
+                    <Box>
+                        <Chip
+                            size="small"
+                            variant="outlined"
+                            label={
+                                normalizedQuery
+                                    ? `${filteredMessages.length} of ${messages.length} shown`
+                                    : `${messages.length} loaded`
+                            }
+                        />
+                    </Box>
+                </Stack>
+
                 {!messagesStore.loaded(appId, archivedView) ? (
                     <LoadingSpinner />
                 ) : (
@@ -233,15 +281,15 @@ const Messages = observer(() => {
                         id="messages"
                         style={{width: '100%'}}
                         useWindowScroll
-                        totalCount={messages.length}
-                        endReached={checkIfLoadMore}
-                        data={messages}
+                        totalCount={filteredMessages.length}
+                        endReached={normalizedQuery ? undefined : checkIfLoadMore}
+                        data={filteredMessages}
                         itemContent={renderMessage}
                         components={{
                             Footer: () =>
                                 hasMore ? (
                                     <LoadingSpinner />
-                                ) : messages.length > 0 ? (
+                                ) : filteredMessages.length > 0 ? (
                                     <Grid size={12}>
                                         <Typography
                                             variant="caption"
@@ -258,7 +306,9 @@ const Messages = observer(() => {
                                     color="text.secondary"
                                     align="center"
                                     sx={{py: 5}}>
-                                    {emptyLabel}
+                                    {normalizedQuery
+                                        ? 'No messages match your search.'
+                                        : emptyLabel}
                                 </Typography>
                             ),
                         }}
