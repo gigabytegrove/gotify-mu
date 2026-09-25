@@ -29,13 +29,21 @@ type installRequest struct {
 	Version string `json:"version"`
 }
 
+type activityEntry struct {
+	Timestamp time.Time `json:"timestamp"`
+	Message   string    `json:"message"`
+}
+
 type updateStatus struct {
-	Ready      bool       `json:"ready"`
-	State      string     `json:"state"`
-	Version    string     `json:"version,omitempty"`
-	Message    string     `json:"message,omitempty"`
-	StartedAt  *time.Time `json:"startedAt,omitempty"`
-	FinishedAt *time.Time `json:"finishedAt,omitempty"`
+	Ready      bool            `json:"ready"`
+	State      string          `json:"state"`
+	Version    string          `json:"version,omitempty"`
+	Message    string          `json:"message,omitempty"`
+	Step       string          `json:"step,omitempty"`
+	Progress   int             `json:"progress"`
+	Activity   []activityEntry `json:"activity,omitempty"`
+	StartedAt  *time.Time      `json:"startedAt,omitempty"`
+	FinishedAt *time.Time      `json:"finishedAt,omitempty"`
 }
 
 type portBinding struct {
@@ -108,17 +116,58 @@ func newManager() *manager {
 	}
 }
 
-func (m *manager) setStatus(state, version, message string, startedAt, finishedAt *time.Time) {
+func (m *manager) beginUpdate(version string, started time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status = updateStatus{
-		Ready:      m.token != "",
-		State:      state,
-		Version:    version,
-		Message:    message,
-		StartedAt:  startedAt,
-		FinishedAt: finishedAt,
+		Ready:     m.token != "",
+		State:     "preparing",
+		Version:   version,
+		Message:   "Preparing update",
+		Step:      "Preparing update",
+		Progress:  2,
+		StartedAt: &started,
+		Activity: []activityEntry{{
+			Timestamp: time.Now().UTC(),
+			Message:   "Update started",
+		}},
 	}
+}
+
+func (m *manager) updateProgress(state, step, message string, progress int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if progress < m.status.Progress {
+		progress = m.status.Progress
+	}
+	if progress > 100 {
+		progress = 100
+	}
+
+	changed := step != "" && step != m.status.Step
+	m.status.Ready = m.token != ""
+	m.status.State = state
+	m.status.Step = step
+	m.status.Message = message
+	m.status.Progress = progress
+
+	if changed {
+		m.status.Activity = append(m.status.Activity, activityEntry{
+			Timestamp: time.Now().UTC(),
+			Message:   step,
+		})
+		if len(m.status.Activity) > 40 {
+			m.status.Activity = append([]activityEntry(nil), m.status.Activity[len(m.status.Activity)-40:]...)
+		}
+	}
+}
+
+func (m *manager) finishUpdate(state, step, message string, progress int, finished time.Time) {
+	m.updateProgress(state, step, message, progress)
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.status.FinishedAt = &finished
 }
 
 func (m *manager) snapshot() updateStatus {
@@ -172,13 +221,13 @@ func (m *manager) installHandler(w http.ResponseWriter, r *http.Request) {
 
 	current := m.snapshot()
 	switch current.State {
-	case "downloading", "building", "replacing", "verifying":
+	case "preparing", "downloading", "building", "replacing", "verifying":
 		writeJSON(w, http.StatusConflict, current)
 		return
 	}
 
 	started := time.Now().UTC()
-	m.setStatus("downloading", request.Version, "Downloading release source", &started, nil)
+	m.beginUpdate(request.Version, started)
 	go m.performInstall(request.Version, started)
 
 	writeJSON(w, http.StatusAccepted, m.snapshot())
@@ -187,61 +236,53 @@ func (m *manager) installHandler(w http.ResponseWriter, r *http.Request) {
 func (m *manager) performInstall(version string, started time.Time) {
 	tempDir, err := os.MkdirTemp("", "gotify-mu-update-*")
 	if err != nil {
-		m.fail(version, started, "Could not create update workspace: "+err.Error())
+		m.fail(version, started, "The update could not be prepared.", err)
 		return
 	}
 	defer os.RemoveAll(tempDir)
 
+	m.updateProgress("preparing", "Checking release", "Checking release", 5)
 	commit, err := m.resolveCommit(version)
 	if err != nil {
-		m.fail(version, started, err.Error())
+		m.fail(version, started, "The release could not be verified.", err)
 		return
 	}
 
 	archivePath := filepath.Join(tempDir, "source.zip")
 	sourceURL := fmt.Sprintf("https://github.com/%s/archive/refs/tags/v%s.zip", m.repository, version)
-	if err := downloadFile(sourceURL, archivePath); err != nil {
-		m.fail(version, started, "Could not download release source: "+err.Error())
+	m.updateProgress("downloading", "Downloading update", "Downloading update", 10)
+	if err := m.downloadFile(sourceURL, archivePath, 10, 24); err != nil {
+		m.fail(version, started, "The update could not be downloaded.", err)
 		return
 	}
 
+	m.updateProgress("preparing", "Preparing update files", "Preparing update files", 27)
 	sourceDir := filepath.Join(tempDir, "source")
 	if err := unzip(archivePath, sourceDir); err != nil {
-		m.fail(version, started, "Could not unpack release source: "+err.Error())
+		m.fail(version, started, "The update files could not be prepared.", err)
 		return
 	}
 	root, err := singleDirectory(sourceDir)
 	if err != nil {
-		m.fail(version, started, "Could not locate release source root: "+err.Error())
+		m.fail(version, started, "The update files could not be prepared.", err)
 		return
 	}
 
-	m.setStatus("building", version, "Building release container", &started, nil)
+	m.updateProgress("building", "Installing update", "Installing update", 30)
 	image := "gotify-mu:release-" + version
 	buildDate := time.Now().UTC().Format(time.RFC3339)
-	if _, err := runDocker(
-		"build",
-		"--pull",
-		"--build-arg", "BUILD_JS=1",
-		"--build-arg", "GO_VERSION=1.26.0",
-		"--build-arg", "GOTIFY_MU_VERSION="+version,
-		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
-		"--build-arg", "GOTIFY_MU_BUILD_DATE="+buildDate,
-		"-f", filepath.Join(root, "docker", "Dockerfile"),
-		"-t", image,
-		root,
-	); err != nil {
-		m.fail(version, started, "Container build failed: "+err.Error())
+	if err := m.buildRelease(root, image, version, commit, buildDate); err != nil {
+		m.fail(version, started, "The update could not be installed.", err)
 		return
 	}
 
-	m.setStatus("replacing", version, "Replacing Gotify MU container", &started, nil)
+	m.updateProgress("replacing", "Applying update", "Applying update", 82)
 	if err := m.replaceContainer(image, version, started); err != nil {
 		return
 	}
 
 	finished := time.Now().UTC()
-	m.setStatus("completed", version, "Update installed successfully", &started, &finished)
+	m.finishUpdate("completed", "Update complete", "Update installed successfully", 100, finished)
 }
 
 func (m *manager) resolveCommit(version string) (string, error) {
@@ -275,21 +316,23 @@ func (m *manager) resolveCommit(version string) (string, error) {
 }
 
 func (m *manager) replaceContainer(image, version string, started time.Time) error {
+	m.updateProgress("replacing", "Saving current installation", "Saving current installation", 84)
 	inspection, err := inspectContainer(m.target)
 	if err != nil {
-		m.fail(version, started, "Could not inspect current container: "+err.Error())
+		m.fail(version, started, "The current installation could not be prepared for updating.", err)
 		return err
 	}
 
 	rollback := fmt.Sprintf("%s-rollback-%d", m.target, time.Now().Unix())
 
+	m.updateProgress("replacing", "Preparing restart", "Preparing restart", 87)
 	if _, err := runDocker("stop", "-t", "20", m.target); err != nil {
-		m.fail(version, started, "Could not stop current container: "+err.Error())
+		m.fail(version, started, "The service could not be stopped safely.", err)
 		return err
 	}
 	if _, err := runDocker("rename", m.target, rollback); err != nil {
 		_, _ = runDocker("start", m.target)
-		m.fail(version, started, "Could not preserve current container: "+err.Error())
+		m.fail(version, started, "The current installation could not be preserved.", err)
 		return err
 	}
 
@@ -298,17 +341,32 @@ func (m *manager) replaceContainer(image, version string, started time.Time) err
 		_, renameErr := runDocker("rename", rollback, m.target)
 		_, startErr := runDocker("start", m.target)
 		finished := time.Now().UTC()
-		message := "Update failed and previous container was restored: " + cause.Error()
 		if renameErr != nil || startErr != nil {
-			message = "Update failed and automatic rollback also failed; manual recovery is required"
+			m.finishUpdate(
+				"failed",
+				"Recovery required",
+				"The update could not be completed and automatic recovery was unsuccessful. The server administrator should review the service.",
+				m.snapshot().Progress,
+				finished,
+			)
+			log.Printf("update failed and rollback failed: update=%v rename=%v start=%v", cause, renameErr, startErr)
+			return cause
 		}
-		m.setStatus("rolled_back", version, message, &started, &finished)
+		m.finishUpdate(
+			"rolled_back",
+			"Previous version restored",
+			"The update could not be completed. The previous version was restored automatically.",
+			m.snapshot().Progress,
+			finished,
+		)
+		log.Printf("update failed and previous version was restored: %v", cause)
 		return cause
 	}
 
+	m.updateProgress("replacing", "Applying new version", "Applying new version", 90)
 	args := createArgs(m.target, image, inspection)
 	if _, err := runDocker(args...); err != nil {
-		return restore(fmt.Errorf("could not create replacement container: %w", err))
+		return restore(fmt.Errorf("could not create replacement service: %w", err))
 	}
 
 	for network := range inspection.NetworkSettings.Networks {
@@ -318,17 +376,18 @@ func (m *manager) replaceContainer(image, version string, started time.Time) err
 		_, _ = runDocker("network", "connect", network, m.target)
 	}
 
+	m.updateProgress("replacing", "Starting updated version", "Starting updated version", 94)
 	if _, err := runDocker("start", m.target); err != nil {
-		return restore(fmt.Errorf("could not start replacement container: %w", err))
+		return restore(fmt.Errorf("could not start replacement service: %w", err))
 	}
 
-	m.setStatus("verifying", version, "Waiting for replacement container health check", &started, nil)
-	if err := waitForHealthy(m.target, 120*time.Second); err != nil {
+	m.updateProgress("verifying", "Checking updated version", "Checking updated version", 96)
+	if err := m.waitForHealthy(m.target, 120*time.Second); err != nil {
 		return restore(err)
 	}
 
 	if _, err := runDocker("rm", "-f", rollback); err != nil {
-		log.Printf("warning: could not remove rollback container %s: %v", rollback, err)
+		log.Printf("warning: could not remove rollback service %s: %v", rollback, err)
 	}
 	return nil
 }
@@ -427,22 +486,29 @@ func inspectContainer(name string) (*inspectedContainer, error) {
 	return &payload[0], nil
 }
 
-func waitForHealthy(name string, timeout time.Duration) error {
+func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
 		output, err := runDocker("inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}", name)
 		if err == nil {
 			status := strings.TrimSpace(output)
 			if status == "healthy" || status == "running" {
+				m.updateProgress("verifying", "Final checks", "Final checks", 99)
 				return nil
 			}
 			if status == "unhealthy" || status == "exited" || status == "dead" {
-				return fmt.Errorf("replacement container entered state %s", status)
+				return fmt.Errorf("replacement service entered state %s", status)
 			}
 		}
+		elapsed := 120*time.Second - time.Until(deadline)
+		progress := 96 + int(elapsed.Seconds()/30)
+		if progress > 99 {
+			progress = 99
+		}
+		m.updateProgress("verifying", "Checking updated version", "Checking updated version", progress)
 		time.Sleep(2 * time.Second)
 	}
-	return errors.New("replacement container did not become healthy before timeout")
+	return errors.New("replacement service did not become healthy before timeout")
 }
 
 func runDocker(args ...string) (string, error) {
@@ -454,7 +520,7 @@ func runDocker(args ...string) (string, error) {
 	return string(output), nil
 }
 
-func downloadFile(url, path string) error {
+func (m *manager) downloadFile(url, path string, startProgress, endProgress int) error {
 	request, err := http.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return err
@@ -473,8 +539,36 @@ func downloadFile(url, path string) error {
 		return err
 	}
 	defer file.Close()
-	_, err = io.Copy(file, response.Body)
-	return err
+
+	if response.ContentLength <= 0 {
+		_, err = io.Copy(file, response.Body)
+		if err == nil {
+			m.updateProgress("downloading", "Downloading update", "Downloading update", endProgress)
+		}
+		return err
+	}
+
+	buffer := make([]byte, 64*1024)
+	var written int64
+	for {
+		n, readErr := response.Body.Read(buffer)
+		if n > 0 {
+			if _, err := file.Write(buffer[:n]); err != nil {
+				return err
+			}
+			written += int64(n)
+			fraction := float64(written) / float64(response.ContentLength)
+			progress := startProgress + int(fraction*float64(endProgress-startProgress))
+			m.updateProgress("downloading", "Downloading update", "Downloading update", progress)
+		}
+		if errors.Is(readErr, io.EOF) {
+			break
+		}
+		if readErr != nil {
+			return readErr
+		}
+	}
+	return nil
 }
 
 func unzip(archivePath, destination string) error {
@@ -537,10 +631,78 @@ func singleDirectory(root string) (string, error) {
 	return "", errors.New("archive did not contain a source directory")
 }
 
-func (m *manager) fail(version string, started time.Time, message string) {
+func (m *manager) fail(version string, started time.Time, publicMessage string, err error) {
 	finished := time.Now().UTC()
-	m.setStatus("failed", version, message, &started, &finished)
-	log.Print(message)
+	m.finishUpdate("failed", "Update stopped", publicMessage, m.snapshot().Progress, finished)
+	log.Printf("update v%s failed: %v", version, err)
+}
+
+type buildProgressWriter struct {
+	mu      sync.Mutex
+	manager *manager
+	buffer  string
+}
+
+func (w *buildProgressWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.buffer += string(p)
+	for {
+		index := strings.IndexByte(w.buffer, '\n')
+		if index < 0 {
+			break
+		}
+		line := strings.TrimSpace(w.buffer[:index])
+		w.buffer = w.buffer[index+1:]
+		w.manager.handleBuildProgress(line)
+	}
+	return len(p), nil
+}
+
+func (m *manager) buildRelease(root, image, version, commit, buildDate string) error {
+	command := exec.Command(
+		"docker",
+		"build",
+		"--progress=plain",
+		"--pull",
+		"--build-arg", "BUILD_JS=1",
+		"--build-arg", "GO_VERSION=1.26.0",
+		"--build-arg", "GOTIFY_MU_VERSION="+version,
+		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
+		"--build-arg", "GOTIFY_MU_BUILD_DATE="+buildDate,
+		"-f", filepath.Join(root, "docker", "Dockerfile"),
+		"-t", image,
+		root,
+	)
+	writer := &buildProgressWriter{manager: m}
+	command.Stdout = writer
+	command.Stderr = writer
+	if err := command.Run(); err != nil {
+		return err
+	}
+	m.updateProgress("building", "Update files ready", "Update files ready", 80)
+	return nil
+}
+
+func (m *manager) handleBuildProgress(line string) {
+	if line == "" {
+		return
+	}
+	switch {
+	case strings.Contains(line, "load build definition"):
+		m.updateProgress("building", "Reading update package", "Reading update package", 33)
+	case strings.Contains(line, "load metadata"):
+		m.updateProgress("building", "Checking required components", "Checking required components", 37)
+	case strings.Contains(line, "js-builder"):
+		m.updateProgress("building", "Preparing web interface", "Preparing web interface", 47)
+	case strings.Contains(line, "[builder "):
+		m.updateProgress("building", "Preparing server", "Preparing server", 62)
+	case strings.Contains(line, "[stage-2 "):
+		m.updateProgress("building", "Assembling update", "Assembling update", 73)
+	case strings.Contains(line, "exporting to image"):
+		m.updateProgress("building", "Finalizing update files", "Finalizing update files", 78)
+	}
 }
 
 func writeJSON(w http.ResponseWriter, status int, value any) {
