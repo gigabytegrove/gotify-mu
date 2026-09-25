@@ -49,6 +49,9 @@ export interface IMessage {
     senderUserId?: number;
     senderName?: string;
     acknowledged?: boolean;
+    acknowledgementCount?: number;
+    acknowledgedBy?: IMessageAcknowledgement[];
+    parentMessageId?: number;
     image?: string;
     extras?: IMessageExtras;
 }
@@ -136,6 +139,11 @@ export interface IWebhookRoute {
     priorityField: string;
     defaultTitle: string;
     defaultPriority: number;
+    allowedCidrs?: string;
+    requireSignature?: boolean;
+    signingSecretConfigured?: boolean;
+    signingSecret?: string;
+    maxAgeSeconds?: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -215,5 +223,46 @@ export interface IEscalationRule {
     delayMinutes: number;
     enabled: boolean;
     createdAt: string;
+    updatedAt: string;
+}
+
+
+export interface IMessageAcknowledgement {
+    userId: number;
+    name: string;
+    displayName?: string;
+    acknowledgedAt: string;
+}
+
+export interface IIntegrationStatus {
+    kind: string;
+    objectId: number;
+    state: string;
+    lastConnectedAt?: string;
+    lastActivityAt?: string;
+    lastError?: string;
+    updatedAt: string;
+}
+
+export interface IAutomationRun {
+    id: number;
+    kind: string;
+    objectId: number;
+    triggerKey: string;
+    status: string;
+    messageId?: number;
+    error?: string;
+    startedAt: string;
+    finishedAt?: string;
+}
+
+export interface ISecurityPolicy {
+    id: number;
+    minPasswordLength: number;
+    sessionLifetimeHours: number;
+    elevationMinutes: number;
+    auditRetentionDays: number;
+    automationRetentionDays: number;
+    allowNativePluginUploads: boolean;
     updatedAt: string;
 }
