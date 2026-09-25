@@ -69,7 +69,7 @@ const Dashboard = observer(() => {
                         title="Channels"
                         subtitle="Shared notification destinations available to your account."
                         action={
-                            <Button component={Link} to="/applications">
+                            <Button component={Link} to="/channels">
                                 Manage Channels
                             </Button>
                         }>
@@ -105,7 +105,7 @@ const Dashboard = observer(() => {
                                         <Button
                                             size="small"
                                             component={Link}
-                                            to={`/messages/${app.id}`}>
+                                            to={`/channels/${app.id}`}>
                                             Open
                                         </Button>
                                     </Stack>
