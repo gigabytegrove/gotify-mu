@@ -34,3 +34,12 @@ func ValidApplicationRole(role string) bool {
 		return false
 	}
 }
+
+
+// ApplicationNotificationPreference overrides realtime delivery without granting Channel access.
+type ApplicationNotificationPreference struct {
+	ApplicationID uint      `gorm:"primaryKey;autoIncrement:false;index"`
+	UserID        uint      `gorm:"primaryKey;autoIncrement:false;index"`
+	Enabled       bool      `gorm:"not null"`
+	UpdatedAt     time.Time
+}
