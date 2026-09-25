@@ -129,6 +129,7 @@ const NotificationPreferences = () => {
                         timezone: response.data.id
                             ? response.data.timezone
                             : browserTimezone,
+                        mode: response.data.mode || 'suppress',
                     })
                 ),
             axios
@@ -234,6 +235,16 @@ const NotificationPreferences = () => {
                         }
                         helperText="Messages at this priority or higher are delivered immediately during quiet hours."
                     />
+                    <TextField
+                        select
+                        label="Lower-priority notifications"
+                        value={quiet.mode || 'suppress'}
+                        onChange={(event) =>
+                            setQuiet({...quiet, mode: event.target.value as 'suppress' | 'defer'})
+                        }>
+                        <MenuItem value="suppress">Keep in history without a realtime alert</MenuItem>
+                        <MenuItem value="defer">Send the realtime alert after quiet hours end</MenuItem>
+                    </TextField>
                     <Button
                         variant="contained"
                         disabled={savingQuiet}
