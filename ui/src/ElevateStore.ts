@@ -66,6 +66,26 @@ export class ElevateStore {
         this.cleanupOidcElevate();
     };
 
+    public directoryElevate = async (
+        password: string,
+        durationSeconds: number
+    ): Promise<void> => {
+        await axios.create().request({
+            url: config.get('url') + 'auth/ldap/elevate',
+            method: 'POST',
+            data: {durationSeconds},
+            headers: {
+                Authorization:
+                    'Basic ' +
+                    btoa(this.currentUser.user.name + ':' + password),
+            },
+        });
+        await this.currentUser.tryAuthenticate();
+        runInAction(() => {
+            this.reauthenticationRequired = false;
+        });
+    };
+
     public oidcElevate = (durationSeconds: number): void => {
         // prevent double execution
         if (this.oidcElevatePending) return;
