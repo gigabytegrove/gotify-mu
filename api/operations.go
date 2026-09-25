@@ -2,6 +2,7 @@ package api
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -9,6 +10,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/gotify/server/v3/backup"
 	"github.com/gotify/server/v3/model"
 )
 
@@ -19,6 +21,7 @@ type OperationsDatabase interface {
 	GetSystemStats() (*model.SystemStats, error)
 	GetIntegrationStatuses() ([]*model.IntegrationStatus, error)
 	GetAutomationRuns(kind string, objectID uint, limit int) ([]*model.AutomationRun, error)
+	CreateSQLiteSnapshot(path string) error
 }
 
 type OperationsAPI struct {
@@ -27,6 +30,8 @@ type OperationsAPI struct {
 	DatabaseDialect string
 	DatabaseConnection string
 	DataPaths []string
+	UploadedImagesDir string
+	PluginsDir string
 	Version *model.VersionInfo
 }
 
@@ -89,4 +94,60 @@ func (a *OperationsAPI) Diagnostics(ctx *gin.Context) {
 	filename := "gotify-mu-diagnostics-" + time.Now().UTC().Format("20060102-150405") + ".json"
 	ctx.Header("Content-Disposition", "attachment; filename="+filename)
 	ctx.Data(http.StatusOK, "application/json", data)
+}
+
+
+func (a *OperationsAPI) Backup(ctx *gin.Context) {
+	if !strings.EqualFold(a.DatabaseDialect, "sqlite3") {
+		ctx.AbortWithError(http.StatusNotImplemented, errors.New("Web UI backup currently requires the SQLite database backend"))
+		return
+	}
+	work, err := os.MkdirTemp("", "gotify-mu-backup-*")
+	if !successOrAbort(ctx, 500, err) { return }
+	defer os.RemoveAll(work)
+
+	snapshot := filepath.Join(work, "gotify.db")
+	if !successOrAbort(ctx, 500, a.DB.CreateSQLiteSnapshot(snapshot)) { return }
+	archive := filepath.Join(work, "gotify-mu-backup.zip")
+	version, commit := "", ""
+	if a.Version != nil { version, commit = a.Version.Version, a.Version.Commit }
+	if !successOrAbort(ctx, 500, backup.CreateArchive(archive, snapshot, a.UploadedImagesDir, a.PluginsDir, version, commit)) { return }
+
+	file, err := os.Open(archive)
+	if !successOrAbort(ctx, 500, err) { return }
+	defer file.Close()
+	info, err := file.Stat()
+	if !successOrAbort(ctx, 500, err) { return }
+	filename := "gotify-mu-backup-" + time.Now().UTC().Format("20060102-150405") + ".zip"
+	ctx.Header("Content-Disposition", "attachment; filename="+filename)
+	ctx.Header("Content-Type", "application/zip")
+	http.ServeContent(ctx.Writer, ctx.Request, filename, info.ModTime(), file)
+}
+
+func (a *OperationsAPI) StageRestore(ctx *gin.Context) {
+	if !strings.EqualFold(a.DatabaseDialect, "sqlite3") {
+		ctx.AbortWithError(http.StatusNotImplemented, errors.New("Web UI restore currently requires the SQLite database backend"))
+		return
+	}
+	header, err := ctx.FormFile("backup")
+	if err != nil {
+		ctx.AbortWithError(400, errors.New("backup file is required"))
+		return
+	}
+	if header.Size <= 0 || header.Size > backup.MaxRestoreBytes {
+		ctx.AbortWithError(400, errors.New("backup file size is invalid"))
+		return
+	}
+	file, err := header.Open()
+	if !successOrAbort(ctx, 500, err) { return }
+	defer file.Close()
+	manifest, err := backup.StageRestore(file, backup.PendingPath(a.DatabaseConnection))
+	if !successOrAbort(ctx, 400, err) { return }
+	ctx.JSON(http.StatusAccepted, gin.H{
+		"staged": true,
+		"restartRequired": true,
+		"backupVersion": manifest.Version,
+		"createdAt": manifest.CreatedAt,
+		"message": "Backup validated and staged. Restart Gotify MU to apply the restore before the database opens.",
+	})
 }
