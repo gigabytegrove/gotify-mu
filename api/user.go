@@ -151,9 +151,12 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 	mfa, mfaErr := a.DB.GetUserMFA(user.ID)
 	if !successOrAbort(ctx, 500, mfaErr) { return }
 	mfaEnabled := mfa != nil && mfa.Enabled
-	mfaRequired := user.OIDCID == nil &&
+	mfaRequired := user.OIDCID == nil && user.LDAPID == nil &&
 		((policy.RequireMFAForAdmins && user.Admin) || policy.RequireMFAForAllLocalUsers) &&
 		!mfaEnabled
+	provider := "local"
+	if user.OIDCID != nil { provider = "oidc" }
+	if user.LDAPID != nil { provider = "ldap" }
 	result := &model.CurrentUserExternal{
 		ID:          user.ID,
 		Name:        user.Name,
@@ -162,6 +165,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		CreatedAt: user.CreatedAt,
 		MFAEnabled: mfaEnabled,
 		MFARequired: mfaRequired,
+		AuthProvider: provider,
 	}
 	client := auth.GetClient(ctx)
 	if client != nil {
