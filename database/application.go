@@ -113,6 +113,13 @@ func (d *GormDatabase) DeleteApplicationByID(id uint) error {
 	})
 }
 
+// GetApplications returns all non-internal Channels.
+func (d *GormDatabase) GetApplications() ([]*model.Application, error) {
+	var applications []*model.Application
+	err := d.DB.Where("internal = ?", false).Order("name asc, id asc").Find(&applications).Error
+	return applications, err
+}
+
 // GetApplicationsByUser returns all applications from a user.
 func (d *GormDatabase) GetApplicationsByUser(userID uint) ([]*model.Application, error) {
 	var apps []*model.Application
