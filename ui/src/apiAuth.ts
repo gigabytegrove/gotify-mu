@@ -1,5 +1,6 @@
 import axios from 'axios';
 import {CurrentUser} from './CurrentUser';
+import {ElevateStore} from './ElevateStore';
 import {SnackReporter} from './snack/SnackManager';
 
 interface ErrorPayload {
@@ -7,7 +8,11 @@ interface ErrorPayload {
     errorDescription?: string;
 }
 
-export const initAxios = (currentUser: CurrentUser, snack: SnackReporter) => {
+export const initAxios = (
+    currentUser: CurrentUser,
+    elevateStore: ElevateStore,
+    snack: SnackReporter
+) => {
     axios.interceptors.response.use(undefined, (error) => {
         if (!error.response) {
             snack('Gotify server is not reachable, try refreshing the page.');
@@ -17,12 +22,16 @@ export const initAxios = (currentUser: CurrentUser, snack: SnackReporter) => {
         const status = error.response.status;
         const payload = (error.response.data || {}) as ErrorPayload;
         const description = payload.errorDescription || '';
+        const elevationText = `${payload.error || ''} ${description}`.toLowerCase();
         const elevationRequired =
-            status === 403 && description.toLowerCase().includes('session not elevated');
+            status === 403 &&
+            (elevationText.includes('session not elevated') ||
+                elevationText.includes('re-authentication required'));
 
         if (elevationRequired) {
-            // The server is authoritative. Refresh the current session so MobX's elevation
-            // reaction immediately switches protected pages/dialogs back to the re-auth form.
+            // Never surface the raw API elevation error to the user. Force a fresh
+            // re-authentication flow even if the browser had stale elevation state.
+            elevateStore.requireReauthentication();
             void currentUser.tryAuthenticate().catch(() => {});
             snack('Re-authentication required. Confirm your identity and try again.');
             return Promise.reject(error);
