@@ -69,8 +69,8 @@ const Settings = ({themeMode, setTheme}: IProps) => (
                 </Stack>
                 <Stack
                     direction={{xs: 'column', sm: 'row'}}
-                    justifyContent="space-between"
-                    spacing={1}>
+                    spacing={1}
+                    sx={{justifyContent: 'space-between'}}> 
                     <Typography>OIDC authentication</Typography>
                     <Chip size="small" label={config.get('oidc') ? 'Enabled' : 'Disabled'} />
                 </Stack>
