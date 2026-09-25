@@ -113,6 +113,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
 	auditHandler := api.AuditAPI{DB: db}
+	systemHandler := api.SystemAPI{DB: db, Dialect: conf.Database.Dialect, NotifyDeleted: streamHandler.NotifyDeletedClient}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{
@@ -308,6 +309,13 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	{
 		adminPlatform.Use(authentication.RequireAdmin)
 		adminPlatform.GET("/audit", auditHandler.GetAuditEvents)
+		adminPlatform.GET("/audit/export", systemHandler.ExportAudit)
+		adminPlatform.POST("/audit/retention/apply", systemHandler.ApplyAuditRetention)
+		adminPlatform.GET("/admin/security-policy", systemHandler.GetSecurityPolicy)
+		adminPlatform.PUT("/admin/security-policy", systemHandler.SaveSecurityPolicy)
+		adminPlatform.GET("/admin/operations", systemHandler.GetOperations)
+		adminPlatform.GET("/admin/sessions", systemHandler.GetSessions)
+		adminPlatform.DELETE("/admin/sessions/:id", systemHandler.RevokeSession)
 		adminPlatform.GET("/group", groupHandler.GetGroups)
 		adminPlatform.POST("/group", groupHandler.CreateGroup)
 		adminPlatform.PUT("/group/:id", groupHandler.UpdateGroup)
