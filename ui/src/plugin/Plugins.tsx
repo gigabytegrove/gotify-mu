@@ -143,6 +143,8 @@ const Plugins = observer(() => {
 const PluginInstallDialog = observer(({fClose}: {fClose: VoidFunction}) => {
     const {pluginStore, elevateStore} = useStores();
     const [file, setFile] = React.useState<File>();
+    const [sha256, setSha256] = React.useState('');
+    const [signature, setSignature] = React.useState('');
     const [installing, setInstalling] = React.useState(false);
 
     const close = () => {
@@ -155,7 +157,7 @@ const PluginInstallDialog = observer(({fClose}: {fClose: VoidFunction}) => {
 
         setInstalling(true);
         try {
-            await pluginStore.installPlugin(file);
+            await pluginStore.installPlugin(file, sha256, signature);
             close();
         } finally {
             setInstalling(false);
@@ -194,17 +196,47 @@ const PluginInstallDialog = observer(({fClose}: {fClose: VoidFunction}) => {
                                 onChange={(event) => {
                                     const selected = event.target.files?.[0];
                                     setFile(selected);
+                                    setSha256('');
+                                    setSignature('');
+                                    if (selected) {
+                                        void selected.arrayBuffer().then(async (buffer) => {
+                                            const digest = await crypto.subtle.digest('SHA-256', buffer);
+                                            setSha256(
+                                                Array.from(new Uint8Array(digest))
+                                                    .map((value) => value.toString(16).padStart(2, '0'))
+                                                    .join('')
+                                            );
+                                        });
+                                    }
                                     event.target.value = '';
                                 }}
                             />
                         </Button>
 
                         {file ? (
-                            <Stack spacing={0.25}>
-                                <Typography sx={{fontWeight: 700}}>{file.name}</Typography>
-                                <Typography variant="body2" color="text.secondary">
-                                    {(file.size / 1024 / 1024).toFixed(1)} MiB
-                                </Typography>
+                            <Stack spacing={1}>
+                                <Stack spacing={0.25}>
+                                    <Typography sx={{fontWeight: 700}}>{file.name}</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        {(file.size / 1024 / 1024).toFixed(1)} MiB
+                                    </Typography>
+                                </Stack>
+                                <TextField
+                                    label="SHA-256"
+                                    value={sha256}
+                                    onChange={(event) => setSha256(event.target.value.trim())}
+                                    helperText="Calculated from the selected file. Compare it with the value published by the plugin author."
+                                    fullWidth
+                                />
+                                <TextField
+                                    label="Trusted signature"
+                                    value={signature}
+                                    onChange={(event) => setSignature(event.target.value)}
+                                    helperText="Paste the plugin author's Ed25519 signature when your server requires signed plugins."
+                                    multiline
+                                    minRows={2}
+                                    fullWidth
+                                />
                             </Stack>
                         ) : (
                             <Typography variant="body2" color="text.secondary">
@@ -226,7 +258,7 @@ const PluginInstallDialog = observer(({fClose}: {fClose: VoidFunction}) => {
                 {elevateStore.elevated && (
                     <Button
                         variant="contained"
-                        disabled={!file || installing}
+                        disabled={!file || !sha256 || installing}
                         loading={installing}
                         onClick={() => void install()}>
                         Install Plugin
