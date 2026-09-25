@@ -118,6 +118,7 @@ export interface ICurrentUser extends IUser {
     elevatedUntil?: string;
     mfaEnabled?: boolean;
     mfaRequired?: boolean;
+    authProvider?: 'local' | 'oidc' | 'ldap';
 }
 
 export interface IVersion {
