@@ -699,13 +699,15 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 			}
 		}
 
-		postingUser, err = a.DB.GetUserByID(userID)
-		if success := successOrAbort(ctx, 500, err); !success {
-			return
-		}
-		if postingUser == nil {
-			ctx.AbortWithError(400, errors.New("user not found"))
-			return
+		if fetchedApp.AllowMemberPost {
+			postingUser, err = a.DB.GetUserByID(userID)
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
+			if postingUser == nil {
+				ctx.AbortWithError(400, errors.New("user not found"))
+				return
+			}
 		}
 		app = fetchedApp
 	}
@@ -721,11 +723,6 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 
 	if message.Priority == nil {
 		message.Priority = &app.DefaultPriority
-	}
-
-	recipients, err := a.DB.GetApplicationRecipientUserIDs(app.ID)
-	if success := successOrAbort(ctx, 500, err); !success {
-		return
 	}
 
 	msgInternal := toInternalMessage(&message)
@@ -744,6 +741,10 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 			return
 		}
 		external = toExternalMessage(msgInternal)
+		recipients, recipientErr := a.DB.GetApplicationRecipientUserIDs(app.ID)
+		if success := successOrAbort(ctx, 500, recipientErr); !success {
+			return
+		}
 		for _, userID := range recipients {
 			a.Notifier.Notify(userID, external)
 		}
