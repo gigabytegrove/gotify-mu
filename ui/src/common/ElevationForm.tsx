@@ -18,12 +18,20 @@ const ElevationForm = observer(() => {
 
     const localAuthEnabled = config.get('localAuth');
     const oidcEnabled = config.get('oidc');
+    const ldapEnabled = config.get('ldap');
+    const ldapIdpName = config.get('ldapIdpName');
+    const provider = currentUser.user.authProvider || 'local';
+    const usePassword = provider === 'local' ? localAuthEnabled : provider === 'ldap' && ldapEnabled;
     const oidcPending = elevateStore.oidcElevatePending;
     const oidcIdpName = config.get('oidcIdpName');
 
     const handleLocalElevate = async () => {
         try {
-            await elevateStore.localElevate(password, ElevateDuration, mfaCode);
+            if (provider === 'ldap') {
+                await elevateStore.directoryElevate(password, ElevateDuration);
+            } else {
+                await elevateStore.localElevate(password, ElevateDuration, mfaCode);
+            }
         } catch {
             setError('Elevation failed. Check your password.');
         }
@@ -51,7 +59,7 @@ const ElevationForm = observer(() => {
     return (
         <>
             <Typography>This action requires re-authentication.</Typography>
-            {localAuthEnabled && (
+            {usePassword && (
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -61,7 +69,7 @@ const ElevationForm = observer(() => {
                         autoFocus
                         margin="dense"
                         type="password"
-                        label="Password"
+                        label={provider === 'ldap' ? ldapIdpName + ' Password' : 'Password'}
                         className="elevation-password"
                         value={password}
                         onChange={(e) => {
@@ -72,7 +80,7 @@ const ElevationForm = observer(() => {
                         error={!!error}
                         helperText={error}
                     />
-                    {currentUser.user.mfaEnabled && (
+                    {provider === 'local' && currentUser.user.mfaEnabled && (
                         <TextField
                             margin="dense"
                             label="Verification code"
@@ -90,18 +98,23 @@ const ElevationForm = observer(() => {
                     <Button
                         type="submit"
                         className="elevation-submit"
-                        disabled={password.length === 0 || (Boolean(currentUser.user.mfaEnabled) && mfaCode.length === 0)}
+                        disabled={
+                            password.length === 0 ||
+                            (provider === 'local' &&
+                                Boolean(currentUser.user.mfaEnabled) &&
+                                mfaCode.length === 0)
+                        }
                         color="primary"
                         variant="contained"
                         fullWidth>
-                        Elevate with Password
+                        {provider === 'ldap' ? 'Confirm with ' + ldapIdpName : 'Elevate with Password'}
                     </Button>
                 </form>
             )}
 
-            {oidcEnabled && (
+            {oidcEnabled && provider === 'oidc' && (
                 <>
-                    {localAuthEnabled && <Divider sx={{my: 2}}>or</Divider>}
+                    {usePassword && <Divider sx={{my: 2}}>or</Divider>}
                     <Button
                         className="elevation-oidc"
                         variant="contained"
