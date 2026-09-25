@@ -1,4 +1,4 @@
-import {IMessageExtras} from '../types';
+import {IMessageExtras, INotificationAction, INotificationField} from '../types';
 
 export enum RenderMode {
     Markdown = 'text/markdown',
@@ -26,4 +26,37 @@ const extract = (extras: IMessageExtras | undefined, key: string, path: string):
     }
 
     return extras[key][path];
+};
+
+
+export const notificationActions = (extras?: IMessageExtras): INotificationAction[] => {
+    const value = extras?.['gotify-mu::display']?.actions;
+    if (!Array.isArray(value)) return [];
+    return value
+        .filter(
+            (item): item is INotificationAction =>
+                Boolean(
+                    item &&
+                        typeof item === 'object' &&
+                        typeof item.label === 'string' &&
+                        typeof item.url === 'string'
+                )
+        )
+        .slice(0, 8);
+};
+
+export const notificationFields = (extras?: IMessageExtras): INotificationField[] => {
+    const value = extras?.['gotify-mu::display']?.fields;
+    if (!Array.isArray(value)) return [];
+    return value
+        .filter(
+            (item): item is INotificationField =>
+                Boolean(
+                    item &&
+                        typeof item === 'object' &&
+                        typeof item.label === 'string' &&
+                        typeof item.value === 'string'
+                )
+        )
+        .slice(0, 20);
 };
