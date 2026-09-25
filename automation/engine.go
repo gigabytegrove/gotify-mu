@@ -1038,6 +1038,9 @@ func externalMessage(msg *model.Message) *model.MessageExternal {
 		SenderUserID: msg.SenderUserID,
 		SenderName: msg.SenderName,
 		Acknowledged: msg.Acknowledged,
+		AcknowledgementCount: msg.AckCount,
+		AcknowledgedBy: msg.Acknowledgements,
+		ParentMessageID: msg.ParentMessageID,
 	}
 }
 
