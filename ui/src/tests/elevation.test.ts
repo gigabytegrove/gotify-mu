@@ -77,6 +77,38 @@ describe('Elevation', () => {
         });
     });
 
+    describe('Expired server elevation prompts globally', () => {
+        it('expires the server-side elevation without updating browser state', async () => {
+            const status = await page.evaluate(async () => {
+                const currentResponse = await fetch('/current/user');
+                const current = (await currentResponse.json()) as {clientId: number};
+                const response = await fetch(`/client/${current.clientId}/elevate`, {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({durationSeconds: -1}),
+                });
+                return response.status;
+            });
+            expect(status).toBe(204);
+        });
+        it('prompts for credentials when the next protected request is rejected', async () => {
+            await page.goto(gotify.url + '/#/clients');
+            await waitForExists(page, selector.heading(), 'Clients');
+
+            await page.click($clientTable.cell(2, ClientCol.Delete, '.delete'));
+            await page.waitForSelector(selector.$confirmDialog.selector());
+            await page.click(selector.$confirmDialog.button('.confirm'));
+
+            await page.waitForSelector(
+                '.global-reauthentication-dialog .elevation-password input'
+            );
+        });
+        it('re-elevates from the global prompt', async () => {
+            await elevateViaForm('admin');
+            await waitToDisappear(page, '.global-reauthentication-dialog');
+        });
+    });
+
     describe('Client delete requires elevation', () => {
         it('de-elevates the current client via UI', () => cancelElevationViaUI(1));
         it('navigates to clients', async () => {
