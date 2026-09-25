@@ -201,7 +201,11 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	{
 		g.GET("/plugin", authentication.RequireClient, pluginHandler.GetPlugins)
+		g.GET("/plugin/catalog", authentication.RequireAdmin, pluginHandler.GetCatalog)
+		g.POST("/plugin/catalog/install", authentication.RequireAdmin, pluginHandler.InstallCatalogPlugin)
 		g.POST("/plugin/install", authentication.RequireAdmin, pluginHandler.InstallPlugin)
+		g.POST("/plugin/:id/update", authentication.RequireAdmin, pluginHandler.StagePluginUpdate)
+		g.DELETE("/plugin/:id/uninstall", authentication.RequireAdmin, pluginHandler.UninstallPlugin)
 		pluginRoute := g.Group("/plugin/", authentication.RequireClient)
 		{
 			pluginRoute.GET("/:id/config", pluginHandler.GetConfig)
