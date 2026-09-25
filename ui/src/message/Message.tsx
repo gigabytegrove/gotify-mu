@@ -1,9 +1,13 @@
 import React from 'react';
+import axios from 'axios';
 import {
     Avatar,
     Box,
     Button,
     Chip,
+    Dialog,
+    DialogContent,
+    DialogTitle,
     IconButton,
     Paper,
     Stack,
@@ -19,7 +23,7 @@ import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
 import TimeAgo from 'react-timeago';
 import {Markdown} from '../common/Markdown';
 import * as config from '../config';
-import {IMessageExtras} from '../types';
+import {IMessageAcknowledgement, IMessageExtras} from '../types';
 import {contentType, RenderMode} from './extras';
 import {TimeAgoFormatter} from '../common/TimeAgoFormatter';
 
@@ -35,8 +39,13 @@ interface IProps {
     fDelete?: VoidFunction;
     fArchive?: VoidFunction;
     fRestore?: VoidFunction;
+    messageId: number;
     fAcknowledge?: VoidFunction;
     acknowledged?: boolean;
+    acknowledgedByAnyone?: boolean;
+    acknowledgementCount?: number;
+    lastAcknowledgedBy?: string;
+    lastAcknowledgedAt?: string;
     senderName?: string;
     extras?: IMessageExtras;
     expanded: boolean;
@@ -47,8 +56,13 @@ const Message = ({
     fDelete,
     fArchive,
     fRestore,
+    messageId,
     fAcknowledge,
     acknowledged = false,
+    acknowledgedByAnyone = false,
+    acknowledgementCount = 0,
+    lastAcknowledgedBy,
+    lastAcknowledgedAt,
     senderName,
     title,
     date,
@@ -63,6 +77,8 @@ const Message = ({
     const contentRef = React.useRef<HTMLDivElement | null>(null);
     const [expanded, setExpanded] = React.useState(initialExpanded);
     const [isOverflowing, setOverflowing] = React.useState(false);
+    const [acknowledgements, setAcknowledgements] = React.useState<IMessageAcknowledgement[]>();
+
 
     const refreshOverflowing = React.useCallback(() => {
         const ref = contentRef.current;
@@ -129,13 +145,37 @@ const Message = ({
                             {priority >= 4 && priority < 8 && (
                                 <Chip size="small" color="warning" variant="outlined" label="High" />
                             )}
-                            {acknowledged && (
+                            {acknowledgedByAnyone && (
                                 <Chip
                                     size="small"
                                     color="success"
                                     variant="outlined"
                                     icon={<TaskAlt fontSize="small" />}
-                                    label="Acknowledged"
+                                    clickable
+                                    onClick={async () => {
+                                        const response = await axios.get<{
+                                            acknowledgements: IMessageAcknowledgement[];
+                                        }>(
+                                            config.get('url') +
+                                                'message/' +
+                                                messageId +
+                                                '/acknowledgement'
+                                        );
+                                        setAcknowledgements(response.data.acknowledgements || []);
+                                    }}
+                                    label={
+                                        lastAcknowledgedBy
+                                            ? 'Acknowledged by ' + lastAcknowledgedBy
+                                            : acknowledgementCount === 1
+                                              ? 'Acknowledged'
+                                              : acknowledgementCount + ' acknowledgements'
+                                    }
+                                    title={
+                                        lastAcknowledgedAt
+                                            ? 'Last acknowledgement ' +
+                                              new Date(lastAcknowledgedAt).toLocaleString()
+                                            : undefined
+                                    }
                                 />
                             )}
                         </Stack>
@@ -217,6 +257,27 @@ const Message = ({
                     </Button>
                 )}
             </Stack>
+            <Dialog open={acknowledgements !== undefined} onClose={() => setAcknowledgements(undefined)}>
+                <DialogTitle>Message Acknowledgements</DialogTitle>
+                <DialogContent>
+                    {acknowledgements && acknowledgements.length > 0 ? (
+                        <Stack spacing={1}>
+                            {acknowledgements.map((item) => (
+                                <Box key={item.userId}>
+                                    <Typography sx={{fontWeight: 600}}>
+                                        {item.displayName || item.username}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {new Date(item.acknowledgedAt).toLocaleString()}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Stack>
+                    ) : (
+                        <Typography color="text.secondary">No acknowledgements.</Typography>
+                    )}
+                </DialogContent>
+            </Dialog>
         </Paper>
     );
 };
