@@ -24,6 +24,7 @@ type UserDatabase interface {
 	GetApplicationsByUser(userID uint) ([]*model.Application, error)
 	CountApplicationMemberships(applicationID uint) (int64, error)
 	GetSecurityPolicy() (model.SecurityPolicy, error)
+	GetUserMFA(userID uint) (*model.UserMFA, error)
 }
 
 // UserChangeNotifier notifies listeners for user changes.
@@ -145,12 +146,22 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 	if success := successOrAbort(ctx, 500, err); !success {
 		return
 	}
+	policy, policyErr := a.DB.GetSecurityPolicy()
+	if !successOrAbort(ctx, 500, policyErr) { return }
+	mfa, mfaErr := a.DB.GetUserMFA(user.ID)
+	if !successOrAbort(ctx, 500, mfaErr) { return }
+	mfaEnabled := mfa != nil && mfa.Enabled
+	mfaRequired := user.OIDCID == nil &&
+		((policy.RequireMFAForAdmins && user.Admin) || policy.RequireMFAForAllLocalUsers) &&
+		!mfaEnabled
 	result := &model.CurrentUserExternal{
 		ID:          user.ID,
 		Name:        user.Name,
 		DisplayName: user.DisplayName,
 		Admin:       user.Admin,
 		CreatedAt: user.CreatedAt,
+		MFAEnabled: mfaEnabled,
+		MFARequired: mfaRequired,
 	}
 	client := auth.GetClient(ctx)
 	if client != nil {
