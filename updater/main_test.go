@@ -98,13 +98,13 @@ func TestBuildProgressUsesUserFacingStages(t *testing.T) {
 
 	manager.handleBuildProgress("#7 [js-builder 4/4] RUN make build-js")
 	status := manager.snapshot()
-	if status.Step != "Preparing web interface" || status.Progress < 47 {
+	if status.Step != "Preparing interface" || status.Progress < 47 {
 		t.Fatalf("unexpected web build status: %#v", status)
 	}
 
 	manager.handleBuildProgress("#11 [builder 6/6] RUN make")
 	status = manager.snapshot()
-	if status.Step != "Preparing server" || status.Progress < 62 {
+	if status.Step != "Preparing application" || status.Progress < 62 {
 		t.Fatalf("unexpected server build status: %#v", status)
 	}
 
