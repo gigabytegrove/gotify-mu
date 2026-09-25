@@ -32,6 +32,7 @@ import FirstPartyConnectors from './FirstPartyConnectors';
 import {
     IHomeAssistantIntegration,
     IMQTTIntegration,
+    IWebhookDelivery,
     IWebhookRoute,
 } from '../types';
 
@@ -52,6 +53,7 @@ const Integrations = () => {
     const [mqttEdit, setMqttEdit] = React.useState<IMQTTIntegration | null | undefined>();
     const [homeAssistantEdit, setHomeAssistantEdit] =
         React.useState<IHomeAssistantIntegration | null | undefined>();
+    const [webhookHistory, setWebhookHistory] = React.useState<{name: string; items: IWebhookDelivery[]} | undefined>();
     const [confirm, setConfirm] = React.useState<
         {title: string; text: string; run: () => Promise<void>} | undefined
     >();
@@ -136,6 +138,16 @@ const Integrations = () => {
                                             snackManager.snack('Webhook test notification sent');
                                         }}>
                                         Send Test
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        onClick={async () => {
+                                            const response = await axios.get<IWebhookDelivery[]>(
+                                                api('integration/webhook/' + item.id + '/history')
+                                            );
+                                            setWebhookHistory({name: item.name, items: response.data});
+                                        }}>
+                                        History
                                     </Button>
                                     <Button
                                         size="small"
@@ -299,6 +311,39 @@ const Integrations = () => {
                     }))}
                 />
             </SurfaceCard>
+
+            {webhookHistory && (
+                <Dialog open onClose={() => setWebhookHistory(undefined)} fullWidth maxWidth="md">
+                    <DialogTitle>{webhookHistory.name} · Delivery History</DialogTitle>
+                    <DialogContent>
+                        <Stack spacing={1} sx={{pt: 1}}>
+                            {webhookHistory.items.length === 0 ? (
+                                <Typography color="text.secondary">No webhook requests have been recorded.</Typography>
+                            ) : webhookHistory.items.map((entry) => (
+                                <Box key={entry.id} sx={{p: 1.25, border: 1, borderColor: 'divider', borderRadius: 2}}>
+                                    <Stack direction={{xs: 'column', sm: 'row'}} spacing={1} sx={{justifyContent: 'space-between'}}>
+                                        <Stack direction="row" spacing={1} sx={{alignItems: 'center', flexWrap: 'wrap'}}>
+                                            <Chip
+                                                size="small"
+                                                label={entry.status}
+                                                color={entry.status === 'delivered' ? 'success' : entry.status === 'ignored' ? 'default' : 'warning'}
+                                                variant="outlined"
+                                            />
+                                            <Typography variant="body2">{new Date(entry.createdAt).toLocaleString()}</Typography>
+                                            {entry.ipAddress && <Typography variant="caption" color="text.secondary">{entry.ipAddress}</Typography>}
+                                        </Stack>
+                                        {entry.messageId ? <Typography variant="caption">Message #{entry.messageId}</Typography> : null}
+                                    </Stack>
+                                    {entry.detail && <Typography variant="caption" color="text.secondary">{entry.detail}</Typography>}
+                                </Box>
+                            ))}
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button onClick={() => setWebhookHistory(undefined)}>Close</Button>
+                    </DialogActions>
+                </Dialog>
+            )}
 
             {confirm && (
                 <ConfirmDialog
@@ -515,6 +560,10 @@ const WebhookDialog = ({
     const [titleField, setTitleField] = React.useState(item?.titleField || 'title');
     const [messageField, setMessageField] = React.useState(item?.messageField || 'message');
     const [priorityField, setPriorityField] = React.useState(item?.priorityField || 'priority');
+    const [matchField, setMatchField] = React.useState(item?.matchField || '');
+    const [matchValue, setMatchValue] = React.useState(item?.matchValue || '');
+    const [titleTemplate, setTitleTemplate] = React.useState(item?.titleTemplate || '');
+    const [messageTemplate, setMessageTemplate] = React.useState(item?.messageTemplate || '');
     const [defaultTitle, setDefaultTitle] = React.useState(item?.defaultTitle || '');
     const [defaultPriority, setDefaultPriority] = React.useState(item?.defaultPriority || 0);
     const [requireSignature, setRequireSignature] = React.useState(item?.requireSignature ?? true);
@@ -532,6 +581,10 @@ const WebhookDialog = ({
                 titleField,
                 messageField,
                 priorityField,
+                matchField,
+                matchValue,
+                titleTemplate,
+                messageTemplate,
                 defaultTitle,
                 defaultPriority,
                 requireSignature,
@@ -572,6 +625,32 @@ const WebhookDialog = ({
                         label="Priority field"
                         value={priorityField}
                         onChange={(e) => setPriorityField(e.target.value)}
+                    />
+                    <TextField
+                        label="Conditional field"
+                        value={matchField}
+                        onChange={(e) => setMatchField(e.target.value)}
+                        helperText="Optional JSON field path. The request is ignored unless this field exists."
+                    />
+                    <TextField
+                        label="Required value"
+                        value={matchValue}
+                        onChange={(e) => setMatchValue(e.target.value)}
+                        helperText="Optional exact value for the conditional field."
+                    />
+                    <TextField
+                        label="Title template"
+                        value={titleTemplate}
+                        onChange={(e) => setTitleTemplate(e.target.value)}
+                        helperText="Optional. Use placeholders such as {{alert.title}} or {{items.0.name}}."
+                    />
+                    <TextField
+                        label="Message template"
+                        value={messageTemplate}
+                        onChange={(e) => setMessageTemplate(e.target.value)}
+                        multiline
+                        minRows={2}
+                        helperText="Optional. Use JSON field placeholders or {{raw}} for the original body."
                     />
                     <TextField
                         label="Default title"
