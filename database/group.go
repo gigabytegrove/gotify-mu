@@ -81,3 +81,43 @@ func (d *GormDatabase) RemoveUserGroupMember(groupID, userID uint) error {
 func (d *GormDatabase) DeleteUserGroupMembershipsForUser(userID uint) error {
 	return d.DB.Where("user_id = ?", userID).Delete(&model.UserGroupMembership{}).Error
 }
+
+
+func (d *GormDatabase) GetApplicationGroupGrants(applicationID uint) ([]*model.ApplicationGroupGrant, error) {
+	var grants []*model.ApplicationGroupGrant
+	err := d.DB.Where("application_id = ?", applicationID).Order("group_id ASC").Find(&grants).Error
+	return grants, err
+}
+
+func (d *GormDatabase) UpsertApplicationGroupGrant(grant *model.ApplicationGroupGrant) error {
+	if !model.ValidApplicationRole(grant.Role) {
+		return errors.New("invalid Channel role")
+	}
+	var group model.UserGroup
+	if err := d.DB.First(&group, grant.GroupID).Error; err != nil {
+		return err
+	}
+	var app model.Application
+	if err := d.DB.First(&app, grant.ApplicationID).Error; err != nil {
+		return err
+	}
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"application_id"},{Name:"group_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"role","receive_notifications","updated_at"}),
+	}).Create(grant).Error
+}
+
+func (d *GormDatabase) DeleteApplicationGroupGrant(applicationID, groupID uint) error {
+	return d.DB.Where("application_id = ? AND group_id = ?", applicationID, groupID).
+		Delete(&model.ApplicationGroupGrant{}).Error
+}
+
+func (d *GormDatabase) GetApplicationGroupGrantsForUser(applicationID, userID uint) ([]*model.ApplicationGroupGrant, error) {
+	var grants []*model.ApplicationGroupGrant
+	err := d.DB.Table("application_group_grants AS agg").
+		Select("agg.*").
+		Joins("JOIN user_group_memberships AS ugm ON ugm.group_id = agg.group_id").
+		Where("agg.application_id = ? AND ugm.user_id = ?", applicationID, userID).
+		Find(&grants).Error
+	return grants, err
+}
