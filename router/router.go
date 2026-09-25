@@ -1,7 +1,10 @@
 package router
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -577,28 +580,31 @@ func auditAuthentication(db *database.GormDatabase) gin.HandlerFunc {
 
 func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		ctx.Next()
-
-		method := ctx.Request.Method
-		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
-			return
-		}
-		if ctx.Writer.Status() >= 400 {
-			return
-		}
-
 		path := ctx.FullPath()
 		if path == "" {
 			path = ctx.Request.URL.Path
 		}
-		if !shouldAuditMutation(path) {
+		shouldAudit := ctx.Request.Method != http.MethodGet &&
+			ctx.Request.Method != http.MethodHead &&
+			ctx.Request.Method != http.MethodOptions &&
+			shouldAuditMutation(path)
+
+		details := ""
+		if shouldAudit {
+			details = safeAuditRequestDetails(ctx)
+		}
+
+		ctx.Next()
+
+		if !shouldAudit || ctx.Writer.Status() >= 400 {
 			return
 		}
 
 		event := &model.AuditEvent{
-			Action:    strings.ToLower(method),
+			Action:    strings.ToLower(ctx.Request.Method),
 			Target:    path,
 			IPAddress: ctx.ClientIP(),
+			Details:   details,
 		}
 		if id := ctx.Param("id"); id != "" {
 			event.TargetID = id
@@ -611,10 +617,87 @@ func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 				event.Username = user.Name
 			}
 		}
+		if event.Details != "" {
+			event.Details = fmt.Sprintf("status=%d %s", ctx.Writer.Status(), event.Details)
+		} else {
+			event.Details = fmt.Sprintf("status=%d", ctx.Writer.Status())
+		}
 		if err := db.CreateAuditEvent(event); err != nil {
 			log.Error().Err(err).Str("path", path).Msg("Could not persist audit event")
 		}
 	}
+}
+
+func safeAuditRequestDetails(ctx *gin.Context) string {
+	contentType := strings.ToLower(ctx.GetHeader("Content-Type"))
+	if strings.Contains(contentType, "multipart/form-data") || ctx.Request.Body == nil {
+		return ""
+	}
+	const maxAuditBody = 32 << 10
+	body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, maxAuditBody+1))
+	if err != nil {
+		return ""
+	}
+	ctx.Request.Body = io.NopCloser(bytes.NewReader(body))
+	if len(body) == 0 {
+		return ""
+	}
+	if len(body) > maxAuditBody {
+		return "request_body=[too large to audit]"
+	}
+
+	var payload any
+	if json.Unmarshal(body, &payload) == nil {
+		sanitizeAuditValue(payload)
+		encoded, encodeErr := json.Marshal(payload)
+		if encodeErr == nil {
+			value := string(encoded)
+			if len(value) > 8000 { value = value[:8000] + "…" }
+			return "request=" + value
+		}
+	}
+
+	if strings.Contains(contentType, "application/x-www-form-urlencoded") {
+		values, parseErr := url.ParseQuery(string(body))
+		if parseErr == nil {
+			for key := range values {
+				if auditSensitiveKey(key) { values.Set(key, "[redacted]") }
+			}
+			value := values.Encode()
+			if len(value) > 8000 { value = value[:8000] + "…" }
+			return "request=" + value
+		}
+	}
+	return ""
+}
+
+func sanitizeAuditValue(value any) {
+	switch typed := value.(type) {
+	case map[string]any:
+		for key, item := range typed {
+			if auditSensitiveKey(key) {
+				typed[key] = "[redacted]"
+				continue
+			}
+			sanitizeAuditValue(item)
+		}
+	case []any:
+		for _, item := range typed { sanitizeAuditValue(item) }
+	}
+}
+
+func auditSensitiveKey(key string) bool {
+	normalized := strings.ToLower(strings.ReplaceAll(strings.ReplaceAll(strings.TrimSpace(key), "_", ""), "-", ""))
+	for _, sensitive := range []string{
+		"password", "pass", "token", "secret", "signature", "privatekey", "clientkey",
+		"recoverycode", "recoverycodes", "credential", "authorization", "bindpassword",
+		"accesstoken", "refreshtoken", "clientsecret", "totpsecret",
+	} {
+		if normalized == sensitive || strings.HasSuffix(normalized, sensitive) {
+			return true
+		}
+	}
+	return false
 }
 
 func shouldAuditMutation(path string) bool {
