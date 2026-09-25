@@ -53,6 +53,7 @@ type AutomationDatabase interface {
 	SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error
 	GetDigestPolicy(userID uint) (*model.DigestPolicy, error)
 	SaveDigestPolicy(item *model.DigestPolicy) error
+	DeleteDigestItems(userID uint) error
 
 	GetEscalationRules() ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
@@ -142,8 +143,13 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 	if !successOrAbort(ctx, 500, err) { return }
 	if item == nil { ctx.AbortWithStatus(404); return }
 
-	body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, 1024*1024))
+	const maxWebhookBody = int64(1024 * 1024)
+	body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, maxWebhookBody+1))
 	if !successOrAbort(ctx, 400, err) { return }
+	if int64(len(body)) > maxWebhookBody {
+		ctx.AbortWithError(413, errors.New("webhook payload exceeds the 1 MiB limit"))
+		return
+	}
 
 	title := item.DefaultTitle
 	message := strings.TrimSpace(string(body))
@@ -414,6 +420,9 @@ func (a *AutomationAPI) SaveDigest(ctx *gin.Context) {
 	if params.Enabled {
 		next := time.Now().Add(time.Duration(params.IntervalMinutes)*time.Minute)
 		item.NextRunAt = &next
+	} else {
+		item.NextRunAt = nil
+		if !successOrAbort(ctx, 500, a.DB.DeleteDigestItems(userID)) { return }
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveDigestPolicy(item)) { return }
 	ctx.JSON(200, item)
