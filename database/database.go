@@ -127,6 +127,12 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.WebAuthnChallenge),
 		new(model.ServiceAccount),
 		new(model.ServiceAccountToken),
+		new(model.MessageAttachment),
+		new(model.MessageReaction),
+		new(model.MessageWorkflow),
+		new(model.MessageRead),
+		new(model.MessageMention),
+		new(model.MessageTemplate),
 	); err != nil {
 		return nil, err
 	}
