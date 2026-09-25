@@ -6,11 +6,13 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/fracdex"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/secretstore"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -134,7 +136,25 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
-	return &GormDatabase{DB: db}, nil
+	keyPath := os.Getenv("GOTIFY_MU_SECRET_KEY_FILE")
+	if keyPath == "" {
+		switch {
+		case dialect == "sqlite3" && !strings.HasPrefix(connection, "file:"):
+			keyPath = filepath.Join(filepath.Dir(connection), "secret.key")
+		default:
+			keyPath = filepath.Join("data", "secret.key")
+		}
+	}
+	secrets, err := secretstore.Open(keyPath)
+	if err != nil {
+		return nil, err
+	}
+	wrapped := &GormDatabase{DB: db, secrets: secrets}
+	if err := wrapped.migrateIntegrationSecrets(); err != nil {
+		return nil, err
+	}
+
+	return wrapped, nil
 }
 
 func fillMissingCreatedAt(db *gorm.DB, now time.Time) error {
@@ -197,7 +217,8 @@ func createDirectoryIfSqlite(dialect, connection string) {
 
 // GormDatabase is a wrapper for the gorm framework.
 type GormDatabase struct {
-	DB *gorm.DB
+	DB      *gorm.DB
+	secrets *secretstore.Store
 }
 
 // Close closes the gorm database connection.
