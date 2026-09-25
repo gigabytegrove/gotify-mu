@@ -142,6 +142,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
 	serviceCredentialHandler := api.ServiceCredentialAPI{DB: db}
+	mfaHandler := api.MFAAPI{DB: db}
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler, automationEngine)
 	if err != nil {
@@ -293,6 +294,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientAuth.GET("/automation/digest", automationHandler.GetDigest)
 		clientAuth.PUT("/automation/digest", automationHandler.SaveDigest)
 		clientAuth.GET("/service-credential", serviceCredentialHandler.List)
+		clientAuth.GET("/current/user/mfa", mfaHandler.Status)
 	}
 
 	clientElevated := g.Group("")
@@ -316,6 +318,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.POST("/current/user/password", userHandler.ChangePassword)
 		clientElevated.POST("/service-credential", serviceCredentialHandler.Create)
 		clientElevated.DELETE("/service-credential/:id", serviceCredentialHandler.Delete)
+		clientElevated.POST("/current/user/mfa/setup", mfaHandler.Setup)
+		clientElevated.POST("/current/user/mfa/enable", mfaHandler.Enable)
+		clientElevated.POST("/current/user/mfa/recovery", mfaHandler.RegenerateRecoveryCodes)
+		clientElevated.DELETE("/current/user/mfa", mfaHandler.Disable)
 	}
 
 	authAdmin := g.Group("/user")
