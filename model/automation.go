@@ -14,6 +14,10 @@ type WebhookRoute struct {
 	PriorityField   string    `gorm:"type:text" json:"priorityField"`
 	DefaultTitle    string    `gorm:"type:text" json:"defaultTitle"`
 	DefaultPriority int       `json:"defaultPriority"`
+	AllowedCIDRs     string    `gorm:"type:text" json:"allowedCidrs,omitempty"`
+	RequireSignature bool     `json:"requireSignature"`
+	SigningSecret    string    `gorm:"type:text" json:"-"`
+	MaxAgeSeconds    int       `json:"maxAgeSeconds"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
@@ -30,6 +34,11 @@ type WebhookRouteView struct {
 	PriorityField   string    `json:"priorityField"`
 	DefaultTitle    string    `json:"defaultTitle"`
 	DefaultPriority int       `json:"defaultPriority"`
+	AllowedCIDRs     string    `json:"allowedCidrs,omitempty"`
+	RequireSignature bool     `json:"requireSignature"`
+	SigningSecretConfigured bool `json:"signingSecretConfigured"`
+	MaxAgeSeconds    int       `json:"maxAgeSeconds"`
+	SigningSecret    string    `json:"signingSecret,omitempty"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
