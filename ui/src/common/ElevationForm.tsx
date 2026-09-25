@@ -6,6 +6,7 @@ import {observer} from 'mobx-react-lite';
 import {useStores} from '../stores';
 import * as config from '../config';
 import CircularProgress from '@mui/material/CircularProgress';
+import Key from '@mui/icons-material/Key';
 import {Box, Divider} from '@mui/material';
 
 const ElevateDuration = 60 * 60;
@@ -110,6 +111,26 @@ const ElevationForm = observer(() => {
                         {provider === 'ldap' ? 'Confirm with ' + ldapIdpName : 'Elevate with Password'}
                     </Button>
                 </form>
+            )}
+
+            {Boolean(currentUser.user.passkeyCount) && (
+                <>
+                    {usePassword && <Divider sx={{my: 2}}>or</Divider>}
+                    <Button
+                        className="elevation-passkey"
+                        variant="outlined"
+                        startIcon={<Key />}
+                        fullWidth
+                        onClick={async () => {
+                            try {
+                                await elevateStore.passkeyElevate();
+                            } catch {
+                                setError('Passkey verification was not completed.');
+                            }
+                        }}>
+                        Confirm with Passkey
+                    </Button>
+                </>
             )}
 
             {oidcEnabled && provider === 'oidc' && (
