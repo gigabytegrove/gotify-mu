@@ -1,50 +1,140 @@
-import {createTheme, PaletteMode} from '@mui/material/styles';
+import {alpha, createTheme, PaletteMode} from '@mui/material/styles';
 
 export type ThemeKey = 'dark' | 'light' | 'system';
 
 export const isThemeKey = (value: string | null): value is ThemeKey =>
     value === 'light' || value === 'dark' || value === 'system';
 
-export const createGotifyMuTheme = (mode: PaletteMode) =>
-    createTheme({
+export const createGotifyMuTheme = (mode: PaletteMode) => {
+    const theme = createTheme({
         palette: {
             mode,
             background:
                 mode === 'dark'
-                    ? {default: '#101418', paper: '#171c21'}
-                    : {default: '#f5f7f9', paper: '#ffffff'},
+                    ? {default: '#0e1216', paper: '#151a20'}
+                    : {default: '#f4f6f8', paper: '#ffffff'},
         },
         shape: {
-            borderRadius: 12,
+            borderRadius: 10,
         },
         typography: {
             fontFamily: '"Roboto", "Helvetica", "Arial", sans-serif',
-            h4: {fontWeight: 700},
-            h5: {fontWeight: 700},
-            h6: {fontWeight: 700},
-            button: {textTransform: 'none', fontWeight: 600},
+            h4: {fontWeight: 750, letterSpacing: '-0.02em'},
+            h5: {fontWeight: 700, letterSpacing: '-0.015em'},
+            h6: {fontWeight: 700, letterSpacing: '-0.01em'},
+            button: {textTransform: 'none', fontWeight: 650},
+            body2: {lineHeight: 1.5},
         },
+    });
+
+    return createTheme(theme, {
         components: {
+            MuiCssBaseline: {
+                styleOverrides: {
+                    body: {
+                        scrollbarColor:
+                            mode === 'dark'
+                                ? '#49515a transparent'
+                                : '#b7bec6 transparent',
+                    },
+                },
+            },
             MuiButton: {
                 defaultProps: {disableElevation: true},
-                styleOverrides: {root: {borderRadius: 9}},
+                styleOverrides: {
+                    root: {
+                        borderRadius: 8,
+                        minHeight: 34,
+                        paddingInline: 14,
+                    },
+                    sizeSmall: {
+                        minHeight: 30,
+                        paddingInline: 10,
+                    },
+                },
+            },
+            MuiIconButton: {
+                styleOverrides: {
+                    root: {
+                        borderRadius: 8,
+                    },
+                },
             },
             MuiPaper: {
                 styleOverrides: {
                     root: {
                         backgroundImage: 'none',
                     },
+                    outlined: {
+                        borderColor: alpha(theme.palette.divider, 0.85),
+                    },
+                },
+            },
+            MuiDialog: {
+                styleOverrides: {
+                    paper: {
+                        borderRadius: 14,
+                        border: `1px solid ${alpha(theme.palette.divider, 0.9)}`,
+                    },
                 },
             },
             MuiTableCell: {
                 styleOverrides: {
-                    head: {fontWeight: 700},
+                    root: {
+                        borderBottomColor: alpha(theme.palette.divider, 0.75),
+                    },
+                    head: {
+                        fontWeight: 700,
+                        color: theme.palette.text.secondary,
+                        fontSize: '0.78rem',
+                        textTransform: 'uppercase',
+                        letterSpacing: '0.04em',
+                    },
                 },
             },
             MuiChip: {
                 styleOverrides: {
-                    root: {fontWeight: 600},
+                    root: {
+                        fontWeight: 650,
+                        height: 24,
+                        borderRadius: 7,
+                    },
+                    sizeSmall: {
+                        height: 22,
+                        fontSize: '0.72rem',
+                    },
+                },
+            },
+            MuiTextField: {
+                defaultProps: {
+                    size: 'small',
+                },
+            },
+            MuiOutlinedInput: {
+                styleOverrides: {
+                    root: {
+                        borderRadius: 9,
+                    },
+                },
+            },
+            MuiTooltip: {
+                defaultProps: {
+                    arrow: true,
+                    enterDelay: 450,
+                },
+            },
+            MuiMenu: {
+                defaultProps: {
+                    elevation: 8,
+                },
+                styleOverrides: {
+                    paper: {
+                        border: `1px solid ${alpha(theme.palette.divider, 0.8)}`,
+                        borderRadius: 10,
+                        minWidth: 220,
+                    },
                 },
             },
         },
     });
+};
