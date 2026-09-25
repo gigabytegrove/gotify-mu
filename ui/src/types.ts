@@ -118,7 +118,7 @@ export interface ICurrentUser extends IUser {
     elevatedUntil?: string;
     mfaEnabled?: boolean;
     mfaRequired?: boolean;
-    authProvider?: 'local' | 'oidc' | 'ldap';
+    authProvider?: 'local' | 'oidc' | 'ldap' | 'passkey';
 }
 
 export interface IVersion {
@@ -409,4 +409,12 @@ export interface IPluginCatalogEntry {
     signature: string;
     publicKey: string;
     installed: boolean;
+}
+
+
+export interface IPasskey {
+    id: number;
+    name: string;
+    createdAt: string;
+    lastUsedAt?: string;
 }
