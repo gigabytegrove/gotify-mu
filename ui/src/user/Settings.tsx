@@ -33,6 +33,7 @@ import {UpdateStatusCard} from '../update/UpdateStatus';
 import {IDigestPolicy, IMFASetupResult, IMFAStatus, IPasskey, IQuietHoursPolicy} from '../types';
 import {createPasskey} from '../passkey';
 import ConfirmDialog from '../common/ConfirmDialog';
+import {PriorityField, TimezoneField} from '../common/NotificationFields';
 
 interface IProps {
     themeMode: ThemeKey;
@@ -230,19 +231,14 @@ const NotificationPreferences = () => {
                             fullWidth
                         />
                     </Stack>
-                    <TextField
-                        label="Timezone"
+                    <TimezoneField
                         value={quiet.timezone || browserTimezone}
-                        onChange={(event) => setQuiet({...quiet, timezone: event.target.value})}
-                        helperText="Your browser timezone is shown by default."
+                        onChange={(timezone) => setQuiet({...quiet, timezone})}
                     />
-                    <TextField
-                        label="Allow priority"
-                        type="number"
+                    <PriorityField
+                        label="Allow immediately at priority"
                         value={quiet.allowPriority}
-                        onChange={(event) =>
-                            setQuiet({...quiet, allowPriority: Number(event.target.value)})
-                        }
+                        onChange={(allowPriority) => setQuiet({...quiet, allowPriority})}
                         helperText="Messages at this priority or higher are delivered immediately during quiet hours."
                     />
                     <TextField
@@ -297,12 +293,11 @@ const NotificationPreferences = () => {
                         <MenuItem value={480}>8 hours</MenuItem>
                         <MenuItem value={1440}>24 hours</MenuItem>
                     </TextField>
-                    <TextField
+                    <PriorityField
                         label="Send immediately at priority"
-                        type="number"
                         value={digest.immediatePriority}
-                        onChange={(event) =>
-                            setDigest({...digest, immediatePriority: Number(event.target.value)})
+                        onChange={(immediatePriority) =>
+                            setDigest({...digest, immediatePriority})
                         }
                         helperText="Messages at this priority or higher skip the digest and notify you immediately."
                     />
