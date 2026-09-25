@@ -65,8 +65,10 @@ type Manager struct {
 	httpClient *http.Client
 }
 
-func New(db Database, publisher Publisher, instanceID string) *Manager {
+func New(db Database, publisher Publisher) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
+	host, _ := os.Hostname()
+	instanceID := fmt.Sprintf("%s-%d", host, time.Now().UnixNano())
 	m := &Manager{
 		db:db, publisher:publisher, ctx:ctx, cancel:cancel, instanceID:instanceID,
 		httpClient:&http.Client{Timeout:20*time.Second},
