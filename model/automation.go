@@ -112,7 +112,13 @@ type ScheduledNotification struct {
 	Hour          int        `json:"hour"`
 	Minute        int        `json:"minute"`
 	Weekday       int        `json:"weekday"`
+	CronExpression string    `gorm:"type:varchar(160)" json:"cronExpression,omitempty"`
 	Timezone      string     `gorm:"type:text" json:"timezone"`
+	EndAt         *time.Time `json:"endAt,omitempty"`
+	MaxRuns       int        `json:"maxRuns"`
+	RunCount      int        `json:"runCount"`
+	MisfirePolicy string     `gorm:"type:varchar(16);default:send" json:"misfirePolicy"`
+	ExcludeDates  string     `gorm:"type:text" json:"excludeDates,omitempty"`
 	Enabled       bool       `json:"enabled"`
 	LastRunAt     *time.Time `json:"lastRunAt,omitempty"`
 	NextRunAt     *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
