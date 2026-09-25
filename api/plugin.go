@@ -26,11 +26,21 @@ type PluginAPI struct {
 	Notifier Notifier
 	Manager  *plugin.Manager
 	DB       PluginDatabase
+	Policy   func() *model.SecurityPolicy
 }
 
 // InstallPlugin installs a server-wide plugin binary uploaded by an administrator.
 // The route is protected by elevated administrator authentication in router.Create.
 func (c *PluginAPI) InstallPlugin(ctx *gin.Context) {
+	policy := model.DefaultSecurityPolicy()
+	if c.Policy != nil {
+		if configured := c.Policy(); configured != nil { policy = configured }
+	}
+	if !policy.AllowNativePluginUploads {
+		ctx.AbortWithError(403, errors.New("native plugin uploads are disabled by security policy"))
+		return
+	}
+
 	header, err := ctx.FormFile("plugin")
 	if err != nil {
 		ctx.AbortWithError(400, errors.New("plugin file is required"))
