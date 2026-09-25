@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -40,6 +39,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			ctx.Request.RemoteAddr = "127.0.0.1:65535"
 		}
 	})
+
+	loginLimiter := newRequestLimiter(8, 15*time.Minute)
+	webhookLimiter := newRequestLimiter(120, time.Minute)
 
 	g.Use(accessLogger(), auditMutations(db), gin.Recovery(), gerror.Handler(), location.Default())
 	g.NoRoute(gerror.NotFound())
@@ -143,7 +145,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}
 
 	g.Match([]string{"GET", "HEAD"}, "/health", healthHandler.Health)
-	g.POST("/integrations/webhook/:secret", automationHandler.ReceiveWebhook)
+	g.POST("/integrations/webhook/:secret", webhookLimiter.Middleware(), automationHandler.ReceiveWebhook)
 	g.GET("/swagger", docs.Serve)
 	g.StaticFS("/image", &onlyImageFS{inner: gin.Dir(conf.UploadedImagesDir, false)})
 
@@ -172,7 +174,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	g.Group("/user").Use(authentication.OptionalAdmin).POST("", userHandler.CreateUser)
 
-	g.POST("/auth/local/login", sessionHandler.Login)
+	g.POST("/auth/local/login", loginLimiter.Middleware(), sessionHandler.Login)
 
 	g.OPTIONS("/*any")
 
@@ -413,26 +415,22 @@ func shouldAuditMutation(path string) bool {
 	}
 }
 
-var tokenRegexp = regexp.MustCompile("token=[^&]+")
-
 func accessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-
-		rawQuery := c.Request.URL.RawQuery
-		path := c.Request.URL.Path
+		originalPath := c.Request.URL.Path
 
 		c.Next()
+
+		path := c.FullPath()
+		if path == "" {
+			path = originalPath
+		}
 
 		clientIP := c.ClientIP()
 		if (clientIP == "127.0.0.1" || clientIP == "::1") && path == "/health" {
 			return
 		}
-
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
-		}
-		path = tokenRegexp.ReplaceAllString(path, "token=[masked]")
 
 		latency := time.Since(start)
 		if latency > time.Minute {
