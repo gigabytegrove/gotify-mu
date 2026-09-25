@@ -65,9 +65,10 @@ type Engine struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	integrationMu sync.Mutex
+	integrationMu      sync.Mutex
 	integrationCancels []context.CancelFunc
-	reload chan struct{}
+	integrationWG      sync.WaitGroup
+	reload             chan struct{}
 }
 
 func New(db Database, notifier Notifier) *Engine {
@@ -430,11 +431,13 @@ func (e *Engine) integrationLoop() {
 
 func (e *Engine) stopIntegrations() {
 	e.integrationMu.Lock()
-	defer e.integrationMu.Unlock()
-	for _, cancel := range e.integrationCancels {
+	cancels := append([]context.CancelFunc(nil), e.integrationCancels...)
+	e.integrationCancels = nil
+	e.integrationMu.Unlock()
+	for _, cancel := range cancels {
 		cancel()
 	}
-	e.integrationCancels = nil
+	e.integrationWG.Wait()
 }
 
 func (e *Engine) restartIntegrations() {
@@ -456,9 +459,9 @@ func (e *Engine) restartIntegrations() {
 		}
 		ctx, cancel := context.WithCancel(e.ctx)
 		e.integrationCancels = append(e.integrationCancels, cancel)
-		e.wg.Add(1)
+		e.integrationWG.Add(1)
 		go func(integration model.MQTTIntegration) {
-			defer e.wg.Done()
+			defer e.integrationWG.Done()
 			e.runMQTTLoop(ctx, &integration)
 		}(*item)
 	}
@@ -468,9 +471,9 @@ func (e *Engine) restartIntegrations() {
 		}
 		ctx, cancel := context.WithCancel(e.ctx)
 		e.integrationCancels = append(e.integrationCancels, cancel)
-		e.wg.Add(1)
+		e.integrationWG.Add(1)
 		go func(integration model.HomeAssistantIntegration) {
-			defer e.wg.Done()
+			defer e.integrationWG.Done()
 			e.runHomeAssistantLoop(ctx, &integration)
 		}(*item)
 	}
@@ -498,19 +501,28 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 		return err
 	}
 	defer conn.Close()
+	stopClose := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close()
+		case <-stopClose:
+		}
+	}()
+	defer close(stopClose)
 
+	reader := bufio.NewReader(conn)
 	clientID := integration.ClientID
 	if clientID == "" {
 		clientID = "gotify-mu-" + strconv.FormatUint(uint64(integration.ID), 10)
 	}
-	if err := mqttConnect(conn, clientID, integration.Username, integration.Password); err != nil {
+	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password); err != nil {
 		return err
 	}
-	if err := mqttSubscribe(conn, integration.Topic); err != nil {
+	if err := mqttSubscribe(conn, reader, integration.Topic); err != nil {
 		return err
 	}
 
-	reader := bufio.NewReader(conn)
 	for {
 		if ctx.Err() != nil {
 			return nil
@@ -584,7 +596,7 @@ func dialMQTT(ctx context.Context, raw string) (net.Conn, error) {
 	}
 }
 
-func mqttConnect(conn net.Conn, clientID, username, password string) error {
+func mqttConnect(conn net.Conn, reader *bufio.Reader, clientID, username, password string) error {
 	flags := byte(0x02)
 	if username != "" {
 		flags |= 0x80
@@ -610,7 +622,6 @@ func mqttConnect(conn net.Conn, clientID, username, password string) error {
 	if _, err := conn.Write(packet); err != nil {
 		return err
 	}
-	reader := bufio.NewReader(conn)
 	header, body, err := readMQTTPacket(reader)
 	if err != nil {
 		return err
@@ -621,7 +632,7 @@ func mqttConnect(conn net.Conn, clientID, username, password string) error {
 	return nil
 }
 
-func mqttSubscribe(conn net.Conn, topic string) error {
+func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string) error {
 	if strings.TrimSpace(topic) == "" {
 		return errors.New("MQTT topic is required")
 	}
@@ -635,7 +646,6 @@ func mqttSubscribe(conn net.Conn, topic string) error {
 	if _, err := conn.Write(packet); err != nil {
 		return err
 	}
-	reader := bufio.NewReader(conn)
 	header, response, err := readMQTTPacket(reader)
 	if err != nil {
 		return err
@@ -746,6 +756,15 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 		return err
 	}
 	defer conn.Close()
+	stopClose := make(chan struct{})
+	go func() {
+		select {
+		case <-ctx.Done():
+			_ = conn.Close()
+		case <-stopClose:
+		}
+	}()
+	defer close(stopClose)
 
 	var hello map[string]any
 	if err := conn.ReadJSON(&hello); err != nil {
