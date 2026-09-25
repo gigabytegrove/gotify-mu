@@ -179,6 +179,11 @@ export interface IMQTTIntegration {
     clientId: string;
     username: string;
     passwordConfigured: boolean;
+    protocolVersion: number;
+    qos: number;
+    caCertificate?: string;
+    clientCertificate?: string;
+    clientKeyConfigured: boolean;
     topic: string;
     enabled: boolean;
     status: string;
