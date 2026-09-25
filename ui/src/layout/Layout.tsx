@@ -1,9 +1,15 @@
 import {
     Box,
+    Button,
     CssBaseline,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     Paper,
     StyledEngineProvider,
     ThemeProvider,
+    Typography,
     useMediaQuery,
 } from '@mui/material';
 import * as React from 'react';
@@ -162,12 +168,46 @@ const Layout = observer(() => {
                             </Box>
                         </Box>
 
+                        {loggedIn && <GlobalReauthenticationDialog />}
                         <ScrollUpButton />
                         <SnackbarProvider />
                     </div>
                 </HashRouter>
             </ThemeProvider>
         </StyledEngineProvider>
+    );
+});
+
+const GlobalReauthenticationDialog = observer(() => {
+    const {elevateStore} = useStores();
+
+    if (!elevateStore.reauthenticationRequired) {
+        return null;
+    }
+
+    const close = () => {
+        elevateStore.cleanupOidcElevate();
+        elevateStore.dismissReauthentication();
+    };
+
+    return (
+        <Dialog
+            open
+            onClose={close}
+            fullWidth
+            maxWidth="sm"
+            className="global-reauthentication-dialog">
+            <DialogTitle>Re-authentication Required</DialogTitle>
+            <DialogContent>
+                <Typography color="text.secondary" sx={{mb: 2}}>
+                    Your elevated session expired. Confirm your identity to continue.
+                </Typography>
+                <ElevationForm />
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={close}>Cancel</Button>
+            </DialogActions>
+        </Dialog>
     );
 });
 
