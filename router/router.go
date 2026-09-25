@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -69,28 +70,38 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			ctx.Abort()
 		})
 	}
+	attachmentDir := filepath.Join(filepath.Dir(filepath.Clean(conf.UploadedImagesDir)), "attachments")
 	maintenanceStop := make(chan struct{})
 	go func() {
-		ticker := time.NewTicker(24 * time.Hour)
+		ticker := time.NewTicker(time.Hour)
 		defer ticker.Stop()
-		run := func() {
+		run := func(now time.Time) {
+			if deleted, err := db.ApplyMessageRetention(now); err != nil {
+				log.Error().Err(err).Msg("Could not apply Channel message retention")
+			} else if deleted > 0 {
+				log.Info().Int("messages", deleted).Msg("Applied Channel message retention")
+			}
 			policy, err := db.GetSecurityPolicy()
 			if err != nil {
-				log.Error().Err(err).Msg("Could not load audit retention policy")
-				return
-			}
-			if policy.AuditRetentionDays > 0 {
-				before := time.Now().AddDate(0, 0, -policy.AuditRetentionDays)
+				log.Error().Err(err).Msg("Could not load retention policy")
+			} else if policy.AuditRetentionDays > 0 {
+				before := now.AddDate(0, 0, -policy.AuditRetentionDays)
 				if err := db.DeleteAuditEventsBefore(before); err != nil {
 					log.Error().Err(err).Msg("Could not apply audit retention")
 				}
+				if err := db.CleanupAutomationHistory(before); err != nil {
+					log.Error().Err(err).Msg("Could not clean automation history")
+				}
+			}
+			if err := cleanupOrphanAttachments(db, attachmentDir); err != nil {
+				log.Error().Err(err).Msg("Could not clean orphaned attachments")
 			}
 		}
-		run()
+		run(time.Now())
 		for {
 			select {
-			case <-ticker.C:
-				run()
+			case now := <-ticker.C:
+				run(now)
 			case <-maintenanceStop:
 				return
 			}
@@ -102,18 +113,23 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	)
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
-		for range ticker.C {
-			connectedTokens := streamHandler.CollectConnectedClientTokens()
-			now := time.Now()
-			if err := db.UpdateClientTokensLastUsedAndExpiresAt(connectedTokens, &now); err != nil {
-				log.Error().Err(err).Msg("Error updating last used")
-			}
-			if expired, err := db.CleanupExpiredClients(now); err == nil {
-				for _, c := range expired {
-					streamHandler.NotifyDeletedClient(c.UserID, c.Token)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-maintenanceStop:
+				return
+			case now := <-ticker.C:
+				connectedTokens := streamHandler.CollectConnectedClientTokens()
+				if err := db.UpdateClientTokensLastUsedAndExpiresAt(connectedTokens, &now); err != nil {
+					log.Error().Err(err).Msg("Error updating last used")
 				}
-			} else {
-				log.Error().Err(err).Msg("Error cleaning up expired clients")
+				if expired, err := db.CleanupExpiredClients(now); err == nil {
+					for _, client := range expired {
+						streamHandler.NotifyDeletedClient(client.UserID, client.Token)
+					}
+				} else {
+					log.Error().Err(err).Msg("Error cleaning up expired clients")
+				}
 			}
 		}
 	}()
@@ -170,7 +186,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	collaborationHandler := api.CollaborationAPI{
 		DB: db,
 		Dispatcher: automationEngine,
-		AttachmentDir: filepath.Join(filepath.Dir(conf.UploadedImagesDir), "attachments"),
+		AttachmentDir: attachmentDir,
 	}
 	connectorHandler := api.ConnectorAPI{DB: db, Runtime: connectorManager}
 	serviceHandler := api.ServiceAccountAPI{DB: db, Publisher: automationEngine}
@@ -669,4 +685,22 @@ func (fs *onlyImageFS) Open(name string) (http.File, error) {
 		return nil, fmt.Errorf("invalid file")
 	}
 	return fs.inner.Open(name)
+}
+
+func cleanupOrphanAttachments(db *database.GormDatabase, directory string) error {
+	names, err := db.GetAttachmentStorageNames()
+	if err != nil { return err }
+	keep := make(map[string]struct{}, len(names))
+	for _, name := range names { keep[filepath.Base(name)] = struct{}{} }
+	entries, err := os.ReadDir(directory)
+	if errors.Is(err, os.ErrNotExist) { return nil }
+	if err != nil { return err }
+	for _, entry := range entries {
+		if entry.IsDir() { continue }
+		if _, ok := keep[entry.Name()]; ok { continue }
+		if err := os.Remove(filepath.Join(directory, entry.Name())); err != nil && !errors.Is(err, os.ErrNotExist) {
+			return err
+		}
+	}
+	return nil
 }
