@@ -1211,6 +1211,9 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 		}
 		eventType, _ := event["event_type"].(string)
 		data := event["data"]
+		if !homeAssistantEventMatches(integration, data) {
+			continue
+		}
 		encoded, _ := json.MarshalIndent(data, "", "  ")
 		title := integration.Name
 		if title == "" {
@@ -1226,6 +1229,56 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 			_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "connected", nil, &eventAt, "", nil, false)
 		}
 	}
+}
+
+func homeAssistantEventMatches(integration *model.HomeAssistantIntegration, data any) bool {
+	object, _ := data.(map[string]any)
+
+	if raw := strings.TrimSpace(integration.EntityIDs); raw != "" {
+		entity, _ := lookupMapPath(object, "entity_id")
+		entityID := strings.TrimSpace(fmt.Sprint(entity))
+		matched := false
+		for _, candidate := range strings.FieldsFunc(raw, func(r rune) bool {
+			return r == ',' || r == ';' || r == '\n'
+		}) {
+			if strings.EqualFold(strings.TrimSpace(candidate), entityID) {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			return false
+		}
+	}
+
+	if field := strings.TrimSpace(integration.DataField); field != "" {
+		value, ok := lookupMapPath(object, field)
+		if !ok {
+			return false
+		}
+		if integration.DataValue != "" && fmt.Sprint(value) != integration.DataValue {
+			return false
+		}
+	}
+	return true
+}
+
+func lookupMapPath(root map[string]any, path string) (any, bool) {
+	if root == nil {
+		return nil, false
+	}
+	var current any = root
+	for _, part := range strings.Split(path, ".") {
+		object, ok := current.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		current, ok = object[part]
+		if !ok {
+			return nil, false
+		}
+	}
+	return current, true
 }
 
 func externalMessage(msg *model.Message) *model.MessageExternal {
