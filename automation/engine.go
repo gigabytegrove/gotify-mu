@@ -59,6 +59,7 @@ type Database interface {
 	IsMessageAcknowledged(messageID uint) (bool, error)
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
+	GetMQTTIntegrationByID(id uint) (*model.MQTTIntegration, error)
 	SaveMQTTIntegration(item *model.MQTTIntegration) error
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
 	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
