@@ -133,6 +133,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.MessageRead),
 		new(model.MessageMention),
 		new(model.MessageTemplate),
+		new(model.SavedMessageSearch),
 	); err != nil {
 		return nil, err
 	}
