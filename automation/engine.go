@@ -705,7 +705,8 @@ func decodePublish(header byte, body []byte) (string, []byte, uint16, byte, erro
 
 func appendMQTTString(target []byte, value string) []byte {
 	length := len(value)
-	return append(target, byte(length>>8), byte(length), value...)
+	target = append(target, byte(length>>8), byte(length))
+	return append(target, []byte(value)...)
 }
 
 func encodeRemainingLength(length int) []byte {
