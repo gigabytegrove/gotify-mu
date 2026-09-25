@@ -76,6 +76,24 @@ type OIDC struct {
 	Prompt         []string
 }
 
+type LDAP struct {
+	Enabled                  bool
+	URL                      string
+	BindDN                   string
+	BindPassword             string
+	BaseDN                   string
+	UserFilter               string
+	DisplayNameAttribute     string
+	GroupAttribute           string
+	AdminGroupDN             string
+	UserGroupDN              string
+	AutoRegister             bool
+	LinkByUsername           bool
+	IDPName                  string
+	CAFile                   string
+	InsecureSkipVerify       bool
+}
+
 type Configuration struct {
 	LogLevel          LogLevel
 	Server            Server
@@ -87,6 +105,7 @@ type Configuration struct {
 	Registration      bool
 	LocalAuthEnabled  bool
 	OIDC              OIDC
+	LDAP              LDAP
 	NoColor           string
 }
 
@@ -125,6 +144,13 @@ func Get() (*Configuration, []FutureLog) {
 			Scopes:        []string{"openid", "profile", "email"},
 			IDPName:       "OIDC",
 			Prompt:        []string{"login"},
+		},
+		LDAP: LDAP{
+			UserFilter:           "(uid={username})",
+			DisplayNameAttribute: "cn",
+			GroupAttribute:       "memberOf",
+			AutoRegister:         true,
+			IDPName:              "Directory",
 		},
 	}
 
@@ -195,12 +221,31 @@ func Get() (*Configuration, []FutureLog) {
 	add(parseBool(&c.OIDC.AutoRedirect, EnvOIDCAutoRedirect))
 	add(parseList(&c.OIDC.Prompt, EnvOIDCPrompt))
 
+	add(parseBool(&c.LDAP.Enabled, EnvLDAPEnabled))
+	add(parseString(&c.LDAP.URL, EnvLDAPURL))
+	add(parseString(&c.LDAP.BindDN, EnvLDAPBindDN))
+	add(parseString(&c.LDAP.BindPassword, EnvLDAPBindPassword))
+	add(parseString(&c.LDAP.BaseDN, EnvLDAPBaseDN))
+	add(parseString(&c.LDAP.UserFilter, EnvLDAPUserFilter))
+	add(parseString(&c.LDAP.DisplayNameAttribute, EnvLDAPDisplayNameAttribute))
+	add(parseString(&c.LDAP.GroupAttribute, EnvLDAPGroupAttribute))
+	add(parseString(&c.LDAP.AdminGroupDN, EnvLDAPAdminGroupDN))
+	add(parseString(&c.LDAP.UserGroupDN, EnvLDAPUserGroupDN))
+	add(parseBool(&c.LDAP.AutoRegister, EnvLDAPAutoRegister))
+	add(parseBool(&c.LDAP.LinkByUsername, EnvLDAPLinkByUsername))
+	add(parseString(&c.LDAP.IDPName, EnvLDAPIDPName))
+	add(parseString(&c.LDAP.CAFile, EnvLDAPCAFile))
+	add(parseBool(&c.LDAP.InsecureSkipVerify, EnvLDAPInsecureSkipVerify))
+
 	add(parseString(&c.NoColor, EnvNoColor))
 
 	addTrailingSlashToPaths(c)
 
-	if !c.LocalAuthEnabled && !c.OIDC.Enabled {
-		logs = append(logs, futureFatal("either local authentication or OIDC must be enabled"))
+	if !c.LocalAuthEnabled && !c.OIDC.Enabled && !c.LDAP.Enabled {
+		logs = append(logs, futureFatal("at least one authentication provider must be enabled"))
+	}
+	if c.LDAP.Enabled && (strings.TrimSpace(c.LDAP.URL) == "" || strings.TrimSpace(c.LDAP.BaseDN) == "") {
+		logs = append(logs, futureFatal("LDAP authentication requires GOTIFY_LDAP_URL and GOTIFY_LDAP_BASE_DN"))
 	}
 	if c.Registration && !c.LocalAuthEnabled {
 		logs = append(logs, futureFatal("registration requires local authentication to be enabled"))
