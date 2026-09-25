@@ -20,6 +20,7 @@ import (
 type AutomationEngine interface {
 	Publish(applicationID uint, title, message string, priority int) (*model.Message, error)
 	ReloadIntegrations()
+	SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error
 }
 
 type AutomationDatabase interface {
@@ -274,6 +275,21 @@ func (a *AutomationAPI) UpdateHomeAssistant(ctx *gin.Context) {
 		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, homeAssistantView(item))
+	})
+}
+
+type homeAssistantEventParams struct {
+	EventType string         `json:"eventType" binding:"required"`
+	Data      map[string]any `json:"data"`
+}
+
+func (a *AutomationAPI) SendHomeAssistantEvent(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		var params homeAssistantEventParams
+		if err := ctx.ShouldBindJSON(&params); err != nil { return }
+		if params.Data == nil { params.Data = map[string]any{} }
+		if !successOrAbort(ctx, 502, a.Engine.SendHomeAssistantEvent(id, params.EventType, params.Data)) { return }
+		ctx.JSON(200, gin.H{"sent": true})
 	})
 }
 
