@@ -83,18 +83,17 @@ const Dashboard = observer(() => {
                                 <Stack
                                     key={app.id}
                                     direction="row"
-                                    alignItems="center"
-                                    justifyContent="space-between"
-                                    spacing={2}>
+                                    spacing={2}
+                                    sx={{alignItems: 'center', justifyContent: 'space-between'}}>
                                     <Stack sx={{minWidth: 0}}>
-                                        <Typography fontWeight={600} noWrap>
+                                        <Typography sx={{fontWeight: 600}} noWrap>
                                             {app.name}
                                         </Typography>
                                         <Typography variant="body2" color="text.secondary" noWrap>
                                             {app.description || 'No description'}
                                         </Typography>
                                     </Stack>
-                                    <Stack direction="row" spacing={1} alignItems="center">
+                                    <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
                                         {app.autoAssign && (
                                             <Chip
                                                 size="small"
@@ -118,17 +117,17 @@ const Dashboard = observer(() => {
                 <Grid size={{xs: 12, md: 5}}>
                     <SurfaceCard title="Server" subtitle="Runtime identity and authentication status.">
                         <Stack spacing={1.5}>
-                            <Stack direction="row" justifyContent="space-between" spacing={2}>
+                            <Stack direction="row" spacing={2} sx={{justifyContent: 'space-between'}}>
                                 <Typography color="text.secondary">Version</Typography>
-                                <Typography fontWeight={600}>@{version.version}</Typography>
+                                <Typography sx={{fontWeight: 600}}>@{version.version}</Typography>
                             </Stack>
                             <Divider />
-                            <Stack direction="row" justifyContent="space-between" spacing={2}>
+                            <Stack direction="row" spacing={2} sx={{justifyContent: 'space-between'}}>
                                 <Typography color="text.secondary">Signed in as</Typography>
-                                <Typography fontWeight={600}>{currentUser.user.name}</Typography>
+                                <Typography sx={{fontWeight: 600}}>{currentUser.user.name}</Typography>
                             </Stack>
                             <Divider />
-                            <Stack direction="row" justifyContent="space-between" spacing={2}>
+                            <Stack direction="row" spacing={2} sx={{justifyContent: 'space-between'}}>
                                 <Typography color="text.secondary">Role</Typography>
                                 <Chip
                                     size="small"
@@ -137,14 +136,14 @@ const Dashboard = observer(() => {
                                 />
                             </Stack>
                             <Divider />
-                            <Stack direction="row" justifyContent="space-between" spacing={2}>
+                            <Stack direction="row" spacing={2} sx={{justifyContent: 'space-between'}}>
                                 <Typography color="text.secondary">Local login</Typography>
                                 <Chip
                                     size="small"
                                     label={config.get('localAuth') ? 'Enabled' : 'Disabled'}
                                 />
                             </Stack>
-                            <Stack direction="row" justifyContent="space-between" spacing={2}>
+                            <Stack direction="row" spacing={2} sx={{justifyContent: 'space-between'}}>
                                 <Typography color="text.secondary">OIDC</Typography>
                                 <Chip
                                     size="small"
