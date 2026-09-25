@@ -11,9 +11,10 @@ import React from 'react';
 
 interface IProps {
     name?: string;
+    displayName?: string;
     admin?: boolean;
     fClose: VoidFunction;
-    fOnSubmit: (name: string, pass: string, admin: boolean) => Promise<void>;
+    fOnSubmit: (name: string, displayName: string, pass: string, admin: boolean) => Promise<void>;
     isEdit?: boolean;
 }
 
@@ -22,16 +23,18 @@ const AddEditUserDialog = ({
     fOnSubmit,
     isEdit,
     name: initialName = '',
+    displayName: initialDisplayName = '',
     admin: initialAdmin = false,
 }: IProps) => {
     const [name, setName] = React.useState(initialName);
+    const [displayName, setDisplayName] = React.useState(initialDisplayName);
     const [pass, setPass] = React.useState('');
     const [admin, setAdmin] = React.useState(initialAdmin);
 
     const namePresent = name.length !== 0;
     const passPresent = pass.length !== 0 || isEdit;
     const submitAndClose = async () => {
-        await fOnSubmit(name, pass, admin);
+        await fOnSubmit(name, displayName, pass, admin);
         fClose();
     };
     return (
@@ -53,6 +56,14 @@ const AddEditUserDialog = ({
                     name="username"
                     id="username"
                     onChange={(e) => setName(e.target.value)}
+                    fullWidth
+                />
+                <TextField
+                    margin="dense"
+                    className="display-name"
+                    label="Display Name"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
                     fullWidth
                 />
                 <TextField
