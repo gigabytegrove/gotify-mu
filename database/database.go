@@ -112,6 +112,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.MessageAcknowledgement),
 		new(model.AutomationLease),
 		new(model.ScheduledRun),
+		new(model.WebhookReplay),
 	); err != nil {
 		return nil, err
 	}
