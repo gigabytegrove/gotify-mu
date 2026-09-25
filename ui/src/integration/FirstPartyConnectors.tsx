@@ -264,7 +264,7 @@ const ConnectorDialog = ({
 }:{
     kind:Kind;item?:AnyItem;channels:Channel[];onClose:VoidFunction;onSaved:()=>Promise<void>;
 }) => {
-    const [value,setValue]=React.useState<Record<string, string|number|boolean>>(()=>{
+    const [value,setValue]=React.useState<Record<string, string|number|boolean|undefined>>(()=>{
         if(kind==='email'){
             const x=item as IEmailGateway|undefined;return {
                 name:x?.name||'',sourceApplicationId:x?.sourceApplicationId||0,smtpHost:x?.smtpHost||'',
