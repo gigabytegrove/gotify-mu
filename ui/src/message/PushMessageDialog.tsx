@@ -1,21 +1,30 @@
 import React, {useEffect, useState} from 'react';
 import axios from 'axios';
 import {
+    Box,
     Button,
     Dialog,
     DialogActions,
     DialogContent,
     DialogContentText,
     DialogTitle,
+    IconButton,
     MenuItem,
     Stack,
     TextField,
     Tooltip,
 } from '@mui/material';
+import Add from '@mui/icons-material/Add';
+import Delete from '@mui/icons-material/Delete';
 import Send from '@mui/icons-material/Send';
 import {PriorityField} from '../common/NotificationFields';
 import * as config from '../config';
-import {IMessageTemplate} from '../types';
+import {
+    IMessageExtras,
+    IMessageTemplate,
+    INotificationAction,
+    INotificationField,
+} from '../types';
 import {useStores} from '../stores';
 
 interface IProps {
@@ -23,7 +32,12 @@ interface IProps {
     appName: string;
     defaultPriority: number;
     fClose: VoidFunction;
-    fOnSubmit: (message: string, title: string, priority: number) => Promise<void>;
+    fOnSubmit: (
+        message: string,
+        title: string,
+        priority: number,
+        extras?: IMessageExtras
+    ) => Promise<void>;
 }
 
 export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnSubmit}: IProps) => {
@@ -33,6 +47,8 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
     const [templates, setTemplates] = useState<IMessageTemplate[]>([]);
     const [templateId, setTemplateId] = useState(0);
     const [templateName, setTemplateName] = useState('');
+    const [actions, setActions] = useState<INotificationAction[]>([]);
+    const [fields, setFields] = useState<INotificationField[]>([]);
     const {snackManager} = useStores();
 
     const loadTemplates = async () => {
@@ -51,17 +67,30 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
         setTitle(item.title);
         setMessage(item.message);
         setPriority(item.priority);
+        const display = item.extras?.['gotify-mu::display'];
+        setActions(Array.isArray(display?.actions) ? display.actions : []);
+        setFields(Array.isArray(display?.fields) ? display.fields : []);
     };
 
     const saveTemplate = async () => {
         const name = templateName.trim();
         if (!name || !message.trim()) return;
+        const extras =
+            actions.length > 0 || fields.length > 0
+                ? {
+                      'gotify-mu::display': {
+                          actions: actions.filter((item) => item.label.trim() && item.url.trim()),
+                          fields: fields.filter((item) => item.label.trim() && item.value.trim()),
+                      },
+                  }
+                : undefined;
         await axios.post(config.get('url') + 'message-template', {
             name,
             applicationId: appId,
             title,
             message,
             priority,
+            extras,
         });
         setTemplateName('');
         await loadTemplates();
@@ -71,7 +100,18 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
     const submitEnabled = message.trim().length !== 0;
 
     const submitAndClose = async () => {
-        await fOnSubmit(message, title, priority);
+        const cleanActions = actions.filter((item) => item.label.trim() && item.url.trim());
+        const cleanFields = fields.filter((item) => item.label.trim() && item.value.trim());
+        const extras: IMessageExtras | undefined =
+            cleanActions.length > 0 || cleanFields.length > 0
+                ? {
+                      'gotify-mu::display': {
+                          actions: cleanActions,
+                          fields: cleanFields,
+                      },
+                  }
+                : undefined;
+        await fOnSubmit(message, title, priority, extras);
         fClose();
     };
 
@@ -125,6 +165,122 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
                         onChange={setPriority}
                         fullWidth
                     />
+                    <Box sx={{borderTop: 1, borderColor: 'divider', pt: 2}}>
+                        <Stack spacing={1.5}>
+                            <Stack
+                                direction="row"
+                                spacing={1}
+                                sx={{justifyContent: 'space-between', alignItems: 'center'}}>
+                                <Box>
+                                    <strong>Details</strong>
+                                    <Box sx={{fontSize: '0.8rem', color: 'text.secondary'}}>
+                                        Add structured values that appear below the notification.
+                                    </Box>
+                                </Box>
+                                <Button
+                                    size="small"
+                                    startIcon={<Add />}
+                                    disabled={fields.length >= 20}
+                                    onClick={() =>
+                                        setFields([...fields, {label: '', value: ''}])
+                                    }>
+                                    Add Detail
+                                </Button>
+                            </Stack>
+                            {fields.map((field, index) => (
+                                <Stack key={index} direction="row" spacing={1}>
+                                    <TextField
+                                        size="small"
+                                        label="Label"
+                                        value={field.label}
+                                        onChange={(event) => {
+                                            const next = [...fields];
+                                            next[index] = {...field, label: event.target.value};
+                                            setFields(next);
+                                        }}
+                                        fullWidth
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Value"
+                                        value={field.value}
+                                        onChange={(event) => {
+                                            const next = [...fields];
+                                            next[index] = {...field, value: event.target.value};
+                                            setFields(next);
+                                        }}
+                                        fullWidth
+                                    />
+                                    <IconButton
+                                        aria-label="Remove detail"
+                                        onClick={() =>
+                                            setFields(fields.filter((_item, i) => i !== index))
+                                        }>
+                                        <Delete />
+                                    </IconButton>
+                                </Stack>
+                            ))}
+                        </Stack>
+                    </Box>
+
+                    <Box sx={{borderTop: 1, borderColor: 'divider', pt: 2}}>
+                        <Stack spacing={1.5}>
+                            <Stack
+                                direction="row"
+                                spacing={1}
+                                sx={{justifyContent: 'space-between', alignItems: 'center'}}>
+                                <Box>
+                                    <strong>Action Buttons</strong>
+                                    <Box sx={{fontSize: '0.8rem', color: 'text.secondary'}}>
+                                        Add links users can open directly from the Web UI.
+                                    </Box>
+                                </Box>
+                                <Button
+                                    size="small"
+                                    startIcon={<Add />}
+                                    disabled={actions.length >= 8}
+                                    onClick={() =>
+                                        setActions([...actions, {label: '', url: 'https://'}])
+                                    }>
+                                    Add Action
+                                </Button>
+                            </Stack>
+                            {actions.map((action, index) => (
+                                <Stack key={index} direction="row" spacing={1}>
+                                    <TextField
+                                        size="small"
+                                        label="Button label"
+                                        value={action.label}
+                                        onChange={(event) => {
+                                            const next = [...actions];
+                                            next[index] = {...action, label: event.target.value};
+                                            setActions(next);
+                                        }}
+                                        fullWidth
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="URL"
+                                        value={action.url}
+                                        onChange={(event) => {
+                                            const next = [...actions];
+                                            next[index] = {...action, url: event.target.value};
+                                            setActions(next);
+                                        }}
+                                        fullWidth
+                                    />
+                                    <IconButton
+                                        aria-label="Remove action"
+                                        onClick={() =>
+                                            setActions(actions.filter((_item, i) => i !== index))
+                                        }>
+                                        <Delete />
+                                    </IconButton>
+                                </Stack>
+                            ))}
+                        </Stack>
+                    </Box>
+
                     <Stack direction={{xs: 'column', sm: 'row'}} spacing={1}>
                         <TextField
                             size="small"
