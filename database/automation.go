@@ -1,6 +1,7 @@
 package database
 
 import (
+	"errors"
 	"time"
 
 	"github.com/gotify/server/v3/model"
@@ -290,4 +291,42 @@ func (d *GormDatabase) migrateIntegrationSecrets() error {
 		}
 		return nil
 	})
+}
+
+
+func (d *GormDatabase) TryAcquireAutomationLease(name, owner string, now time.Time, ttl time.Duration) (bool, error) {
+	expires := now.Add(ttl)
+	acquired := false
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.AutomationLease{}).
+			Where("name = ? AND (owner = ? OR expires_at <= ?)", name, owner, now).
+			Updates(map[string]any{
+				"owner":      owner,
+				"expires_at": expires,
+				"updated_at": now,
+			})
+		if result.Error != nil {
+			return result.Error
+		}
+		if result.RowsAffected > 0 {
+			acquired = true
+			return nil
+		}
+
+		lease := &model.AutomationLease{
+			Name:      name,
+			Owner:     owner,
+			ExpiresAt: expires,
+			UpdatedAt: now,
+		}
+		if err := tx.Create(lease).Error; err != nil {
+			if errors.Is(err, gorm.ErrDuplicatedKey) {
+				return nil
+			}
+			return err
+		}
+		acquired = true
+		return nil
+	})
+	return acquired, err
 }
