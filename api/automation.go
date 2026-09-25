@@ -27,6 +27,7 @@ type AutomationEngine interface {
 	Publish(applicationID uint, title, message string, priority int) (*model.Message, error)
 	ReloadIntegrations()
 	SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error
+	TestMQTTConnection(id uint) error
 }
 
 type AutomationDatabase interface {
@@ -276,6 +277,13 @@ func (a *AutomationAPI) UpdateMQTT(ctx *gin.Context) {
 		if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, mqttView(item))
+	})
+}
+
+func (a *AutomationAPI) TestMQTT(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 502, a.Engine.TestMQTTConnection(id)) { return }
+		ctx.JSON(200, gin.H{"connected":true})
 	})
 }
 
@@ -618,6 +626,8 @@ func mqttView(item *model.MQTTIntegration) model.MQTTIntegrationView {
 	return model.MQTTIntegrationView{
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,BrokerURL:item.BrokerURL,ClientID:item.ClientID,
 		Username:item.Username,PasswordConfigured:item.Password!="",Topic:item.Topic,Enabled:item.Enabled,
+		Status:item.Status,LastConnectedAt:item.LastConnectedAt,LastMessageAt:item.LastMessageAt,
+		LastError:item.LastError,LastErrorAt:item.LastErrorAt,ReconnectCount:item.ReconnectCount,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
 }
@@ -626,6 +636,8 @@ func homeAssistantView(item *model.HomeAssistantIntegration) model.HomeAssistant
 	return model.HomeAssistantIntegrationView{
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,BaseURL:item.BaseURL,
 		TokenConfigured:item.Token!="",EventType:item.EventType,Enabled:item.Enabled,
+		Status:item.Status,LastConnectedAt:item.LastConnectedAt,LastEventAt:item.LastEventAt,
+		LastError:item.LastError,LastErrorAt:item.LastErrorAt,ReconnectCount:item.ReconnectCount,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
 }
