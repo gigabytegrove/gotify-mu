@@ -510,3 +510,18 @@ func (d *GormDatabase) DeleteEscalationTargetApplication(targetType string, targ
 	}
 	return nil
 }
+
+
+func (d *GormDatabase) CleanupAutomationHistory(before time.Time) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("completed = ? AND done_at IS NOT NULL AND done_at < ?", true, before).
+			Delete(&model.EscalationState{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("finished_at IS NOT NULL AND finished_at < ?", before).
+			Delete(&model.ScheduledNotificationRun{}).Error; err != nil {
+			return err
+		}
+		return tx.Where("created_at < ?", before).Delete(&model.ConnectorSeenItem{}).Error
+	})
+}
