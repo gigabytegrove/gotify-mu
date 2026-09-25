@@ -6,11 +6,13 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/fracdex"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/secretstore"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -98,6 +100,26 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.AuditEvent),
 		new(model.UserGroup),
 		new(model.UserGroupMembership),
+		new(model.WebhookRoute),
+		new(model.MQTTIntegration),
+		new(model.HomeAssistantIntegration),
+		new(model.ScheduledNotification),
+		new(model.QuietHoursPolicy),
+		new(model.DigestPolicy),
+		new(model.DigestItem),
+		new(model.EscalationRule),
+		new(model.EscalationState),
+		new(model.MessageAcknowledgement),
+		new(model.AutomationLease),
+		new(model.ScheduledRun),
+		new(model.WebhookReplay),
+		new(model.AuditSettings),
+		new(model.ApplicationGroupGrant),
+		new(model.ApplicationNotificationPreference),
+		new(model.ServiceCredential),
+		new(model.UserMFA),
+		new(model.PasskeyCredential),
+		new(model.PasskeyChallenge),
 	); err != nil {
 		return nil, err
 	}
@@ -115,6 +137,9 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 	if err := db.Transaction(backfillApplicationMemberships, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {
 		return nil, err
 	}
+	if err := db.Transaction(backfillApplicationMembershipRoles, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {
+		return nil, err
+	}
 
 	if err := db.Transaction(fillMissingSortKeys, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {
 		return nil, err
@@ -124,7 +149,42 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
-	return &GormDatabase{DB: db}, nil
+	var secrets *secretstore.Store
+	if dialect == "sqlite3" && strings.HasPrefix(connection, "file:") && strings.Contains(connection, "mode=memory") {
+		secrets, err = secretstore.NewEphemeral()
+	} else {
+		keyPath := os.Getenv("GOTIFY_MU_SECRET_KEY_FILE")
+		if keyPath == "" {
+			if dialect == "sqlite3" && !strings.HasPrefix(connection, "file:") {
+				keyPath = filepath.Join(filepath.Dir(connection), "secret.key")
+			} else {
+				keyPath = filepath.Join("data", "secret.key")
+			}
+		}
+		secrets, err = secretstore.Open(keyPath)
+	}
+	if err != nil {
+		return nil, err
+	}
+	wrapped := &GormDatabase{DB: db, secrets: secrets}
+	if err := wrapped.migrateIntegrationSecrets(); err != nil {
+		return nil, err
+	}
+
+	return wrapped, nil
+}
+
+
+func backfillApplicationMembershipRoles(db *gorm.DB) error {
+	if err := db.Model(&model.ApplicationMembership{}).
+		Where("role IS NULL OR role = ''").
+		Update("role", model.ApplicationRoleMember).Error; err != nil {
+		return err
+	}
+	return db.Exec(
+		"UPDATE application_memberships SET role = ? WHERE EXISTS (SELECT 1 FROM applications WHERE applications.id = application_memberships.application_id AND applications.user_id = application_memberships.user_id)",
+		model.ApplicationRoleManager,
+	).Error
 }
 
 func fillMissingCreatedAt(db *gorm.DB, now time.Time) error {
@@ -187,7 +247,8 @@ func createDirectoryIfSqlite(dialect, connection string) {
 
 // GormDatabase is a wrapper for the gorm framework.
 type GormDatabase struct {
-	DB *gorm.DB
+	DB      *gorm.DB
+	secrets *secretstore.Store
 }
 
 // Close closes the gorm database connection.

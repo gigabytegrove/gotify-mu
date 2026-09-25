@@ -21,6 +21,10 @@ type ApplicationMembershipDatabase interface {
 	SetApplicationMembershipNotifications(applicationID, userID uint, enabled bool) error
 	TransferApplicationOwnership(applicationID, newOwnerID uint) error
 	SetApplicationMemberPosting(applicationID uint, enabled bool) error
+	GetApplicationGroupGrants(applicationID uint) ([]*model.ApplicationGroupGrant, error)
+	UpsertApplicationGroupGrant(grant *model.ApplicationGroupGrant) error
+	DeleteApplicationGroupGrant(applicationID, groupID uint) error
+	GetUserGroupByID(id uint) (*model.UserGroup, error)
 }
 
 type ApplicationMembershipAPI struct {
@@ -28,8 +32,9 @@ type ApplicationMembershipAPI struct {
 }
 
 type ApplicationMemberParams struct {
-	UserID               uint  `json:"userId" binding:"required"`
-	ReceiveNotifications *bool `json:"receiveNotifications,omitempty"`
+	UserID               uint   `json:"userId" binding:"required"`
+	ReceiveNotifications *bool  `json:"receiveNotifications,omitempty"`
+	Role                 string `json:"role"`
 }
 
 type ApplicationMemberExternal struct {
@@ -38,6 +43,7 @@ type ApplicationMemberExternal struct {
 	Owner                bool   `json:"owner"`
 	ReceiveNotifications bool   `json:"receiveNotifications"`
 	AutoAssigned         bool   `json:"autoAssigned"`
+	Role                 string `json:"role"`
 }
 
 type ApplicationAutoAssignParams struct {
@@ -57,6 +63,19 @@ type ApplicationMemberPostingParams struct {
 	Enabled bool `json:"enabled"`
 }
 
+type ApplicationGroupGrantParams struct {
+	GroupID              uint   `json:"groupId" binding:"required"`
+	Role                 string `json:"role" binding:"required"`
+	ReceiveNotifications *bool  `json:"receiveNotifications,omitempty"`
+}
+
+type ApplicationGroupGrantExternal struct {
+	GroupID              uint   `json:"groupId"`
+	Name                 string `json:"name"`
+	Role                 string `json:"role"`
+	ReceiveNotifications bool   `json:"receiveNotifications"`
+}
+
 func (a *ApplicationMembershipAPI) authorizeOwnerOrAdmin(
 	userID uint,
 	app *model.Application,
@@ -72,7 +91,14 @@ func (a *ApplicationMembershipAPI) authorizeOwnerOrAdmin(
 	if err != nil {
 		return false, err
 	}
-	return user != nil && user.Admin, nil
+	if user != nil && user.Admin {
+		return true, nil
+	}
+	membership, err := a.DB.GetApplicationMembership(app.ID, userID)
+	if err != nil {
+		return false, err
+	}
+	return membership != nil && membership.Role == model.ApplicationRoleManager, nil
 }
 
 func (a *ApplicationMembershipAPI) getAuthorizedApplication(
@@ -123,6 +149,11 @@ func (a *ApplicationMembershipAPI) GetMembers(ctx *gin.Context) {
 				Owner:                user.ID == app.UserID,
 				ReceiveNotifications: membership.ReceiveNotifications,
 				AutoAssigned:         membership.AutoAssigned,
+				Role: func() string {
+					if user.ID == app.UserID { return "owner" }
+					if membership.Role == "" { return model.ApplicationRoleMember }
+					return membership.Role
+				}(),
 			})
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -168,11 +199,20 @@ func (a *ApplicationMembershipAPI) UpsertMember(ctx *gin.Context) {
 		if params.ReceiveNotifications != nil {
 			receive = *params.ReceiveNotifications
 		}
+		role := params.Role
+		if role == "" {
+			role = model.ApplicationRoleMember
+		}
+		if !model.ValidApplicationRole(role) {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid Channel role"))
+			return
+		}
 
 		membership := &model.ApplicationMembership{
 			ApplicationID:        id,
 			UserID:               params.UserID,
 			ReceiveNotifications: receive,
+			Role:                 role,
 		}
 		if success := successOrAbort(
 			ctx,
@@ -186,6 +226,7 @@ func (a *ApplicationMembershipAPI) UpsertMember(ctx *gin.Context) {
 			UserID:               user.ID,
 			Name:                 user.Name,
 			ReceiveNotifications: membership.ReceiveNotifications,
+			Role:                 membership.Role,
 		})
 	})
 }
@@ -405,3 +446,72 @@ func (a *ApplicationMembershipAPI) SetMemberPosting(ctx *gin.Context) {
 	})
 }
 
+
+
+func (a *ApplicationMembershipAPI) GetGroupGrants(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if _, ok := a.getAuthorizedApplication(ctx, id); !ok { return }
+		grants, err := a.DB.GetApplicationGroupGrants(id)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		out := make([]ApplicationGroupGrantExternal, 0, len(grants))
+		for _, grant := range grants {
+			group, err := a.DB.GetUserGroupByID(grant.GroupID)
+			if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+			if group == nil { continue }
+			out = append(out, ApplicationGroupGrantExternal{
+				GroupID: group.ID,
+				Name: group.Name,
+				Role: grant.Role,
+				ReceiveNotifications: grant.ReceiveNotifications,
+			})
+		}
+		ctx.JSON(http.StatusOK, out)
+	})
+}
+
+func (a *ApplicationMembershipAPI) UpsertGroupGrant(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, ok := a.getAuthorizedApplication(ctx, id)
+		if !ok { return }
+		if app.Internal {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("internal applications cannot be assigned to Groups"))
+			return
+		}
+		var params ApplicationGroupGrantParams
+		if err := ctx.ShouldBindJSON(&params); err != nil { return }
+		if !model.ValidApplicationRole(params.Role) {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid Channel role"))
+			return
+		}
+		receive := true
+		if params.ReceiveNotifications != nil { receive = *params.ReceiveNotifications }
+		grant := &model.ApplicationGroupGrant{
+			ApplicationID: id,
+			GroupID: params.GroupID,
+			Role: params.Role,
+			ReceiveNotifications: receive,
+		}
+		if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.UpsertApplicationGroupGrant(grant)) { return }
+		group, err := a.DB.GetUserGroupByID(params.GroupID)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if group == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("Group does not exist"))
+			return
+		}
+		ctx.JSON(http.StatusOK, ApplicationGroupGrantExternal{
+			GroupID: group.ID,
+			Name: group.Name,
+			Role: grant.Role,
+			ReceiveNotifications: grant.ReceiveNotifications,
+		})
+	})
+}
+
+func (a *ApplicationMembershipAPI) DeleteGroupGrant(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if _, ok := a.getAuthorizedApplication(ctx, id); !ok { return }
+		withID(ctx, "groupId", func(groupID uint) {
+			successOrAbort(ctx, http.StatusInternalServerError, a.DB.DeleteApplicationGroupGrant(id, groupID))
+		})
+	})
+}

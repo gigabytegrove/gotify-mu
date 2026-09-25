@@ -35,6 +35,8 @@ type UserSuite struct {
 
 func (s *UserSuite) BeforeTest(suiteName, testName string) {
 	mode.Set(mode.TestDev)
+	s.notifiedAdd = false
+	s.notifiedDelete = false
 	s.recorder = httptest.NewRecorder()
 	s.ctx, _ = gin.CreateTestContext(s.recorder)
 

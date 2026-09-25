@@ -21,6 +21,9 @@ const Login = observer(() => {
     const [username, setUsername] = React.useState('');
     const [password, setPassword] = React.useState('');
     const [registerDialog, setRegisterDialog] = React.useState(false);
+    const [mfaRequired, setMfaRequired] = React.useState(false);
+    const [verificationCode, setVerificationCode] = React.useState('');
+    const [useRecoveryCode, setUseRecoveryCode] = React.useState(false);
     const {currentUser} = useStores();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
@@ -56,9 +59,18 @@ const Login = observer(() => {
         oidcLoginUrl,
     ]);
 
-    const login = (event: React.FormEvent) => {
+    const login = async (event: React.FormEvent) => {
         event.preventDefault();
-        void currentUser.login(username, password);
+        const result = await currentUser.login(
+            username,
+            password,
+            mfaRequired ? verificationCode : undefined,
+            useRecoveryCode
+        );
+        if (result === 'mfa-required') {
+            setMfaRequired(true);
+            setVerificationCode('');
+        }
     };
 
     return (
@@ -104,6 +116,34 @@ const Login = observer(() => {
                                     onChange={(event) => setPassword(event.target.value)}
                                     fullWidth
                                 />
+                                {mfaRequired && (
+                                    <>
+                                        <TextField
+                                            autoFocus
+                                            id="verification-code"
+                                            label={useRecoveryCode ? 'Recovery code' : 'Verification code'}
+                                            value={verificationCode}
+                                            onChange={(event) => setVerificationCode(event.target.value)}
+                                            autoComplete="one-time-code"
+                                            helperText={
+                                                useRecoveryCode
+                                                    ? 'Enter one unused recovery code.'
+                                                    : 'Enter the 6-digit code from your authenticator.'
+                                            }
+                                            fullWidth
+                                        />
+                                        <Button
+                                            size="small"
+                                            onClick={() => {
+                                                setUseRecoveryCode(!useRecoveryCode);
+                                                setVerificationCode('');
+                                            }}>
+                                            {useRecoveryCode
+                                                ? 'Use authenticator code'
+                                                : 'Use a recovery code'}
+                                        </Button>
+                                    </>
+                                )}
                                 <Button
                                     type="submit"
                                     startIcon={<LockOutlined />}

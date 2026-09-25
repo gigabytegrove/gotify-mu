@@ -192,6 +192,31 @@ export class MessagesStore {
         this.cancelPendingDelete(message);
     };
 
+    @action
+    public setAcknowledged = async (message: IMessage, acknowledged: boolean): Promise<void> => {
+        const url = config.get('url') + 'message/' + message.id + '/acknowledgement';
+        if (acknowledged) {
+            await axios.post(url);
+        } else {
+            await axios.delete(url);
+        }
+
+        runInAction(() => {
+            const update = (states: Record<string, MessagesState>) => {
+                Object.values(states).forEach((state) => {
+                    const match = state.messages.find((item) => item.id === message.id);
+                    if (match) {
+                        match.acknowledged = acknowledged;
+                    }
+                });
+            };
+            update(this.state);
+            update(this.archivedState);
+        });
+        this.clearCache();
+        this.snack(acknowledged ? 'Message acknowledged' : 'Acknowledgement removed');
+    };
+
     public sendMessage = async (
         appId: number,
         message: string,

@@ -15,3 +15,11 @@ type AuditEvent struct {
 	IPAddress string    `gorm:"type:varchar(180)" json:"ipAddress,omitempty"`
 	CreatedAt time.Time `gorm:"index" json:"createdAt"`
 }
+
+
+// AuditSettings controls audit-log retention.
+type AuditSettings struct {
+	ID            uint      `gorm:"primaryKey;autoIncrement:false" json:"id"`
+	RetentionDays int       `json:"retentionDays"`
+	UpdatedAt     time.Time `json:"updatedAt"`
+}

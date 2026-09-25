@@ -116,6 +116,10 @@ const Messages = observer(() => {
             fRestore={
                 archivedView ? () => void messagesStore.restoreSingle(message) : undefined
             }
+            fAcknowledge={() =>
+                void messagesStore.setAcknowledged(message, !Boolean(message.acknowledged))
+            }
+            acknowledged={Boolean(message.acknowledged)}
             senderName={message.senderName}
             onExpand={(expanded) => (expandedState.current[message.id] = expanded)}
             title={message.title}

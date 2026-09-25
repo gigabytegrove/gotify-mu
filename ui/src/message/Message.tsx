@@ -14,6 +14,8 @@ import {ExpandLess, ExpandMore} from '@mui/icons-material';
 import Delete from '@mui/icons-material/Delete';
 import Archive from '@mui/icons-material/Archive';
 import Unarchive from '@mui/icons-material/Unarchive';
+import TaskAlt from '@mui/icons-material/TaskAlt';
+import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
 import TimeAgo from 'react-timeago';
 import {Markdown} from '../common/Markdown';
 import * as config from '../config';
@@ -33,6 +35,8 @@ interface IProps {
     fDelete?: VoidFunction;
     fArchive?: VoidFunction;
     fRestore?: VoidFunction;
+    fAcknowledge?: VoidFunction;
+    acknowledged?: boolean;
     senderName?: string;
     extras?: IMessageExtras;
     expanded: boolean;
@@ -43,6 +47,8 @@ const Message = ({
     fDelete,
     fArchive,
     fRestore,
+    fAcknowledge,
+    acknowledged = false,
     senderName,
     title,
     date,
@@ -123,6 +129,15 @@ const Message = ({
                             {priority >= 4 && priority < 8 && (
                                 <Chip size="small" color="warning" variant="outlined" label="High" />
                             )}
+                            {acknowledged && (
+                                <Chip
+                                    size="small"
+                                    color="success"
+                                    variant="outlined"
+                                    icon={<TaskAlt fontSize="small" />}
+                                    label="Acknowledged"
+                                />
+                            )}
                         </Stack>
                         <Typography
                             variant="caption"
@@ -135,6 +150,17 @@ const Message = ({
                     </Box>
 
                     <Stack direction="row" spacing={0.1}>
+                        {fAcknowledge && (
+                            <Tooltip
+                                title={acknowledged ? 'Undo acknowledgement' : 'Acknowledge'}>
+                                <IconButton
+                                    onClick={fAcknowledge}
+                                    size="small"
+                                    color={acknowledged ? 'success' : 'default'}>
+                                    {acknowledged ? <TaskAlt /> : <RadioButtonUnchecked />}
+                                </IconButton>
+                            </Tooltip>
+                        )}
                         {fRestore && (
                             <Tooltip title="Restore from Archive">
                                 <IconButton onClick={fRestore} size="small">

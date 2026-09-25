@@ -1,7 +1,10 @@
 import React from 'react';
+import axios from 'axios';
 import {
+    Button,
     Chip,
     InputAdornment,
+    MenuItem,
     Stack,
     Table,
     TableBody,
@@ -12,17 +15,35 @@ import {
     Typography,
 } from '@mui/material';
 import Search from '@mui/icons-material/Search';
+import Download from '@mui/icons-material/Download';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
 import {observer} from 'mobx-react-lite';
 import {useStores} from '../stores';
 import {formatDate} from '../common/TimeAgoFormatter';
+import * as config from '../config';
+import {IAuditSettings} from '../types';
 
 const Audit = observer(() => {
     const {auditStore} = useStores();
     const [query, setQuery] = React.useState('');
+    const [settings, setSettings] = React.useState<IAuditSettings>();
 
-    React.useEffect(() => void auditStore.refresh(), [auditStore]);
+    React.useEffect(() => {
+        void auditStore.refresh();
+        void axios
+            .get<IAuditSettings>(config.get('url') + 'audit/settings')
+            .then((response) => setSettings(response.data));
+    }, [auditStore]);
+
+    const saveRetention = async (retentionDays: number) => {
+        const response = await axios.put<IAuditSettings>(
+            config.get('url') + 'audit/settings',
+            {retentionDays}
+        );
+        setSettings(response.data);
+        await auditStore.refresh();
+    };
 
     const events = auditStore.getItems();
     const normalized = query.trim().toLowerCase();
@@ -45,6 +66,33 @@ const Audit = observer(() => {
         <DefaultPage
             title="Audit Log"
             description="Security-sensitive and administrative changes recorded by Gotify MU.">
+            <SurfaceCard
+                title="Retention & Export"
+                subtitle="Control how long administrative history is kept and export a copy when needed.">
+                <Stack direction={{xs: 'column', sm: 'row'}} spacing={2} sx={{alignItems: {sm: 'center'}}}>
+                    <TextField
+                        select
+                        label="Keep audit history"
+                        value={settings?.retentionDays || 180}
+                        onChange={(event) => void saveRetention(Number(event.target.value))}
+                        sx={{minWidth: 220}}>
+                        <MenuItem value={30}>30 days</MenuItem>
+                        <MenuItem value={90}>90 days</MenuItem>
+                        <MenuItem value={180}>180 days</MenuItem>
+                        <MenuItem value={365}>1 year</MenuItem>
+                        <MenuItem value={730}>2 years</MenuItem>
+                        <MenuItem value={1825}>5 years</MenuItem>
+                    </TextField>
+                    <Button
+                        startIcon={<Download />}
+                        href={config.get('url') + 'audit/export'}
+                        target="_blank"
+                        rel="noreferrer">
+                        Export CSV
+                    </Button>
+                </Stack>
+            </SurfaceCard>
+
             <SurfaceCard
                 title="Recent Activity"
                 subtitle={`Showing up to ${events.length} recent administrative events`}>

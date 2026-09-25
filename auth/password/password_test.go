@@ -25,3 +25,9 @@ func TestBCryptoTooLongErrorIsReturned(t *testing.T) {
 	_, err := CreatePassword(strings.Repeat("a", 100), 5)
 	assert.ErrorIs(t, err, bcrypt.ErrPasswordTooLong)
 }
+
+
+func TestValidateNewPasswordRequiresMinimumLength(t *testing.T) {
+	assert.Error(t, ValidateNewPassword("shortpass"))
+	assert.NoError(t, ValidateNewPassword("long-enough-password"))
+}

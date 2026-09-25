@@ -7,8 +7,8 @@ import (
 )
 
 func ValidateNewPassword(pw string) error {
-	if pw == "" {
-		return errors.New("password must not be empty")
+	if len([]rune(pw)) < 12 {
+		return errors.New("password must be at least 12 characters")
 	}
 	if len([]byte(pw)) > 72 {
 		return bcrypt.ErrPasswordTooLong

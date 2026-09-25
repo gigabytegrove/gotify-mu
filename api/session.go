@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth"
+	"github.com/gotify/server/v3/auth/mfa"
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/model"
 )
@@ -16,6 +17,9 @@ type SessionDatabase interface {
 	CreateClient(client *model.Client) error
 	GetClientByToken(token string) (*model.Client, error)
 	DeleteClientByID(id uint) error
+	CreateAuditEvent(event *model.AuditEvent) error
+	GetUserMFA(userID uint) (*model.UserMFA, error)
+	ConsumeUserMFARecoveryHash(userID uint, target string) (bool, error)
 }
 
 // SessionAPI provides handlers for cookie-based session authentication.
@@ -76,8 +80,51 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		return
 	}
 	if user == nil || !password.ComparePassword(user.Pass, []byte(pass)) {
+		_ = a.DB.CreateAuditEvent(&model.AuditEvent{
+			Username:  name,
+			Action:    "login_failed",
+			Target:    "/auth/local/login",
+			IPAddress: ctx.ClientIP(),
+			Details:   "Invalid local credentials",
+		})
 		ctx.AbortWithError(401, errors.New("invalid credentials"))
 		return
+	}
+
+	mfaSettings, err := a.DB.GetUserMFA(user.ID)
+	if err != nil {
+		ctx.AbortWithError(500, err)
+		return
+	}
+	if mfaSettings != nil && mfaSettings.Enabled {
+		totpCode := ctx.GetHeader("X-Gotify-MU-MFA")
+		recoveryCode := ctx.GetHeader("X-Gotify-MU-Recovery")
+		verified := false
+		switch {
+		case totpCode != "":
+			verified = mfa.VerifyTOTP(mfaSettings.Secret, totpCode, time.Now())
+		case recoveryCode != "":
+			verified, err = a.DB.ConsumeUserMFARecoveryHash(user.ID, mfa.HashRecoveryCode(recoveryCode))
+			if err != nil {
+				ctx.AbortWithError(500, err)
+				return
+			}
+		default:
+			ctx.AbortWithStatusJSON(428, gin.H{
+				"error": "Multi-factor verification required.",
+				"mfaRequired": true,
+			})
+			return
+		}
+		if !verified {
+			_ = a.DB.CreateAuditEvent(&model.AuditEvent{
+				UserID: user.ID, Username: user.Name, Action: "mfa_failed",
+				Target: "/auth/local/login", IPAddress: ctx.ClientIP(),
+				Details: "Invalid multi-factor verification",
+			})
+			ctx.AbortWithError(401, errors.New("invalid verification code"))
+			return
+		}
 	}
 
 	clientParams := ClientParams{}
@@ -99,6 +146,13 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 	}
 
 	auth.SetCookie(ctx.Writer, tokenPrivate, auth.CookieMaxAge, a.SecureCookie)
+	_ = a.DB.CreateAuditEvent(&model.AuditEvent{
+		UserID:    user.ID,
+		Username:  user.Name,
+		Action:    "login",
+		Target:    "/auth/local/login",
+		IPAddress: ctx.ClientIP(),
+	})
 
 	ctx.JSON(200, &model.CurrentUserExternal{
 		ID:            user.ID,

@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/secretstore"
 	"github.com/rs/zerolog/log"
 )
 
@@ -32,11 +33,14 @@ var timeNow = time.Now
 // The Database interface for encapsulating database access.
 type Database interface {
 	GetApplicationByToken(token string) (*model.Application, error)
+	GetApplicationByID(id uint) (*model.Application, error)
 	GetClientByToken(token string) (*model.Client, error)
 	GetUserByName(name string) (*model.User, error)
 	GetUserByID(id uint) (*model.User, error)
 	UpdateClientTokensLastUsedAndExpiresAt(tokens []string, t *time.Time) error
 	UpdateApplicationTokenLastUsed(token string, t *time.Time) error
+	GetServiceCredentialByHash(hash string) (*model.ServiceCredential, error)
+	TouchServiceCredential(id uint, now time.Time) error
 }
 
 // Auth is the provider for authentication middleware.
@@ -95,9 +99,16 @@ func (a *Auth) RequireApplicationToken(ctx *gin.Context) {
 	a.abort401(ctx)
 }
 
+// RequireServiceScope allows only a non-human service credential with the requested scope.
+func (a *Auth) RequireServiceScope(scope string) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		a.evaluateOr401(ctx, a.handleService(scope))
+	}
+}
+
 // RequireAny requires client, application, or basic auth.
 func (a *Auth) RequireApplicationOrClient(ctx *gin.Context) {
-	a.evaluateOr401(ctx, a.handleApplication, a.handleClient(), a.handleUser())
+	a.evaluateOr401(ctx, a.handleApplication, a.handleService("message:write"), a.handleClient(), a.handleUser())
 }
 
 func (a *Auth) evaluate(ctx *gin.Context, funcs ...func(ctx *gin.Context) (authState, error)) bool {
@@ -224,6 +235,59 @@ func (a *Auth) handleClient(checks ...func(*model.Client) (authState, error)) fu
 
 		return authStateOk, nil
 	}
+}
+
+func (a *Auth) handleService(requiredScope string) func(ctx *gin.Context) (authState, error) {
+	return func(ctx *gin.Context) (authState, error) {
+		token, _ := a.readTokenFromRequest(ctx)
+		if token == "" || !strings.HasPrefix(token, "S") {
+			return authStateSkip, nil
+		}
+		credential, err := a.DB.GetServiceCredentialByHash(secretstore.Hash(token))
+		if err != nil {
+			return authStateSkip, err
+		}
+		if credential == nil {
+			return authStateSkip, nil
+		}
+		if !serviceCredentialHasScope(credential.Scopes, requiredScope) {
+			return authStateForbidden, nil
+		}
+		user, err := a.DB.GetUserByID(credential.UserID)
+		if err != nil {
+			return authStateSkip, err
+		}
+		if user == nil {
+			return authStateForbidden, nil
+		}
+		RegisterUser(ctx, user)
+		if credential.ApplicationID != nil {
+			app, err := a.DB.GetApplicationByID(*credential.ApplicationID)
+			if err != nil {
+				return authStateSkip, err
+			}
+			if app == nil {
+				return authStateForbidden, nil
+			}
+			RegisterApplication(ctx, app)
+		}
+		now := timeNow()
+		if credential.LastUsed == nil || credential.LastUsed.Add(5*time.Minute).Before(now) {
+			if err := a.DB.TouchServiceCredential(credential.ID, now); err != nil {
+				return authStateSkip, err
+			}
+		}
+		return authStateOk, nil
+	}
+}
+
+func serviceCredentialHasScope(raw, required string) bool {
+	for _, value := range strings.Split(raw, ",") {
+		if strings.TrimSpace(value) == required {
+			return true
+		}
+	}
+	return false
 }
 
 func (a *Auth) handleApplication(ctx *gin.Context) (authState, error) {

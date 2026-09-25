@@ -4,7 +4,13 @@ import {action, runInAction} from 'mobx';
 import {BaseStore} from '../common/BaseStore';
 import * as config from '../config';
 import {SnackReporter} from '../snack/SnackManager';
-import {IApplication, IApplicationMember, IUser} from '../types';
+import {
+    IApplication,
+    IApplicationGroupGrant,
+    IApplicationMember,
+    IChannelRole,
+    IUser,
+} from '../types';
 import {arrayMove} from '@dnd-kit/sortable';
 
 export class AppStore extends BaseStore<IApplication> {
@@ -126,14 +132,39 @@ export class AppStore extends BaseStore<IApplication> {
     public setMember = async (
         id: number,
         userId: number,
-        receiveNotifications = true
+        receiveNotifications = true,
+        role: Exclude<IChannelRole, 'owner'> = 'member'
     ): Promise<IApplicationMember> =>
         axios
             .post<IApplicationMember>(`${config.get('url')}application/${id}/members`, {
                 userId,
                 receiveNotifications,
+                role,
             })
             .then((response) => response.data);
+
+    public getGroupGrants = async (id: number): Promise<IApplicationGroupGrant[]> =>
+        axios
+            .get<IApplicationGroupGrant[]>(`${config.get('url')}application/${id}/groups`)
+            .then((response) => response.data);
+
+    public setGroupGrant = async (
+        id: number,
+        groupId: number,
+        role: Exclude<IChannelRole, 'owner'>,
+        receiveNotifications = true
+    ): Promise<IApplicationGroupGrant> =>
+        axios
+            .post<IApplicationGroupGrant>(`${config.get('url')}application/${id}/groups`, {
+                groupId,
+                role,
+                receiveNotifications,
+            })
+            .then((response) => response.data);
+
+    public removeGroupGrant = async (id: number, groupId: number): Promise<void> => {
+        await axios.delete(`${config.get('url')}application/${id}/groups/${groupId}`);
+    };
 
     public removeMember = async (id: number, userId: number): Promise<void> => {
         await axios.delete(`${config.get('url')}application/${id}/members/${userId}`);

@@ -59,6 +59,7 @@ func (d *GormDatabase) CreateApplication(application *model.Application) error {
 				ApplicationID:        application.ID,
 				UserID:               application.UserID,
 				ReceiveNotifications: true,
+				Role:                 model.ApplicationRoleManager,
 			}
 			if err := tx.Create(membership).Error; err != nil {
 				return err
@@ -77,10 +78,31 @@ func (d *GormDatabase) DeleteApplicationByID(id uint) error {
 	if err := d.DeleteMessagesByApplication(id); err != nil {
 		return err
 	}
-	if err := d.DB.Where("application_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil {
-		return err
-	}
-	return d.DB.Where("id = ?", id).Delete(&model.Application{}).Error
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		var escalationRuleIDs []uint
+		if err := tx.Model(&model.EscalationRule{}).
+			Where("source_application_id = ? OR target_application_id = ?", id, id).
+			Pluck("id", &escalationRuleIDs).Error; err != nil {
+			return err
+		}
+		if len(escalationRuleIDs) > 0 {
+			if err := tx.Where("rule_id IN ?", escalationRuleIDs).Delete(&model.EscalationState{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", escalationRuleIDs).Delete(&model.EscalationRule{}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("application_id = ?", id).Delete(&model.WebhookRoute{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.MQTTIntegration{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.HomeAssistantIntegration{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.ScheduledNotification{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationGroupGrant{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationNotificationPreference{}).Error; err != nil { return err }
+		return tx.Where("id = ?", id).Delete(&model.Application{}).Error
+	})
 }
 
 // GetApplicationsByUser returns all applications from a user.
@@ -98,8 +120,21 @@ func (d *GormDatabase) GetApplicationsByUser(userID uint) ([]*model.Application,
 // or has been assigned to through an ApplicationMembership.
 func (d *GormDatabase) GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error) {
 	var apps []*model.Application
-	err := d.DB.Joins("JOIN application_memberships AS am ON am.application_id = applications.id AND am.user_id = ?", userID).
-		Order("applications.sort_key, applications.id ASC").Find(&apps).Error
+	err := d.DB.
+		Where(`
+			EXISTS (
+				SELECT 1 FROM application_memberships am
+				WHERE am.application_id = applications.id AND am.user_id = ?
+			)
+			OR EXISTS (
+				SELECT 1
+				FROM application_group_grants agg
+				JOIN user_group_memberships ugm ON ugm.group_id = agg.group_id
+				WHERE agg.application_id = applications.id AND ugm.user_id = ?
+			)
+		`, userID, userID).
+		Order("applications.sort_key, applications.id ASC").
+		Find(&apps).Error
 	if err == gorm.ErrRecordNotFound {
 		err = nil
 	}

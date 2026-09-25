@@ -1,6 +1,10 @@
 package main
 
 import (
+	"crypto/sha256"
+	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -123,4 +127,48 @@ func containsAdjacent(values []string, first string, rest ...string) bool {
 		}
 	}
 	return false
+}
+
+
+func TestRedactDockerArgsMasksEnvironmentValues(t *testing.T) {
+	got := redactDockerArgs([]string{
+		"create",
+		"--env", "PASSWORD=super-secret",
+		"--env=TOKEN=another-secret",
+		"image",
+	})
+	expected := []string{
+		"create",
+		"--env", "PASSWORD=[redacted]",
+		"--env=TOKEN=[redacted]",
+		"image",
+	}
+	if !slices.Equal(got, expected) {
+		t.Fatalf("expected %v, got %v", expected, got)
+	}
+}
+
+func TestVerifySHA256(t *testing.T) {
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "source.zip")
+	content := []byte("release archive")
+	if err := os.WriteFile(archive, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256(content)
+	checksums := filepath.Join(dir, "SHA256SUMS")
+	line := fmt.Sprintf("%x  gotify-mu-v0.5.0-source.zip\n", sum)
+	if err := os.WriteFile(checksums, []byte(line), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifySHA256(archive, checksums); err != nil {
+		t.Fatalf("expected checksum verification to pass: %v", err)
+	}
+
+	if err := os.WriteFile(archive, []byte("tampered"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifySHA256(archive, checksums); err == nil {
+		t.Fatal("expected tampered archive to fail checksum verification")
+	}
 }

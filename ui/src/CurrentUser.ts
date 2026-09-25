@@ -48,36 +48,51 @@ export class CurrentUser {
         return (browser && browser.name + ' ' + browser.version) || 'unknown browser';
     };
 
-    public login = async (username: string, password: string) => {
+    public login = async (
+        username: string,
+        password: string,
+        verificationCode?: string,
+        recovery = false
+    ): Promise<'success' | 'mfa-required' | 'failed'> => {
         runInAction(() => {
             this.loggedIn = false;
             this.authenticating = true;
         });
         const name = this.createClientName();
-        axios
-            .create()
-            .request({
+        try {
+            const headers: Record<string, string> = {
+                Authorization: 'Basic ' + btoa(username + ':' + password),
+            };
+            if (verificationCode) {
+                headers[recovery ? 'X-Gotify-MU-Recovery' : 'X-Gotify-MU-MFA'] =
+                    verificationCode;
+            }
+            const resp = await axios.create().request<ICurrentUser>({
                 url: config.get('url') + 'auth/local/login',
                 method: 'POST',
                 data: {name},
-                headers: {Authorization: 'Basic ' + btoa(username + ':' + password)},
-            })
-            .then(
-                action((resp: AxiosResponse<ICurrentUser>) => {
-                    this.snack(`A client named '${name}' was created for your session.`);
-                    this.user = resp.data;
-                    this.loggedIn = true;
-                    this.authenticating = false;
-                    this.connectionErrorMessage = null;
-                    this.reconnectTime = 7500;
-                })
-            )
-            .catch(
-                action(() => {
-                    this.authenticating = false;
-                    return this.snack('Login failed');
-                })
-            );
+                headers,
+            });
+            runInAction(() => {
+                this.snack(`A client named '${name}' was created for your session.`);
+                this.user = resp.data;
+                this.loggedIn = true;
+                this.authenticating = false;
+                this.connectionErrorMessage = null;
+                this.reconnectTime = 7500;
+            });
+            return 'success';
+        } catch (error) {
+            const axiosError = error as AxiosError<{mfaRequired?: boolean}>;
+            runInAction(() => {
+                this.authenticating = false;
+            });
+            if (axiosError.response?.status === 428 && axiosError.response.data?.mfaRequired) {
+                return 'mfa-required';
+            }
+            this.snack('Login failed');
+            return 'failed';
+        }
     };
 
     public tryAuthenticate = async (): Promise<AxiosResponse<ICurrentUser>> => {

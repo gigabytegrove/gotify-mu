@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -68,6 +69,23 @@ type endpointInfo struct {
 	Aliases []string `json:"Aliases"`
 }
 
+type deviceMapping struct {
+	PathOnHost        string `json:"PathOnHost"`
+	PathInContainer   string `json:"PathInContainer"`
+	CgroupPermissions string `json:"CgroupPermissions"`
+}
+
+type ulimit struct {
+	Name string `json:"Name"`
+	Soft int64  `json:"Soft"`
+	Hard int64  `json:"Hard"`
+}
+
+type logConfig struct {
+	Type   string            `json:"Type"`
+	Config map[string]string `json:"Config"`
+}
+
 type inspectedContainer struct {
 	Config struct {
 		Env        []string          `json:"Env"`
@@ -83,6 +101,24 @@ type inspectedContainer struct {
 		ExtraHosts    []string                 `json:"ExtraHosts"`
 		DNS           []string                 `json:"Dns"`
 		DNSSearch     []string                 `json:"DnsSearch"`
+		ReadonlyRootfs bool                    `json:"ReadonlyRootfs"`
+		CapAdd         []string                `json:"CapAdd"`
+		CapDrop        []string                `json:"CapDrop"`
+		SecurityOpt    []string                `json:"SecurityOpt"`
+		Tmpfs          map[string]string       `json:"Tmpfs"`
+		Memory         int64                   `json:"Memory"`
+		NanoCpus       int64                   `json:"NanoCpus"`
+		CPUQuota       int64                   `json:"CpuQuota"`
+		CPUPeriod      int64                   `json:"CpuPeriod"`
+		CpusetCpus     string                  `json:"CpusetCpus"`
+		PidsLimit      *int64                  `json:"PidsLimit"`
+		Privileged     bool                    `json:"Privileged"`
+		IpcMode        string                  `json:"IpcMode"`
+		PidMode        string                  `json:"PidMode"`
+		ShmSize        int64                   `json:"ShmSize"`
+		Devices        []deviceMapping         `json:"Devices"`
+		Ulimits        []ulimit                `json:"Ulimits"`
+		LogConfig      logConfig               `json:"LogConfig"`
 	} `json:"HostConfig"`
 	Mounts []mountInfo `json:"Mounts"`
 	NetworkSettings struct {
@@ -251,10 +287,21 @@ func (m *manager) performInstall(version string, started time.Time) {
 	}
 
 	archivePath := filepath.Join(tempDir, "source.zip")
-	sourceURL := fmt.Sprintf("https://github.com/%s/archive/refs/tags/v%s.zip", m.repository, version)
+	checksumPath := filepath.Join(tempDir, "SHA256SUMS")
+	sourceURL := fmt.Sprintf("https://github.com/%s/releases/download/v%s/gotify-mu-v%s-source.zip", m.repository, version, version)
+	checksumURL := fmt.Sprintf("https://github.com/%s/releases/download/v%s/SHA256SUMS", m.repository, version)
 	m.updateProgress("downloading", "Downloading update", "Downloading update", 10)
-	if err := m.downloadFile(sourceURL, archivePath, 10, 24); err != nil {
+	if err := m.downloadFile(sourceURL, archivePath, 10, 21); err != nil {
 		m.fail(version, started, "The update could not be downloaded.", err)
+		return
+	}
+	if err := m.downloadFile(checksumURL, checksumPath, 21, 24); err != nil {
+		m.fail(version, started, "The release checksum could not be downloaded.", err)
+		return
+	}
+	m.updateProgress("preparing", "Verifying update", "Verifying update", 25)
+	if err := verifySHA256(archivePath, checksumPath); err != nil {
+		m.fail(version, started, "The update failed integrity verification.", err)
 		return
 	}
 
@@ -462,6 +509,71 @@ func createArgs(name, image string, inspected *inspectedContainer) []string {
 	for _, search := range inspected.HostConfig.DNSSearch {
 		args = append(args, "--dns-search", search)
 	}
+	if inspected.HostConfig.ReadonlyRootfs {
+		args = append(args, "--read-only")
+	}
+	for _, capability := range inspected.HostConfig.CapAdd {
+		args = append(args, "--cap-add", capability)
+	}
+	for _, capability := range inspected.HostConfig.CapDrop {
+		args = append(args, "--cap-drop", capability)
+	}
+	for _, option := range inspected.HostConfig.SecurityOpt {
+		args = append(args, "--security-opt", option)
+	}
+	for path, options := range inspected.HostConfig.Tmpfs {
+		value := path
+		if options != "" {
+			value += ":" + options
+		}
+		args = append(args, "--tmpfs", value)
+	}
+	if inspected.HostConfig.Memory > 0 {
+		args = append(args, "--memory", strconv.FormatInt(inspected.HostConfig.Memory, 10))
+	}
+	if inspected.HostConfig.NanoCpus > 0 {
+		args = append(args, "--cpus", strconv.FormatFloat(float64(inspected.HostConfig.NanoCpus)/1e9, 'f', -1, 64))
+	}
+	if inspected.HostConfig.CPUPeriod > 0 {
+		args = append(args, "--cpu-period", strconv.FormatInt(inspected.HostConfig.CPUPeriod, 10))
+	}
+	if inspected.HostConfig.CPUQuota > 0 {
+		args = append(args, "--cpu-quota", strconv.FormatInt(inspected.HostConfig.CPUQuota, 10))
+	}
+	if inspected.HostConfig.CpusetCpus != "" {
+		args = append(args, "--cpuset-cpus", inspected.HostConfig.CpusetCpus)
+	}
+	if inspected.HostConfig.PidsLimit != nil && *inspected.HostConfig.PidsLimit > 0 {
+		args = append(args, "--pids-limit", strconv.FormatInt(*inspected.HostConfig.PidsLimit, 10))
+	}
+	if inspected.HostConfig.Privileged {
+		args = append(args, "--privileged")
+	}
+	if inspected.HostConfig.IpcMode != "" && inspected.HostConfig.IpcMode != "private" {
+		args = append(args, "--ipc", inspected.HostConfig.IpcMode)
+	}
+	if inspected.HostConfig.PidMode != "" {
+		args = append(args, "--pid", inspected.HostConfig.PidMode)
+	}
+	if inspected.HostConfig.ShmSize > 0 {
+		args = append(args, "--shm-size", strconv.FormatInt(inspected.HostConfig.ShmSize, 10))
+	}
+	for _, device := range inspected.HostConfig.Devices {
+		value := device.PathOnHost + ":" + device.PathInContainer
+		if device.CgroupPermissions != "" {
+			value += ":" + device.CgroupPermissions
+		}
+		args = append(args, "--device", value)
+	}
+	for _, limit := range inspected.HostConfig.Ulimits {
+		args = append(args, "--ulimit", fmt.Sprintf("%s=%d:%d", limit.Name, limit.Soft, limit.Hard))
+	}
+	if inspected.HostConfig.LogConfig.Type != "" {
+		args = append(args, "--log-driver", inspected.HostConfig.LogConfig.Type)
+		for key, value := range inspected.HostConfig.LogConfig.Config {
+			args = append(args, "--log-opt", key+"="+value)
+		}
+	}
 	if inspected.Config.User != "" {
 		args = append(args, "--user", inspected.Config.User)
 	}
@@ -491,15 +603,23 @@ func inspectContainer(name string) (*inspectedContainer, error) {
 func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		output, err := runDocker("inspect", "--format", "{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Status}}{{end}}", name)
+		output, err := runDocker("inspect", "--format", "{{.State.Status}}", name)
 		if err == nil {
 			status := strings.TrimSpace(output)
-			if status == "healthy" || status == "running" {
-				m.updateProgress("verifying", "Final checks", "Final checks", 99)
-				return nil
-			}
 			if status == "unhealthy" || status == "exited" || status == "dead" {
 				return fmt.Errorf("replacement service entered state %s", status)
+			}
+			if status == "running" {
+				health, healthErr := runDocker(
+					"exec", name, "sh", "-c",
+					"curl -fsS http://127.0.0.1/health",
+				)
+				if healthErr == nil &&
+					strings.Contains(health, "\"health\":\"green\"") &&
+					strings.Contains(health, "\"database\":\"green\"") {
+					m.updateProgress("verifying", "Final checks", "Final checks", 99)
+					return nil
+				}
 			}
 		}
 		elapsed := timeout - time.Until(deadline)
@@ -510,16 +630,34 @@ func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 		m.updateProgress("verifying", "Checking updated version", "Checking updated version", progress)
 		time.Sleep(2 * time.Second)
 	}
-	return errors.New("replacement service did not become healthy before timeout")
+	return errors.New("replacement service did not report healthy application and database state before timeout")
 }
 
 func runDocker(args ...string) (string, error) {
 	command := exec.Command("docker", args...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(redactDockerArgs(args), " "), err, strings.TrimSpace(string(output)))
 	}
 	return string(output), nil
+}
+
+func redactDockerArgs(args []string) []string {
+	safe := append([]string(nil), args...)
+	for i := 0; i < len(safe); i++ {
+		if safe[i] == "--env" && i+1 < len(safe) {
+			name := strings.SplitN(safe[i+1], "=", 2)[0]
+			safe[i+1] = name + "=[redacted]"
+			i++
+			continue
+		}
+		if strings.HasPrefix(safe[i], "--env=") {
+			value := strings.TrimPrefix(safe[i], "--env=")
+			name := strings.SplitN(value, "=", 2)[0]
+			safe[i] = "--env=" + name + "=[redacted]"
+		}
+	}
+	return safe
 }
 
 func (m *manager) downloadFile(url, path string, startProgress, endProgress int) error {
@@ -569,6 +707,45 @@ func (m *manager) downloadFile(url, path string, startProgress, endProgress int)
 		if readErr != nil {
 			return readErr
 		}
+	}
+	return nil
+}
+
+func verifySHA256(archivePath, checksumPath string) error {
+	checksumData, err := os.ReadFile(checksumPath)
+	if err != nil {
+		return fmt.Errorf("read checksum file: %w", err)
+	}
+	archive, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("open downloaded archive: %w", err)
+	}
+	defer archive.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, archive); err != nil {
+		return fmt.Errorf("hash downloaded archive: %w", err)
+	}
+	actual := fmt.Sprintf("%x", hash.Sum(nil))
+	expectedName := filepath.Base(archivePath)
+
+	var expected string
+	for _, line := range strings.Split(string(checksumData), "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 2 {
+			continue
+		}
+		name := strings.TrimPrefix(fields[len(fields)-1], "*")
+		if filepath.Base(name) == expectedName || strings.HasSuffix(name, "-source.zip") {
+			expected = strings.ToLower(fields[0])
+			break
+		}
+	}
+	if expected == "" {
+		return errors.New("release checksum file does not contain the source archive")
+	}
+	if !strings.EqualFold(actual, expected) {
+		return fmt.Errorf("source archive checksum mismatch")
 	}
 	return nil
 }
@@ -669,6 +846,7 @@ func (m *manager) buildRelease(root, image, version, commit, buildDate string) e
 		"--progress=plain",
 		"--pull",
 		"--build-arg", "BUILD_JS=1",
+		"--build-arg", "RUN_TESTS=1",
 		"--build-arg", "GO_VERSION=1.26.0",
 		"--build-arg", "GOTIFY_MU_VERSION="+version,
 		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
