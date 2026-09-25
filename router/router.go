@@ -183,10 +183,11 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		conf.LDAP.Enabled, conf.LDAP.IDPName,
 	)
 
-	g.POST("/auth/passkey/login/options", passkeyHandler.LoginOptions)
-	g.POST("/auth/passkey/login/verify", passkeyHandler.LoginVerify)
+	loginRateLimit := security.RateLimitMiddleware(loginLimiter, func(ctx *gin.Context) string { return ctx.ClientIP() })
+	g.POST("/auth/passkey/login/options", loginRateLimit, passkeyHandler.LoginOptions)
+	g.POST("/auth/passkey/login/verify", loginRateLimit, passkeyHandler.LoginVerify)
 	if conf.LDAP.Enabled {
-		g.POST("/auth/ldap/login", ldapHandler.Login)
+		g.POST("/auth/ldap/login", loginRateLimit, ldapHandler.Login)
 	}
 
 	if conf.OIDC.Enabled {
@@ -233,7 +234,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	g.Group("/user").Use(authentication.OptionalAdmin).POST("", userHandler.CreateUser)
 
-	g.POST("/auth/local/login", security.RateLimitMiddleware(loginLimiter, func(ctx *gin.Context) string { return ctx.ClientIP() }), sessionHandler.Login)
+	g.POST("/auth/local/login", loginRateLimit, sessionHandler.Login)
 
 	g.OPTIONS("/*any")
 
