@@ -659,6 +659,7 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 	defer close(stopClose)
 
 	reader := bufio.NewReader(conn)
+	pendingQoS2 := make(map[uint16]struct{})
 	clientID := integration.ClientID
 	if clientID == "" {
 		clientID = "gotify-mu-" + strconv.FormatUint(uint64(integration.ID), 10)
@@ -687,37 +688,46 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 			return err
 		}
 		packetType := header >> 4
-		if packetType != 3 {
+		if packetType == 6 {
+			if len(body) < 2 { return errors.New("invalid MQTT PUBREL packet") }
+			packetID := binary.BigEndian.Uint16(body[:2])
+			_, _ = conn.Write([]byte{0x70, 0x02, byte(packetID >> 8), byte(packetID)})
+			delete(pendingQoS2, packetID)
 			continue
 		}
+		if packetType != 3 { continue }
+
 		topic, payload, packetID, qos, err := decodePublish(header, body)
-		if err != nil {
-			return err
+		if err != nil { return err }
+		shouldPublish := true
+		if qos == 2 {
+			if _, seen := pendingQoS2[packetID]; seen { shouldPublish = false }
 		}
-		title, message, priority := integration.Name, string(payload), 0
-		var object map[string]any
-		if json.Unmarshal(payload, &object) == nil {
-			if value, ok := object["title"].(string); ok && value != "" {
-				title = value
+		if shouldPublish {
+			title, message, priority := integration.Name, string(payload), 0
+			var object map[string]any
+			if json.Unmarshal(payload, &object) == nil {
+				if value, ok := object["title"].(string); ok && value != "" { title = value }
+				if value, ok := object["message"].(string); ok { message = value }
+				if value, ok := numberAsInt(object["priority"]); ok { priority = value }
 			}
-			if value, ok := object["message"].(string); ok {
-				message = value
+			if title == "" { title = topic }
+			if _, err := e.Publish(integration.ApplicationID, title, message, priority); err != nil {
+				log.Error().Err(err).Uint("integration_id", integration.ID).Msg("MQTT message could not be published")
+			} else {
+				e.setIntegrationStatus("mqtt", integration.ID, "connected", "", false, true)
 			}
-			if value, ok := numberAsInt(object["priority"]); ok {
-				priority = value
+		}
+		switch qos {
+		case 1:
+			if packetID != 0 {
+				_, _ = conn.Write([]byte{0x40, 0x02, byte(packetID >> 8), byte(packetID)})
 			}
-		}
-		if title == "" {
-			title = topic
-		}
-		if _, err := e.Publish(integration.ApplicationID, title, message, priority); err != nil {
-			log.Error().Err(err).Uint("integration_id", integration.ID).Msg("MQTT message could not be published")
-		} else {
-			e.setIntegrationStatus("mqtt", integration.ID, "connected", "", false, true)
-		}
-		if qos == 1 && packetID != 0 {
-			ack := []byte{0x40, 0x02, byte(packetID >> 8), byte(packetID)}
-			_, _ = conn.Write(ack)
+		case 2:
+			if packetID != 0 {
+				pendingQoS2[packetID] = struct{}{}
+				_, _ = conn.Write([]byte{0x50, 0x02, byte(packetID >> 8), byte(packetID)})
+			}
 		}
 	}
 }
@@ -806,6 +816,8 @@ func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string) error {
 	return nil
 }
 
+const maxMQTTPacketBytes = 2 * 1024 * 1024
+
 func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 	header, err := reader.ReadByte()
 	if err != nil {
@@ -818,6 +830,9 @@ func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 			return 0, nil, err
 		}
 		remaining += int(value&127) * multiplier
+		if remaining > maxMQTTPacketBytes {
+			return 0, nil, fmt.Errorf("MQTT packet exceeds %d byte limit", maxMQTTPacketBytes)
+		}
 		if value&128 == 0 {
 			body := make([]byte, remaining)
 			_, err = io.ReadFull(reader, body)
