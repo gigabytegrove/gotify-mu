@@ -1,7 +1,10 @@
 package router
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"path/filepath"
@@ -361,28 +364,54 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		ctx.Next()
-
 		method := ctx.Request.Method
-		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
-			return
+		mutation := method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
+		var capturedBody []byte
+		contentType := strings.ToLower(ctx.GetHeader("Content-Type"))
+		if mutation && strings.Contains(contentType, "application/json") && ctx.Request.Body != nil {
+			capturedBody, _ = io.ReadAll(io.LimitReader(ctx.Request.Body, 64*1024))
+			ctx.Request.Body = io.NopCloser(bytes.NewReader(capturedBody))
 		}
-		if ctx.Writer.Status() >= 400 {
-			return
-		}
+
+		ctx.Next()
 
 		path := ctx.FullPath()
 		if path == "" {
 			path = ctx.Request.URL.Path
 		}
-		if !shouldAuditMutation(path) {
+		status := ctx.Writer.Status()
+		authFailure := (status == http.StatusUnauthorized || status == http.StatusForbidden) &&
+			(strings.HasPrefix(path, "/auth/") || strings.TrimSpace(ctx.GetHeader("Authorization")) != "")
+
+		if !shouldAuditMutation(path) && !authFailure {
+			return
+		}
+		if status >= 400 && !authFailure {
 			return
 		}
 
+		action := strings.ToLower(method)
+		if authFailure {
+			action = "authentication_failed"
+		}
+
+		details := map[string]any{
+			"status":    status,
+			"userAgent": ctx.GetHeader("User-Agent"),
+		}
+		if len(capturedBody) > 0 && !authFailure {
+			var payload any
+			if json.Unmarshal(capturedBody, &payload) == nil {
+				details["request"] = redactAuditValue(payload)
+			}
+		}
+		detailJSON, _ := json.Marshal(details)
+
 		event := &model.AuditEvent{
-			Action:    strings.ToLower(method),
+			Action:    action,
 			Target:    path,
 			IPAddress: ctx.ClientIP(),
+			Details:   string(detailJSON),
 		}
 		if id := ctx.Param("id"); id != "" {
 			event.TargetID = id
@@ -401,9 +430,38 @@ func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 	}
 }
 
+func redactAuditValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for key, child := range typed {
+			lower := strings.ToLower(key)
+			if strings.Contains(lower, "password") ||
+				strings.Contains(lower, "token") ||
+				strings.Contains(lower, "secret") ||
+				strings.Contains(lower, "credential") ||
+				strings.Contains(lower, "authorization") ||
+				strings.HasSuffix(lower, "key") {
+				out[key] = "[redacted]"
+				continue
+			}
+			out[key] = redactAuditValue(child)
+		}
+		return out
+	case []any:
+		out := make([]any, len(typed))
+		for i := range typed {
+			out[i] = redactAuditValue(typed[i])
+		}
+		return out
+	default:
+		return value
+	}
+}
+
 func shouldAuditMutation(path string) bool {
 	switch {
-	case path == "/auth/logout":
+	case path == "/auth/logout" || path == "/auth/local/login":
 		return true
 	case path == "/current/user/password":
 		return true
