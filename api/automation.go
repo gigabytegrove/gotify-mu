@@ -59,6 +59,7 @@ type AutomationDatabase interface {
 	SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error
 	GetDigestPolicy(userID uint) (*model.DigestPolicy, error)
 	SaveDigestPolicy(item *model.DigestPolicy) error
+	DeleteDigestItems(userID uint) error
 
 	GetEscalationRules() ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
@@ -67,6 +68,7 @@ type AutomationDatabase interface {
 
 	SetMessageAcknowledgement(userID, messageID uint, acknowledged bool, now time.Time) error
 	IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error)
+	GetMessageAcknowledgements(messageID uint) ([]*model.MessageAcknowledgementView, error)
 }
 
 type AutomationAPI struct {
@@ -415,6 +417,7 @@ type quietHoursParams struct {
 	EndMinute     int    `json:"endMinute"`
 	Timezone      string `json:"timezone"`
 	AllowPriority int    `json:"allowPriority"`
+	Mode          string `json:"mode"`
 }
 
 func (a *AutomationAPI) GetQuietHours(ctx *gin.Context) {
@@ -422,7 +425,7 @@ func (a *AutomationAPI) GetQuietHours(ctx *gin.Context) {
 	item, err := a.DB.GetQuietHoursPolicy(userID)
 	if !successOrAbort(ctx, 500, err) { return }
 	if item == nil {
-		item = &model.QuietHoursPolicy{UserID:userID, StartMinute:1320, EndMinute:420, Timezone:"UTC", AllowPriority:8}
+		item = &model.QuietHoursPolicy{UserID:userID, StartMinute:1320, EndMinute:420, Timezone:"UTC", AllowPriority:8, Mode:"suppress"}
 	}
 	ctx.JSON(200, item)
 }
@@ -436,7 +439,12 @@ func (a *AutomationAPI) SaveQuietHours(ctx *gin.Context) {
 	if _, err := time.LoadLocation(valueOr(params.Timezone, "UTC")); err != nil {
 		ctx.AbortWithError(400, errors.New("invalid timezone")); return
 	}
-	item := &model.QuietHoursPolicy{UserID:auth.GetUserID(ctx), Enabled:params.Enabled, StartMinute:params.StartMinute, EndMinute:params.EndMinute, Timezone:valueOr(params.Timezone,"UTC"), AllowPriority:params.AllowPriority}
+	mode := strings.ToLower(strings.TrimSpace(params.Mode))
+	if mode == "" { mode = "suppress" }
+	if mode != "suppress" && mode != "defer" {
+		ctx.AbortWithError(400, errors.New("quiet-hours mode must be suppress or defer")); return
+	}
+	item := &model.QuietHoursPolicy{UserID:auth.GetUserID(ctx), Enabled:params.Enabled, StartMinute:params.StartMinute, EndMinute:params.EndMinute, Timezone:valueOr(params.Timezone,"UTC"), AllowPriority:params.AllowPriority, Mode:mode}
 	if !successOrAbort(ctx, 500, a.DB.SaveQuietHoursPolicy(item)) { return }
 	ctx.JSON(200, item)
 }
@@ -469,6 +477,9 @@ func (a *AutomationAPI) SaveDigest(ctx *gin.Context) {
 	if params.Enabled {
 		next := time.Now().Add(time.Duration(params.IntervalMinutes)*time.Minute)
 		item.NextRunAt = &next
+	} else {
+		item.NextRunAt = nil
+		if !successOrAbort(ctx, 500, a.DB.DeleteDigestItems(userID)) { return }
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveDigestPolicy(item)) { return }
 	ctx.JSON(200, item)
@@ -524,7 +535,14 @@ func (a *AutomationAPI) GetAcknowledgement(ctx *gin.Context) {
 		if !a.canAccessMessage(ctx, id) { return }
 		value, err := a.DB.IsMessageAcknowledgedByUser(auth.GetUserID(ctx), id)
 		if !successOrAbort(ctx, 500, err) { return }
-		ctx.JSON(200, gin.H{"acknowledged":value})
+		history, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{
+			"acknowledged":value,
+			"acknowledgedByAnyone":len(history) > 0,
+			"acknowledgementCount":len(history),
+			"acknowledgements":history,
+		})
 	})
 }
 
