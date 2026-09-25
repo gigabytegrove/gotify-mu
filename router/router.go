@@ -399,6 +399,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.PUT("/application/:id/security", applicationHandler.UpdateApplicationSecurity)
 		clientElevated.GET("/application/:id/members", applicationMembershipHandler.GetMembers)
 		clientElevated.GET("/application/:id/assignable-users", applicationMembershipHandler.GetAssignableUsers)
+		clientElevated.GET("/application/:id/assignable-groups", applicationMembershipHandler.GetAssignableGroups)
 		clientElevated.GET("/application/:id/groups", applicationMembershipHandler.GetGroupAssignments)
 		clientElevated.POST("/application/:id/groups", applicationMembershipHandler.UpsertGroupAssignment)
 		clientElevated.DELETE("/application/:id/groups/:groupId", applicationMembershipHandler.DeleteGroupAssignment)
