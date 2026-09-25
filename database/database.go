@@ -110,6 +110,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.EscalationRule),
 		new(model.EscalationState),
 		new(model.MessageAcknowledgement),
+		new(model.AutomationLease),
 	); err != nil {
 		return nil, err
 	}
