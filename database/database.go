@@ -111,6 +111,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.AutomationLease),
 		new(model.AutomationRun),
 		new(model.IntegrationStatus),
+		new(model.SecurityPolicy),
 	); err != nil {
 		return nil, err
 	}
