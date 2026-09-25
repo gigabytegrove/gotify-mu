@@ -113,13 +113,15 @@ const Layout = observer(() => {
                                     <Route path="/login" element={<Login />} />
                                     <Route path="/" element={authed(<Dashboard />)} />
                                     <Route path="/messages" element={authed(<Messages />)} />
+                                    <Route path="/channels" element={authed(<Applications />)} />
+                                    <Route path="/channels/:id" element={authed(<Messages />)} />
                                     <Route
                                         path="/messages/:id"
                                         element={authed(<Messages />)}
                                     />
                                     <Route
                                         path="/applications"
-                                        element={authed(<Applications />)}
+                                        element={<Navigate replace to="/channels" />}
                                     />
                                     <Route path="/clients" element={authed(<Clients />)} />
                                     <Route

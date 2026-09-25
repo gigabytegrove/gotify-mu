@@ -30,7 +30,9 @@ const waitForChannel =
 const updateChannel =
     (id: number, data: {name?: string; description?: string}): (() => Promise<void>) =>
     async () => {
-        await page.click(`${card(id)} .edit`);
+        await page.click(`${card(id)} .channel-actions`);
+        await page.waitForSelector('.edit');
+        await page.click('.edit');
         await page.waitForSelector($dialog.selector());
 
         if (data.name) {
@@ -74,7 +76,7 @@ describe('Channels', () => {
     });
 
     it('has changed url', async () => {
-        expect(page.url()).toContain('/applications');
+        expect(page.url()).toContain('/channels');
     });
 
     it('does not have any Channels', async () => {
@@ -110,7 +112,9 @@ describe('Channels', () => {
     });
 
     it('regenerates Channel token', async () => {
-        await page.click(`${card(1)} .regenerate-token`);
+        await page.click(`${card(1)} .channel-actions`);
+        await page.waitForSelector('.regenerate-token');
+        await page.click('.regenerate-token');
         await page.waitForSelector(selector.$confirmDialog.selector());
         await page.click(selector.$confirmDialog.button('.confirm'));
         await waitToDisappear(page, selector.$confirmDialog.selector());
@@ -123,7 +127,9 @@ describe('Channels', () => {
     });
 
     it('deletes Channel', async () => {
-        await page.click(`${card(2)} .delete`);
+        await page.click(`${card(2)} .channel-actions`);
+        await page.waitForSelector('.delete');
+        await page.click('.delete');
         await page.waitForSelector(selector.$confirmDialog.selector());
         await page.click(selector.$confirmDialog.button('.confirm'));
     });

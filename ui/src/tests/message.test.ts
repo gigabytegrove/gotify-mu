@@ -88,7 +88,7 @@ describe('Messages', () => {
     });
     it('changes url when navigating to application', async () => {
         await navigate('Windows');
-        expect(page.url()).toContain('/messages/1');
+        expect(page.url()).toContain('/channels/1');
         await navigate('All Messages');
     });
     it('has no messages', async () => {

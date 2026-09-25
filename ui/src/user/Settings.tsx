@@ -15,6 +15,7 @@ import {
 import DarkMode from '@mui/icons-material/DarkMode';
 import Security from '@mui/icons-material/Security';
 import Key from '@mui/icons-material/Key';
+import VpnKey from '@mui/icons-material/VpnKey';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
 import ElevationForm from '../common/ElevationForm';
@@ -78,6 +79,24 @@ const Settings = ({themeMode, setTheme}: IProps) => (
                     features. They are not enabled by this UI rewrite.
                 </Alert>
             </Stack>
+        </SurfaceCard>
+
+        <SurfaceCard
+            title="Planned Security"
+            subtitle="Authentication capabilities tracked for future Gotify MU releases."
+            action={<VpnKey color="action" />}>
+            <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap>
+                <Chip label="TOTP MFA" variant="outlined" />
+                <Chip label="Recovery Codes" variant="outlined" />
+                <Chip label="WebAuthn / Passkeys" variant="outlined" />
+                <Chip label="LDAP / Active Directory" variant="outlined" />
+                <Chip label="MFA Enforcement" variant="outlined" />
+                <Chip label="Security Audit Log" variant="outlined" />
+            </Stack>
+            <Typography variant="body2" color="text.secondary" sx={{mt: 2}}>
+                These controls are roadmap items only. Existing local and OIDC authentication
+                behavior remains unchanged until the corresponding backend support is implemented.
+            </Typography>
         </SurfaceCard>
 
         <SurfaceCard
