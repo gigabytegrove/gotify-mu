@@ -44,6 +44,10 @@ type Notifier interface {
 	Notify(userID uint, message *model.MessageExternal)
 }
 
+type Dispatcher interface {
+	StoreAndDeliver(message *model.Message) (*model.MessageExternal, error)
+}
+
 // Manager is an encapsulating layer for plugins and manages all plugins and its instances.
 type Manager struct {
 	mutex     *sync.RWMutex
@@ -52,7 +56,8 @@ type Manager struct {
 	messages  chan MessageWithUserID
 	db        Database
 	mux       *gin.RouterGroup
-	directory string
+	directory  string
+	dispatcher Dispatcher
 }
 
 // NewManager created a Manager from configurations.
@@ -80,7 +85,26 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 			if message.Message.Extras != nil {
 				internalMsg.Extras, _ = json.Marshal(message.Message.Extras)
 			}
-			db.CreateMessage(internalMsg)
+
+			manager.mutex.RLock()
+			dispatcher := manager.dispatcher
+			manager.mutex.RUnlock()
+			if dispatcher != nil {
+				external, err := dispatcher.StoreAndDeliver(internalMsg)
+				if err != nil {
+					log.Error().Err(err).Uint("user_id", message.UserID).Msg("Plugin notification delivery failed")
+					continue
+				}
+				if external != nil {
+					message.Message.ID = external.ID
+				}
+				continue
+			}
+
+			if err := db.CreateMessage(internalMsg); err != nil {
+				log.Error().Err(err).Uint("user_id", message.UserID).Msg("Plugin notification storage failed")
+				continue
+			}
 			message.Message.ID = internalMsg.ID
 			notifier.Notify(message.UserID, &message.Message)
 		}
@@ -219,6 +243,13 @@ func (m *Manager) InstallPlugin(filename string, source io.Reader) (compat.Info,
 		Msg("Installed plugin from Web UI")
 
 	return info, warnings, nil
+}
+
+// SetDispatcher routes plugin notifications through Gotify MU's shared delivery policy engine.
+func (m *Manager) SetDispatcher(dispatcher Dispatcher) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.dispatcher = dispatcher
 }
 
 // SetPluginEnabled sets the plugins enabled state.
