@@ -117,6 +117,12 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.AutomationLease),
 		new(model.SystemSetting),
 		new(model.UserMFA),
+		new(model.EmailGateway),
+		new(model.SMTPRoute),
+		new(model.RSSMonitor),
+		new(model.SyslogRoute),
+		new(model.CalendarMonitor),
+		new(model.ConnectorSeenItem),
 	); err != nil {
 		return nil, err
 	}
