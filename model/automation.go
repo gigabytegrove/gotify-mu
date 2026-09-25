@@ -127,6 +127,7 @@ type QuietHoursPolicy struct {
 	EndMinute     int       `json:"endMinute"`
 	Timezone      string    `gorm:"type:text" json:"timezone"`
 	AllowPriority int       `json:"allowPriority"`
+	Mode          string    `gorm:"type:varchar(16)" json:"mode"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
@@ -184,5 +185,29 @@ type EscalationState struct {
 type MessageAcknowledgement struct {
 	UserID         uint      `gorm:"primaryKey;autoIncrement:false" json:"userId"`
 	MessageID      uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
+	AcknowledgedAt time.Time `json:"acknowledgedAt"`
+}
+
+
+// DeferredNotification queues one realtime notification until Quiet Hours end.
+type DeferredNotification struct {
+	UserID    uint      `gorm:"primaryKey;autoIncrement:false" json:"userId"`
+	MessageID uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+// AutomationLease elects one active worker for schedulers and persistent integrations.
+type AutomationLease struct {
+	Name      string    `gorm:"primaryKey;type:varchar(220)" json:"name"`
+	Holder    string    `gorm:"type:varchar(96);index" json:"holder"`
+	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+// MessageAcknowledgementView is the user-facing acknowledgement history for a message.
+type MessageAcknowledgementView struct {
+	UserID         uint      `json:"userId"`
+	Username       string    `json:"username"`
+	DisplayName    string    `json:"displayName,omitempty"`
 	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }
