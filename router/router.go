@@ -140,6 +140,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		DatabaseDialect: conf.Database.Dialect,
 		DatabaseConnection: conf.Database.Connection,
 		DataPaths: []string{conf.UploadedImagesDir, conf.PluginsDir, filepath.Dir(conf.Database.Connection)},
+		UploadedImagesDir: conf.UploadedImagesDir,
+		PluginsDir: conf.PluginsDir,
 		Version: vInfo,
 	}
 
@@ -367,6 +369,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.DELETE("/operations/sessions/:id", operationsHandler.RevokeSession)
 		adminPlatform.GET("/operations/stats", operationsHandler.Stats)
 		adminPlatform.GET("/operations/diagnostics", operationsHandler.Diagnostics)
+		adminPlatform.GET("/operations/backup", operationsHandler.Backup)
+		adminPlatform.POST("/operations/restore", operationsHandler.StageRestore)
 
 		adminPlatform.GET("/security/policy", securityPolicyHandler.Get)
 		adminPlatform.PUT("/security/policy", securityPolicyHandler.Save)
