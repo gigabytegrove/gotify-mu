@@ -145,16 +145,20 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
-	keyPath := os.Getenv("GOTIFY_MU_SECRET_KEY_FILE")
-	if keyPath == "" {
-		switch {
-		case dialect == "sqlite3" && !strings.HasPrefix(connection, "file:"):
-			keyPath = filepath.Join(filepath.Dir(connection), "secret.key")
-		default:
-			keyPath = filepath.Join("data", "secret.key")
+	var secrets *secretstore.Store
+	if dialect == "sqlite3" && strings.HasPrefix(connection, "file:") && strings.Contains(connection, "mode=memory") {
+		secrets, err = secretstore.NewEphemeral()
+	} else {
+		keyPath := os.Getenv("GOTIFY_MU_SECRET_KEY_FILE")
+		if keyPath == "" {
+			if dialect == "sqlite3" && !strings.HasPrefix(connection, "file:") {
+				keyPath = filepath.Join(filepath.Dir(connection), "secret.key")
+			} else {
+				keyPath = filepath.Join("data", "secret.key")
+			}
 		}
+		secrets, err = secretstore.Open(keyPath)
 	}
-	secrets, err := secretstore.Open(keyPath)
 	if err != nil {
 		return nil, err
 	}
