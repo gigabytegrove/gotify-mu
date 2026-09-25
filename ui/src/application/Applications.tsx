@@ -4,6 +4,12 @@ import Button from '@mui/material/Button';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Alert from '@mui/material/Alert';
+import Chip from '@mui/material/Chip';
+import InputAdornment from '@mui/material/InputAdornment';
+import TextField from '@mui/material/TextField';
+import ToggleButton from '@mui/material/ToggleButton';
+import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
+import Search from '@mui/icons-material/Search';
 import {
     DndContext,
     closestCenter,
@@ -39,6 +45,22 @@ const Applications = observer(() => {
     const [createDialog, setCreateDialog] = useState(false);
     const [toManageMembersApp, setToManageMembersApp] = useState<IApplication>();
     const [toClearHistoryApp, setToClearHistoryApp] = useState<IApplication>();
+    const [query, setQuery] = useState('');
+    const [filter, setFilter] = useState<'all' | 'global' | 'muted'>('all');
+
+    const normalizedQuery = query.trim().toLowerCase();
+    const filteredApps = apps.filter((app) => {
+        if (filter === 'global' && !app.autoAssign) return false;
+        if (filter === 'muted' && app.receiveNotifications !== false) return false;
+        if (!normalizedQuery) return true;
+
+        return (
+            app.name.toLowerCase().includes(normalizedQuery) ||
+            app.description.toLowerCase().includes(normalizedQuery)
+        );
+    });
+    const globalCount = apps.filter((app) => app.autoAssign).length;
+    const mutedCount = apps.filter((app) => app.receiveNotifications === false).length;
 
     const fileInputRef = useRef<HTMLInputElement>(null);
     const uploadId = useRef(-1);
@@ -96,64 +118,113 @@ const Applications = observer(() => {
                     </Stack>
                 ) : (
                     <>
-                        <Typography variant="body2" color="text.secondary" sx={{mb: 2}}>
-                            Owners and administrators can drag Channels to change their order.
-                            Destructive actions are grouped under each Channel's action menu.
-                        </Typography>
-                        <DndContext
-                            sensors={sensors}
-                            collisionDetection={closestCenter}
-                            onDragEnd={handleDragEnd}>
-                            <SortableContext
-                                items={apps.map((app) => app.id)}
-                                strategy={verticalListSortingStrategy}>
-                                <Grid container spacing={1.5}>
-                                    {apps.map((app) => {
-                                        const canManage =
-                                            currentUser.user.admin ||
-                                            app.ownerId === currentUser.user.id;
-                                        const canDeleteChannel =
-                                            currentUser.user.admin || !app.autoAssign;
-                                        const canClearHistory =
-                                            currentUser.user.admin ||
-                                            (!app.autoAssign &&
-                                                app.ownerId === currentUser.user.id);
+                        <Stack
+                            direction={{xs: 'column', md: 'row'}}
+                            spacing={1.25}
+                            sx={{mb: 1.5, justifyContent: 'space-between'}}>
+                            <TextField
+                                value={query}
+                                onChange={(event) => setQuery(event.target.value)}
+                                placeholder="Search Channels"
+                                aria-label="Search Channels"
+                                sx={{width: {xs: '100%', md: 320}}}
+                                slotProps={{
+                                    input: {
+                                        startAdornment: (
+                                            <InputAdornment position="start">
+                                                <Search fontSize="small" />
+                                            </InputAdornment>
+                                        ),
+                                    },
+                                }}
+                            />
+                            <ToggleButtonGroup
+                                size="small"
+                                exclusive
+                                value={filter}
+                                onChange={(_event, value) => value && setFilter(value)}
+                                aria-label="Channel filter">
+                                <ToggleButton value="all">All {apps.length}</ToggleButton>
+                                <ToggleButton value="global">Global {globalCount}</ToggleButton>
+                                <ToggleButton value="muted">Muted {mutedCount}</ToggleButton>
+                            </ToggleButtonGroup>
+                        </Stack>
 
-                                        return (
-                                            <Grid key={app.id} size={12}>
-                                                <ChannelCard
-                                                    app={app}
-                                                    canManage={canManage}
-                                                    canDeleteChannel={canDeleteChannel}
-                                                    canClearHistory={canClearHistory}
-                                                    fEdit={() => setToUpdateApp(app)}
-                                                    fMembers={() => setToManageMembersApp(app)}
-                                                    fToggleNotifications={() =>
-                                                        void appStore.setNotifications(
-                                                            app.id,
-                                                            app.receiveNotifications === false
-                                                        )
-                                                    }
-                                                    fRegenerateToken={() =>
-                                                        setToRegenerateTokenApp(app)
-                                                    }
-                                                    fUpload={() =>
-                                                        handleImageUploadClick(app.id)
-                                                    }
-                                                    fDeleteImage={() =>
-                                                        setToDeleteImage(app)
-                                                    }
-                                                    fClearHistory={() =>
-                                                        setToClearHistoryApp(app)
-                                                    }
-                                                    fDelete={() => setToDeleteApp(app)}
-                                                />
-                                            </Grid>
-                                        );
-                                    })}
-                                </Grid>
-                            </SortableContext>
-                        </DndContext>
+                        <Stack
+                            direction="row"
+                            spacing={0.75}
+                            useFlexGap
+                            sx={{mb: 1.5, flexWrap: 'wrap', alignItems: 'center'}}>
+                            <Chip
+                                size="small"
+                                variant="outlined"
+                                label={`${filteredApps.length} shown`}
+                            />
+                            <Typography variant="caption" color="text.secondary">
+                                Drag Channels to reorder them. Use the action menu for advanced
+                                management.
+                            </Typography>
+                        </Stack>
+
+                        {filteredApps.length === 0 ? (
+                            <Typography color="text.secondary" sx={{py: 3, textAlign: 'center'}}>
+                                No Channels match this search or filter.
+                            </Typography>
+                        ) : (
+                            <DndContext
+                                sensors={sensors}
+                                collisionDetection={closestCenter}
+                                onDragEnd={handleDragEnd}>
+                                <SortableContext
+                                    items={filteredApps.map((app) => app.id)}
+                                    strategy={verticalListSortingStrategy}>
+                                    <Grid container spacing={1}>
+                                        {filteredApps.map((app) => {
+                                            const isOwner = app.ownerId === currentUser.user.id;
+                                            const canManage = currentUser.user.admin || isOwner;
+                                            const canDeleteChannel =
+                                                currentUser.user.admin || !app.autoAssign;
+                                            const canClearHistory =
+                                                currentUser.user.admin ||
+                                                (!app.autoAssign && isOwner);
+
+                                            return (
+                                                <Grid key={app.id} size={12}>
+                                                    <ChannelCard
+                                                        app={app}
+                                                        canManage={canManage}
+                                                        isOwner={isOwner}
+                                                        canDeleteChannel={canDeleteChannel}
+                                                        canClearHistory={canClearHistory}
+                                                        fEdit={() => setToUpdateApp(app)}
+                                                        fMembers={() => setToManageMembersApp(app)}
+                                                        fToggleNotifications={() =>
+                                                            void appStore.setNotifications(
+                                                                app.id,
+                                                                app.receiveNotifications === false
+                                                            )
+                                                        }
+                                                        fRegenerateToken={() =>
+                                                            setToRegenerateTokenApp(app)
+                                                        }
+                                                        fUpload={() =>
+                                                            handleImageUploadClick(app.id)
+                                                        }
+                                                        fDeleteImage={() =>
+                                                            setToDeleteImage(app)
+                                                        }
+                                                        fClearHistory={() =>
+                                                            setToClearHistoryApp(app)
+                                                        }
+                                                        fDelete={() => setToDeleteApp(app)}
+                                                    />
+                                                </Grid>
+                                            );
+                                        })}
+                                    </Grid>
+                                </SortableContext>
+                            </DndContext>
+                        )}
                     </>
                 )}
 
