@@ -148,6 +148,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		DB:            db,
 		ImageDir:      conf.UploadedImagesDir,
 		NotifyDeleted: streamHandler.NotifyDeletedClient,
+		ConnectedClients: streamHandler.ConnectedClientCount,
 	}
 	applicationHandler := api.ApplicationAPI{
 		DB:       db,
