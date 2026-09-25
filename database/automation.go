@@ -265,6 +265,16 @@ func (d *GormDatabase) GetIntegrationStatuses() ([]*model.IntegrationStatus, err
 	return items, d.DB.Order("kind asc, object_id asc").Find(&items).Error
 }
 
+func (d *GormDatabase) GetIntegrationStatus(kind string, objectID uint) (*model.IntegrationStatus, error) {
+	item := new(model.IntegrationStatus)
+	if err := d.DB.Where("kind = ? AND object_id = ?", kind, objectID).First(item).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) { return nil, nil }
+		return nil, err
+	}
+	return item, nil
+}
+
+
 func (d *GormDatabase) DeleteIntegrationStatus(kind string, objectID uint) error {
 	return d.DB.Where("kind = ? AND object_id = ?", kind, objectID).Delete(&model.IntegrationStatus{}).Error
 }
