@@ -50,6 +50,17 @@ func (a *API) CollectConnectedClientTokens() []string {
 	return uniq(clients)
 }
 
+// ConnectedClientCount returns the number of active WebSocket connections.
+func (a *API) ConnectedClientCount() int {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	count := 0
+	for _, clients := range a.clients {
+		count += len(clients)
+	}
+	return count
+}
+
 // NotifyDeletedUser closes existing connections for the given user.
 func (a *API) NotifyDeletedUser(userID uint) error {
 	a.lock.Lock()
