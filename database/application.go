@@ -77,10 +77,29 @@ func (d *GormDatabase) DeleteApplicationByID(id uint) error {
 	if err := d.DeleteMessagesByApplication(id); err != nil {
 		return err
 	}
-	if err := d.DB.Where("application_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil {
-		return err
-	}
-	return d.DB.Where("id = ?", id).Delete(&model.Application{}).Error
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		var escalationRuleIDs []uint
+		if err := tx.Model(&model.EscalationRule{}).
+			Where("source_application_id = ? OR target_application_id = ?", id, id).
+			Pluck("id", &escalationRuleIDs).Error; err != nil {
+			return err
+		}
+		if len(escalationRuleIDs) > 0 {
+			if err := tx.Where("rule_id IN ?", escalationRuleIDs).Delete(&model.EscalationState{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", escalationRuleIDs).Delete(&model.EscalationRule{}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("application_id = ?", id).Delete(&model.WebhookRoute{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.MQTTIntegration{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.HomeAssistantIntegration{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.ScheduledNotification{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil { return err }
+		return tx.Where("id = ?", id).Delete(&model.Application{}).Error
+	})
 }
 
 // GetApplicationsByUser returns all applications from a user.
