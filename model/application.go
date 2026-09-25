@@ -52,6 +52,8 @@ type Application struct {
 	//
 	// read only: true
 	ReceiveNotifications *bool `gorm:"-" json:"receiveNotifications,omitempty"`
+	// Effective role of the current requesting user on this Channel.
+	CurrentRole string `gorm:"-" json:"role,omitempty"`
 	// The image of the application.
 	//
 	// read only: true
