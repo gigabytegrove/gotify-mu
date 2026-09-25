@@ -130,7 +130,7 @@ export const UpdateStatusCard = () => {
     const currentVersion = current.version;
     const [updater, setUpdater] = React.useState<UpdaterStatus>();
     const [installing, setInstalling] = React.useState(false);
-    const updaterRef = React.useRef<UpdaterStatus>();
+    const updaterRef = React.useRef<UpdaterStatus | undefined>(undefined);
     const updateStartedHere = React.useRef(false);
     const sawActiveUpdate = React.useRef(false);
     const reloadScheduled = React.useRef(false);
