@@ -6,6 +6,31 @@ import (
 	"gorm.io/gorm/clause"
 )
 
+
+func (d *GormDatabase) markAcknowledged(userID uint, messages []*model.Message) error {
+	if len(messages) == 0 {
+		return nil
+	}
+	ids := make([]uint, 0, len(messages))
+	for _, message := range messages {
+		ids = append(ids, message.ID)
+	}
+	var acknowledged []uint
+	if err := d.DB.Model(&model.MessageAcknowledgement{}).
+		Where("user_id = ? AND message_id IN ?", userID, ids).
+		Pluck("message_id", &acknowledged).Error; err != nil {
+		return err
+	}
+	set := make(map[uint]struct{}, len(acknowledged))
+	for _, id := range acknowledged {
+		set[id] = struct{}{}
+	}
+	for _, message := range messages {
+		_, message.Acknowledged = set[message.ID]
+	}
+	return nil
+}
+
 func visibleMessages(db *gorm.DB, userID uint) *gorm.DB {
 	return db.Joins("JOIN application_memberships AS am ON am.application_id = messages.application_id AND am.user_id = ?", userID).
 		Joins("LEFT JOIN message_dismissals AS md ON md.message_id = messages.id AND md.user_id = ?", userID).
@@ -76,6 +101,9 @@ func (d *GormDatabase) GetArchivedMessagesByUserSince(
 	if err == gorm.ErrRecordNotFound {
 		err = nil
 	}
+	if err == nil {
+		err = d.markAcknowledged(userID, messages)
+	}
 	return messages, err
 }
 
@@ -117,6 +145,9 @@ func (d *GormDatabase) GetMessagesByApplicationForUserSince(userID, appID uint, 
 	if err == gorm.ErrRecordNotFound {
 		err = nil
 	}
+	if err == nil {
+		err = d.markAcknowledged(userID, messages)
+	}
 	return messages, err
 }
 
@@ -138,6 +169,9 @@ func (d *GormDatabase) GetArchivedMessagesByApplicationForUserSince(
 	err := db.Find(&messages).Error
 	if err == gorm.ErrRecordNotFound {
 		err = nil
+	}
+	if err == nil {
+		err = d.markAcknowledged(userID, messages)
 	}
 	return messages, err
 }
@@ -274,10 +308,13 @@ func (d *GormDatabase) DismissMessagesByApplicationForUser(userID, applicationID
 
 // DeleteMessageByID deletes a message by its id.
 func (d *GormDatabase) DeleteMessageByID(id uint) error {
-	if err := d.DB.Where("message_id = ?", id).Delete(&model.MessageDismissal{}).Error; err != nil {
-		return err
-	}
-	return d.DB.Where("id = ?", id).Delete(&model.Message{}).Error
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("message_id = ?", id).Delete(&model.MessageDismissal{}).Error; err != nil { return err }
+		if err := tx.Where("message_id = ?", id).Delete(&model.MessageAcknowledgement{}).Error; err != nil { return err }
+		if err := tx.Where("message_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
+		if err := tx.Where("message_id = ?", id).Delete(&model.EscalationState{}).Error; err != nil { return err }
+		return tx.Where("id = ?", id).Delete(&model.Message{}).Error
+	})
 }
 
 // DeleteMessagesByApplication deletes all messages from an application.
