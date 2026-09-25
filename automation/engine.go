@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -31,6 +33,7 @@ type Notifier interface {
 // Database is the storage contract required by the native integration engine.
 type Database interface {
 	CreateMessage(message *model.Message) error
+	CreateMessageOnce(message *model.Message) (bool, error)
 	GetMessageByID(id uint) (*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
@@ -53,6 +56,12 @@ type Database interface {
 	GetDueEscalations(now time.Time) ([]*model.EscalationState, error)
 	SaveEscalationState(item *model.EscalationState) error
 	IsMessageAcknowledged(messageID uint) (bool, error)
+	QueueDeferredNotification(userID, messageID uint) error
+	GetDeferredNotifications() ([]*model.DeferredNotification, error)
+	DeleteDeferredNotification(userID, messageID uint) error
+	GetOrCreateDigestApplication(userID uint) (*model.Application, error)
+	TryAcquireAutomationLease(name, holder string, now time.Time, ttl time.Duration) (bool, error)
+	ReleaseAutomationLease(name, holder string) error
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
@@ -72,16 +81,20 @@ type Engine struct {
 	integrationCancels []context.CancelFunc
 	integrationWG      sync.WaitGroup
 	reload             chan struct{}
+	instanceID         string
 }
 
 func New(db Database, notifier Notifier) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
+	instanceBytes := make([]byte, 12)
+	_, _ = rand.Read(instanceBytes)
 	e := &Engine{
 		db: db,
 		notifier: notifier,
 		ctx: ctx,
 		cancel: cancel,
 		reload: make(chan struct{}, 1),
+		instanceID: hex.EncodeToString(instanceBytes),
 	}
 	e.wg.Add(2)
 	go e.schedulerLoop()
@@ -136,14 +149,16 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 	if msg.Date.IsZero() {
 		msg.Date = time.Now()
 	}
-	if err := e.db.CreateMessage(msg); err != nil {
-		return nil, err
+	created, err := e.db.CreateMessageOnce(msg)
+	if err != nil { return nil, err }
+	external := externalMessage(msg)
+	if !created {
+		return external, nil
 	}
 	recipients, err := e.db.GetApplicationRecipientUserIDs(msg.ApplicationID)
 	if err != nil {
 		return nil, err
 	}
-	external := externalMessage(msg)
 	for _, userID := range recipients {
 		if err := e.deliver(userID, msg, external); err != nil {
 			log.Error().Err(err).Uint("user_id", userID).Uint("message_id", msg.ID).Msg("Could not apply delivery policy")
@@ -179,6 +194,9 @@ func (e *Engine) deliver(userID uint, msg *model.Message, external *model.Messag
 		return err
 	}
 	if quiet != nil && quiet.Enabled && msg.Priority < quiet.AllowPriority && quietNow(quiet, time.Now()) {
+		if strings.EqualFold(quiet.Mode, "defer") {
+			return e.db.QueueDeferredNotification(userID, msg.ID)
+		}
 		return nil
 	}
 
@@ -231,13 +249,22 @@ func (e *Engine) schedulerLoop() {
 	defer e.wg.Done()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	e.runDue(time.Now())
+	run := func(now time.Time) {
+		acquired, err := e.db.TryAcquireAutomationLease("scheduler", e.instanceID, now, 25*time.Second)
+		if err != nil {
+			log.Error().Err(err).Msg("Could not acquire automation scheduler lease")
+			return
+		}
+		if acquired { e.runDue(now) }
+	}
+	run(time.Now())
 	for {
 		select {
 		case <-e.ctx.Done():
+			_ = e.db.ReleaseAutomationLease("scheduler", e.instanceID)
 			return
 		case now := <-ticker.C:
-			e.runDue(now)
+			run(now)
 		}
 	}
 }
@@ -246,6 +273,7 @@ func (e *Engine) runDue(now time.Time) {
 	e.runSchedules(now)
 	e.runDigests(now)
 	e.runEscalations(now)
+	e.runDeferred(now)
 }
 
 func (e *Engine) runSchedules(now time.Time) {
@@ -255,7 +283,17 @@ func (e *Engine) runSchedules(now time.Time) {
 		return
 	}
 	for _, item := range items {
-		if _, err := e.Publish(item.ApplicationID, item.Title, item.Message, item.Priority); err != nil {
+		scheduledFor := now
+		if item.NextRunAt != nil { scheduledFor = *item.NextRunAt }
+		msg := &model.Message{
+			ApplicationID:item.ApplicationID,
+			Title:item.Title,
+			Message:item.Message,
+			Priority:item.Priority,
+			Date:now,
+			DeduplicationKey:fmt.Sprintf("schedule:%d:%d", item.ID, scheduledFor.UnixNano()),
+		}
+		if _, err := e.storeAndDeliver(msg, true); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
 			continue
 		}
@@ -333,41 +371,80 @@ func (e *Engine) runDigests(now time.Time) {
 			lines := make([]string, 0, len(items))
 			highest := 0
 			for _, item := range items {
-				if item.Priority > highest {
-					highest = item.Priority
-				}
+				if item.Priority > highest { highest = item.Priority }
 				line := item.Title
-				if strings.TrimSpace(line) == "" {
-					line = item.Message
-				}
-				if len(line) > 120 {
-					line = line[:117] + "..."
-				}
+				if strings.TrimSpace(line) == "" { line = item.Message }
+				if len(line) > 120 { line = line[:117] + "..." }
 				lines = append(lines, "• "+line)
 			}
-			last := items[len(items)-1]
-			e.notifier.Notify(policy.UserID, &model.MessageExternal{
-				ID: last.MessageID,
-				ApplicationID: last.ApplicationID,
-				Title: fmt.Sprintf("%d notification digest", len(items)),
-				Message: strings.Join(lines, "\n"),
-				Priority: &highest,
-				Date: now,
-			})
+			app, appErr := e.db.GetOrCreateDigestApplication(policy.UserID)
+			if appErr != nil {
+				log.Error().Err(appErr).Uint("user_id", policy.UserID).Msg("Could not prepare digest history")
+				continue
+			}
+			runKey := now.UnixNano()
+			if policy.NextRunAt != nil { runKey = policy.NextRunAt.UnixNano() }
+			summary := &model.Message{
+				ApplicationID:app.ID,
+				Title:fmt.Sprintf("%d notification digest", len(items)),
+				Message:strings.Join(lines, "\n"),
+				Priority:highest,
+				Date:now,
+				DeduplicationKey:fmt.Sprintf("digest:%d:%d", policy.UserID, runKey),
+			}
+			created, storeErr := e.db.CreateMessageOnce(summary)
+			if storeErr != nil {
+				log.Error().Err(storeErr).Uint("user_id", policy.UserID).Msg("Could not store digest")
+				continue
+			}
+			if created {
+				quiet, quietErr := e.db.GetQuietHoursPolicy(policy.UserID)
+				if quietErr != nil {
+					log.Error().Err(quietErr).Uint("user_id", policy.UserID).Msg("Could not evaluate digest quiet hours")
+				} else if quiet == nil || !quiet.Enabled || highest >= quiet.AllowPriority || !quietNow(quiet, now) {
+					e.notifier.Notify(policy.UserID, externalMessage(summary))
+				} else if strings.EqualFold(quiet.Mode, "defer") {
+					_ = e.db.QueueDeferredNotification(policy.UserID, summary.ID)
+				}
+			}
 			if err := e.db.DeleteDigestItems(policy.UserID); err != nil {
 				log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not clear digest")
+				continue
 			}
 		}
 		lastSent := now
 		policy.LastSentAt = &lastSent
 		interval := policy.IntervalMinutes
-		if interval < 15 {
-			interval = 15
-		}
+		if interval < 15 { interval = 15 }
 		next := now.Add(time.Duration(interval) * time.Minute)
 		policy.NextRunAt = &next
 		if err := e.db.SaveDigestPolicy(policy); err != nil {
 			log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not update digest policy")
+		}
+	}
+}
+
+func (e *Engine) runDeferred(now time.Time) {
+	items, err := e.db.GetDeferredNotifications()
+	if err != nil {
+		log.Error().Err(err).Msg("Could not load deferred notifications")
+		return
+	}
+	for _, item := range items {
+		quiet, quietErr := e.db.GetQuietHoursPolicy(item.UserID)
+		if quietErr != nil {
+			log.Error().Err(quietErr).Uint("user_id", item.UserID).Msg("Could not inspect deferred Quiet Hours")
+			continue
+		}
+		if quiet != nil && quiet.Enabled && quietNow(quiet, now) { continue }
+		msg, msgErr := e.db.GetMessageByID(item.MessageID)
+		if msgErr != nil {
+			log.Error().Err(msgErr).Uint("message_id", item.MessageID).Msg("Could not load deferred message")
+			continue
+		}
+		if msg != nil { e.notifier.Notify(item.UserID, externalMessage(msg)) }
+		if err := e.db.DeleteDeferredNotification(item.UserID, item.MessageID); err != nil {
+			log.Error().Err(err).Uint("message_id", item.MessageID).Msg("Could not clear deferred notification")
 		}
 	}
 }
@@ -400,7 +477,14 @@ func (e *Engine) runEscalations(now time.Time) {
 						title = "Escalated: " + title
 					}
 					body := msg.Message + "\n\nThis notification was escalated because it was not acknowledged."
-					escalated := &model.Message{ApplicationID:rule.TargetApplicationID,Title:title,Message:body,Priority:msg.Priority,Date:time.Now()}
+					escalated := &model.Message{
+						ApplicationID:rule.TargetApplicationID,
+						Title:title,
+						Message:body,
+						Priority:msg.Priority,
+						Date:time.Now(),
+						DeduplicationKey:fmt.Sprintf("escalation:%d", state.ID),
+					}
 					if _, publishErr := e.storeAndDeliver(escalated, false); publishErr != nil {
 						log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
 						continue
@@ -483,19 +567,55 @@ func (e *Engine) restartIntegrations() {
 }
 
 func (e *Engine) runMQTTLoop(ctx context.Context, integration *model.MQTTIntegration) {
+	leaseName := fmt.Sprintf("mqtt:%d", integration.ID)
 	for {
-		if ctx.Err() != nil {
-			return
-		}
-		if err := e.runMQTT(ctx, integration); err != nil && ctx.Err() == nil {
+		if ctx.Err() != nil { return }
+		err := e.runWithLease(ctx, leaseName, func(leaseCtx context.Context) error {
+			return e.runMQTT(leaseCtx, integration)
+		})
+		if err != nil && !errors.Is(err, errLeaseUnavailable) && ctx.Err() == nil {
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("MQTT connection interrupted")
 		}
 		select {
-		case <-ctx.Done():
-			return
+		case <-ctx.Done(): return
 		case <-time.After(10 * time.Second):
 		}
 	}
+}
+
+var errLeaseUnavailable = errors.New("automation lease unavailable")
+
+func (e *Engine) runWithLease(ctx context.Context, name string, work func(context.Context) error) error {
+	acquired, err := e.db.TryAcquireAutomationLease(name, e.instanceID, time.Now(), 30*time.Second)
+	if err != nil { return err }
+	if !acquired { return errLeaseUnavailable }
+
+	leaseCtx, cancel := context.WithCancel(ctx)
+	stop := make(chan struct{})
+	go func() {
+		ticker := time.NewTicker(10 * time.Second)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-leaseCtx.Done():
+				return
+			case <-stop:
+				return
+			case now := <-ticker.C:
+				ok, leaseErr := e.db.TryAcquireAutomationLease(name, e.instanceID, now, 30*time.Second)
+				if leaseErr != nil || !ok {
+					cancel()
+					return
+				}
+			}
+		}
+	}()
+
+	workErr := work(leaseCtx)
+	close(stop)
+	cancel()
+	_ = e.db.ReleaseAutomationLease(name, e.instanceID)
+	return workErr
 }
 
 func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration) error {
@@ -762,16 +882,17 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 }
 
 func (e *Engine) runHomeAssistantLoop(ctx context.Context, integration *model.HomeAssistantIntegration) {
+	leaseName := fmt.Sprintf("home-assistant:%d", integration.ID)
 	for {
-		if ctx.Err() != nil {
-			return
-		}
-		if err := e.runHomeAssistant(ctx, integration); err != nil && ctx.Err() == nil {
+		if ctx.Err() != nil { return }
+		err := e.runWithLease(ctx, leaseName, func(leaseCtx context.Context) error {
+			return e.runHomeAssistant(leaseCtx, integration)
+		})
+		if err != nil && !errors.Is(err, errLeaseUnavailable) && ctx.Err() == nil {
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("Home Assistant connection interrupted")
 		}
 		select {
-		case <-ctx.Done():
-			return
+		case <-ctx.Done(): return
 		case <-time.After(10 * time.Second):
 		}
 	}
@@ -877,6 +998,10 @@ func externalMessage(msg *model.Message) *model.MessageExternal {
 		SenderUserID: msg.SenderUserID,
 		SenderName: msg.SenderName,
 		Acknowledged: msg.Acknowledged,
+		AcknowledgedByAnyone: msg.AcknowledgedByAnyone,
+		AcknowledgementCount: msg.AcknowledgementCount,
+		LastAcknowledgedBy: msg.LastAcknowledgedBy,
+		LastAcknowledgedAt: msg.LastAcknowledgedAt,
 	}
 }
 
