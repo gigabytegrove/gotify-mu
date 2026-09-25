@@ -343,6 +343,13 @@ func (m *Manager) StagePluginUpdate(modulePath, filename string, source io.Reade
 	return verified.SHA256, nil
 }
 
+func (m *Manager) HasPlugin(modulePath string) bool {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	_, ok := m.plugins[modulePath]
+	return ok
+}
+
 // SetPluginEnabled sets the plugins enabled state.
 func (m *Manager) SetPluginEnabled(pluginID uint, enabled bool) error {
 	instance, err := m.Instance(pluginID)
