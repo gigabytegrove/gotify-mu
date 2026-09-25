@@ -16,6 +16,7 @@ import {useStores} from '../stores';
 import {observer} from 'mobx-react-lite';
 import {useNavigate, useSearchParams} from 'react-router';
 import LockOutlined from '@mui/icons-material/LockOutlined';
+import Key from '@mui/icons-material/Key';
 
 const Login = observer(() => {
     const [username, setUsername] = React.useState('');
@@ -140,6 +141,20 @@ const Login = observer(() => {
                             </Stack>
                         </Box>
                     )}
+
+                    <Button
+                        variant="outlined"
+                        size="large"
+                        fullWidth
+                        startIcon={<Key />}
+                        disabled={
+                            !username ||
+                            Boolean(currentUser.connectionErrorMessage) ||
+                            currentUser.authenticating
+                        }
+                        onClick={() => void currentUser.loginPasskey(username)}>
+                        Sign in with Passkey
+                    </Button>
 
                     {ldapEnabled && (
                         <>
