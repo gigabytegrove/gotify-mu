@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -413,13 +414,38 @@ func shouldAuditMutation(path string) bool {
 	}
 }
 
-var tokenRegexp = regexp.MustCompile("token=[^&]+")
+var tokenRegexp = regexp.MustCompile("(?i)(token|code|state|key|secret|password|access_token|refresh_token|id_token)=[^&]+")
+
+func sanitizedLogPath(requestURL *url.URL) string {
+	path := requestURL.Path
+	if strings.HasPrefix(path, "/integrations/webhook/") {
+		path = "/integrations/webhook/[masked]"
+	}
+	if requestURL.RawQuery == "" {
+		return path
+	}
+
+	values, err := url.ParseQuery(requestURL.RawQuery)
+	if err != nil {
+		return tokenRegexp.ReplaceAllString(path+"?"+requestURL.RawQuery, "$1=[masked]")
+	}
+	for key := range values {
+		lower := strings.ToLower(key)
+		if strings.Contains(lower, "token") ||
+			strings.Contains(lower, "secret") ||
+			strings.Contains(lower, "password") ||
+			lower == "code" ||
+			lower == "state" ||
+			lower == "key" {
+			values.Set(key, "[masked]")
+		}
+	}
+	return path + "?" + values.Encode()
+}
 
 func accessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-
-		rawQuery := c.Request.URL.RawQuery
 		path := c.Request.URL.Path
 
 		c.Next()
@@ -429,10 +455,7 @@ func accessLogger() gin.HandlerFunc {
 			return
 		}
 
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
-		}
-		path = tokenRegexp.ReplaceAllString(path, "token=[masked]")
+		path = sanitizedLogPath(c.Request.URL)
 
 		latency := time.Since(start)
 		if latency > time.Minute {
