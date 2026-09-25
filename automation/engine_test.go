@@ -93,3 +93,11 @@ func TestEncodeRemainingLength(t *testing.T) {
 		t.Fatalf("expected %v, got %v", expected, got)
 	}
 }
+
+func TestAppendMQTTString(t *testing.T) {
+	got := appendMQTTString(nil, "MQTT")
+	expected := []byte{0x00, 0x04, 'M', 'Q', 'T', 'T'}
+	if !bytes.Equal(got, expected) {
+		t.Fatalf("expected %v, got %v", expected, got)
+	}
+}
