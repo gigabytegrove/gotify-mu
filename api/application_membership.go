@@ -21,7 +21,7 @@ type ApplicationMembershipDatabase interface {
 	SetApplicationMembershipNotifications(applicationID, userID uint, enabled bool) error
 	TransferApplicationOwnership(applicationID, newOwnerID uint) error
 	SetApplicationMemberPosting(applicationID uint, enabled bool) error
-	GetGroupByID(id uint) (*model.UserGroup, error)
+	GetUserGroupByID(id uint) (*model.UserGroup, error)
 	GetApplicationGroupAssignments(applicationID uint) ([]*model.ApplicationGroupAssignment, error)
 	UpsertApplicationGroupAssignment(item *model.ApplicationGroupAssignment) error
 	DeleteApplicationGroupAssignment(applicationID, groupID uint) error
@@ -270,7 +270,7 @@ func (a *ApplicationMembershipAPI) GetGroups(ctx *gin.Context) {
 		if !successOrAbort(ctx, 500, err) { return }
 		result := make([]ApplicationGroupExternal, 0, len(assignments))
 		for _, assignment := range assignments {
-			group, err := a.DB.GetGroupByID(assignment.GroupID)
+			group, err := a.DB.GetUserGroupByID(assignment.GroupID)
 			if !successOrAbort(ctx, 500, err) { return }
 			if group == nil { continue }
 			result = append(result, ApplicationGroupExternal{
@@ -296,7 +296,7 @@ func (a *ApplicationMembershipAPI) UpsertGroup(ctx *gin.Context) {
 			ctx.AbortWithError(400, errors.New("Group role must be manager, publisher, member, or read_only"))
 			return
 		}
-		group, err := a.DB.GetGroupByID(params.GroupID)
+		group, err := a.DB.GetUserGroupByID(params.GroupID)
 		if !successOrAbort(ctx, 500, err) { return }
 		if group == nil { ctx.AbortWithError(404, errors.New("Group not found")); return }
 		receive := true
