@@ -25,6 +25,7 @@ import Sensors from '@mui/icons-material/Sensors';
 import Home from '@mui/icons-material/Home';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
+import ConfirmDialog from '../common/ConfirmDialog';
 import * as config from '../config';
 import {useStores} from '../stores';
 import {
@@ -50,6 +51,9 @@ const Integrations = () => {
     const [mqttEdit, setMqttEdit] = React.useState<IMQTTIntegration | null | undefined>();
     const [homeAssistantEdit, setHomeAssistantEdit] =
         React.useState<IHomeAssistantIntegration | null | undefined>();
+    const [confirm, setConfirm] = React.useState<
+        {title: string; text: string; run: () => Promise<void>} | undefined
+    >();
 
     const refresh = React.useCallback(async () => {
         setLoading(true);
@@ -126,24 +130,51 @@ const Integrations = () => {
                                     </Button>
                                     <Button
                                         size="small"
-                                        startIcon={<Refresh />}
                                         onClick={async () => {
-                                            await axios.post(
-                                                api(`integration/webhook/${item.id}/regenerate`)
-                                            );
-                                            await refresh();
-                                            snackManager.snack('Webhook URL regenerated');
+                                            await axios.post(api(`integration/webhook/${item.id}/test`));
+                                            snackManager.snack('Webhook test notification sent');
                                         }}>
+                                        Send Test
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        startIcon={<Refresh />}
+                                        onClick={() =>
+                                            setConfirm({
+                                                title: 'Regenerate Webhook URL?',
+                                                text: 'The current webhook URL will stop working immediately. Systems using it must be updated.',
+                                                run: async () => {
+                                                    await axios.post(
+                                                        api(`integration/webhook/${item.id}/regenerate`)
+                                                    );
+                                                    await refresh();
+                                                    snackManager.snack('Webhook URL regenerated');
+                                                },
+                                            })
+                                        }>
                                         Regenerate URL
                                     </Button>
+                                </Stack>
+                                <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
+                                    {item.requireSignature && <Chip size="small" label="Signed requests required" />}
+                                    <Chip size="small" variant="outlined" label={`${item.rateLimitPerMinute}/min`} />
+                                    {item.allowedCidrs && (
+                                        <Chip size="small" variant="outlined" label="Source IP restrictions" />
+                                    )}
                                 </Stack>
                             </Stack>
                         ),
                         onEdit: () => setWebhookEdit(item),
                         onDelete: async () => {
-                            await axios.delete(api(`integration/webhook/${item.id}`));
-                            await refresh();
-                            snackManager.snack('Webhook deleted');
+                            setConfirm({
+                                title: 'Delete Webhook?',
+                                text: 'Requests to this webhook will stop working immediately.',
+                                run: async () => {
+                                    await axios.delete(api(`integration/webhook/${item.id}`));
+                                    await refresh();
+                                    snackManager.snack('Webhook deleted');
+                                },
+                            });
                         },
                     }))}
                 />
@@ -171,11 +202,36 @@ const Integrations = () => {
                             item.applicationId
                         )}`,
                         enabled: item.enabled,
+                        details: (
+                            <IntegrationHealth
+                                status={item.status}
+                                lastConnectedAt={item.lastConnectedAt}
+                                lastActivityAt={item.lastMessageAt}
+                                lastActivityLabel="Last message"
+                                lastError={item.lastError}
+                                reconnectCount={item.reconnectCount}>
+                                <Button
+                                    size="small"
+                                    onClick={async () => {
+                                        await axios.post(api(`integration/mqtt/${item.id}/test`));
+                                        snackManager.snack('MQTT connection test succeeded');
+                                        await refresh();
+                                    }}>
+                                    Test Connection
+                                </Button>
+                            </IntegrationHealth>
+                        ),
                         onEdit: () => setMqttEdit(item),
                         onDelete: async () => {
-                            await axios.delete(api(`integration/mqtt/${item.id}`));
-                            await refresh();
-                            snackManager.snack('MQTT connection deleted');
+                            setConfirm({
+                                title: 'Delete MQTT Connection?',
+                                text: 'Gotify MU will stop listening to this MQTT topic.',
+                                run: async () => {
+                                    await axios.delete(api(`integration/mqtt/${item.id}`));
+                                    await refresh();
+                                    snackManager.snack('MQTT connection deleted');
+                                },
+                            });
                         },
                     }))}
                 />
@@ -204,30 +260,58 @@ const Integrations = () => {
                         )}`,
                         enabled: item.enabled,
                         details: (
-                            <Button
-                                size="small"
-                                onClick={async () => {
-                                    await axios.post(
-                                        api('integration/home-assistant/' + item.id + '/event'),
-                                        {
-                                            eventType: 'gotify_mu_test',
-                                            data: {message: 'Gotify MU connection test'},
-                                        }
-                                    );
-                                    snackManager.snack('Test event sent to Home Assistant');
-                                }}>
-                                Send Test Event
-                            </Button>
+                            <IntegrationHealth
+                                status={item.status}
+                                lastConnectedAt={item.lastConnectedAt}
+                                lastActivityAt={item.lastEventAt}
+                                lastActivityLabel="Last event"
+                                lastError={item.lastError}
+                                reconnectCount={item.reconnectCount}>
+                                <Button
+                                    size="small"
+                                    onClick={async () => {
+                                        await axios.post(
+                                            api('integration/home-assistant/' + item.id + '/event'),
+                                            {
+                                                eventType: 'gotify_mu_test',
+                                                data: {message: 'Gotify MU connection test'},
+                                            }
+                                        );
+                                        snackManager.snack('Test event sent to Home Assistant');
+                                    }}>
+                                    Send Test Event
+                                </Button>
+                            </IntegrationHealth>
                         ),
                         onEdit: () => setHomeAssistantEdit(item),
                         onDelete: async () => {
-                            await axios.delete(api(`integration/home-assistant/${item.id}`));
-                            await refresh();
-                            snackManager.snack('Home Assistant connection deleted');
+                            setConfirm({
+                                title: 'Delete Home Assistant Connection?',
+                                text: 'Gotify MU will stop receiving events from this Home Assistant connection.',
+                                run: async () => {
+                                    await axios.delete(api(`integration/home-assistant/${item.id}`));
+                                    await refresh();
+                                    snackManager.snack('Home Assistant connection deleted');
+                                },
+                            });
                         },
                     }))}
                 />
             </SurfaceCard>
+
+            {confirm && (
+                <ConfirmDialog
+                    title={confirm.title}
+                    text={confirm.text}
+                    requireElevated
+                    fClose={() => setConfirm(undefined)}
+                    fOnSubmit={() => {
+                        const action = confirm.run;
+                        setConfirm(undefined);
+                        void action();
+                    }}
+                />
+            )}
 
             {webhookEdit !== undefined && (
                 <WebhookDialog
@@ -265,6 +349,56 @@ const Integrations = () => {
         </DefaultPage>
     );
 };
+
+const IntegrationHealth = ({
+    status,
+    lastConnectedAt,
+    lastActivityAt,
+    lastActivityLabel,
+    lastError,
+    reconnectCount,
+    children,
+}: {
+    status?: string;
+    lastConnectedAt?: string;
+    lastActivityAt?: string;
+    lastActivityLabel: string;
+    lastError?: string;
+    reconnectCount: number;
+    children?: React.ReactNode;
+}) => (
+    <Stack spacing={0.75}>
+        <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap', alignItems: 'center'}}>
+            <Chip
+                size="small"
+                color={status === 'connected' ? 'success' : status === 'reconnecting' ? 'warning' : 'default'}
+                variant="outlined"
+                label={status || 'Waiting'}
+            />
+            {lastConnectedAt && (
+                <Typography variant="caption" color="text.secondary">
+                    Connected {new Date(lastConnectedAt).toLocaleString()}
+                </Typography>
+            )}
+            {lastActivityAt && (
+                <Typography variant="caption" color="text.secondary">
+                    {lastActivityLabel} {new Date(lastActivityAt).toLocaleString()}
+                </Typography>
+            )}
+            {reconnectCount > 0 && (
+                <Typography variant="caption" color="text.secondary">
+                    Reconnects {reconnectCount}
+                </Typography>
+            )}
+        </Stack>
+        {lastError && (
+            <Alert severity="warning" sx={{py: 0}}>
+                {lastError}
+            </Alert>
+        )}
+        {children && <Stack direction="row" spacing={1}>{children}</Stack>}
+    </Stack>
+);
 
 interface ListItem {
     id: number;
@@ -380,6 +514,9 @@ const WebhookDialog = ({
     const [priorityField, setPriorityField] = React.useState(item?.priorityField || 'priority');
     const [defaultTitle, setDefaultTitle] = React.useState(item?.defaultTitle || '');
     const [defaultPriority, setDefaultPriority] = React.useState(item?.defaultPriority || 0);
+    const [requireSignature, setRequireSignature] = React.useState(item?.requireSignature ?? true);
+    const [allowedCidrs, setAllowedCidrs] = React.useState(item?.allowedCidrs || '');
+    const [rateLimitPerMinute, setRateLimitPerMinute] = React.useState(item?.rateLimitPerMinute || 120);
     const [saving, setSaving] = React.useState(false);
 
     const save = async () => {
@@ -394,6 +531,9 @@ const WebhookDialog = ({
                 priorityField,
                 defaultTitle,
                 defaultPriority,
+                requireSignature,
+                allowedCidrs,
+                rateLimitPerMinute,
             };
             if (item) {
                 await axios.put(api(`integration/webhook/${item.id}`), payload);
@@ -440,6 +580,24 @@ const WebhookDialog = ({
                         type="number"
                         value={defaultPriority}
                         onChange={(e) => setDefaultPriority(Number(e.target.value))}
+                    />
+                    <FormControlLabel
+                        control={<Switch checked={requireSignature} onChange={(e) => setRequireSignature(e.target.checked)} />}
+                        label="Require signed requests"
+                    />
+                    <TextField
+                        label="Allowed source IPs / networks"
+                        value={allowedCidrs}
+                        onChange={(e) => setAllowedCidrs(e.target.value)}
+                        placeholder="192.168.1.0/24, 10.0.0.10"
+                        helperText="Optional. Separate IP addresses or CIDR networks with commas."
+                    />
+                    <TextField
+                        label="Rate limit per minute"
+                        type="number"
+                        value={rateLimitPerMinute}
+                        onChange={(e) => setRateLimitPerMinute(Number(e.target.value))}
+                        slotProps={{htmlInput: {min: 1, max: 10000}}}
                     />
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
