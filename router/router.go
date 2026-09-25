@@ -110,6 +110,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
 	auditHandler := api.AuditAPI{DB: db}
 	groupHandler := api.UserGroupAPI{DB: db}
+	updateHandler := api.NewUpdateAPIFromEnv()
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
@@ -291,6 +292,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/group/:id/members", groupHandler.GetMembers)
 		adminPlatform.POST("/group/:id/members", groupHandler.AddMember)
 		adminPlatform.DELETE("/group/:id/members/:userId", groupHandler.RemoveMember)
+		adminPlatform.GET("/update/status", updateHandler.Status)
+		adminPlatform.POST("/update/install", updateHandler.Install)
 	}
 	return g, streamHandler.Close
 }
@@ -354,6 +357,8 @@ func shouldAuditMutation(path string) bool {
 	case strings.HasPrefix(path, "/plugin/") && !strings.Contains(path, "/custom/"):
 		return true
 	case strings.HasPrefix(path, "/application") && !strings.Contains(path, "/message"):
+		return true
+	case strings.HasPrefix(path, "/update"):
 		return true
 	default:
 		return false
