@@ -351,3 +351,20 @@ func (d *GormDatabase) GetOrCreateDigestApplication(userID uint) (*model.Applica
 	}
 	return app, nil
 }
+
+
+func (d *GormDatabase) UpdateMQTTIntegrationStatus(id uint, status string, connectedAt, messageAt *time.Time, lastError string, errorAt *time.Time, incrementReconnect bool) error {
+	updates := map[string]any{"status":status, "last_error":lastError, "last_error_at":errorAt}
+	if connectedAt != nil { updates["last_connected_at"] = connectedAt }
+	if messageAt != nil { updates["last_message_at"] = messageAt }
+	if incrementReconnect { updates["reconnect_count"] = gorm.Expr("reconnect_count + ?", 1) }
+	return d.DB.Model(&model.MQTTIntegration{}).Where("id = ?", id).Updates(updates).Error
+}
+
+func (d *GormDatabase) UpdateHomeAssistantIntegrationStatus(id uint, status string, connectedAt, eventAt *time.Time, lastError string, errorAt *time.Time, incrementReconnect bool) error {
+	updates := map[string]any{"status":status, "last_error":lastError, "last_error_at":errorAt}
+	if connectedAt != nil { updates["last_connected_at"] = connectedAt }
+	if eventAt != nil { updates["last_event_at"] = eventAt }
+	if incrementReconnect { updates["reconnect_count"] = gorm.Expr("reconnect_count + ?", 1) }
+	return d.DB.Model(&model.HomeAssistantIntegration{}).Where("id = ?", id).Updates(updates).Error
+}
