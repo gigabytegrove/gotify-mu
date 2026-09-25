@@ -226,6 +226,7 @@ func (a *Auth) handleClient(checks ...func(*model.Client) (authState, error)) fu
 		if policyErr != nil { return authStateSkip, policyErr }
 		if policy.RequireMFAForAllLocalUsers && !client.MFAAuthenticated &&
 			!strings.HasPrefix(ctx.Request.URL.Path, "/current/user/mfa") &&
+			!strings.HasPrefix(ctx.Request.URL.Path, "/current/user/passkeys") &&
 			!strings.HasPrefix(ctx.Request.URL.Path, "/auth/logout") {
 			user, userErr := a.DB.GetUserByID(client.UserID)
 			if userErr != nil { return authStateSkip, userErr }
