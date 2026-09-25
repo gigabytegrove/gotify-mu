@@ -70,6 +70,7 @@ type Database interface {
 	GetAutomationRunByTrigger(triggerKey string) (*model.AutomationRun, error)
 	SaveAutomationRun(item *model.AutomationRun) error
 	SaveIntegrationStatus(item *model.IntegrationStatus) error
+	GetIntegrationStatus(kind string, objectID uint) (*model.IntegrationStatus, error)
 }
 
 // Engine runs scheduled work and persistent native integrations.
@@ -607,11 +608,18 @@ func (e *Engine) restartIntegrations() {
 }
 
 func (e *Engine) runMQTTLoop(ctx context.Context, integration *model.MQTTIntegration) {
+	key := fmt.Sprintf("integration:mqtt:%d", integration.ID)
 	for {
-		if ctx.Err() != nil {
-			return
-		}
-		if err := e.runMQTT(ctx, integration); err != nil && ctx.Err() == nil {
+		if ctx.Err() != nil { return }
+		err := e.runWithLease(ctx, key, 45*time.Second, func(leased context.Context) error {
+			e.setIntegrationStatus("mqtt", integration.ID, "connecting", "", false, false)
+			return e.runMQTT(leased, integration)
+		})
+		if ctx.Err() != nil { return }
+		if errors.Is(err, errLeaseUnavailable) {
+			e.setIntegrationStatus("mqtt", integration.ID, "standby", "", false, false)
+		} else if err != nil {
+			e.setIntegrationStatus("mqtt", integration.ID, "reconnecting", err.Error(), false, false)
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("MQTT connection interrupted")
 		}
 		select {
@@ -649,6 +657,7 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 	if err := mqttSubscribe(conn, reader, integration.Topic); err != nil {
 		return err
 	}
+	e.setIntegrationStatus("mqtt", integration.ID, "connected", "", true, false)
 
 	for {
 		if ctx.Err() != nil {
@@ -691,6 +700,8 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 		}
 		if _, err := e.Publish(integration.ApplicationID, title, message, priority); err != nil {
 			log.Error().Err(err).Uint("integration_id", integration.ID).Msg("MQTT message could not be published")
+		} else {
+			e.setIntegrationStatus("mqtt", integration.ID, "connected", "", false, true)
 		}
 		if qos == 1 && packetID != 0 {
 			ack := []byte{0x40, 0x02, byte(packetID >> 8), byte(packetID)}
@@ -890,11 +901,18 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 }
 
 func (e *Engine) runHomeAssistantLoop(ctx context.Context, integration *model.HomeAssistantIntegration) {
+	key := fmt.Sprintf("integration:home-assistant:%d", integration.ID)
 	for {
-		if ctx.Err() != nil {
-			return
-		}
-		if err := e.runHomeAssistant(ctx, integration); err != nil && ctx.Err() == nil {
+		if ctx.Err() != nil { return }
+		err := e.runWithLease(ctx, key, 45*time.Second, func(leased context.Context) error {
+			e.setIntegrationStatus("home-assistant", integration.ID, "connecting", "", false, false)
+			return e.runHomeAssistant(leased, integration)
+		})
+		if ctx.Err() != nil { return }
+		if errors.Is(err, errLeaseUnavailable) {
+			e.setIntegrationStatus("home-assistant", integration.ID, "standby", "", false, false)
+		} else if err != nil {
+			e.setIntegrationStatus("home-assistant", integration.ID, "reconnecting", err.Error(), false, false)
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("Home Assistant connection interrupted")
 		}
 		select {
@@ -952,6 +970,7 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 	if authResponse["type"] != "auth_ok" {
 		return errors.New("Home Assistant authentication failed")
 	}
+	e.setIntegrationStatus("home-assistant", integration.ID, "connected", "", true, false)
 
 	subscribe := map[string]any{"id":1,"type":"subscribe_events"}
 	if strings.TrimSpace(integration.EventType) != "" {
@@ -989,6 +1008,8 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 		}
 		if _, err := e.Publish(integration.ApplicationID, title, string(encoded), 0); err != nil {
 			log.Error().Err(err).Uint("integration_id", integration.ID).Msg("Home Assistant event could not be published")
+		} else {
+			e.setIntegrationStatus("home-assistant", integration.ID, "connected", "", false, true)
 		}
 	}
 }
@@ -1019,6 +1040,61 @@ func numberAsInt(value any) (int, bool) {
 		return number, true
 	default:
 		return 0, false
+	}
+}
+
+var errLeaseUnavailable = errors.New("automation lease is held by another instance")
+
+func (e *Engine) runWithLease(parent context.Context, key string, ttl time.Duration, fn func(context.Context) error) error {
+	acquired, err := e.db.AcquireAutomationLease(key, e.instanceID, time.Now(), ttl)
+	if err != nil { return err }
+	if !acquired { return errLeaseUnavailable }
+	defer e.db.ReleaseAutomationLease(key, e.instanceID)
+
+	ctx, cancel := context.WithCancel(parent)
+	defer cancel()
+	done := make(chan error, 1)
+	go func() { done <- fn(ctx) }()
+
+	renewEvery := ttl / 3
+	if renewEvery < 5*time.Second { renewEvery = 5*time.Second }
+	ticker := time.NewTicker(renewEvery)
+	defer ticker.Stop()
+	for {
+		select {
+		case err := <-done:
+			return err
+		case <-parent.Done():
+			cancel()
+			return <-done
+		case <-ticker.C:
+			ok, renewErr := e.db.AcquireAutomationLease(key, e.instanceID, time.Now(), ttl)
+			if renewErr != nil || !ok {
+				cancel()
+				if renewErr != nil { return renewErr }
+				return errLeaseUnavailable
+			}
+		}
+	}
+}
+
+func (e *Engine) setIntegrationStatus(kind string, objectID uint, state, lastError string, connected, activity bool) {
+	status, err := e.db.GetIntegrationStatus(kind, objectID)
+	if err != nil {
+		log.Warn().Err(err).Str("kind", kind).Uint("integration_id", objectID).Msg("Could not load integration status")
+		return
+	}
+	if status == nil {
+		status = &model.IntegrationStatus{Kind:kind, ObjectID:objectID}
+	}
+	now := time.Now()
+	status.State = state
+	status.LastError = lastError
+	status.UpdatedAt = now
+	if connected { status.LastConnectedAt = &now }
+	if activity { status.LastActivityAt = &now }
+	if err := e.db.SaveIntegrationStatus(status); err != nil {
+		log.Warn().Err(err).Str("kind", kind).Uint("integration_id", objectID).Msg("Could not save integration status")
 	}
 }
 
