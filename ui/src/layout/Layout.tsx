@@ -117,7 +117,7 @@ const Layout = observer(() => {
                                     <Route path="/channels/:id" element={authed(<Messages />)} />
                                     <Route
                                         path="/messages/:id"
-                                        element={<Navigate replace to="/channels/:id" />}
+                                        element={authed(<Messages />)}
                                     />
                                     <Route
                                         path="/applications"
