@@ -55,6 +55,8 @@ The Web UI uses **Channels** as the user-facing term and provides:
 - Channel status cards and membership management
 - Global Channel administration
 - User, Client, and Plugin administration
+- User display names and administrative Groups
+- Administrative/security Audit Log
 - Elevated administrator plugin installation directly from the Web UI
 - Standardized light, dark, and system themes
 - Responsive desktop and mobile-web navigation
