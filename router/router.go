@@ -144,6 +144,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
 	mfaHandler := api.MFAAPI{DB: db}
+	var ldapHandler *api.LDAPAPI
+	if conf.LDAP.Enabled {
+		ldapHandler = api.NewLDAP(conf, db, userChangeNotifier)
+	}
 	auditHandler := api.AuditAPI{DB: db}
 	systemHandler := api.SystemAPI{DB: db, Dialect: conf.Database.Dialect, NotifyDeleted: streamHandler.NotifyDeletedClient}
 	groupHandler := api.UserGroupAPI{DB: db}
@@ -172,7 +176,15 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	userChangeNotifier.OnUserDeleted(pluginManager.RemoveUser)
 	userChangeNotifier.OnUserAdded(pluginManager.InitializeForUserID)
 
-	ui.Register(g, *vInfo, conf.Registration, conf.LocalAuthEnabled, conf.OIDC.Enabled, conf.OIDC.IDPName, conf.OIDC.AutoRedirect)
+	ui.Register(
+		g, *vInfo, conf.Registration, conf.LocalAuthEnabled,
+		conf.OIDC.Enabled, conf.OIDC.IDPName, conf.OIDC.AutoRedirect,
+		conf.LDAP.Enabled, conf.LDAP.IDPName,
+	)
+
+	if conf.LDAP.Enabled {
+		g.POST("/auth/ldap/login", ldapHandler.Login)
+	}
 
 	if conf.OIDC.Enabled {
 		oidcHandler := api.NewOIDC(conf, db, userChangeNotifier)
@@ -256,6 +268,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			LocalAuth:        conf.LocalAuthEnabled,
 			OIDCIDPName:      conf.OIDC.IDPName,
 			OIDCAutoRedirect: conf.OIDC.AutoRedirect,
+			LDAP:             conf.LDAP.Enabled,
+			LDAPIDPName:      conf.LDAP.IDPName,
 		})
 	})
 
@@ -306,6 +320,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientAuth.GET("/stream", streamHandler.Handle)
 		clientAuth.GET("current/user", userHandler.GetCurrentUser)
 		clientAuth.GET("/current/user/mfa/status", mfaHandler.Status)
+		if conf.LDAP.Enabled {
+			clientAuth.POST("/auth/ldap/elevate", ldapHandler.Elevate)
+		}
 		clientAuth.POST("/auth/logout", sessionHandler.Logout)
 		clientAuth.GET("/automation/quiet-hours", automationHandler.GetQuietHours)
 		clientAuth.PUT("/automation/quiet-hours", automationHandler.SaveQuietHours)
