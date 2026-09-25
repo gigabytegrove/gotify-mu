@@ -1,6 +1,5 @@
 import React, {useState} from 'react';
 import {
-    Alert,
     Button,
     Chip,
     FormControl,
@@ -15,7 +14,6 @@ import {
 import DarkMode from '@mui/icons-material/DarkMode';
 import Security from '@mui/icons-material/Security';
 import Key from '@mui/icons-material/Key';
-import VpnKey from '@mui/icons-material/VpnKey';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
 import ElevationForm from '../common/ElevationForm';
@@ -35,13 +33,13 @@ const Settings = ({themeMode, setTheme}: IProps) => {
     return (
     <DefaultPage
         title="Settings"
-        description="Account preferences, authentication, and server security information."
+        description="Account preferences and sign-in settings."
         maxWidth={900}>
         {currentUser.user.admin && <UpdateStatusCard />}
 
         <SurfaceCard
             title="Appearance"
-            subtitle="Choose how the Gotify MU Web UI is displayed."
+            subtitle="Choose how Gotify MU looks on this device."
             action={<DarkMode color="action" />}>
             <FormControl fullWidth>
                 <InputLabel id="theme-select-label">Theme</InputLabel>
@@ -67,7 +65,7 @@ const Settings = ({themeMode, setTheme}: IProps) => {
                     direction={{xs: 'column', sm: 'row'}}
                     spacing={1}
                     sx={{justifyContent: 'space-between'}}> 
-                    <Typography>Local password authentication</Typography>
+                    <Typography>Password sign-in</Typography>
                     <Chip
                         size="small"
                         label={config.get('localAuth') ? 'Enabled' : 'Disabled'}
@@ -77,37 +75,15 @@ const Settings = ({themeMode, setTheme}: IProps) => {
                     direction={{xs: 'column', sm: 'row'}}
                     spacing={1}
                     sx={{justifyContent: 'space-between'}}> 
-                    <Typography>OIDC authentication</Typography>
+                    <Typography>Single sign-on</Typography>
                     <Chip size="small" label={config.get('oidc') ? 'Enabled' : 'Disabled'} />
                 </Stack>
-                <Alert severity="info">
-                    MFA/2FA and LDAP/Active Directory authentication are planned security
-                    features. They are not enabled by this UI rewrite.
-                </Alert>
             </Stack>
-        </SurfaceCard>
-
-        <SurfaceCard
-            title="Planned Security"
-            subtitle="Authentication capabilities tracked for future Gotify MU releases."
-            action={<VpnKey color="action" />}>
-            <Stack direction="row" spacing={1} sx={{flexWrap: 'wrap'}} useFlexGap>
-                <Chip label="TOTP MFA" variant="outlined" />
-                <Chip label="Recovery Codes" variant="outlined" />
-                <Chip label="WebAuthn / Passkeys" variant="outlined" />
-                <Chip label="LDAP / Active Directory" variant="outlined" />
-                <Chip label="MFA Enforcement" variant="outlined" />
-                <Chip label="Security Audit Log" variant="outlined" />
-            </Stack>
-            <Typography variant="body2" color="text.secondary" sx={{mt: 2}}>
-                These controls are roadmap items only. Existing local and OIDC authentication
-                behavior remains unchanged until the corresponding backend support is implemented.
-            </Typography>
         </SurfaceCard>
 
         <SurfaceCard
             title="Change Password"
-            subtitle="Update the password used for local authentication."
+            subtitle="Choose a new password for your account."
             action={<Key color="action" />}>
             <ChangePasswordForm />
         </SurfaceCard>
@@ -126,7 +102,7 @@ const ChangePasswordForm = () => {
     };
 
     if (!localAuthEnabled) {
-        return <Typography color="text.secondary">Password login is disabled on this server.</Typography>;
+        return <Typography color="text.secondary">Password sign-in is disabled on this server.</Typography>;
     }
 
     if (!elevateStore.elevated) {
