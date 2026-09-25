@@ -25,6 +25,7 @@ import Sensors from '@mui/icons-material/Sensors';
 import Home from '@mui/icons-material/Home';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
+import FirstPartyIntegrations from './FirstPartyIntegrations';
 import * as config from '../config';
 import {useStores} from '../stores';
 import {
@@ -228,6 +229,8 @@ const Integrations = () => {
                     }))}
                 />
             </SurfaceCard>
+
+            <FirstPartyIntegrations channels={channels} />
 
             {webhookEdit !== undefined && (
                 <WebhookDialog
