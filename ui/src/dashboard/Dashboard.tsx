@@ -27,6 +27,7 @@ import StatCard from '../common/StatCard';
 import SurfaceCard from '../common/SurfaceCard';
 import {useStores} from '../stores';
 import * as config from '../config';
+import {UpdateAvailableBanner} from '../update/UpdateStatus';
 
 const Dashboard = observer(() => {
     const {appStore, userStore, clientStore, pluginStore, groupStore, currentUser} = useStores();
@@ -74,6 +75,8 @@ const Dashboard = observer(() => {
                     Open Messages
                 </Button>
             }>
+            {admin && <UpdateAvailableBanner />}
+
             <Grid container spacing={1.5}>
                 <Grid size={{xs: 12, sm: 6, lg: 3}}>
                     <StatCard
