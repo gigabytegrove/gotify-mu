@@ -16,6 +16,10 @@ type WebhookRoute struct {
 	TitleField      string    `gorm:"type:text" json:"titleField"`
 	MessageField    string    `gorm:"type:text" json:"messageField"`
 	PriorityField   string    `gorm:"type:text" json:"priorityField"`
+	MatchField      string    `gorm:"type:text" json:"matchField"`
+	MatchValue      string    `gorm:"type:text" json:"matchValue"`
+	TitleTemplate   string    `gorm:"type:text" json:"titleTemplate"`
+	MessageTemplate string    `gorm:"type:text" json:"messageTemplate"`
 	DefaultTitle    string    `gorm:"type:text" json:"defaultTitle"`
 	DefaultPriority int       `json:"defaultPriority"`
 	CreatedAt       time.Time `json:"createdAt"`
@@ -35,10 +39,25 @@ type WebhookRouteView struct {
 	TitleField      string    `json:"titleField"`
 	MessageField    string    `json:"messageField"`
 	PriorityField   string    `json:"priorityField"`
+	MatchField      string    `json:"matchField"`
+	MatchValue      string    `json:"matchValue"`
+	TitleTemplate   string    `json:"titleTemplate"`
+	MessageTemplate string    `json:"messageTemplate"`
 	DefaultTitle    string    `json:"defaultTitle"`
 	DefaultPriority int       `json:"defaultPriority"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
+}
+
+// WebhookDelivery records recent inbound webhook outcomes without storing credentials or full payloads.
+type WebhookDelivery struct {
+	ID             uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	WebhookRouteID uint      `gorm:"index" json:"webhookRouteId"`
+	IPAddress      string    `gorm:"type:varchar(180)" json:"ipAddress,omitempty"`
+	Status         string    `gorm:"type:varchar(24);index" json:"status"`
+	Detail         string    `gorm:"type:text" json:"detail,omitempty"`
+	MessageID      uint      `gorm:"index" json:"messageId,omitempty"`
+	CreatedAt      time.Time `gorm:"index" json:"createdAt"`
 }
 
 // MQTTIntegration subscribes to one broker/topic and publishes received payloads into a Channel.
