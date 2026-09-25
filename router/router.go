@@ -321,6 +321,11 @@ func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 			Target:    path,
 			IPAddress: ctx.ClientIP(),
 		}
+		if id := ctx.Param("id"); id != "" {
+			event.TargetID = id
+		} else if userID := ctx.Param("userId"); userID != "" {
+			event.TargetID = userID
+		}
 		if userID := auth.TryGetUserID(ctx); userID != nil {
 			event.UserID = *userID
 			if user, err := db.GetUserByID(*userID); err == nil && user != nil {
