@@ -42,14 +42,22 @@ export class ElevateStore {
         this.reauthenticationRequired = false;
     };
 
-    public localElevate = async (password: string, durationSeconds: number): Promise<void> => {
+    public localElevate = async (
+        password: string,
+        durationSeconds: number,
+        mfaCode = ''
+    ): Promise<void> => {
+        const headers: Record<string, string> = {
+            Authorization: 'Basic ' + btoa(this.currentUser.user.name + ':' + password),
+        };
+        if (mfaCode.trim()) {
+            headers['X-Gotify-MFA-Code'] = mfaCode.trim();
+        }
         await axios.create().request({
             url: `${config.get('url')}client/${this.currentUser.user.clientId}/elevate`,
             method: 'POST',
             data: {durationSeconds},
-            headers: {
-                Authorization: 'Basic ' + btoa(this.currentUser.user.name + ':' + password),
-            },
+            headers,
         });
         await this.currentUser.tryAuthenticate();
         runInAction(() => {
