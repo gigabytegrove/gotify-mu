@@ -8,10 +8,8 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
-    IconButton,
     Stack,
     TextField,
-    Tooltip,
     Typography,
 } from '@mui/material';
 import Reply from '@mui/icons-material/Reply';
@@ -22,7 +20,7 @@ import MarkEmailRead from '@mui/icons-material/MarkEmailRead';
 import MarkEmailUnread from '@mui/icons-material/MarkEmailUnread';
 import AttachFile from '@mui/icons-material/AttachFile';
 import * as config from '../config';
-import {IMessage, IMessageCollaboration} from '../types';
+import {IMessage} from '../types';
 import {useStores} from '../stores';
 
 const api = (path: string) => config.get('url') + path;
