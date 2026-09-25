@@ -4,6 +4,7 @@ import {detect} from 'detect-browser';
 import {SnackReporter} from './snack/SnackManager';
 import {observable, runInAction, action} from 'mobx';
 import {ICurrentUser} from './types';
+import {loginWithPasskey} from './passkey';
 
 export class CurrentUser {
     private reconnectTimeoutId: number | null = null;
@@ -93,6 +94,31 @@ export class CurrentUser {
                 }
             });
             return {success: false, mfaRequired};
+        }
+    };
+
+    public loginPasskey = async (username: string): Promise<boolean> => {
+        runInAction(() => {
+            this.loggedIn = false;
+            this.authenticating = true;
+        });
+        try {
+            const user = await loginWithPasskey(username, this.createClientName());
+            runInAction(() => {
+                this.user = user;
+                this.loggedIn = true;
+                this.authenticating = false;
+                this.connectionErrorMessage = null;
+                this.reconnectTime = 7500;
+            });
+            this.snack('Passkey sign-in successful');
+            return true;
+        } catch {
+            runInAction(() => {
+                this.authenticating = false;
+            });
+            this.snack('Passkey sign-in was not completed');
+            return false;
         }
     };
 
