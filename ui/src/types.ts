@@ -119,6 +119,7 @@ export interface ICurrentUser extends IUser {
     mfaEnabled?: boolean;
     mfaRequired?: boolean;
     authProvider?: 'local' | 'oidc' | 'ldap' | 'passkey';
+    passkeyCount?: number;
 }
 
 export interface IVersion {
