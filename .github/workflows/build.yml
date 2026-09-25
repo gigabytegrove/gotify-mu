@@ -6,24 +6,25 @@ on:
       - master
     tags:
       - 'v*'
-  pull_request:
   workflow_dispatch:
 
 permissions:
   contents: write
   packages: write
+  id-token: write
+  attestations: write
 
 jobs:
   gotify:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/setup-go@v7
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version: 1.26.x
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
           node-version: '24'
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           fetch-depth: 0
 
@@ -68,9 +69,9 @@ jobs:
           echo "create_tag=${CREATE_TAG}" >> "${GITHUB_OUTPUT}"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
-      - run: (cd ui && yarn)
+      - run: (cd ui && yarn --frozen-lockfile)
       - run: make build-js
-      - uses: golangci/golangci-lint-action@v9
+      - uses: golangci/golangci-lint-action@ba0d7d2ec06a0ea1cb5fa41b2e4a3ab91d21278a # v9
         with:
           version: v2.13.0
           args: --timeout=5m
@@ -79,7 +80,7 @@ jobs:
       - run: make download-tools
       - run: make test
       - run: make check-ci
-      - uses: codecov/codecov-action@v7
+      - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
@@ -92,21 +93,42 @@ jobs:
           echo "LD_FLAGS=-w -s -X main.Version=${VERSION} -X main.BuildDate=$(date "+%F-%T") -X main.Commit=$(git rev-parse --verify HEAD) -X main.Mode=prod" >> "${GITHUB_ENV}"
 
       - if: steps.release.outputs.release == 'true'
-        name: Build release archives
+        name: Build release archives and verified source package
         run: |
           make build
           sudo chown -R $UID build
           make package-zip
+          VERSION="${{ steps.release.outputs.version }}"
+          git archive             --format=zip             --prefix="gotify-mu-v${VERSION}/"             --output="build/gotify-mu-v${VERSION}-source.zip"             HEAD
+          (
+            cd build
+            sha256sum *.zip > SHA256SUMS
+          )
           ls -lath build
+
+      - if: steps.release.outputs.release == 'true'
+        name: Generate release SBOM
+        uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
+        with:
+          path: .
+          format: spdx-json
+          output-file: build/gotify-mu.spdx.json
+          upload-artifact: false
+
+      - if: steps.release.outputs.release == 'true'
+        name: Attest release artifacts
+        uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
+        with:
+          subject-path: 'build/*'
 
       - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
         name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
       - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
         name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
       - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
-        uses: docker/login-action@v4
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -133,10 +155,10 @@ jobs:
 
       - if: steps.release.outputs.release == 'true'
         name: Publish GitHub release
-        uses: svenstaro/upload-release-action@v2
+        uses: svenstaro/upload-release-action@29e53e917877a24fad85510ded594ab3c9ca12de # v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: build/*.zip
+          file: build/*
           tag: "v${{ steps.release.outputs.version }}"
           release_name: "Gotify MU v${{ steps.release.outputs.version }}"
           body: "See CHANGELOG.md and docs/releases/v${{ steps.release.outputs.version }}.md for release notes and compatibility details."
