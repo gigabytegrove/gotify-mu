@@ -68,6 +68,9 @@ type AutomationDatabase interface {
 	SetMessageAcknowledgement(userID, messageID uint, acknowledged bool, now time.Time) error
 	IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error)
 	GetMessageAcknowledgements(messageID uint) ([]model.MessageAcknowledgementExternal, error)
+	GetIntegrationStatuses() ([]*model.IntegrationStatus, error)
+	GetAutomationRuns(kind string, objectID uint, limit int) ([]*model.AutomationRun, error)
+	DeleteAutomationRunsBefore(before time.Time) error
 }
 
 type AutomationAPI struct {
@@ -88,6 +91,42 @@ type webhookParams struct {
 	RequireSignature bool   `json:"requireSignature"`
 	SigningSecret    string `json:"signingSecret"`
 	MaxAgeSeconds    int    `json:"maxAgeSeconds"`
+}
+
+func (a *AutomationAPI) GetIntegrationStatuses(ctx *gin.Context) {
+	items, err := a.DB.GetIntegrationStatuses()
+	if !successOrAbort(ctx, 500, err) { return }
+	ctx.JSON(200, items)
+}
+
+func (a *AutomationAPI) GetAutomationRuns(ctx *gin.Context) {
+	limit := 100
+	if raw := strings.TrimSpace(ctx.Query("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil { limit = parsed }
+	}
+	var objectID uint
+	if raw := strings.TrimSpace(ctx.Query("objectId")); raw != "" {
+		parsed, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil { ctx.AbortWithError(400, errors.New("objectId must be an integer")); return }
+		objectID = uint(parsed)
+	}
+	items, err := a.DB.GetAutomationRuns(strings.TrimSpace(ctx.Query("kind")), objectID, limit)
+	if !successOrAbort(ctx, 500, err) { return }
+	ctx.JSON(200, items)
+}
+
+func (a *AutomationAPI) CleanupAutomationRuns(ctx *gin.Context) {
+	days := 90
+	if raw := strings.TrimSpace(ctx.Query("days")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > 3650 {
+			ctx.AbortWithError(400, errors.New("days must be between 1 and 3650"))
+			return
+		}
+		days = parsed
+	}
+	if !successOrAbort(ctx, 500, a.DB.DeleteAutomationRunsBefore(time.Now().AddDate(0,0,-days))) { return }
+	ctx.Status(204)
 }
 
 func (a *AutomationAPI) GetWebhookRoutes(ctx *gin.Context) {
