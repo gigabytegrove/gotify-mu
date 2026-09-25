@@ -20,6 +20,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"github.com/rs/zerolog/log"
 )
 
@@ -55,8 +56,10 @@ type Database interface {
 	IsMessageAcknowledged(messageID uint) (bool, error)
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
+	SaveMQTTIntegration(item *model.MQTTIntegration) error
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
 	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
+	SaveHomeAssistantIntegration(item *model.HomeAssistantIntegration) error
 }
 
 // Engine runs scheduled work and persistent native integrations.
@@ -460,25 +463,55 @@ func (e *Engine) restartIntegrations() {
 		if !item.Enabled {
 			continue
 		}
+		password, revealErr := security.Reveal(item.Password)
+		if revealErr != nil {
+			log.Error().Err(revealErr).Uint("integration_id", item.ID).Msg("MQTT credentials could not be decrypted")
+			continue
+		}
+		if item.Password != "" && !strings.HasPrefix(item.Password, "enc:v1:") {
+			if protected, protectErr := security.Protect(item.Password); protectErr == nil {
+				item.Password = protected
+				if saveErr := e.db.SaveMQTTIntegration(item); saveErr != nil {
+					log.Warn().Err(saveErr).Uint("integration_id", item.ID).Msg("Could not migrate MQTT credentials")
+				}
+			}
+		}
+		runtimeItem := *item
+		runtimeItem.Password = password
 		ctx, cancel := context.WithCancel(e.ctx)
 		e.integrationCancels = append(e.integrationCancels, cancel)
 		e.integrationWG.Add(1)
 		go func(integration model.MQTTIntegration) {
 			defer e.integrationWG.Done()
 			e.runMQTTLoop(ctx, &integration)
-		}(*item)
+		}(runtimeItem)
 	}
 	for _, item := range haItems {
 		if !item.Enabled {
 			continue
 		}
+		token, revealErr := security.Reveal(item.Token)
+		if revealErr != nil {
+			log.Error().Err(revealErr).Uint("integration_id", item.ID).Msg("Home Assistant credentials could not be decrypted")
+			continue
+		}
+		if item.Token != "" && !strings.HasPrefix(item.Token, "enc:v1:") {
+			if protected, protectErr := security.Protect(item.Token); protectErr == nil {
+				item.Token = protected
+				if saveErr := e.db.SaveHomeAssistantIntegration(item); saveErr != nil {
+					log.Warn().Err(saveErr).Uint("integration_id", item.ID).Msg("Could not migrate Home Assistant credentials")
+				}
+			}
+		}
+		runtimeItem := *item
+		runtimeItem.Token = token
 		ctx, cancel := context.WithCancel(e.ctx)
 		e.integrationCancels = append(e.integrationCancels, cancel)
 		e.integrationWG.Add(1)
 		go func(integration model.HomeAssistantIntegration) {
 			defer e.integrationWG.Done()
 			e.runHomeAssistantLoop(ctx, &integration)
-		}(*item)
+		}(runtimeItem)
 	}
 }
 
@@ -747,7 +780,11 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 	if err != nil {
 		return err
 	}
-	request.Header.Set("Authorization", "Bearer "+integration.Token)
+	token, revealErr := security.Reveal(integration.Token)
+	if revealErr != nil {
+		return revealErr
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
 	request.Header.Set("Content-Type", "application/json")
 	client := &http.Client{Timeout: 15 * time.Second}
 	response, err := client.Do(request)
