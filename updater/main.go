@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -251,10 +252,21 @@ func (m *manager) performInstall(version string, started time.Time) {
 	}
 
 	archivePath := filepath.Join(tempDir, "source.zip")
-	sourceURL := fmt.Sprintf("https://github.com/%s/archive/refs/tags/v%s.zip", m.repository, version)
+	checksumPath := filepath.Join(tempDir, "SHA256SUMS")
+	sourceURL := fmt.Sprintf("https://github.com/%s/releases/download/v%s/gotify-mu-v%s-source.zip", m.repository, version, version)
+	checksumURL := fmt.Sprintf("https://github.com/%s/releases/download/v%s/SHA256SUMS", m.repository, version)
 	m.updateProgress("downloading", "Downloading update", "Downloading update", 10)
-	if err := m.downloadFile(sourceURL, archivePath, 10, 24); err != nil {
+	if err := m.downloadFile(sourceURL, archivePath, 10, 21); err != nil {
 		m.fail(version, started, "The update could not be downloaded.", err)
+		return
+	}
+	if err := m.downloadFile(checksumURL, checksumPath, 21, 24); err != nil {
+		m.fail(version, started, "The release checksum could not be downloaded.", err)
+		return
+	}
+	m.updateProgress("preparing", "Verifying update", "Verifying update", 25)
+	if err := verifySHA256(archivePath, checksumPath); err != nil {
+		m.fail(version, started, "The update failed integrity verification.", err)
 		return
 	}
 
@@ -517,9 +529,27 @@ func runDocker(args ...string) (string, error) {
 	command := exec.Command("docker", args...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(redactDockerArgs(args), " "), err, strings.TrimSpace(string(output)))
 	}
 	return string(output), nil
+}
+
+func redactDockerArgs(args []string) []string {
+	safe := append([]string(nil), args...)
+	for i := 0; i < len(safe); i++ {
+		if safe[i] == "--env" && i+1 < len(safe) {
+			name := strings.SplitN(safe[i+1], "=", 2)[0]
+			safe[i+1] = name + "=[redacted]"
+			i++
+			continue
+		}
+		if strings.HasPrefix(safe[i], "--env=") {
+			value := strings.TrimPrefix(safe[i], "--env=")
+			name := strings.SplitN(value, "=", 2)[0]
+			safe[i] = "--env=" + name + "=[redacted]"
+		}
+	}
+	return safe
 }
 
 func (m *manager) downloadFile(url, path string, startProgress, endProgress int) error {
@@ -569,6 +599,45 @@ func (m *manager) downloadFile(url, path string, startProgress, endProgress int)
 		if readErr != nil {
 			return readErr
 		}
+	}
+	return nil
+}
+
+func verifySHA256(archivePath, checksumPath string) error {
+	checksumData, err := os.ReadFile(checksumPath)
+	if err != nil {
+		return fmt.Errorf("read checksum file: %w", err)
+	}
+	archive, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("open downloaded archive: %w", err)
+	}
+	defer archive.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, archive); err != nil {
+		return fmt.Errorf("hash downloaded archive: %w", err)
+	}
+	actual := fmt.Sprintf("%x", hash.Sum(nil))
+	expectedName := filepath.Base(archivePath)
+
+	var expected string
+	for _, line := range strings.Split(string(checksumData), "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 2 {
+			continue
+		}
+		name := strings.TrimPrefix(fields[len(fields)-1], "*")
+		if filepath.Base(name) == expectedName || strings.HasSuffix(name, "-source.zip") {
+			expected = strings.ToLower(fields[0])
+			break
+		}
+	}
+	if expected == "" {
+		return errors.New("release checksum file does not contain the source archive")
+	}
+	if !strings.EqualFold(actual, expected) {
+		return fmt.Errorf("source archive checksum mismatch")
 	}
 	return nil
 }
@@ -669,6 +738,7 @@ func (m *manager) buildRelease(root, image, version, commit, buildDate string) e
 		"--progress=plain",
 		"--pull",
 		"--build-arg", "BUILD_JS=1",
+		"--build-arg", "RUN_TESTS=1",
 		"--build-arg", "GO_VERSION=1.26.0",
 		"--build-arg", "GOTIFY_MU_VERSION="+version,
 		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
