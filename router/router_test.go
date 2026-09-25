@@ -22,6 +22,17 @@ var (
 	forbiddenJSON = `{"error":"Forbidden", "errorCode":403, "errorDescription":"you are not allowed to access this api"}`
 )
 
+func TestShouldAuditMutation(t *testing.T) {
+	assert.True(t, shouldAuditMutation("/user/:id"))
+	assert.True(t, shouldAuditMutation("/group/:id/members"))
+	assert.True(t, shouldAuditMutation("/plugin/install"))
+	assert.True(t, shouldAuditMutation("/application/:id/security"))
+	assert.False(t, shouldAuditMutation("/message"))
+	assert.False(t, shouldAuditMutation("/application/:id/message/archive"))
+	assert.False(t, shouldAuditMutation("/plugin/:id/custom/:token/webhook"))
+	assert.False(t, shouldAuditMutation("/auth/local/login"))
+}
+
 func TestIntegrationSuite(t *testing.T) {
 	suite.Run(t, new(IntegrationSuite))
 }
