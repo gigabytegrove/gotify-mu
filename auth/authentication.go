@@ -229,7 +229,7 @@ func (a *Auth) handleClient(checks ...func(*model.Client) (authState, error)) fu
 			!strings.HasPrefix(ctx.Request.URL.Path, "/auth/logout") {
 			user, userErr := a.DB.GetUserByID(client.UserID)
 			if userErr != nil { return authStateSkip, userErr }
-			if user != nil && user.OIDCID == nil { return authStateMFARequired, nil }
+			if user != nil && user.OIDCID == nil && user.LDAPID == nil { return authStateMFARequired, nil }
 		}
 
 		now := timeNow()
@@ -339,7 +339,7 @@ func (a *Auth) checkClientAdmin(client *model.Client) (authState, error) {
 		return authStateForbidden, nil
 	} else if !user.Admin {
 		return authStateForbidden, nil
-	} else if user.OIDCID == nil {
+	} else if user.OIDCID == nil && user.LDAPID == nil {
 		policy, err := a.DB.GetSecurityPolicy()
 		if err != nil { return authStateSkip, err }
 		if policy.RequireMFAForAdmins && !client.MFAAuthenticated { return authStateMFARequired, nil }
