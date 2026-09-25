@@ -96,6 +96,9 @@ type HomeAssistantIntegration struct {
 	BaseURL       string    `gorm:"type:text" json:"baseUrl"`
 	Token         string    `gorm:"type:text" json:"-"`
 	EventType       string     `gorm:"type:text" json:"eventType"`
+	EntityIDs       string     `gorm:"type:text" json:"entityIds"`
+	DataField       string     `gorm:"type:text" json:"dataField"`
+	DataValue       string     `gorm:"type:text" json:"dataValue"`
 	Enabled         bool       `json:"enabled"`
 	Status          string     `gorm:"type:varchar(24)" json:"status"`
 	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
@@ -115,6 +118,9 @@ type HomeAssistantIntegrationView struct {
 	BaseURL         string    `json:"baseUrl"`
 	TokenConfigured bool      `json:"tokenConfigured"`
 	EventType       string     `json:"eventType"`
+	EntityIDs       string     `json:"entityIds"`
+	DataField       string     `json:"dataField"`
+	DataValue       string     `json:"dataValue"`
 	Enabled         bool       `json:"enabled"`
 	Status          string     `json:"status"`
 	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
