@@ -264,5 +264,13 @@ export interface ISecurityPolicy {
     auditRetentionDays: number;
     automationRetentionDays: number;
     allowNativePluginUploads: boolean;
+    requireMfaAdmins: boolean;
+    requireMfaAll: boolean;
     updatedAt: string;
+}
+
+
+export interface IMFAStatus {
+    enabled: boolean;
+    recoveryCodesRemaining: number;
 }
