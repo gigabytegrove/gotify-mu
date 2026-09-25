@@ -222,7 +222,13 @@ const Dashboard = observer(() => {
                     <SurfaceCard
                         title="Server & Security"
                         subtitle="Runtime identity and authentication state."
-                        action={<Chip size="small" label="Online" />}>
+                        action={
+                            <Chip
+                                size="small"
+                                color={currentUser.connectionErrorMessage ? 'warning' : 'success'}
+                                label={currentUser.connectionErrorMessage ? 'Attention' : 'Connected'}
+                            />
+                        }>
                         <Stack spacing={1}>
                             <InfoRow label="Version" value={`@${version.version}`} />
                             <Divider />
