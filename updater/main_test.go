@@ -20,6 +20,20 @@ func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 	inspected.HostConfig.ExtraHosts = []string{"example.local:192.0.2.10"}
 	inspected.HostConfig.DNS = []string{"1.1.1.1"}
 	inspected.HostConfig.DNSSearch = []string{"example.local"}
+	inspected.Config.Labels = map[string]string{"com.example.role":"notifications"}
+	inspected.Config.Hostname = "notify01"
+	inspected.HostConfig.Memory = 536870912
+	inspected.HostConfig.NanoCPUs = 1500000000
+	inspected.HostConfig.PidsLimit = 256
+	inspected.HostConfig.CapAdd = []string{"NET_BIND_SERVICE"}
+	inspected.HostConfig.CapDrop = []string{"NET_RAW"}
+	inspected.HostConfig.ReadonlyRootfs = true
+	inspected.HostConfig.SecurityOpt = []string{"no-new-privileges"}
+	inspected.HostConfig.ShmSize = 67108864
+	inspected.HostConfig.Tmpfs = map[string]string{"/tmp":"rw,noexec,nosuid,size=64m"}
+	inspected.HostConfig.Devices = []deviceMapping{{PathOnHost:"/dev/null",PathInContainer:"/dev/testnull",CgroupPermissions:"r"}}
+	inspected.HostConfig.LogConfig = logConfig{Type:"local",Config:map[string]string{"max-size":"10m"}}
+	inspected.HostConfig.Ulimits = []ulimit{{Name:"nofile",Soft:1024,Hard:4096}}
 
 	args := createArgs("gotify-mu", "gotify-mu:release-0.2.2", inspected)
 
@@ -34,6 +48,21 @@ func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 		{"--add-host", "example.local:192.0.2.10"},
 		{"--dns", "1.1.1.1"},
 		{"--dns-search", "example.local"},
+		{"--label", "com.example.role=notifications"},
+		{"--hostname", "notify01"},
+		{"--memory", "536870912"},
+		{"--cpus", "1.5"},
+		{"--pids-limit", "256"},
+		{"--cap-add", "NET_BIND_SERVICE"},
+		{"--cap-drop", "NET_RAW"},
+		{"--read-only"},
+		{"--security-opt", "no-new-privileges"},
+		{"--shm-size", "67108864"},
+		{"--tmpfs", "/tmp:rw,noexec,nosuid,size=64m"},
+		{"--device", "/dev/null:/dev/testnull:r"},
+		{"--log-driver", "local"},
+		{"--log-opt", "max-size=10m"},
+		{"--ulimit", "nofile=1024:4096"},
 		{"--user", "1000:1000"},
 		{"--workdir", "/app"},
 	}
