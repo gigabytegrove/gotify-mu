@@ -3,8 +3,8 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -21,6 +21,7 @@ import (
 	gerror "github.com/gotify/server/v3/error"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/plugin"
+	"github.com/gotify/server/v3/security"
 	"github.com/gotify/server/v3/ui"
 	"github.com/rs/zerolog/log"
 )
@@ -114,7 +115,13 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	auditHandler := api.AuditAPI{DB: db}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
-	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
+	automationHandler := api.AutomationAPI{
+		DB: db,
+		Engine: automationEngine,
+		WebhookLimiter: security.NewDynamicLimiter(),
+		WebhookReplay: security.NewReplayCache(),
+	}
+	loginLimiter := security.NewFixedWindowLimiter(10, 5*time.Minute)
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
@@ -172,7 +179,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	g.Group("/user").Use(authentication.OptionalAdmin).POST("", userHandler.CreateUser)
 
-	g.POST("/auth/local/login", sessionHandler.Login)
+	g.POST("/auth/local/login", security.RateLimitMiddleware(loginLimiter, func(ctx *gin.Context) string { return ctx.ClientIP() }), sessionHandler.Login)
 
 	g.OPTIONS("/*any")
 
@@ -413,7 +420,25 @@ func shouldAuditMutation(path string) bool {
 	}
 }
 
-var tokenRegexp = regexp.MustCompile("token=[^&]+")
+func sanitizeRequestPath(path, rawQuery string) string {
+	if strings.HasPrefix(path, "/integrations/webhook/") {
+		path = "/integrations/webhook/[masked]"
+	}
+	if rawQuery == "" {
+		return path
+	}
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return path + "?[masked]"
+	}
+	for key := range values {
+		switch strings.ToLower(key) {
+		case "token", "code", "state", "access_token", "id_token", "secret", "key", "password", "client_secret", "refresh_token":
+			values.Set(key, "[masked]")
+		}
+	}
+	return path + "?" + values.Encode()
+}
 
 func accessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -429,10 +454,7 @@ func accessLogger() gin.HandlerFunc {
 			return
 		}
 
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
-		}
-		path = tokenRegexp.ReplaceAllString(path, "token=[masked]")
+		path = sanitizeRequestPath(path, rawQuery)
 
 		latency := time.Since(start)
 		if latency > time.Minute {
