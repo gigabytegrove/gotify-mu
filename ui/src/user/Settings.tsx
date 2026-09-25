@@ -88,6 +88,8 @@ const Settings = ({themeMode, setTheme}: IProps) => {
             </Stack>
         </SurfaceCard>
 
+        <MFASettings />
+
         <SurfaceCard
             title="Change Password"
             subtitle="Choose a new password for your account."
@@ -298,6 +300,157 @@ const NotificationPreferences = () => {
     );
 };
 
+interface MFAStatus {
+    enabled: boolean;
+    recoveryRemaining: number;
+}
+
+interface MFASetup {
+    secret: string;
+    provisioningUri: string;
+}
+
+const MFASettings = () => {
+    const {snackManager, elevateStore} = useStores();
+    const [status, setStatus] = React.useState<MFAStatus>();
+    const [setup, setSetup] = React.useState<MFASetup>();
+    const [code, setCode] = React.useState('');
+    const [recoveryCodes, setRecoveryCodes] = React.useState<string[]>([]);
+
+    const refresh = React.useCallback(async () => {
+        const response = await axios.get<MFAStatus>(config.get('url') + 'current/user/mfa');
+        setStatus(response.data);
+    }, []);
+
+    React.useEffect(() => void refresh(), [refresh]);
+
+    const beginSetup = async () => {
+        const response = await axios.post<MFASetup>(config.get('url') + 'current/user/mfa/setup');
+        setSetup(response.data);
+        setCode('');
+        setRecoveryCodes([]);
+    };
+
+    const enable = async () => {
+        if (!setup) return;
+        const response = await axios.post<{recoveryCodes: string[]}>(
+            config.get('url') + 'current/user/mfa/enable',
+            {secret: setup.secret, code}
+        );
+        setRecoveryCodes(response.data.recoveryCodes);
+        setSetup(undefined);
+        setCode('');
+        await refresh();
+        snackManager.snack('Authenticator verification enabled');
+    };
+
+    const disable = async () => {
+        await axios.delete(config.get('url') + 'current/user/mfa');
+        setRecoveryCodes([]);
+        await refresh();
+        snackManager.snack('Authenticator verification disabled');
+    };
+
+    if (!status) {
+        return (
+            <SurfaceCard title="Authenticator Verification" subtitle="Add a second sign-in step.">
+                <Typography color="text.secondary">Loading security settings…</Typography>
+            </SurfaceCard>
+        );
+    }
+
+    return (
+        <SurfaceCard
+            title="Authenticator Verification"
+            subtitle="Require a rotating verification code after your password."
+            action={<Security color="action" />}>
+            {!elevateStore.elevated ? (
+                <ElevationForm />
+            ) : (
+                <Stack spacing={2}>
+                    <Stack
+                        direction={{xs: 'column', sm: 'row'}}
+                        spacing={1}
+                        sx={{justifyContent: 'space-between', alignItems: {sm: 'center'}}}>
+                        <Stack>
+                            <Typography sx={{fontWeight: 600}}>
+                                {status.enabled ? 'Enabled' : 'Not enabled'}
+                            </Typography>
+                            {status.enabled && (
+                                <Typography variant="body2" color="text.secondary">
+                                    {status.recoveryRemaining} recovery code
+                                    {status.recoveryRemaining === 1 ? '' : 's'} remaining
+                                </Typography>
+                            )}
+                        </Stack>
+                        {status.enabled ? (
+                            <Button color="error" onClick={() => void disable()}>
+                                Disable
+                            </Button>
+                        ) : (
+                            <Button variant="contained" onClick={() => void beginSetup()}>
+                                Set Up
+                            </Button>
+                        )}
+                    </Stack>
+
+                    {setup && (
+                        <Stack spacing={1.5}>
+                            <Typography>
+                                Add Gotify MU to your authenticator using this setup key:
+                            </Typography>
+                            <TextField
+                                label="Setup key"
+                                value={setup.secret}
+                                slotProps={{input: {readOnly: true}}}
+                                fullWidth
+                            />
+                            <Typography variant="caption" color="text.secondary" sx={{wordBreak: 'break-all'}}>
+                                {setup.provisioningUri}
+                            </Typography>
+                            <TextField
+                                label="6-digit verification code"
+                                value={code}
+                                onChange={(event) => setCode(event.target.value)}
+                                autoComplete="one-time-code"
+                                fullWidth
+                            />
+                            <Button
+                                variant="contained"
+                                disabled={code.trim().length !== 6}
+                                onClick={() => void enable()}>
+                                Verify and Enable
+                            </Button>
+                        </Stack>
+                    )}
+
+                    {recoveryCodes.length > 0 && (
+                        <Stack spacing={1}>
+                            <Typography sx={{fontWeight: 700}}>Save your recovery codes</Typography>
+                            <Typography variant="body2" color="text.secondary">
+                                Each code works once. Store them somewhere safe; they are not shown again.
+                            </Typography>
+                            <TextField
+                                multiline
+                                minRows={5}
+                                value={recoveryCodes.join('\n')}
+                                slotProps={{input: {readOnly: true}}}
+                                fullWidth
+                            />
+                            <Button
+                                onClick={() =>
+                                    void navigator.clipboard.writeText(recoveryCodes.join('\n'))
+                                }>
+                                Copy Recovery Codes
+                            </Button>
+                        </Stack>
+                    )}
+                </Stack>
+            )}
+        </SurfaceCard>
+    );
+};
+
 const ChangePasswordForm = () => {
     const [pass, setPass] = useState('');
     const {currentUser, elevateStore} = useStores();
@@ -333,12 +486,18 @@ const ChangePasswordForm = () => {
                     onChange={(e) => setPass(e.target.value)}
                     fullWidth
                 />
-                <Tooltip title={pass.length !== 0 ? '' : 'Password is required'}>
+                <Tooltip title={
+                        pass.length === 0
+                            ? 'Password is required'
+                            : pass.length < 12
+                              ? 'Use at least 12 characters'
+                              : ''
+                    }>
                     <span>
                         <Button
                             className="change"
                             type="submit"
-                            disabled={!localAuthEnabled || pass.length === 0}
+                            disabled={!localAuthEnabled || pass.length < 12}
                             variant="contained">
                             Change Password
                         </Button>
