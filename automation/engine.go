@@ -89,6 +89,8 @@ type Engine struct {
 	integrationWG      sync.WaitGroup
 	reload             chan struct{}
 	instanceID         string
+	hookMu             sync.RWMutex
+	postStoreHooks     []func(*model.Message)
 }
 
 func New(db Database, notifier Notifier) *Engine {
@@ -113,6 +115,22 @@ func (e *Engine) Close() {
 	e.cancel()
 	e.stopIntegrations()
 	e.wg.Wait()
+}
+
+func (e *Engine) AddPostStoreHook(hook func(*model.Message)) {
+	if hook == nil { return }
+	e.hookMu.Lock()
+	e.postStoreHooks = append(e.postStoreHooks, hook)
+	e.hookMu.Unlock()
+}
+
+func (e *Engine) runPostStoreHooks(msg *model.Message) {
+	e.hookMu.RLock()
+	hooks := append([]func(*model.Message){}, e.postStoreHooks...)
+	e.hookMu.RUnlock()
+	for _, hook := range hooks {
+		hook(msg)
+	}
 }
 
 func (e *Engine) ReloadIntegrations() {
@@ -177,6 +195,7 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 			log.Error().Err(err).Uint("message_id", msg.ID).Msg("Could not queue escalation")
 		}
 	}
+	e.runPostStoreHooks(msg)
 	return external, nil
 }
 
