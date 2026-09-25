@@ -685,16 +685,18 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		}
 
 		if fetchedApp.UserID != userID {
-			if !fetchedApp.AllowMemberPost {
-				ctx.AbortWithError(400, errors.New("appid not found"))
-				return
-			}
 			membership, err := a.DB.GetApplicationMembership(fetchedApp.ID, userID)
 			if success := successOrAbort(ctx, 500, err); !success {
 				return
 			}
 			if membership == nil {
 				ctx.AbortWithError(400, errors.New("appid not found"))
+				return
+			}
+			canPublish := fetchedApp.AllowMemberPost &&
+				(membership.Role == model.ApplicationRoleManager || membership.Role == model.ApplicationRolePublisher)
+			if !canPublish {
+				ctx.AbortWithError(403, errors.New("you do not have permission to publish to this Channel"))
 				return
 			}
 		}
