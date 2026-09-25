@@ -114,6 +114,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.ScheduledRun),
 		new(model.WebhookReplay),
 		new(model.AuditSettings),
+		new(model.ApplicationGroupGrant),
 	); err != nil {
 		return nil, err
 	}
