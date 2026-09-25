@@ -7,6 +7,7 @@ import {CurrentUser} from './CurrentUser';
 export class ElevateStore {
     @observable accessor elevated = false;
     @observable accessor oidcElevatePending = false;
+    @observable accessor reauthenticationRequired = false;
     private oidcPollIntervalId: number | undefined = undefined;
     private oidcPopup: Window | null = null;
 
@@ -31,6 +32,16 @@ export class ElevateStore {
         return ms;
     };
 
+    @action
+    public requestReauthentication = (): void => {
+        this.reauthenticationRequired = true;
+    };
+
+    @action
+    public dismissReauthentication = (): void => {
+        this.reauthenticationRequired = false;
+    };
+
     public localElevate = async (password: string, durationSeconds: number): Promise<void> => {
         await axios.create().request({
             url: `${config.get('url')}client/${this.currentUser.user.clientId}/elevate`,
@@ -41,6 +52,9 @@ export class ElevateStore {
             },
         });
         await this.currentUser.tryAuthenticate();
+        runInAction(() => {
+            this.reauthenticationRequired = false;
+        });
         this.cleanupOidcElevate();
     };
 
@@ -81,7 +95,11 @@ export class ElevateStore {
             // errors handled in tryAuthenticate
         }
 
-        if (!this.elevated) {
+        if (this.elevated) {
+            runInAction(() => {
+                this.reauthenticationRequired = false;
+            });
+        } else {
             this.snack(`${config.get('oidcIdpName')} elevation was not completed.`);
         }
         this.cleanupOidcElevate();
