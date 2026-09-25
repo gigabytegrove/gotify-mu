@@ -134,6 +134,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
 	securityPolicyHandler := api.SecurityPolicyAPI{DB: db}
 	mfaHandler := api.MFAAPI{DB: db}
+	operationsHandler := api.OperationsAPI{
+		DB: db,
+		NotifyDeleted: streamHandler.NotifyDeletedClient,
+		DatabaseDialect: conf.Database.Dialect,
+		DatabaseConnection: conf.Database.Connection,
+		DataPaths: []string{conf.UploadedImagesDir, conf.PluginsDir, filepath.Dir(conf.Database.Connection)},
+		Version: vInfo,
+	}
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
@@ -355,6 +363,11 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	adminPlatform := g.Group("")
 	{
 		adminPlatform.Use(authentication.RequireAdmin)
+		adminPlatform.GET("/operations/sessions", operationsHandler.Sessions)
+		adminPlatform.DELETE("/operations/sessions/:id", operationsHandler.RevokeSession)
+		adminPlatform.GET("/operations/stats", operationsHandler.Stats)
+		adminPlatform.GET("/operations/diagnostics", operationsHandler.Diagnostics)
+
 		adminPlatform.GET("/security/policy", securityPolicyHandler.Get)
 		adminPlatform.PUT("/security/policy", securityPolicyHandler.Save)
 		adminPlatform.GET("/audit", auditHandler.GetAuditEvents)
