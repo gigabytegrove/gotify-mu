@@ -20,15 +20,21 @@ export class UserStore extends BaseStore<IUser> {
     }
 
     @action
-    public create = async (name: string, pass: string, admin: boolean) => {
-        await axios.post(`${config.get('url')}user`, {name, pass, admin});
+    public create = async (name: string, displayName: string, pass: string, admin: boolean) => {
+        await axios.post(`${config.get('url')}user`, {name, displayName, pass, admin});
         await this.refresh();
         this.snack('User created');
     };
 
     @action
-    public update = async (id: number, name: string, pass: string | null, admin: boolean) => {
-        await axios.post(config.get('url') + 'user/' + id, {name, pass, admin});
+    public update = async (
+        id: number,
+        name: string,
+        displayName: string,
+        pass: string | null,
+        admin: boolean
+    ) => {
+        await axios.post(config.get('url') + 'user/' + id, {name, displayName, pass, admin});
         await this.refresh();
         this.snack('User updated');
     };
