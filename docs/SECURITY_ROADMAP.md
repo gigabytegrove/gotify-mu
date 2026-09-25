@@ -65,7 +65,7 @@ Future administrative settings should support:
 - elevated-session lifetime
 - account lockout / rate limiting
 - trusted proxy awareness for authentication logs
-- security-event audit log
+- security-event audit log (foundation implemented; event coverage/retention controls will continue expanding)
 
 ## Recovery and migration
 
@@ -85,4 +85,4 @@ The Web UI should eventually expose authentication under **Settings → Security
 - Sessions
 - Audit / security events
 
-The current UI may show these features as planned, but must not imply they are active before the corresponding backend support exists.
+The UI must not imply a security capability is active before the corresponding backend support exists. The Audit Log foundation is now active; MFA and LDAP/AD remain planned until their backend implementations land.
