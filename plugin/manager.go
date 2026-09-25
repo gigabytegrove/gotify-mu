@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"plugin"
@@ -51,6 +52,7 @@ type Manager struct {
 	messages  chan MessageWithUserID
 	db        Database
 	mux       *gin.RouterGroup
+	directory string
 }
 
 // NewManager created a Manager from configurations.
@@ -62,6 +64,7 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 		messages:  make(chan MessageWithUserID),
 		db:        db,
 		mux:       mux,
+		directory: directory,
 	}
 
 	go func() {
@@ -100,8 +103,123 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 	return manager, nil
 }
 
+// MaxPluginUploadBytes is the maximum size accepted for a plugin uploaded through the API.
+const MaxPluginUploadBytes int64 = 100 << 20
+
 // ErrAlreadyEnabledOrDisabled is returned on SetPluginEnabled call when a plugin is already enabled or disabled.
 var ErrAlreadyEnabledOrDisabled = errors.New("config is already enabled/disabled")
+
+// InstallPlugin persists and loads a Linux Go plugin without requiring a server restart.
+// Plugin binaries are server-wide; a disabled per-user plugin configuration is created
+// for every existing user just like plugins discovered during normal startup.
+func (m *Manager) InstallPlugin(filename string, source io.Reader) (compat.Info, []string, error) {
+	var empty compat.Info
+
+	if m.directory == "" {
+		return empty, nil, errors.New("plugin installation is disabled because no plugin directory is configured")
+	}
+
+	name := filepath.Base(strings.TrimSpace(filename))
+	if name == "" || name == "." || strings.HasPrefix(name, ".") {
+		return empty, nil, errors.New("invalid plugin filename")
+	}
+	if strings.ToLower(filepath.Ext(name)) != ".so" {
+		return empty, nil, errors.New("plugin file must use the .so extension")
+	}
+
+	if err := os.MkdirAll(m.directory, 0o755); err != nil {
+		return empty, nil, fmt.Errorf("create plugin directory: %w", err)
+	}
+
+	finalPath := filepath.Join(m.directory, name)
+	if _, err := os.Stat(finalPath); err == nil {
+		return empty, nil, fmt.Errorf("a plugin file named %s already exists", name)
+	} else if !os.IsNotExist(err) {
+		return empty, nil, fmt.Errorf("check plugin destination: %w", err)
+	}
+
+	tmp, err := os.CreateTemp(m.directory, ".gotify-mu-plugin-*.so")
+	if err != nil {
+		return empty, nil, fmt.Errorf("create temporary plugin file: %w", err)
+	}
+	tmpPath := tmp.Name()
+	cleanupPath := tmpPath
+	defer func() {
+		if cleanupPath != "" {
+			_ = os.Remove(cleanupPath)
+		}
+	}()
+
+	written, copyErr := io.Copy(tmp, io.LimitReader(source, MaxPluginUploadBytes+1))
+	closeErr := tmp.Close()
+	if copyErr != nil {
+		return empty, nil, fmt.Errorf("write plugin: %w", copyErr)
+	}
+	if closeErr != nil {
+		return empty, nil, fmt.Errorf("close plugin: %w", closeErr)
+	}
+	if written > MaxPluginUploadBytes {
+		return empty, nil, fmt.Errorf("plugin exceeds the %d MiB upload limit", MaxPluginUploadBytes>>20)
+	}
+	if err := os.Chmod(tmpPath, 0o644); err != nil {
+		return empty, nil, fmt.Errorf("set plugin permissions: %w", err)
+	}
+	if err := os.Rename(tmpPath, finalPath); err != nil {
+		return empty, nil, fmt.Errorf("store plugin: %w", err)
+	}
+	cleanupPath = finalPath
+
+	raw, err := plugin.Open(finalPath)
+	if err != nil {
+		return empty, nil, pluginFileLoadError{name, err}
+	}
+	compatPlugin, err := compat.Wrap(raw)
+	if err != nil {
+		return empty, nil, pluginFileLoadError{name, err}
+	}
+	info := compatPlugin.PluginInfo()
+	if strings.TrimSpace(info.ModulePath) == "" {
+		return empty, nil, errors.New("plugin did not report a module path")
+	}
+
+	users, err := m.db.GetUsers()
+	if err != nil {
+		return empty, nil, fmt.Errorf("load users for plugin initialization: %w", err)
+	}
+
+	m.mutex.Lock()
+	if _, exists := m.plugins[info.ModulePath]; exists {
+		m.mutex.Unlock()
+		return empty, nil, fmt.Errorf("plugin with module path %s is already installed", info.ModulePath)
+	}
+	m.plugins[info.ModulePath] = compatPlugin
+
+	warnings := make([]string, 0)
+	for _, user := range users {
+		userCtx := compat.UserContext{
+			ID:    user.ID,
+			Name:  user.Name,
+			Admin: user.Admin,
+		}
+		if err := m.initializeSingleUserPlugin(userCtx, compatPlugin); err != nil {
+			warnings = append(warnings, fmt.Sprintf("user %d: %s", user.ID, err))
+			log.Error().
+				Err(err).
+				Uint("user_id", user.ID).
+				Str("module_path", info.ModulePath).
+				Msg("Installed plugin but failed to initialize it for user")
+		}
+	}
+	m.mutex.Unlock()
+
+	cleanupPath = ""
+	log.Info().
+		Str("path", finalPath).
+		Str("module_path", info.ModulePath).
+		Msg("Installed plugin from Web UI")
+
+	return info, warnings, nil
+}
 
 // SetPluginEnabled sets the plugins enabled state.
 func (m *Manager) SetPluginEnabled(pluginID uint, enabled bool) error {
