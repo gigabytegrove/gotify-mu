@@ -80,6 +80,15 @@ func (s *PluginSuite) Notify(userID uint, msg *model.MessageExternal) {
 	s.notified = true
 }
 
+func (s *PluginSuite) Test_InstallPlugin_missingFile_expect400() {
+	test.WithUser(s.ctx, 1)
+	s.ctx.Request = httptest.NewRequest("POST", "/plugin/install", nil)
+
+	s.a.InstallPlugin(s.ctx)
+
+	assert.Equal(s.T(), 400, s.recorder.Code)
+}
+
 func (s *PluginSuite) Test_GetPlugins() {
 	test.WithUser(s.ctx, 1)
 

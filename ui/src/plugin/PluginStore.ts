@@ -5,6 +5,12 @@ import * as config from '../config';
 import {SnackReporter} from '../snack/SnackManager';
 import {IPlugin} from '../types';
 
+export interface IPluginInstallResult {
+    name: string;
+    modulePath: string;
+    warnings: string[];
+}
+
 export class PluginStore extends BaseStore<IPlugin> {
     public onDelete: () => void = () => {};
 
@@ -29,6 +35,26 @@ export class PluginStore extends BaseStore<IPlugin> {
     public getName = (id: number): string => {
         const plugin = this.getByIDOrUndefined(id);
         return id === -1 ? 'All Plugins' : plugin !== undefined ? plugin.name : 'unknown';
+    };
+
+    @action
+    public installPlugin = async (file: File): Promise<IPluginInstallResult> => {
+        const form = new FormData();
+        form.append('plugin', file);
+
+        const response = await axios.post<IPluginInstallResult>(
+            `${config.get('url')}plugin/install`,
+            form
+        );
+
+        this.snack(`Installed plugin: ${response.data.name}`);
+        if (response.data.warnings.length > 0) {
+            this.snack(
+                `Plugin installed with ${response.data.warnings.length} initialization warning${response.data.warnings.length === 1 ? '' : 's'}`
+            );
+        }
+        await this.refresh();
+        return response.data;
     };
 
     @action
