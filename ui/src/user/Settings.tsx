@@ -30,7 +30,9 @@ import {ThemeKey} from '../layout/theme';
 import {useStores} from '../stores';
 import * as config from '../config';
 import {UpdateStatusCard} from '../update/UpdateStatus';
-import {IDigestPolicy, IMFASetupResult, IMFAStatus, IQuietHoursPolicy} from '../types';
+import {IDigestPolicy, IMFASetupResult, IMFAStatus, IPasskey, IQuietHoursPolicy} from '../types';
+import {createPasskey} from '../passkey';
+import ConfirmDialog from '../common/ConfirmDialog';
 
 interface IProps {
     themeMode: ThemeKey;
@@ -69,6 +71,7 @@ const Settings = ({themeMode, setTheme}: IProps) => {
         </SurfaceCard>
 
         <MFASettings />
+        <PasskeySettings />
 
         <SurfaceCard
             title="Account Security"
@@ -539,6 +542,121 @@ const MFASettings = () => {
                     <Button onClick={() => setRecoveryCodes(undefined)}>Done</Button>
                 </DialogActions>
             </Dialog>
+        </>
+    );
+};
+
+
+const PasskeySettings = () => {
+    const {currentUser, elevateStore, snackManager} = useStores();
+    const [items, setItems] = React.useState<IPasskey[]>([]);
+    const [name, setName] = React.useState('');
+    const [busy, setBusy] = React.useState(false);
+    const [deleteItem, setDeleteItem] = React.useState<IPasskey>();
+
+    const refresh = React.useCallback(async () => {
+        const response = await axios.get<IPasskey[]>(config.get('url') + 'current/user/passkeys');
+        setItems(response.data);
+    }, []);
+
+    React.useEffect(() => {
+        void refresh();
+    }, [refresh]);
+
+    const add = async () => {
+        if (!elevateStore.elevated) {
+            elevateStore.requestReauthentication();
+            return;
+        }
+        setBusy(true);
+        try {
+            await createPasskey(name.trim() || 'Passkey');
+            setName('');
+            await refresh();
+            await currentUser.tryAuthenticate();
+            snackManager.snack('Passkey added');
+        } finally {
+            setBusy(false);
+        }
+    };
+
+    const remove = async (item: IPasskey) => {
+        await axios.delete(config.get('url') + 'current/user/passkeys/' + item.id);
+        await refresh();
+        await currentUser.tryAuthenticate();
+        snackManager.snack('Passkey removed');
+    };
+
+    return (
+        <>
+            <SurfaceCard
+                title="Passkeys"
+                subtitle="Use a device passkey or security key for passwordless sign-in and identity confirmation."
+                action={<Key color="action" />}>
+                <Stack spacing={2}>
+                    {items.length === 0 ? (
+                        <Typography color="text.secondary">No passkeys are registered.</Typography>
+                    ) : (
+                        <Stack spacing={1}>
+                            {items.map((item) => (
+                                <Stack
+                                    key={item.id}
+                                    direction={{xs: 'column', sm: 'row'}}
+                                    spacing={1}
+                                    sx={{
+                                        border: 1,
+                                        borderColor: 'divider',
+                                        borderRadius: 2,
+                                        p: 1.5,
+                                        justifyContent: 'space-between',
+                                        alignItems: {sm: 'center'},
+                                    }}>
+                                    <Box>
+                                        <Typography sx={{fontWeight: 700}}>{item.name}</Typography>
+                                        <Typography variant="caption" color="text.secondary">
+                                            Added {new Date(item.createdAt).toLocaleString()}
+                                            {item.lastUsedAt
+                                                ? ' · Last used ' +
+                                                  new Date(item.lastUsedAt).toLocaleString()
+                                                : ''}
+                                        </Typography>
+                                    </Box>
+                                    <Button
+                                        size="small"
+                                        color="error"
+                                        onClick={() => setDeleteItem(item)}>
+                                        Remove
+                                    </Button>
+                                </Stack>
+                            ))}
+                        </Stack>
+                    )}
+                    <Stack direction={{xs: 'column', sm: 'row'}} spacing={1}>
+                        <TextField
+                            label="Passkey name"
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="Laptop, phone, security key"
+                            fullWidth
+                        />
+                        <Button
+                            variant="contained"
+                            disabled={busy}
+                            onClick={() => void add()}>
+                            Add Passkey
+                        </Button>
+                    </Stack>
+                </Stack>
+            </SurfaceCard>
+            {deleteItem && (
+                <ConfirmDialog
+                    title="Remove Passkey?"
+                    text={'Remove "' + deleteItem.name + '" from this account?'}
+                    requireElevated
+                    fClose={() => setDeleteItem(undefined)}
+                    fOnSubmit={() => void remove(deleteItem)}
+                />
+            )}
         </>
     );
 };
