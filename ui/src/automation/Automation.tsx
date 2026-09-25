@@ -30,6 +30,8 @@ import {
     IEscalationRule,
     IScheduledNotification,
     IScheduledNotificationRun,
+    IUser,
+    IUserGroup,
 } from '../types';
 
 const api = (path: string) => config.get('url') + path;
@@ -40,10 +42,30 @@ const channelName = (
     id: number
 ): string => channels.find((channel) => channel.id === id)?.name || 'Unknown Channel';
 
+const escalationTargetName = (
+    item: IEscalationRule,
+    channels: Array<{id: number; name: string}>,
+    users: IUser[],
+    groups: IUserGroup[]
+): string => {
+    const targetType = item.targetType || 'channel';
+    const targetId = item.targetId || item.targetApplicationId;
+    if (targetType === 'user') {
+        const user = users.find((candidate) => candidate.id === targetId);
+        return user?.displayName || user?.name || 'Unknown user';
+    }
+    if (targetType === 'group') {
+        return groups.find((group) => group.id === targetId)?.name || 'Unknown Group';
+    }
+    return channelName(channels, targetId);
+};
+
 const Automation = () => {
     const {appStore, snackManager} = useStores();
     const [schedules, setSchedules] = React.useState<IScheduledNotification[]>([]);
     const [escalations, setEscalations] = React.useState<IEscalationRule[]>([]);
+    const [users, setUsers] = React.useState<IUser[]>([]);
+    const [groups, setGroups] = React.useState<IUserGroup[]>([]);
     const [scheduleEdit, setScheduleEdit] =
         React.useState<IScheduledNotification | null | undefined>();
     const [escalationEdit, setEscalationEdit] =
@@ -60,12 +82,17 @@ const Automation = () => {
         setLoading(true);
         try {
             await appStore.refresh();
-            const [scheduleResponse, escalationResponse] = await Promise.all([
-                axios.get<IScheduledNotification[]>(api('automation/schedule')),
-                axios.get<IEscalationRule[]>(api('automation/escalation')),
-            ]);
+            const [scheduleResponse, escalationResponse, userResponse, groupResponse] =
+                await Promise.all([
+                    axios.get<IScheduledNotification[]>(api('automation/schedule')),
+                    axios.get<IEscalationRule[]>(api('automation/escalation')),
+                    axios.get<IUser[]>(api('user')),
+                    axios.get<IUserGroup[]>(api('group')),
+                ]);
             setSchedules(scheduleResponse.data);
             setEscalations(escalationResponse.data);
+            setUsers(userResponse.data);
+            setGroups(groupResponse.data);
         } finally {
             setLoading(false);
         }
@@ -165,7 +192,7 @@ const Automation = () => {
                                 subtitle={
                                     channelName(channels, item.sourceApplicationId) +
                                     ' → ' +
-                                    channelName(channels, item.targetApplicationId)
+                                    escalationTargetName(item, channels, users, groups)
                                 }
                                 detail={
                                     'After ' +
@@ -174,7 +201,15 @@ const Automation = () => {
                                     (item.delayMinutes === 1 ? '' : 's') +
                                     ' if priority is ' +
                                     item.minPriority +
-                                    ' or higher and the message is still unacknowledged.'
+                                    ' or higher and the message is still unacknowledged.' +
+                                    (item.repeatMinutes > 0 && item.maxRepeats > 0
+                                        ? ' Repeats every ' +
+                                          item.repeatMinutes +
+                                          ' minutes up to ' +
+                                          item.maxRepeats +
+                                          ' additional time' +
+                                          (item.maxRepeats === 1 ? '.' : 's.')
+                                        : '')
                                 }
                                 onEdit={() => setEscalationEdit(item)}
                                 onDelete={async () => {
@@ -288,6 +323,8 @@ const Automation = () => {
                 <EscalationDialog
                     item={escalationEdit}
                     channels={channels}
+                    users={users}
+                    groups={groups}
                     onClose={() => setEscalationEdit(undefined)}
                     onSaved={async () => {
                         setEscalationEdit(undefined);
@@ -664,11 +701,15 @@ const ScheduleDialog = ({
 const EscalationDialog = ({
     item,
     channels,
+    users,
+    groups,
     onClose,
     onSaved,
 }: {
     item: IEscalationRule | null;
     channels: Array<{id: number; name: string}>;
+    users: IUser[];
+    groups: IUserGroup[];
     onClose: VoidFunction;
     onSaved: () => Promise<void>;
 }) => {
@@ -676,11 +717,16 @@ const EscalationDialog = ({
     const [sourceApplicationId, setSourceApplicationId] = React.useState(
         item?.sourceApplicationId || 0
     );
-    const [targetApplicationId, setTargetApplicationId] = React.useState(
-        item?.targetApplicationId || 0
+    const [targetType, setTargetType] = React.useState<'channel' | 'user' | 'group'>(
+        item?.targetType || 'channel'
+    );
+    const [targetId, setTargetId] = React.useState(
+        item?.targetId || item?.targetApplicationId || 0
     );
     const [minPriority, setMinPriority] = React.useState(item?.minPriority ?? 4);
     const [delayMinutes, setDelayMinutes] = React.useState(item?.delayMinutes ?? 15);
+    const [repeatMinutes, setRepeatMinutes] = React.useState(item?.repeatMinutes ?? 0);
+    const [maxRepeats, setMaxRepeats] = React.useState(item?.maxRepeats ?? 0);
     const [enabled, setEnabled] = React.useState(item?.enabled ?? true);
     const [saving, setSaving] = React.useState(false);
 
@@ -690,9 +736,13 @@ const EscalationDialog = ({
             const payload = {
                 name,
                 sourceApplicationId,
-                targetApplicationId,
+                targetApplicationId: targetType === 'channel' ? targetId : 0,
+                targetType,
+                targetId,
                 minPriority,
                 delayMinutes,
+                repeatMinutes,
+                maxRepeats,
                 enabled,
             };
             if (item) {
@@ -718,12 +768,54 @@ const EscalationDialog = ({
                         onChange={setSourceApplicationId}
                         channels={channels}
                     />
-                    <ChannelSelect
-                        label="Escalate to"
-                        value={targetApplicationId}
-                        onChange={setTargetApplicationId}
-                        channels={channels.filter((channel) => channel.id !== sourceApplicationId)}
-                    />
+                    <TextField
+                        select
+                        label="Escalation target"
+                        value={targetType}
+                        onChange={(event) => {
+                            setTargetType(event.target.value as 'channel' | 'user' | 'group');
+                            setTargetId(0);
+                        }}>
+                        <MenuItem value="channel">Channel</MenuItem>
+                        <MenuItem value="user">User</MenuItem>
+                        <MenuItem value="group">Group</MenuItem>
+                    </TextField>
+                    {targetType === 'channel' && (
+                        <ChannelSelect
+                            label="Escalate to Channel"
+                            value={targetId}
+                            onChange={setTargetId}
+                            channels={channels.filter((channel) => channel.id !== sourceApplicationId)}
+                        />
+                    )}
+                    {targetType === 'user' && (
+                        <TextField
+                            select
+                            label="Escalate to user"
+                            value={targetId || ''}
+                            onChange={(event) => setTargetId(Number(event.target.value))}
+                            required>
+                            {users.map((user) => (
+                                <MenuItem key={user.id} value={user.id}>
+                                    {user.displayName || user.name}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    )}
+                    {targetType === 'group' && (
+                        <TextField
+                            select
+                            label="Escalate to Group"
+                            value={targetId || ''}
+                            onChange={(event) => setTargetId(Number(event.target.value))}
+                            required>
+                            {groups.map((group) => (
+                                <MenuItem key={group.id} value={group.id}>
+                                    {group.name}
+                                </MenuItem>
+                            ))}
+                        </TextField>
+                    )}
                     <TextField
                         type="number"
                         label="Minimum priority"
@@ -737,6 +829,22 @@ const EscalationDialog = ({
                         onChange={(e) => setDelayMinutes(Number(e.target.value))}
                         helperText="Minutes without acknowledgement before the message is escalated."
                         slotProps={{htmlInput: {min: 1, max: 10080}}}
+                    />
+                    <TextField
+                        type="number"
+                        label="Repeat every"
+                        value={repeatMinutes}
+                        onChange={(e) => setRepeatMinutes(Number(e.target.value))}
+                        helperText="Minutes between repeated escalations. Use 0 to disable repeats."
+                        slotProps={{htmlInput: {min: 0, max: 10080}}}
+                    />
+                    <TextField
+                        type="number"
+                        label="Maximum repeats"
+                        value={maxRepeats}
+                        onChange={(e) => setMaxRepeats(Number(e.target.value))}
+                        helperText="Additional escalation deliveries after the first one."
+                        slotProps={{htmlInput: {min: 0, max: 1000}}}
                     />
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
@@ -752,8 +860,8 @@ const EscalationDialog = ({
                         saving ||
                         !name ||
                         !sourceApplicationId ||
-                        !targetApplicationId ||
-                        sourceApplicationId === targetApplicationId
+                        !targetId ||
+                        (targetType === 'channel' && sourceApplicationId === targetId)
                     }
                     onClick={() => void save()}>
                     Save
