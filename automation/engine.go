@@ -33,6 +33,7 @@ type Notifier interface {
 // Database is the storage contract required by the native integration engine.
 type Database interface {
 	CreateMessage(message *model.Message) error
+	CreateMessageOnce(message *model.Message, key string) (bool, error)
 	GetMessageByID(id uint) (*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
@@ -171,6 +172,38 @@ func (e *Engine) StoreAndDeliverToUsers(msg *model.Message, userIDs []uint) (*mo
 	return external, nil
 }
 
+func (e *Engine) storeAndDeliverOnce(msg *model.Message, key string, allowEscalation bool) (*model.MessageExternal, bool, error) {
+	if msg.Date.IsZero() { msg.Date = time.Now() }
+	created, err := e.db.CreateMessageOnce(msg, key)
+	if err != nil { return nil, false, err }
+	external := externalMessage(msg)
+	if !created {
+		return external, false, nil
+	}
+	recipients, err := e.db.GetApplicationRecipientUserIDs(msg.ApplicationID)
+	if err != nil { return nil, false, err }
+	for _, userID := range recipients {
+		if err := e.deliver(userID, msg, external); err != nil {
+			log.Error().Err(err).Uint("user_id", userID).Uint("message_id", msg.ID).Msg("Could not apply delivery policy")
+			e.notifier.Notify(userID, external)
+		}
+	}
+	if allowEscalation {
+		if err := e.queueEscalations(msg); err != nil { return nil, true, err }
+	}
+	return external, true, nil
+}
+
+func (e *Engine) publishOnce(applicationID uint, title, message string, priority int, key string) (*model.Message, bool, error) {
+	app, err := e.db.GetApplicationByID(applicationID)
+	if err != nil { return nil, false, err }
+	if app == nil { return nil, false, errors.New("channel not found") }
+	if strings.TrimSpace(title) == "" { title = app.Name }
+	msg := &model.Message{ApplicationID:applicationID,Title:title,Message:message,Priority:priority,Date:time.Now()}
+	_, created, err := e.storeAndDeliverOnce(msg, key, true)
+	return msg, created, err
+}
+
 func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*model.MessageExternal, error) {
 	if msg.Date.IsZero() {
 		msg.Date = time.Now()
@@ -299,7 +332,10 @@ func (e *Engine) runSchedules(now time.Time) {
 		return
 	}
 	for _, item := range items {
-		if _, err := e.Publish(item.ApplicationID, item.Title, item.Message, item.Priority); err != nil {
+		if item.NextRunAt == nil { continue }
+		dueAt := *item.NextRunAt
+		key := fmt.Sprintf("schedule:%d:%d", item.ID, dueAt.UnixNano())
+		if _, _, err := e.publishOnce(item.ApplicationID, item.Title, item.Message, item.Priority, key); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
 			continue
 		}
@@ -445,7 +481,8 @@ func (e *Engine) runEscalations(now time.Time) {
 					}
 					body := msg.Message + "\n\nThis notification was escalated because it was not acknowledged."
 					escalated := &model.Message{ApplicationID:rule.TargetApplicationID,Title:title,Message:body,Priority:msg.Priority,Date:time.Now(),ParentMessageID:msg.ID,EscalationRuleID:rule.ID}
-					if _, publishErr := e.storeAndDeliver(escalated, false); publishErr != nil {
+					key := fmt.Sprintf("escalation:%d", state.ID)
+					if _, _, publishErr := e.storeAndDeliverOnce(escalated, key, false); publishErr != nil {
 						log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
 						continue
 					}
