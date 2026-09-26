@@ -214,8 +214,11 @@ export interface IHomeAssistantIntegration {
     id: number;
     name: string;
     applicationId: number;
+    connectionMode: 'token' | 'integration';
     baseUrl: string;
     tokenConfigured: boolean;
+    nativePaired: boolean;
+    pairingExpiresAt?: string;
     eventType: string;
     entityIds: string;
     dataField: string;

@@ -28,6 +28,7 @@ type AutomationEngine interface {
 	Publish(applicationID uint, title, message string, priority int) (*model.Message, error)
 	ReloadIntegrations()
 	SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error
+	ReceiveHomeAssistantEvent(id uint, eventType string, data map[string]any) (bool, error)
 	TestMQTTConnection(id uint) error
 }
 
@@ -415,15 +416,59 @@ func (a *AutomationAPI) DeleteMQTT(ctx *gin.Context) {
 }
 
 type homeAssistantParams struct {
-	Name          string `json:"name" binding:"required"`
-	ApplicationID uint   `json:"applicationId" binding:"required"`
-	BaseURL       string `json:"baseUrl" binding:"required"`
-	Token         string `json:"token"`
-	EventType     string `json:"eventType"`
-	EntityIDs     string `json:"entityIds"`
-	DataField     string `json:"dataField"`
-	DataValue     string `json:"dataValue"`
-	Enabled       bool   `json:"enabled"`
+	Name           string `json:"name" binding:"required"`
+	ApplicationID  uint   `json:"applicationId" binding:"required"`
+	ConnectionMode string `json:"connectionMode"`
+	BaseURL        string `json:"baseUrl"`
+	Token          string `json:"token"`
+	EventType      string `json:"eventType"`
+	EntityIDs      string `json:"entityIds"`
+	DataField      string `json:"dataField"`
+	DataValue      string `json:"dataValue"`
+	Enabled        bool   `json:"enabled"`
+}
+
+type homeAssistantPairingResponse struct {
+	model.HomeAssistantIntegrationView
+	PairingCode string `json:"pairingCode"`
+}
+
+type homeAssistantNativePairParams struct {
+	PairingCode string `json:"pairingCode" binding:"required"`
+	WebhookURL  string `json:"webhookUrl" binding:"required"`
+}
+
+type homeAssistantNativePairResponse struct {
+	IntegrationID uint   `json:"integrationId"`
+	Secret        string `json:"secret"`
+	EventPath     string `json:"eventPath"`
+}
+
+func normalizeHomeAssistantMode(value string) string {
+	switch strings.ToLower(strings.TrimSpace(value)) {
+	case "", "token", "llt":
+		return "token"
+	case "integration", "native":
+		return "integration"
+	default:
+		return ""
+	}
+}
+
+func prepareHomeAssistantPairing(item *model.HomeAssistantIntegration) (string, error) {
+	code, err := generateIntegrationSecret()
+	if err != nil {
+		return "", err
+	}
+	expires := time.Now().Add(15 * time.Minute)
+	item.PairingCodeHash = security.HashSecret(code)
+	item.PairingExpiresAt = &expires
+	item.NativeWebhookURL = ""
+	item.NativeSecret = ""
+	item.Status = "pairing"
+	item.LastError = ""
+	item.LastErrorAt = nil
+	return code, nil
 }
 
 func (a *AutomationAPI) GetHomeAssistant(ctx *gin.Context) {
@@ -438,44 +483,205 @@ func (a *AutomationAPI) CreateHomeAssistant(ctx *gin.Context) {
 	var params homeAssistantParams
 	if err := ctx.ShouldBindJSON(&params); err != nil { return }
 	if !a.channelExists(ctx, params.ApplicationID) { return }
-	if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("home Assistant URL must use http or https")); return }
-	if strings.TrimSpace(params.Token) == "" { ctx.AbortWithError(400, errors.New("access token is required")); return }
-	item := &model.HomeAssistantIntegration{
-		Name: params.Name, ApplicationID: params.ApplicationID, BaseURL: strings.TrimRight(params.BaseURL, "/"),
-		Token: params.Token, EventType: strings.TrimSpace(params.EventType),
-		EntityIDs: strings.TrimSpace(params.EntityIDs), DataField: strings.TrimSpace(params.DataField), DataValue: params.DataValue,
-		Enabled: params.Enabled,
+
+	mode := normalizeHomeAssistantMode(params.ConnectionMode)
+	if mode == "" {
+		ctx.AbortWithError(400, errors.New("connection mode must be token or integration"))
+		return
 	}
+
+	item := &model.HomeAssistantIntegration{
+		Name: params.Name, ApplicationID: params.ApplicationID, ConnectionMode: mode,
+		EventType: strings.TrimSpace(params.EventType), EntityIDs: strings.TrimSpace(params.EntityIDs),
+		DataField: strings.TrimSpace(params.DataField), DataValue: params.DataValue, Enabled: params.Enabled,
+	}
+
+	if mode == "token" {
+		if !validHTTPURL(params.BaseURL) {
+			ctx.AbortWithError(400, errors.New("home assistant URL must use http or https"))
+			return
+		}
+		if strings.TrimSpace(params.Token) == "" {
+			ctx.AbortWithError(400, errors.New("long-lived access token is required"))
+			return
+		}
+		item.BaseURL = strings.TrimRight(params.BaseURL, "/")
+		item.Token = params.Token
+		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
+		a.Engine.ReloadIntegrations()
+		ctx.JSON(201, homeAssistantView(item))
+		return
+	}
+
+	pairingCode, err := prepareHomeAssistantPairing(item)
+	if !successOrAbort(ctx, 500, err) { return }
 	if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
-	a.Engine.ReloadIntegrations()
-	ctx.JSON(201, homeAssistantView(item))
+	ctx.JSON(201, homeAssistantPairingResponse{
+		HomeAssistantIntegrationView: homeAssistantView(item),
+		PairingCode: fmt.Sprintf("%d.%s", item.ID, pairingCode),
+	})
 }
 
 func (a *AutomationAPI) UpdateHomeAssistant(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		item, err := a.DB.GetHomeAssistantIntegrationByID(id)
 		if !successOrAbort(ctx, 500, err) { return }
-		if item == nil { ctx.AbortWithError(404, errors.New("home Assistant connection not found")); return }
+		if item == nil {
+			ctx.AbortWithError(404, errors.New("home assistant connection not found"))
+			return
+		}
+
 		var params homeAssistantParams
 		if err := ctx.ShouldBindJSON(&params); err != nil { return }
 		if !a.channelExists(ctx, params.ApplicationID) { return }
-		if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("home Assistant URL must use http or https")); return }
-		item.Name, item.ApplicationID, item.BaseURL = params.Name, params.ApplicationID, strings.TrimRight(params.BaseURL, "/")
+
+		mode := normalizeHomeAssistantMode(params.ConnectionMode)
+		if mode == "" {
+			ctx.AbortWithError(400, errors.New("connection mode must be token or integration"))
+			return
+		}
+
+		item.Name = params.Name
+		item.ApplicationID = params.ApplicationID
+		item.ConnectionMode = mode
 		item.EventType = strings.TrimSpace(params.EventType)
 		item.EntityIDs = strings.TrimSpace(params.EntityIDs)
 		item.DataField = strings.TrimSpace(params.DataField)
 		item.DataValue = params.DataValue
 		item.Enabled = params.Enabled
-		if params.Token != "" { item.Token = params.Token }
+
+		if mode == "token" {
+			if !validHTTPURL(params.BaseURL) {
+				ctx.AbortWithError(400, errors.New("home assistant URL must use http or https"))
+				return
+			}
+			item.BaseURL = strings.TrimRight(params.BaseURL, "/")
+			if params.Token != "" { item.Token = params.Token }
+			if strings.TrimSpace(item.Token) == "" {
+				ctx.AbortWithError(400, errors.New("long-lived access token is required"))
+				return
+			}
+			item.NativeWebhookURL = ""
+			item.NativeSecret = ""
+			item.PairingCodeHash = ""
+			item.PairingExpiresAt = nil
+		} else {
+			item.BaseURL = ""
+			item.Token = ""
+		}
+
 		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, homeAssistantView(item))
 	})
 }
 
+func (a *AutomationAPI) RegenerateHomeAssistantPairing(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetHomeAssistantIntegrationByID(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		if item == nil {
+			ctx.AbortWithError(404, errors.New("home assistant connection not found"))
+			return
+		}
+		if normalizeHomeAssistantMode(item.ConnectionMode) != "integration" {
+			ctx.AbortWithError(400, errors.New("native pairing is only available for integration mode"))
+			return
+		}
+		code, err := prepareHomeAssistantPairing(item)
+		if !successOrAbort(ctx, 500, err) { return }
+		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
+		ctx.JSON(200, homeAssistantPairingResponse{
+			HomeAssistantIntegrationView: homeAssistantView(item),
+			PairingCode: fmt.Sprintf("%d.%s", item.ID, code),
+		})
+	})
+}
+
+func (a *AutomationAPI) PairNativeHomeAssistant(ctx *gin.Context) {
+	var params homeAssistantNativePairParams
+	if err := ctx.ShouldBindJSON(&params); err != nil { return }
+
+	parts := strings.SplitN(strings.TrimSpace(params.PairingCode), ".", 2)
+	if len(parts) != 2 {
+		ctx.AbortWithError(400, errors.New("invalid home assistant pairing code"))
+		return
+	}
+	id64, err := strconv.ParseUint(parts[0], 10, 64)
+	if err != nil || id64 == 0 {
+		ctx.AbortWithError(400, errors.New("invalid home assistant pairing code"))
+		return
+	}
+	id := uint(id64)
+
+	item, err := a.DB.GetHomeAssistantIntegrationByID(id)
+	if !successOrAbort(ctx, 500, err) { return }
+	if item == nil || normalizeHomeAssistantMode(item.ConnectionMode) != "integration" {
+		ctx.AbortWithError(404, errors.New("home assistant pairing request not found"))
+		return
+	}
+	if item.PairingExpiresAt == nil || time.Now().After(*item.PairingExpiresAt) || item.PairingCodeHash == "" {
+		ctx.AbortWithError(410, errors.New("home assistant pairing code has expired"))
+		return
+	}
+	expected, decodeErr := hex.DecodeString(item.PairingCodeHash)
+	if decodeErr != nil {
+		ctx.AbortWithError(500, errors.New("home assistant pairing state is invalid"))
+		return
+	}
+	providedHash := sha256.Sum256([]byte(parts[1]))
+	if !hmac.Equal(expected, providedHash[:]) {
+		ctx.AbortWithError(401, errors.New("invalid home assistant pairing code"))
+		return
+	}
+	if !validHTTPURL(params.WebhookURL) {
+		ctx.AbortWithError(400, errors.New("home assistant webhook URL must use http or https"))
+		return
+	}
+	secret, err := generateIntegrationSecret()
+	if !successOrAbort(ctx, 500, err) { return }
+	now := time.Now()
+	item.NativeWebhookURL = strings.TrimSpace(params.WebhookURL)
+	item.NativeSecret = secret
+	item.PairingCodeHash = ""
+	item.PairingExpiresAt = nil
+	item.Status = "connected"
+	item.LastConnectedAt = &now
+	item.LastError = ""
+	item.LastErrorAt = nil
+	if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
+	ctx.JSON(200, homeAssistantNativePairResponse{
+		IntegrationID: item.ID,
+		Secret: secret,
+		EventPath: fmt.Sprintf("/integrations/home-assistant/native/%d/event", item.ID),
+	})
+}
+
 type homeAssistantEventParams struct {
 	EventType string         `json:"eventType" binding:"required"`
 	Data      map[string]any `json:"data"`
+}
+
+func (a *AutomationAPI) ReceiveNativeHomeAssistantEvent(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetHomeAssistantIntegrationByID(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		if item == nil || normalizeHomeAssistantMode(item.ConnectionMode) != "integration" || !item.Enabled {
+			ctx.AbortWithError(404, errors.New("home assistant native bridge not found"))
+			return
+		}
+		provided := strings.TrimSpace(strings.TrimPrefix(ctx.GetHeader("Authorization"), "Bearer "))
+		if provided == "" || item.NativeSecret == "" || !hmac.Equal([]byte(provided), []byte(item.NativeSecret)) {
+			ctx.AbortWithError(401, errors.New("invalid home assistant native bridge credential"))
+			return
+		}
+		var params homeAssistantEventParams
+		if err := ctx.ShouldBindJSON(&params); err != nil { return }
+		if params.Data == nil { params.Data = map[string]any{} }
+		routed, err := a.Engine.ReceiveHomeAssistantEvent(id, params.EventType, params.Data)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(202, gin.H{"accepted": true, "routed": routed})
+	})
 }
 
 func (a *AutomationAPI) SendHomeAssistantEvent(ctx *gin.Context) {
@@ -874,9 +1080,12 @@ func mqttView(item *model.MQTTIntegration) model.MQTTIntegrationView {
 }
 
 func homeAssistantView(item *model.HomeAssistantIntegration) model.HomeAssistantIntegrationView {
+	mode := normalizeHomeAssistantMode(item.ConnectionMode)
+	if mode == "" { mode = "token" }
 	return model.HomeAssistantIntegrationView{
-		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,BaseURL:item.BaseURL,
-		TokenConfigured:item.Token!="",EventType:item.EventType,EntityIDs:item.EntityIDs,DataField:item.DataField,DataValue:item.DataValue,Enabled:item.Enabled,
+		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,ConnectionMode:mode,BaseURL:item.BaseURL,
+		TokenConfigured:item.Token!="",NativePaired:item.NativeWebhookURL!="" && item.NativeSecret!="",PairingExpiresAt:item.PairingExpiresAt,
+		EventType:item.EventType,EntityIDs:item.EntityIDs,DataField:item.DataField,DataValue:item.DataValue,Enabled:item.Enabled,
 		Status:item.Status,LastConnectedAt:item.LastConnectedAt,LastEventAt:item.LastEventAt,
 		LastError:item.LastError,LastErrorAt:item.LastErrorAt,ReconnectCount:item.ReconnectCount,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,

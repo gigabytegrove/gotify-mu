@@ -240,6 +240,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	g.Match([]string{"GET", "HEAD"}, "/health", healthHandler.Health)
 	g.POST("/integrations/webhook/:secret", automationHandler.ReceiveWebhook)
+	g.POST("/integrations/home-assistant/native/pair", automationHandler.PairNativeHomeAssistant)
+	g.POST("/integrations/home-assistant/native/:id/event", automationHandler.ReceiveNativeHomeAssistantEvent)
 	g.GET("/swagger", docs.Serve)
 	g.StaticFS("/image", &onlyImageFS{inner: gin.Dir(conf.UploadedImagesDir, false)})
 
@@ -489,6 +491,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.POST("/integration/home-assistant", automationHandler.CreateHomeAssistant)
 		adminPlatform.PUT("/integration/home-assistant/:id", automationHandler.UpdateHomeAssistant)
 		adminPlatform.POST("/integration/home-assistant/:id/event", automationHandler.SendHomeAssistantEvent)
+		adminPlatform.POST("/integration/home-assistant/:id/pairing", automationHandler.RegenerateHomeAssistantPairing)
 		adminPlatform.DELETE("/integration/home-assistant/:id", automationHandler.DeleteHomeAssistant)
 
 		adminPlatform.GET("/automation/schedule", automationHandler.GetSchedules)
