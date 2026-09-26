@@ -121,7 +121,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	webhookIPLimiter := ratelimit.New(120, time.Minute)
 	webhookRouteLimiter := ratelimit.New(600, time.Minute)
 
-	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
+	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler, automationEngine)
 	if err != nil {
 		panic(err)
 	}
