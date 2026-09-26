@@ -133,7 +133,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine, WebhookLimiter: webhookLimiter}
 
-	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
+	pluginManager, err := plugin.NewManagerWithDispatcher(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), automationEngine)
 	if err != nil {
 		panic(err)
 	}
