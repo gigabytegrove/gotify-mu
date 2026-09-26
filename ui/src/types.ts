@@ -105,6 +105,8 @@ export interface IAuditEvent {
     targetId?: string;
     details?: string;
     ipAddress?: string;
+    statusCode?: number;
+    success?: boolean;
     createdAt: string;
 }
 
