@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -20,6 +21,7 @@ type MessageDatabase interface {
 	GetArchivedMessagesByApplicationForUserSince(userID, appID uint, limit int, since uint) ([]*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetUserByID(id uint) (*model.User, error)
+	GetUserByName(name string) (*model.User, error)
 	GetAccessibleApplicationsByUser(userID uint) ([]*model.Application, error)
 	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	CountApplicationMemberships(applicationID uint) (int64, error)
@@ -41,6 +43,7 @@ type MessageDatabase interface {
 }
 
 var timeNow = time.Now
+var mentionPattern = regexp.MustCompile(`(?:^|[\\s(\\[{])@([A-Za-z0-9._-]{1,180})`)
 
 // Notifier notifies when a new message was created.
 type Notifier interface {
@@ -723,6 +726,45 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		return
 	}
 
+	isChat := app.ChannelType == model.ChannelTypeChat ||
+		(app.ChannelType == "" && app.AllowMemberPost)
+	mentionedNames := make([]string, 0)
+	if isChat {
+		seenMentions := make(map[string]struct{})
+		for _, match := range mentionPattern.FindAllStringSubmatch(message.Message, -1) {
+			if len(match) < 2 {
+				continue
+			}
+			name := match[1]
+			if _, seen := seenMentions[name]; seen {
+				continue
+			}
+			user, err := a.DB.GetUserByName(name)
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
+			if user == nil || (postingUser != nil && user.ID == postingUser.ID) {
+				continue
+			}
+			membership, err := a.DB.GetApplicationMembership(app.ID, user.ID)
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
+			if membership == nil {
+				continue
+			}
+			seenMentions[name] = struct{}{}
+			mentionedNames = append(mentionedNames, name)
+			recipients = append(recipients, user.ID)
+		}
+		if len(mentionedNames) > 0 {
+			if message.Extras == nil {
+				message.Extras = make(map[string]any)
+			}
+			message.Extras["gotify::mu::mentions"] = mentionedNames
+		}
+	}
+
 	msgInternal := toInternalMessage(&message)
 	if postingUser != nil {
 		msgInternal.SenderUserID = postingUser.ID
@@ -732,7 +774,15 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		return
 	}
 	external := toExternalMessage(msgInternal)
+	notified := make(map[uint]struct{}, len(recipients))
 	for _, userID := range recipients {
+		if postingUser != nil && userID == postingUser.ID {
+			continue
+		}
+		if _, already := notified[userID]; already {
+			continue
+		}
+		notified[userID] = struct{}{}
 		a.Notifier.Notify(userID, external)
 	}
 	ctx.JSON(200, external)
