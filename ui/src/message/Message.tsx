@@ -37,6 +37,8 @@ interface IProps {
     fRestore?: VoidFunction;
     fAcknowledge?: VoidFunction;
     acknowledged?: boolean;
+    acknowledgementCount?: number;
+    fShowAcknowledgements?: VoidFunction;
     senderName?: string;
     extras?: IMessageExtras;
     expanded: boolean;
@@ -49,6 +51,8 @@ const Message = ({
     fRestore,
     fAcknowledge,
     acknowledged = false,
+    acknowledgementCount = 0,
+    fShowAcknowledgements,
     senderName,
     title,
     date,
@@ -129,13 +133,19 @@ const Message = ({
                             {priority >= 4 && priority < 8 && (
                                 <Chip size="small" color="warning" variant="outlined" label="High" />
                             )}
-                            {acknowledged && (
+                            {acknowledgementCount > 0 && (
                                 <Chip
                                     size="small"
                                     color="success"
                                     variant="outlined"
                                     icon={<TaskAlt fontSize="small" />}
-                                    label="Acknowledged"
+                                    label={
+                                        acknowledgementCount === 1
+                                            ? 'Acknowledged'
+                                            : `Acknowledged · ${acknowledgementCount}`
+                                    }
+                                    onClick={fShowAcknowledgements}
+                                    clickable={Boolean(fShowAcknowledgements)}
                                 />
                             )}
                         </Stack>
