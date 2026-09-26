@@ -139,6 +139,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		Name:        user.Name,
 		DisplayName: user.DisplayName,
 		Admin:       user.Admin,
+		DirectoryManaged: user.DirectoryManaged,
 		CreatedAt: user.CreatedAt,
 	}
 	client := auth.GetClient(ctx)
