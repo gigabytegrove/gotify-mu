@@ -328,3 +328,50 @@ func (d *GormDatabase) ReleaseAutomationLease(name, owner string, now time.Time)
 		Where("name = ? AND owner = ?", name, owner).
 		Updates(map[string]any{"lease_until": now, "updated_at": now}).Error
 }
+
+
+func (d *GormDatabase) CreateScheduledMessage(item *model.ScheduledNotification, message *model.Message, now time.Time, nextRunAt *time.Time, enabled bool) (bool, error) {
+	created := false
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		result := tx.Model(&model.ScheduledNotification{}).
+			Where("id = ? AND enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ?", item.ID, true, now).
+			Updates(map[string]any{
+				"last_run_at": now,
+				"next_run_at": nextRunAt,
+				"enabled": enabled,
+				"updated_at": now,
+			})
+		if result.Error != nil { return result.Error }
+		if result.RowsAffected == 0 { return nil }
+		if err := tx.Create(message).Error; err != nil { return err }
+		created = true
+		return nil
+	})
+	return created, err
+}
+
+func (d *GormDatabase) CompleteEscalationWithMessage(state *model.EscalationState, message *model.Message, now time.Time) (bool, error) {
+	created := false
+	err := d.DB.Transaction(func(tx *gorm.DB) error {
+		var acknowledgements int64
+		if err := tx.Model(&model.MessageAcknowledgement{}).
+			Where("message_id = ?", state.MessageID).Count(&acknowledgements).Error; err != nil {
+			return err
+		}
+		if acknowledgements > 0 {
+			return tx.Model(&model.EscalationState{}).
+				Where("id = ? AND completed = ?", state.ID, false).
+				Updates(map[string]any{"completed":true, "done_at":now}).Error
+		}
+
+		result := tx.Model(&model.EscalationState{}).
+			Where("id = ? AND completed = ?", state.ID, false).
+			Updates(map[string]any{"completed":true, "done_at":now})
+		if result.Error != nil { return result.Error }
+		if result.RowsAffected == 0 { return nil }
+		if err := tx.Create(message).Error; err != nil { return err }
+		created = true
+		return nil
+	})
+	return created, err
+}
