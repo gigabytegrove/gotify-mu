@@ -70,9 +70,15 @@ func (a *MUPresenceAPI) SetTyping(ctx *gin.Context) {
 			ctx.AbortWithError(400, errors.New("typing presence is only available for chat channels"))
 			return
 		}
-		if app.UserID != userID && !app.AllowMemberPost {
-			ctx.AbortWithError(403, errors.New("member posting is disabled for this channel"))
-			return
+		if app.UserID != userID {
+			role := membership.EffectiveRole
+			canPost := role == model.ChannelRoleManager ||
+				role == model.ChannelRolePublisher ||
+				(role == model.ChannelRoleMember && app.AllowMemberPost)
+			if !canPost {
+				ctx.AbortWithError(403, errors.New("your Channel role does not allow posting"))
+				return
+			}
 		}
 
 		user, err := a.DB.GetUserByID(userID)
