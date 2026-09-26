@@ -88,20 +88,20 @@ type MQTTIntegration struct {
 
 // MQTTIntegrationView masks the stored password.
 type MQTTIntegrationView struct {
-	ID                 uint      `json:"id"`
-	Name               string    `json:"name"`
-	ApplicationID      uint      `json:"applicationId"`
-	BrokerURL           string    `json:"brokerUrl"`
-	ClientID            string    `json:"clientId"`
-	Username             string    `json:"username"`
-	PasswordConfigured  bool      `json:"passwordConfigured"`
+	ID                  uint       `json:"id"`
+	Name                string     `json:"name"`
+	ApplicationID       uint       `json:"applicationId"`
+	BrokerURL           string     `json:"brokerUrl"`
+	ClientID            string     `json:"clientId"`
+	Username            string     `json:"username"`
+	PasswordConfigured  bool       `json:"passwordConfigured"`
 	ProtocolVersion     int        `json:"protocolVersion"`
 	QoS                 int        `json:"qos"`
 	CACertificate       string     `json:"caCertificate,omitempty"`
 	ClientCertificate   string     `json:"clientCertificate,omitempty"`
 	ClientKeyConfigured bool       `json:"clientKeyConfigured"`
-	Topic                string    `json:"topic"`
-	Enabled              bool       `json:"enabled"`
+	Topic               string     `json:"topic"`
+	Enabled             bool       `json:"enabled"`
 	Status              string     `json:"status"`
 	LastConnectedAt     *time.Time `json:"lastConnectedAt,omitempty"`
 	LastMessageAt       *time.Time `json:"lastMessageAt,omitempty"`
@@ -114,10 +114,10 @@ type MQTTIntegrationView struct {
 
 // HomeAssistantIntegration subscribes to Home Assistant events over its WebSocket API.
 type HomeAssistantIntegration struct {
-	ID            uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name          string    `gorm:"type:text" json:"name"`
-	ApplicationID uint      `gorm:"index" json:"applicationId"`
-	BaseURL       string    `gorm:"type:text" json:"baseUrl"`
+	ID              uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name            string     `gorm:"type:text" json:"name"`
+	ApplicationID   uint       `gorm:"index" json:"applicationId"`
+	BaseURL         string     `gorm:"type:text" json:"baseUrl"`
 	Token           string     `gorm:"type:text" json:"-"`
 	EventType       string     `gorm:"type:text" json:"eventType"`
 	EntityIDs       string     `gorm:"type:text" json:"entityIds"`
@@ -136,11 +136,11 @@ type HomeAssistantIntegration struct {
 
 // HomeAssistantIntegrationView masks the stored access token.
 type HomeAssistantIntegrationView struct {
-	ID              uint      `json:"id"`
-	Name            string    `json:"name"`
-	ApplicationID   uint      `json:"applicationId"`
-	BaseURL         string    `json:"baseUrl"`
-	TokenConfigured bool      `json:"tokenConfigured"`
+	ID              uint       `json:"id"`
+	Name            string     `json:"name"`
+	ApplicationID   uint       `json:"applicationId"`
+	BaseURL         string     `json:"baseUrl"`
+	TokenConfigured bool       `json:"tokenConfigured"`
 	EventType       string     `json:"eventType"`
 	EntityIDs       string     `json:"entityIds"`
 	DataField       string     `json:"dataField"`
@@ -201,15 +201,15 @@ type QuietHoursPolicy struct {
 
 // DigestPolicy controls summary delivery for lower-priority notifications.
 type DigestPolicy struct {
-	ID               uint       `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID           uint       `gorm:"uniqueIndex" json:"userId"`
-	Enabled          bool       `json:"enabled"`
+	ID                uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID            uint       `gorm:"uniqueIndex" json:"userId"`
+	Enabled           bool       `json:"enabled"`
 	IntervalMinutes   int        `json:"intervalMinutes"`
 	ImmediatePriority int        `json:"immediatePriority"`
-	LastSentAt       *time.Time `json:"lastSentAt,omitempty"`
-	NextRunAt        *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
-	CreatedAt        time.Time  `json:"createdAt"`
-	UpdatedAt        time.Time  `json:"updatedAt"`
+	LastSentAt        *time.Time `json:"lastSentAt,omitempty"`
+	NextRunAt         *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
 }
 
 // DigestItem stores one notification awaiting a user's next digest.
