@@ -247,10 +247,15 @@ type atomDocument struct {
 		Content string `xml:"content"`
 		Updated string `xml:"updated"`
 		Links []struct{ Href string `xml:"href,attr"` } `xml:"link"`
+		Categories []struct{ Term string `xml:"term,attr"` } `xml:"category"`
 	} `xml:"entry"`
 }
 
-type feedItem struct { Key, Title, Body string; When time.Time }
+type feedItem struct {
+	Key, Title, Body string
+	Categories []string
+	When time.Time
+}
 
 func (m *Manager) fetchURL(raw string, etag, modified string) ([]byte, string, string, bool, error) {
 	request, err := http.NewRequestWithContext(m.ctx,http.MethodGet,raw,nil)
