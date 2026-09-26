@@ -1,1 +1,1 @@
-Trigger Gotify MU Android v0.2.0 Tailwind final candidate with full login, correct membership model, admin controls, and MU branding.
+Trigger Gotify MU Android v0.2.1 Tailwind Preview side-by-side verification build.
