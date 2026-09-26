@@ -13,7 +13,7 @@ type Message struct {
 	Priority      int
 	Extras        []byte
 	Date          time.Time
-	SenderUserID  uint `gorm:"index"`
+	SenderUserID  uint   `gorm:"index"`
 	SenderName    string `gorm:"type:text"`
 }
 

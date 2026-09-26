@@ -17,20 +17,20 @@ type MUCapabilities struct {
 }
 
 type MUCapabilityFlags struct {
-	SharedChannels        bool `json:"sharedChannels"`
-	GlobalChannels        bool `json:"globalChannels"`
-	ChannelTypes          bool `json:"channelTypes"`
-	ChatChannels          bool `json:"chatChannels"`
-	MemberPosting         bool `json:"memberPosting"`
-	SenderIdentity        bool `json:"senderIdentity"`
-	PerUserArchive        bool `json:"perUserArchive"`
-	PerChannelMute        bool `json:"perChannelMute"`
+	SharedChannels       bool `json:"sharedChannels"`
+	GlobalChannels       bool `json:"globalChannels"`
+	ChannelTypes         bool `json:"channelTypes"`
+	ChatChannels         bool `json:"chatChannels"`
+	MemberPosting        bool `json:"memberPosting"`
+	SenderIdentity       bool `json:"senderIdentity"`
+	PerUserArchive       bool `json:"perUserArchive"`
+	PerChannelMute       bool `json:"perChannelMute"`
 	MembershipManagement bool `json:"membershipManagement"`
-	OwnershipTransfer     bool `json:"ownershipTransfer"`
-	UserGroups            bool `json:"userGroups"`
-	AuditLog              bool `json:"auditLog"`
-	TypingPresence        bool `json:"typingPresence"`
-	ChatNotifications     bool `json:"chatNotifications"`
+	OwnershipTransfer    bool `json:"ownershipTransfer"`
+	UserGroups           bool `json:"userGroups"`
+	AuditLog             bool `json:"auditLog"`
+	TypingPresence       bool `json:"typingPresence"`
+	ChatNotifications    bool `json:"chatNotifications"`
 }
 
 func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
@@ -39,20 +39,20 @@ func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
 		Version:    a.Version,
 		APIVersion: 1,
 		Features: MUCapabilityFlags{
-			SharedChannels:        true,
-			GlobalChannels:        true,
-			ChannelTypes:          true,
-			ChatChannels:          true,
-			MemberPosting:         true,
-			SenderIdentity:        true,
-			PerUserArchive:        true,
-			PerChannelMute:        true,
+			SharedChannels:       true,
+			GlobalChannels:       true,
+			ChannelTypes:         true,
+			ChatChannels:         true,
+			MemberPosting:        true,
+			SenderIdentity:       true,
+			PerUserArchive:       true,
+			PerChannelMute:       true,
 			MembershipManagement: true,
-			OwnershipTransfer:     true,
-			UserGroups:            true,
-			AuditLog:              true,
-			TypingPresence:        true,
-			ChatNotifications:     true,
+			OwnershipTransfer:    true,
+			UserGroups:           true,
+			AuditLog:             true,
+			TypingPresence:       true,
+			ChatNotifications:    true,
 		},
 	})
 }

@@ -48,7 +48,6 @@ type ApplicationNotificationParams struct {
 	Enabled bool `json:"enabled"`
 }
 
-
 type ApplicationOwnerParams struct {
 	UserID uint `json:"userId" binding:"required"`
 }
@@ -404,4 +403,3 @@ func (a *ApplicationMembershipAPI) SetMemberPosting(ctx *gin.Context) {
 		ctx.JSON(http.StatusOK, params)
 	})
 }
-
