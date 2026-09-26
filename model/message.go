@@ -15,7 +15,8 @@ type Message struct {
 	Date          time.Time
 	SenderUserID  uint `gorm:"index"`
 	SenderName    string `gorm:"type:text"`
-	Acknowledged  bool   `gorm:"-" json:"-"`
+	Acknowledged  bool    `gorm:"-" json:"-"`
+	AutomationKey *string `gorm:"type:text;uniqueIndex" json:"-"`
 }
 
 // MessageExternal Model
