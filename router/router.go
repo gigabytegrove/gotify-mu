@@ -132,6 +132,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
+	serviceAccountHandler := api.ServiceAccountAPI{DB: db, Dispatcher: automationEngine}
 	securityPolicyHandler := api.SecurityPolicyAPI{DB: db}
 	mfaHandler := api.MFAAPI{DB: db}
 	operationsHandler := api.OperationsAPI{
@@ -218,6 +219,13 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		}
 	})
 	g.Use(cors.New(auth.CorsConfig(conf)))
+
+	serviceAPI := g.Group("/service/v1")
+	{
+		serviceAPI.GET("/channels", serviceAccountHandler.Channels)
+		serviceAPI.GET("/messages", serviceAccountHandler.Messages)
+		serviceAPI.POST("/message", serviceAccountHandler.Publish)
+	}
 
 	{
 		g.GET("/plugin", authentication.RequireClient, pluginHandler.GetPlugins)
@@ -371,6 +379,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/operations/diagnostics", operationsHandler.Diagnostics)
 		adminPlatform.GET("/operations/backup", operationsHandler.Backup)
 		adminPlatform.POST("/operations/restore", operationsHandler.StageRestore)
+
+		adminPlatform.GET("/service-account", serviceAccountHandler.List)
+		adminPlatform.POST("/service-account", serviceAccountHandler.Create)
+		adminPlatform.DELETE("/service-account/:id", serviceAccountHandler.Delete)
 
 		adminPlatform.GET("/security/policy", securityPolicyHandler.Get)
 		adminPlatform.PUT("/security/policy", securityPolicyHandler.Save)
@@ -571,6 +583,8 @@ func shouldAuditMutation(path string) bool {
 	case strings.HasPrefix(path, "/integration"):
 		return true
 	case strings.HasPrefix(path, "/automation"):
+		return true
+	case strings.HasPrefix(path, "/service-account"):
 		return true
 	case strings.Contains(path, "/acknowledgement"):
 		return true
