@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -21,6 +20,7 @@ import (
 	gerror "github.com/gotify/server/v3/error"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/plugin"
+	"github.com/gotify/server/v3/security"
 	"github.com/gotify/server/v3/ui"
 	"github.com/rs/zerolog/log"
 )
@@ -41,7 +41,11 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		}
 	})
 
-	g.Use(accessLogger(), auditMutations(db), gin.Recovery(), gerror.Handler(), location.Default())
+	basicAuthLimiter := security.NewRateLimiter(120, time.Minute, 5*time.Minute)
+	loginLimiter := security.NewRateLimiter(10, 5*time.Minute, 10*time.Minute)
+	webhookLimiter := security.NewRateLimiter(120, time.Minute, 5*time.Minute)
+
+	g.Use(basicAuthRateLimit(basicAuthLimiter), accessLogger(), auditMutations(db), gin.Recovery(), gerror.Handler(), location.Default())
 	g.NoRoute(gerror.NotFound())
 
 	if conf.Server.SSL.Enabled && conf.Server.SSL.RedirectToHTTPS {
@@ -143,7 +147,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}
 
 	g.Match([]string{"GET", "HEAD"}, "/health", healthHandler.Health)
-	g.POST("/integrations/webhook/:secret", automationHandler.ReceiveWebhook)
+	g.POST("/integrations/webhook/:secret", webhookLimiter.Middleware(func(ctx *gin.Context) string {
+		return ctx.ClientIP() + ":" + ctx.Param("secret")
+	}), automationHandler.ReceiveWebhook)
 	g.GET("/swagger", docs.Serve)
 	g.StaticFS("/image", &onlyImageFS{inner: gin.Dir(conf.UploadedImagesDir, false)})
 
@@ -172,7 +178,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	g.Group("/user").Use(authentication.OptionalAdmin).POST("", userHandler.CreateUser)
 
-	g.POST("/auth/local/login", sessionHandler.Login)
+	g.POST("/auth/local/login", loginLimiter.Middleware(func(ctx *gin.Context) string {
+		name, _, _ := ctx.Request.BasicAuth()
+		return ctx.ClientIP() + ":" + strings.ToLower(strings.TrimSpace(name))
+	}), sessionHandler.Login)
 
 	g.OPTIONS("/*any")
 
@@ -413,27 +422,64 @@ func shouldAuditMutation(path string) bool {
 	}
 }
 
-var tokenRegexp = regexp.MustCompile("token=[^&]+")
+func basicAuthRateLimit(limiter *security.RateLimiter) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		name, _, ok := ctx.Request.BasicAuth()
+		if !ok {
+			ctx.Next()
+			return
+		}
+		allowed, retry := limiter.Allow(ctx.ClientIP() + ":" + strings.ToLower(strings.TrimSpace(name)))
+		if !allowed {
+			seconds := int(retry.Seconds())
+			if seconds < 1 { seconds = 1 }
+			ctx.Header("Retry-After", fmt.Sprintf("%d", seconds))
+			ctx.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error":"too many authentication requests; try again later"})
+			return
+		}
+		ctx.Next()
+	}
+}
+
+var sensitiveQueryKeys = map[string]struct{}{
+	"token": {}, "code": {}, "state": {}, "access_token": {}, "refresh_token": {},
+	"id_token": {}, "api_key": {}, "apikey": {}, "key": {}, "secret": {},
+	"password": {}, "client_secret": {},
+}
+
+func sanitizedRequestPath(c *gin.Context, rawQuery string) string {
+	path := c.FullPath()
+	if path == "" {
+		path = c.Request.URL.Path
+	}
+	if rawQuery == "" {
+		return path
+	}
+	values := c.Request.URL.Query()
+	for key := range values {
+		if _, sensitive := sensitiveQueryKeys[strings.ToLower(key)]; sensitive {
+			values.Set(key, "[masked]")
+		}
+	}
+	encoded := values.Encode()
+	if encoded == "" { return path }
+	return path + "?" + encoded
+}
 
 func accessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-
 		rawQuery := c.Request.URL.RawQuery
-		path := c.Request.URL.Path
+		requestPath := c.Request.URL.Path
 
 		c.Next()
 
 		clientIP := c.ClientIP()
-		if (clientIP == "127.0.0.1" || clientIP == "::1") && path == "/health" {
+		if (clientIP == "127.0.0.1" || clientIP == "::1") && requestPath == "/health" {
 			return
 		}
 
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
-		}
-		path = tokenRegexp.ReplaceAllString(path, "token=[masked]")
-
+		path := sanitizedRequestPath(c, rawQuery)
 		latency := time.Since(start)
 		if latency > time.Minute {
 			latency = latency - latency%time.Second
