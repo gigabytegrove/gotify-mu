@@ -213,12 +213,17 @@ export interface IScheduledNotification {
     title: string;
     message: string;
     priority: number;
-    scheduleType: 'once' | 'hourly' | 'daily' | 'weekly';
+    scheduleType: 'once' | 'interval' | 'hourly' | 'daily' | 'weekly';
     runAt?: string;
     hour: number;
     minute: number;
     weekday: number;
+    intervalMinutes: number;
     timezone: string;
+    excludedDates?: string[];
+    endAt?: string;
+    maxRuns: number;
+    runCount: number;
     enabled: boolean;
     lastRunAt?: string;
     nextRunAt?: string;
@@ -257,4 +262,16 @@ export interface IEscalationRule {
     enabled: boolean;
     createdAt: string;
     updatedAt: string;
+}
+
+
+export interface IScheduleRun {
+    id: number;
+    scheduleId: number;
+    scheduledFor: string;
+    messageId?: number;
+    status: string;
+    error?: string;
+    startedAt: string;
+    finishedAt?: string;
 }
