@@ -339,6 +339,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.PUT("/integration/home-assistant/:id", automationHandler.UpdateHomeAssistant)
 		adminPlatform.POST("/integration/home-assistant/:id/event", automationHandler.SendHomeAssistantEvent)
 		adminPlatform.DELETE("/integration/home-assistant/:id", automationHandler.DeleteHomeAssistant)
+		adminPlatform.GET("/integration/:kind/:id/events", automationHandler.GetIntegrationEvents)
 
 		adminPlatform.GET("/automation/schedule", automationHandler.GetSchedules)
 		adminPlatform.POST("/automation/schedule", automationHandler.CreateSchedule)
