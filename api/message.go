@@ -43,7 +43,7 @@ type MessageDatabase interface {
 }
 
 var timeNow = time.Now
-var mentionPattern = regexp.MustCompile(`(?:^|[\\s(\\[{])@([A-Za-z0-9._-]{1,180})`)
+var mentionPattern = regexp.MustCompile(`(?:^|[^A-Za-z0-9._-])@([A-Za-z0-9._-]{1,180})`)
 
 // Notifier notifies when a new message was created.
 type Notifier interface {
