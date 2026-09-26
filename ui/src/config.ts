@@ -7,6 +7,7 @@ export interface IConfig {
     oidc: boolean;
     oidcAutoRedirect: boolean;
     localAuth: boolean;
+    directory: boolean;
     oidcIdpName: string;
 }
 
@@ -23,6 +24,7 @@ const config: IConfig = {
     oidc: false,
     oidcAutoRedirect: false,
     localAuth: true,
+    directory: false,
     oidcIdpName: 'OIDC',
     ...window.config,
 };
