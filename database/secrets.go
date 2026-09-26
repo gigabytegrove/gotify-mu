@@ -39,10 +39,24 @@ func (d *GormDatabase) encryptExistingIntegrationSecrets() error {
 					return err
 				}
 			}
+			signingSecret := item.SigningSecret
+			if signingSecret != "" {
+				signingPlain, decryptErr := d.SecretBox.DecryptString(signingSecret)
+				if decryptErr != nil {
+					return fmt.Errorf("decrypt webhook %d signing secret: %w", item.ID, decryptErr)
+				}
+				if !security.IsEncryptedSecret(signingSecret) {
+					signingSecret, err = d.SecretBox.EncryptString(signingPlain)
+					if err != nil {
+						return err
+					}
+				}
+			}
 			if err := tx.Model(&model.WebhookRoute{}).Where("id = ?", item.ID).
 				Updates(map[string]any{
-					"secret":      encrypted,
-					"secret_hash": hashWebhookSecret(plain),
+					"secret":         encrypted,
+					"secret_hash":    hashWebhookSecret(plain),
+					"signing_secret": signingSecret,
 				}).Error; err != nil {
 				return err
 			}
