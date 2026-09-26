@@ -225,3 +225,16 @@ type IntegrationEvent struct {
 	Message       string    `gorm:"type:text" json:"message"`
 	CreatedAt     time.Time `gorm:"index" json:"createdAt"`
 }
+
+
+// AutomationRecipientDispatch tracks durable per-user delivery for one automated message run.
+type AutomationRecipientDispatch struct {
+	AutomationKey string     `gorm:"primaryKey;type:varchar(180)" json:"automationKey"`
+	UserID        uint       `gorm:"primaryKey;autoIncrement:false;index" json:"userId"`
+	MessageID     uint       `gorm:"index" json:"messageId"`
+	Completed     bool       `gorm:"index" json:"completed"`
+	Attempts      int        `json:"attempts"`
+	LastError     string     `gorm:"type:text" json:"lastError,omitempty"`
+	CompletedAt   *time.Time `json:"completedAt,omitempty"`
+	UpdatedAt     time.Time  `json:"updatedAt"`
+}
