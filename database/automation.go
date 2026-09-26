@@ -572,6 +572,6 @@ func (d *GormDatabase) CleanupAutomationHistory(before time.Time) error {
 			Delete(&model.ScheduledNotificationRun{}).Error; err != nil {
 			return err
 		}
-		return tx.Where("created_at < ?", before).Delete(&model.ConnectorSeenItem{}).Error
+		return tx.Where("seen_at < ?", before).Delete(&model.ConnectorSeenItem{}).Error
 	})
 }
