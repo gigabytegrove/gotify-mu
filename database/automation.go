@@ -252,7 +252,7 @@ func (d *GormDatabase) GetQuietHoursPolicy(userID uint) (*model.QuietHoursPolicy
 func (d *GormDatabase) SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error {
 	return d.DB.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name:"user_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"enabled","start_minute","end_minute","timezone","allow_priority","updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"enabled","start_minute","end_minute","timezone","allow_priority","mode","updated_at"}),
 	}).Create(item).Error
 }
 
@@ -439,4 +439,24 @@ func (d *GormDatabase) SaveAutomationRecipientDispatch(item *model.AutomationRec
 
 func (d *GormDatabase) DeleteAutomationRecipientDispatchesForMessage(messageID uint) error {
 	return d.DB.Where("message_id = ?", messageID).Delete(&model.AutomationRecipientDispatch{}).Error
+}
+
+
+func (d *GormDatabase) QueueDeferredNotification(item *model.DeferredNotification) error {
+	return d.DB.Clauses(clause.OnConflict{DoNothing:true}).Create(item).Error
+}
+
+func (d *GormDatabase) GetDeferredNotifications(limit int) ([]*model.DeferredNotification, error) {
+	if limit <= 0 || limit > 1000 { limit = 500 }
+	var items []*model.DeferredNotification
+	return items, d.DB.Order("created_at asc").Limit(limit).Find(&items).Error
+}
+
+func (d *GormDatabase) DeleteDeferredNotification(userID, messageID uint) error {
+	return d.DB.Where("user_id = ? AND message_id = ?", userID, messageID).
+		Delete(&model.DeferredNotification{}).Error
+}
+
+func (d *GormDatabase) DeleteDeferredNotifications(userID uint) error {
+	return d.DB.Where("user_id = ?", userID).Delete(&model.DeferredNotification{}).Error
 }
