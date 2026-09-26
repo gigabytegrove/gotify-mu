@@ -395,17 +395,35 @@ func (m *manager) releaseAssets(version string) (string, string, error) {
 func verifyChecksum(archivePath, checksumPath string) error {
 	checksumRaw, err := os.ReadFile(checksumPath)
 	if err != nil { return err }
-	fields := strings.Fields(string(checksumRaw))
-	if len(fields) < 1 || len(fields[0]) != 64 {
+
+	targetName := filepath.Base(archivePath)
+	var expected string
+	for _, line := range strings.Split(string(checksumRaw), "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 2 { continue }
+		name := strings.TrimPrefix(strings.TrimPrefix(fields[len(fields)-1], "*"), "./")
+		if name == targetName || strings.HasSuffix(name, "/"+targetName) {
+			expected = fields[0]
+			break
+		}
+	}
+	if expected == "" {
+		// Historical Gotify MU releases contained a single checksum line whose
+		// local build path may differ from the downloaded filename.
+		lines := strings.Fields(string(checksumRaw))
+		if len(lines) >= 1 { expected = lines[0] }
+	}
+	if len(expected) != 64 {
 		return errors.New("release checksum file is invalid")
 	}
+
 	file, err := os.Open(archivePath)
 	if err != nil { return err }
 	defer file.Close()
 	hash := sha256.New()
 	if _, err := io.Copy(hash, file); err != nil { return err }
 	actual := hex.EncodeToString(hash.Sum(nil))
-	if !strings.EqualFold(actual, fields[0]) {
+	if !strings.EqualFold(actual, expected) {
 		return fmt.Errorf("source checksum mismatch")
 	}
 	return nil
