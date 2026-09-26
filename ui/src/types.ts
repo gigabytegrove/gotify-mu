@@ -404,3 +404,22 @@ export interface IServiceAccount {
 export interface IServiceAccountCreated extends IServiceAccount {
     token: string;
 }
+
+
+export interface IDirectoryConfig {
+    id: number;
+    enabled: boolean;
+    url: string;
+    startTls: boolean;
+    bindDn: string;
+    bindPasswordConfigured: boolean;
+    userBaseDn: string;
+    userAttribute: string;
+    displayNameAttribute: string;
+    adminGroupDn: string;
+    autoRegister: boolean;
+    linkByUsername: boolean;
+    caCertificatePem: string;
+    createdAt: string;
+    updatedAt: string;
+}
