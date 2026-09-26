@@ -53,6 +53,7 @@ type AutomationDatabase interface {
 	SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error
 	GetDigestPolicy(userID uint) (*model.DigestPolicy, error)
 	SaveDigestPolicy(item *model.DigestPolicy) error
+	DeleteDigestItems(userID uint) error
 
 	GetEscalationRules() ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
@@ -61,6 +62,7 @@ type AutomationDatabase interface {
 
 	SetMessageAcknowledgement(userID, messageID uint, acknowledged bool, now time.Time) error
 	IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error)
+	GetMessageAcknowledgements(messageID uint) ([]model.MessageAcknowledgementView, error)
 
 	GetIntegrationStatus(kind string, integrationID uint) (*model.IntegrationStatus, error)
 	GetIntegrationEvents(kind string, integrationID uint, limit int) ([]*model.IntegrationEvent, error)
@@ -442,6 +444,9 @@ func (a *AutomationAPI) SaveDigest(ctx *gin.Context) {
 		item.NextRunAt = &next
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveDigestPolicy(item)) { return }
+	if !params.Enabled {
+		if !successOrAbort(ctx, 500, a.DB.DeleteDigestItems(userID)) { return }
+	}
 	ctx.JSON(200, item)
 }
 
@@ -495,7 +500,14 @@ func (a *AutomationAPI) GetAcknowledgement(ctx *gin.Context) {
 		if !a.canAccessMessage(ctx, id) { return }
 		value, err := a.DB.IsMessageAcknowledgedByUser(auth.GetUserID(ctx), id)
 		if !successOrAbort(ctx, 500, err) { return }
-		ctx.JSON(200, gin.H{"acknowledged":value})
+		history, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{
+			"acknowledged": value,
+			"acknowledgedAny": len(history) > 0,
+			"count": len(history),
+			"acknowledgedBy": history,
+		})
 	})
 }
 
