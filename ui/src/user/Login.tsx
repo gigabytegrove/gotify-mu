@@ -27,6 +27,8 @@ const Login = observer(() => {
     const [searchParams] = useSearchParams();
 
     const localAuthEnabled = config.get('localAuth');
+    const directoryEnabled = config.get('directory');
+    const passwordSignInEnabled = localAuthEnabled || directoryEnabled;
     const oidcEnabled = config.get('oidc');
     const oidcIdpName = config.get('oidcIdpName');
 
@@ -80,7 +82,7 @@ const Login = observer(() => {
                         </Typography>
                     </Box>
 
-                    {localAuthEnabled && (
+                    {passwordSignInEnabled && (
                         <Box component="form" id="login-form" onSubmit={login}>
                             <Stack spacing={2}>
                                 <TextField
@@ -136,7 +138,7 @@ const Login = observer(() => {
 
                     {oidcEnabled && (
                         <>
-                            {localAuthEnabled && <Divider>or</Divider>}
+                            {passwordSignInEnabled && <Divider>or</Divider>}
                             <Button
                                 id="oidc-login"
                                 component="a"
@@ -168,7 +170,7 @@ const Login = observer(() => {
                             variant="outlined"
                             label={`@${config.get('version').version}`}
                         />
-                        {localAuthEnabled && (
+                        {passwordSignInEnabled && (
                             <Chip size="small" variant="outlined" label="Local auth" />
                         )}
                         {oidcEnabled && (
