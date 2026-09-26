@@ -2,6 +2,7 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -249,12 +250,26 @@ func (m *manager) performInstall(version string, started time.Time) {
 		m.fail(version, started, "The release could not be verified.", err)
 		return
 	}
+	sourceURL, checksumURL, err := m.resolveReleaseAssets(version)
+	if err != nil {
+		m.fail(version, started, "The release assets could not be verified.", err)
+		return
+	}
 
 	archivePath := filepath.Join(tempDir, "source.zip")
-	sourceURL := fmt.Sprintf("https://github.com/%s/archive/refs/tags/v%s.zip", m.repository, version)
+	checksumPath := filepath.Join(tempDir, "SHA256SUMS")
 	m.updateProgress("downloading", "Downloading update", "Downloading update", 10)
-	if err := m.downloadFile(sourceURL, archivePath, 10, 24); err != nil {
+	if err := m.downloadFile(sourceURL, archivePath, 10, 22); err != nil {
 		m.fail(version, started, "The update could not be downloaded.", err)
+		return
+	}
+	if err := m.downloadFile(checksumURL, checksumPath, 22, 24); err != nil {
+		m.fail(version, started, "The release checksum could not be downloaded.", err)
+		return
+	}
+	m.updateProgress("preparing", "Verifying update", "Verifying update", 25)
+	if err := verifyReleaseChecksum(archivePath, checksumPath, "gotify-mu-v"+version+"-source.zip"); err != nil {
+		m.fail(version, started, "The downloaded update failed integrity verification.", err)
 		return
 	}
 
@@ -315,6 +330,88 @@ func (m *manager) resolveCommit(version string) (string, error) {
 		return "", errors.New("GitHub did not return a release commit")
 	}
 	return payload.SHA, nil
+}
+
+func (m *manager) resolveReleaseAssets(version string) (string, string, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/tags/v%s", m.repository, version)
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return "", "", err
+	}
+	request.Header.Set("Accept", "application/vnd.github+json")
+	request.Header.Set("User-Agent", "gotify-mu-updater")
+
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return "", "", fmt.Errorf("could not resolve release assets: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return "", "", fmt.Errorf("could not resolve release assets: GitHub returned HTTP %d", response.StatusCode)
+	}
+
+	var payload struct {
+		Assets []struct {
+			Name               string `json:"name"`
+			BrowserDownloadURL string `json:"browser_download_url"`
+		} `json:"assets"`
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, 2<<20)).Decode(&payload); err != nil {
+		return "", "", fmt.Errorf("could not decode release assets: %w", err)
+	}
+
+	sourceName := "gotify-mu-v" + version + "-source.zip"
+	var sourceURL, checksumURL string
+	for _, asset := range payload.Assets {
+		switch asset.Name {
+		case sourceName:
+			sourceURL = asset.BrowserDownloadURL
+		case "SHA256SUMS":
+			checksumURL = asset.BrowserDownloadURL
+		}
+	}
+	if sourceURL == "" || checksumURL == "" {
+		return "", "", fmt.Errorf("release must contain %s and SHA256SUMS", sourceName)
+	}
+	return sourceURL, checksumURL, nil
+}
+
+func verifyReleaseChecksum(archivePath, checksumPath, expectedName string) error {
+	sums, err := os.ReadFile(checksumPath)
+	if err != nil {
+		return fmt.Errorf("read checksum file: %w", err)
+	}
+	expected := ""
+	for _, line := range strings.Split(string(sums), "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 2 {
+			continue
+		}
+		name := strings.TrimPrefix(fields[len(fields)-1], "*")
+		if filepath.Base(name) == expectedName {
+			expected = strings.ToLower(fields[0])
+			break
+		}
+	}
+	if expected == "" {
+		return fmt.Errorf("SHA256SUMS does not contain %s", expectedName)
+	}
+
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return fmt.Errorf("open update archive: %w", err)
+	}
+	defer file.Close()
+
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return fmt.Errorf("hash update archive: %w", err)
+	}
+	actual := fmt.Sprintf("%x", hash.Sum(nil))
+	if !strings.EqualFold(actual, expected) {
+		return fmt.Errorf("checksum mismatch")
+	}
+	return nil
 }
 
 func (m *manager) replaceContainer(image, version string, started time.Time) error {
@@ -517,9 +614,33 @@ func runDocker(args ...string) (string, error) {
 	command := exec.Command("docker", args...)
 	output, err := command.CombinedOutput()
 	if err != nil {
-		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(output)))
+		return string(output), fmt.Errorf("docker %s: %w: %s", strings.Join(redactDockerArgs(args), " "), err, strings.TrimSpace(string(output)))
 	}
 	return string(output), nil
+}
+
+func redactDockerArgs(args []string) []string {
+	out := append([]string(nil), args...)
+	for i := 0; i < len(out); i++ {
+		if (out[i] == "--env" || out[i] == "-e") && i+1 < len(out) {
+			if key, _, ok := strings.Cut(out[i+1], "="); ok {
+				out[i+1] = key + "=[redacted]"
+			} else {
+				out[i+1] = "[redacted]"
+			}
+			i++
+			continue
+		}
+		if strings.HasPrefix(out[i], "--env=") {
+			value := strings.TrimPrefix(out[i], "--env=")
+			if key, _, ok := strings.Cut(value, "="); ok {
+				out[i] = "--env=" + key + "=[redacted]"
+			} else {
+				out[i] = "--env=[redacted]"
+			}
+		}
+	}
+	return out
 }
 
 func (m *manager) downloadFile(url, path string, startProgress, endProgress int) error {
@@ -669,6 +790,7 @@ func (m *manager) buildRelease(root, image, version, commit, buildDate string) e
 		"--progress=plain",
 		"--pull",
 		"--build-arg", "BUILD_JS=1",
+		"--build-arg", "RUN_TESTS=1",
 		"--build-arg", "GO_VERSION=1.26.0",
 		"--build-arg", "GOTIFY_MU_VERSION="+version,
 		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
