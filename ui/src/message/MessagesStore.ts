@@ -206,7 +206,14 @@ export class MessagesStore {
                 Object.values(states).forEach((state) => {
                     const match = state.messages.find((item) => item.id === message.id);
                     if (match) {
+                        const wasAcknowledged = Boolean(match.acknowledged);
                         match.acknowledged = acknowledged;
+                        const currentCount = match.acknowledgementCount ?? 0;
+                        if (!wasAcknowledged && acknowledged) {
+                            match.acknowledgementCount = currentCount + 1;
+                        } else if (wasAcknowledged && !acknowledged) {
+                            match.acknowledgementCount = Math.max(0, currentCount - 1);
+                        }
                     }
                 });
             };
