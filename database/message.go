@@ -25,8 +25,25 @@ func (d *GormDatabase) markAcknowledged(userID uint, messages []*model.Message) 
 	for _, id := range acknowledged {
 		set[id] = struct{}{}
 	}
+	type acknowledgementCount struct {
+		MessageID uint
+		Count     int
+	}
+	var counts []acknowledgementCount
+	if err := d.DB.Model(&model.MessageAcknowledgement{}).
+		Select("message_id, COUNT(*) as count").
+		Where("message_id IN ?", ids).
+		Group("message_id").
+		Scan(&counts).Error; err != nil {
+		return err
+	}
+	countByMessage := make(map[uint]int, len(counts))
+	for _, count := range counts {
+		countByMessage[count.MessageID] = count.Count
+	}
 	for _, message := range messages {
 		_, message.Acknowledged = set[message.ID]
+		message.AcknowledgementCount = countByMessage[message.ID]
 	}
 	return nil
 }
