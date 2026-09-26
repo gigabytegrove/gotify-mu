@@ -37,6 +37,9 @@ interface IProps {
     fRestore?: VoidFunction;
     fAcknowledge?: VoidFunction;
     acknowledged?: boolean;
+    acknowledgedByAnyone?: boolean;
+    acknowledgedByName?: string;
+    acknowledgedCount?: number;
     senderName?: string;
     extras?: IMessageExtras;
     expanded: boolean;
@@ -49,6 +52,9 @@ const Message = ({
     fRestore,
     fAcknowledge,
     acknowledged = false,
+    acknowledgedByAnyone = false,
+    acknowledgedByName,
+    acknowledgedCount = 0,
     senderName,
     title,
     date,
@@ -129,13 +135,25 @@ const Message = ({
                             {priority >= 4 && priority < 8 && (
                                 <Chip size="small" color="warning" variant="outlined" label="High" />
                             )}
-                            {acknowledged && (
+                            {acknowledgedByAnyone && (
                                 <Chip
                                     size="small"
                                     color="success"
                                     variant="outlined"
                                     icon={<TaskAlt fontSize="small" />}
-                                    label="Acknowledged"
+                                    label={
+                                        acknowledged
+                                            ? acknowledgedCount > 1
+                                                ? `Acknowledged by you + ${acknowledgedCount - 1}`
+                                                : 'Acknowledged by you'
+                                            : acknowledgedByName
+                                              ? `Acknowledged by ${acknowledgedByName}${
+                                                    acknowledgedCount > 1
+                                                        ? ` + ${acknowledgedCount - 1}`
+                                                        : ''
+                                                }`
+                                              : 'Acknowledged'
+                                    }
                                 />
                             )}
                         </Stack>
