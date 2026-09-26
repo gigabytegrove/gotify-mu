@@ -7,7 +7,8 @@ type WebhookRoute struct {
 	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	Name            string    `gorm:"type:text" json:"name"`
 	ApplicationID   uint      `gorm:"index" json:"applicationId"`
-	Secret          string    `gorm:"type:varchar(96);uniqueIndex" json:"-"`
+	Secret          string    `gorm:"type:text" json:"-"`
+	SecretHash      string    `gorm:"type:char(64);uniqueIndex" json:"-"`
 	Enabled         bool      `json:"enabled"`
 	TitleField      string    `gorm:"type:text" json:"titleField"`
 	MessageField    string    `gorm:"type:text" json:"messageField"`
