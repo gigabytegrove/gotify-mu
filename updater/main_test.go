@@ -1,7 +1,12 @@
 package main
 
 import (
+	"crypto/sha256"
+	"fmt"
+	"os"
+	"path/filepath"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -123,4 +128,59 @@ func containsAdjacent(values []string, first string, rest ...string) bool {
 		}
 	}
 	return false
+}
+
+
+func TestRedactDockerArgsMasksEnvironmentValues(t *testing.T) {
+	args := []string{
+		"create",
+		"--env", "GOTIFY_MU_UPDATER_TOKEN=super-secret",
+		"-e", "HOME_ASSISTANT_TOKEN=another-secret",
+		"--env=MQTT_PASSWORD=password123",
+		"image",
+	}
+	got := redactDockerArgs(args)
+	joined := strings.Join(got, " ")
+	for _, secret := range []string{"super-secret", "another-secret", "password123"} {
+		if strings.Contains(joined, secret) {
+			t.Fatalf("secret %q leaked in redacted args: %s", secret, joined)
+		}
+	}
+	for _, expected := range []string{
+		"GOTIFY_MU_UPDATER_TOKEN=[redacted]",
+		"HOME_ASSISTANT_TOKEN=[redacted]",
+		"--env=MQTT_PASSWORD=[redacted]",
+	} {
+		if !strings.Contains(joined, expected) {
+			t.Fatalf("expected %q in redacted args: %s", expected, joined)
+		}
+	}
+}
+
+func TestVerifyReleaseChecksum(t *testing.T) {
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "gotify-mu-v0.5.0-source.zip")
+	sums := filepath.Join(dir, "SHA256SUMS")
+	content := []byte("verified release bytes")
+	if err := os.WriteFile(archive, content, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	hash := sha256.Sum256(content)
+	if err := os.WriteFile(
+		sums,
+		[]byte(fmt.Sprintf("%x  /tmp/release/gotify-mu-v0.5.0-source.zip\n", hash)),
+		0o600,
+	); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyReleaseChecksum(archive, sums, "gotify-mu-v0.5.0-source.zip"); err != nil {
+		t.Fatalf("expected checksum verification to pass: %v", err)
+	}
+
+	if err := os.WriteFile(archive, []byte("tampered"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyReleaseChecksum(archive, sums, "gotify-mu-v0.5.0-source.zip"); err == nil {
+		t.Fatal("expected tampered archive to fail checksum verification")
+	}
 }
