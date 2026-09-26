@@ -2,7 +2,7 @@
 
 All notable Gotify MU changes are documented here.
 
-## [0.5.0] - 2026-09-25
+## [0.5.0] - 2026-09-26
 
 Security, reliability, automation, collaboration, connector, plugin, and operations completion release.
 
