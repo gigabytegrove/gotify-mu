@@ -11,18 +11,17 @@ type ApplicationMembership struct {
 	ReceiveNotifications bool   `gorm:"not null"`
 	NotificationOverride *bool  `json:"-"`
 	AutoAssigned         bool   `gorm:"not null"`
-	Role                 string `gorm:"type:varchar(16)"`
+	Role                      string `gorm:"type:varchar(16)"`
 	GroupRole                 string `gorm:"type:varchar(16)"`
 	GroupAssigned             bool   `gorm:"not null"`
 	GroupReceiveNotifications bool   `gorm:"not null"`
-	EffectiveRole        string `gorm:"-" json:"-"`
+	EffectiveRole             string `gorm:"-" json:"-"`
 	CreatedAt            time.Time
 	UpdatedAt            time.Time
 }
 
 // TableName keeps the table name stable across all supported GORM dialects.
 func (ApplicationMembership) TableName() string { return "application_memberships" }
-
 
 const (
 	ChannelRoleReadOnly  = "readonly"
@@ -59,10 +58,16 @@ func NormalizeChannelRole(role string) string {
 }
 
 func EffectiveChannelRole(owner bool, membership *ApplicationMembership) string {
-	if owner { return ChannelRoleOwner }
-	if membership == nil { return "" }
+	if owner {
+		return ChannelRoleOwner
+	}
+	if membership == nil {
+		return ""
+	}
 	best := ""
-	if membership.Role != "" { best = NormalizeChannelRole(membership.Role) }
+	if membership.Role != "" {
+		best = NormalizeChannelRole(membership.Role)
+	}
 	if membership.AutoAssigned && ChannelRoleRank(best) < ChannelRoleRank(ChannelRoleMember) {
 		best = ChannelRoleMember
 	}
