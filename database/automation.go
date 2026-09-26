@@ -200,7 +200,7 @@ func (d *GormDatabase) GetDigestPolicy(userID uint) (*model.DigestPolicy, error)
 func (d *GormDatabase) SaveDigestPolicy(item *model.DigestPolicy) error {
 	return d.DB.Clauses(clause.OnConflict{
 		Columns: []clause.Column{{Name:"user_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"enabled","interval_minutes","immediate_priority","last_sent_at","next_run_at","updated_at"}),
+		DoUpdates: clause.AssignmentColumns([]string{"enabled","interval_minutes","immediate_priority","last_sent_at","next_run_at","claim_owner","claim_until","updated_at"}),
 	}).Create(item).Error
 }
 func (d *GormDatabase) QueueDigestItem(item *model.DigestItem) error {
@@ -210,7 +210,15 @@ func (d *GormDatabase) GetDigestItems(userID uint) ([]*model.DigestItem, error) 
 	var items []*model.DigestItem
 	return items, d.DB.Where("user_id = ?", userID).Order("created_at asc").Find(&items).Error
 }
-func (d *GormDatabase) DeleteDigestItems(userID uint) error { return d.DB.Where("user_id = ?", userID).Delete(&model.DigestItem{}).Error }
+func (d *GormDatabase) DeleteDigestItems(userID uint) error {
+	return d.DB.Where("user_id = ?", userID).Delete(&model.DigestItem{}).Error
+}
+func (d *GormDatabase) DeleteDigestItemsByIDs(userID uint, ids []uint) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	return d.DB.Where("user_id = ? AND id IN ?", userID, ids).Delete(&model.DigestItem{}).Error
+}
 func (d *GormDatabase) GetDueDigestPolicies(now time.Time) ([]*model.DigestPolicy, error) {
 	var items []*model.DigestPolicy
 	return items, d.DB.Where("enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ? AND (claim_until IS NULL OR claim_until <= ?)", true, now, now).Find(&items).Error
