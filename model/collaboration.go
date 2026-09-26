@@ -92,20 +92,19 @@ type MessageCollaboration struct {
 	ReplyCount       int                      `json:"replyCount,omitempty"`
 }
 
-
 type SavedMessageSearch struct {
-	ID        uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	UserID    uint      `gorm:"index" json:"userId"`
-	Name      string    `gorm:"type:varchar(180)" json:"name"`
-	Query     string    `gorm:"type:text" json:"query"`
-	ApplicationID uint  `gorm:"index" json:"applicationId,omitempty"`
-	MinPriority int     `json:"minPriority"`
-	MaxPriority int     `json:"maxPriority"`
-	Sender    string    `gorm:"type:text" json:"sender,omitempty"`
-	Status    string    `gorm:"type:varchar(24)" json:"status,omitempty"`
-	Acknowledged string `gorm:"type:varchar(16)" json:"acknowledged,omitempty"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ID            uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	UserID        uint      `gorm:"index" json:"userId"`
+	Name          string    `gorm:"type:varchar(180)" json:"name"`
+	Query         string    `gorm:"type:text" json:"query"`
+	ApplicationID uint      `gorm:"index" json:"applicationId,omitempty"`
+	MinPriority   int       `json:"minPriority"`
+	MaxPriority   int       `json:"maxPriority"`
+	Sender        string    `gorm:"type:text" json:"sender,omitempty"`
+	Status        string    `gorm:"type:varchar(24)" json:"status,omitempty"`
+	Acknowledged  string    `gorm:"type:varchar(16)" json:"acknowledged,omitempty"`
+	CreatedAt     time.Time `json:"createdAt"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
 type MessageSearchFilter struct {
