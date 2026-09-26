@@ -122,6 +122,7 @@ type CurrentUserExternal struct {
 	// required: true
 	// example: true
 	Admin bool `json:"admin"`
+	DirectoryManaged bool `json:"directoryManaged,omitempty"`
 	// The date the user was created.
 	//
 	// read only: true
