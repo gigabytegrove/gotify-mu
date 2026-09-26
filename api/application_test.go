@@ -341,6 +341,28 @@ func (s *ApplicationSuite) Test_Sorting() {
 	assert.Equal(s.T(), apps[2].SortKey, "a2")
 }
 
+func (s *ApplicationSuite) Test_GetCurrentApplication() {
+	userBuilder := s.db.User(5)
+	expected := userBuilder.NewAppWithToken(1, "known-app-key")
+	expected.Name = "Home Assistant"
+	expected.Description = "Home Assistant notifications"
+	require.NoError(s.T(), s.db.UpdateApplication(expected))
+
+	stored, err := s.db.GetApplicationByID(1)
+	require.NoError(s.T(), err)
+	auth.RegisterApplication(s.ctx, stored)
+	s.ctx.Request = httptest.NewRequest("GET", "/application/current", nil)
+
+	s.a.GetCurrentApplication(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	result := *stored
+	result.Token = ""
+	result.Image = "static/defaultapp.png"
+	test.BodyEquals(s.T(), &result, s.recorder)
+	assert.NotContains(s.T(), s.recorder.Body.String(), "known-app-key")
+}
+
 func (s *ApplicationSuite) Test_GetApplications() {
 	userBuilder := s.db.User(5)
 	first := userBuilder.NewAppWithToken(1, "perfper")
