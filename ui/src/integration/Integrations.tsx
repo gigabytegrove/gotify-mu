@@ -491,7 +491,7 @@ const IntegrationHistoryDialog = ({
                                     spacing={1}
                                     sx={{alignItems: 'center', justifyContent: 'space-between'}}>
                                     <Typography sx={{fontWeight: 700}}>
-                                        {item.event.replaceAll('_', ' ')}
+                                        {item.event.replace(/_/g, ' ')}
                                     </Typography>
                                     <Chip
                                         size="small"
