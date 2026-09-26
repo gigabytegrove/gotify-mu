@@ -422,7 +422,7 @@ func (s *IntegrationSuite) TestAuthentication() {
 
 	req = s.newRequest("POST", "user", `{"name": "normal", "pass": "secret-password-123"}`)
 	req.SetBasicAuth("admin", "pw")
-	doRequestAndExpect(s.T(), req, 200, `{"id": 2, "name": "normal", "admin": false, "createdAt":"2020-01-01T00:00:00Z", "mfaEnabled":false, "mfaRequired":false, "authProvider":"local", "passkeyCount":0}`)
+	doRequestAndExpect(s.T(), req, 200, `{"id": 2, "name": "normal", "admin": false, "createdAt":"2020-01-01T00:00:00Z"}`)
 
 	req = s.newRequest("POST", "user", `{"name": "normal2", "pass": "secret-password-123"}`)
 	req.SetBasicAuth("normal", "secret-password-123")
@@ -434,7 +434,7 @@ func (s *IntegrationSuite) TestAuthentication() {
 
 	req = s.newRequest("GET", "current/user", "")
 	req.SetBasicAuth("normal", "secret-password-123")
-	doRequestAndExpect(s.T(), req, 200, `{"id": 2, "name": "normal", "admin": false, "createdAt":"2020-01-01T00:00:00Z"}`)
+	doRequestAndExpect(s.T(), req, 200, `{"id": 2, "name": "normal", "admin": false, "createdAt":"2020-01-01T00:00:00Z", "mfaEnabled":false, "mfaRequired":false, "authProvider":"local", "passkeyCount":0}`)
 
 	req = s.newRequest("POST", "client", `{"name": "android-client"}`)
 	req.SetBasicAuth("normal", "secret-password-123")
