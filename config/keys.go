@@ -31,6 +31,7 @@ const (
 	EnvPassStrength                     = "GOTIFY_PASSSTRENGTH"
 	EnvUploadedImagesDir                = "GOTIFY_UPLOADEDIMAGESDIR"
 	EnvPluginsDir                       = "GOTIFY_PLUGINSDIR"
+	EnvPluginTrustedSHA256              = "GOTIFY_PLUGINS_TRUSTEDSHA256"
 	EnvRegistration                     = "GOTIFY_REGISTRATION"
 	EnvLocalAuthEnabled                 = "GOTIFY_LOCALAUTH_ENABLED"
 	EnvOIDCEnabled                      = "GOTIFY_OIDC_ENABLED"
