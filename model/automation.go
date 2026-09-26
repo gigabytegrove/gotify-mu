@@ -4,49 +4,49 @@ import "time"
 
 // WebhookRoute defines a named inbound webhook that publishes into a Channel.
 type WebhookRoute struct {
-	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name            string    `gorm:"type:text" json:"name"`
-	ApplicationID   uint      `gorm:"index" json:"applicationId"`
-	Secret          string    `gorm:"type:text" json:"-"`
-	SecretHash      string    `gorm:"type:varchar(64);uniqueIndex" json:"-"`
-	Enabled         bool      `json:"enabled"`
-	RequireSignature bool     `json:"requireSignature"`
-	AllowedCIDRs    string    `gorm:"type:text" json:"allowedCidrs"`
-	RateLimitPerMinute int    `json:"rateLimitPerMinute"`
-	TitleField      string    `gorm:"type:text" json:"titleField"`
-	MessageField    string    `gorm:"type:text" json:"messageField"`
-	PriorityField   string    `gorm:"type:text" json:"priorityField"`
-	MatchField      string    `gorm:"type:text" json:"matchField"`
-	MatchValue      string    `gorm:"type:text" json:"matchValue"`
-	TitleTemplate   string    `gorm:"type:text" json:"titleTemplate"`
-	MessageTemplate string    `gorm:"type:text" json:"messageTemplate"`
-	DefaultTitle    string    `gorm:"type:text" json:"defaultTitle"`
-	DefaultPriority int       `json:"defaultPriority"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+	ID                 uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name               string    `gorm:"type:text" json:"name"`
+	ApplicationID      uint      `gorm:"index" json:"applicationId"`
+	Secret             string    `gorm:"type:text" json:"-"`
+	SecretHash         string    `gorm:"type:varchar(64);uniqueIndex" json:"-"`
+	Enabled            bool      `json:"enabled"`
+	RequireSignature   bool      `json:"requireSignature"`
+	AllowedCIDRs       string    `gorm:"type:text" json:"allowedCidrs"`
+	RateLimitPerMinute int       `json:"rateLimitPerMinute"`
+	TitleField         string    `gorm:"type:text" json:"titleField"`
+	MessageField       string    `gorm:"type:text" json:"messageField"`
+	PriorityField      string    `gorm:"type:text" json:"priorityField"`
+	MatchField         string    `gorm:"type:text" json:"matchField"`
+	MatchValue         string    `gorm:"type:text" json:"matchValue"`
+	TitleTemplate      string    `gorm:"type:text" json:"titleTemplate"`
+	MessageTemplate    string    `gorm:"type:text" json:"messageTemplate"`
+	DefaultTitle       string    `gorm:"type:text" json:"defaultTitle"`
+	DefaultPriority    int       `json:"defaultPriority"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
 }
 
 // WebhookRouteView includes the generated inbound path without exposing the secret itself.
 type WebhookRouteView struct {
-	ID              uint      `json:"id"`
-	Name            string    `json:"name"`
-	ApplicationID   uint      `json:"applicationId"`
-	Enabled         bool      `json:"enabled"`
-	RequireSignature bool     `json:"requireSignature"`
-	AllowedCIDRs    string    `json:"allowedCidrs"`
-	RateLimitPerMinute int    `json:"rateLimitPerMinute"`
-	Path            string    `json:"path"`
-	TitleField      string    `json:"titleField"`
-	MessageField    string    `json:"messageField"`
-	PriorityField   string    `json:"priorityField"`
-	MatchField      string    `json:"matchField"`
-	MatchValue      string    `json:"matchValue"`
-	TitleTemplate   string    `json:"titleTemplate"`
-	MessageTemplate string    `json:"messageTemplate"`
-	DefaultTitle    string    `json:"defaultTitle"`
-	DefaultPriority int       `json:"defaultPriority"`
-	CreatedAt       time.Time `json:"createdAt"`
-	UpdatedAt       time.Time `json:"updatedAt"`
+	ID                 uint      `json:"id"`
+	Name               string    `json:"name"`
+	ApplicationID      uint      `json:"applicationId"`
+	Enabled            bool      `json:"enabled"`
+	RequireSignature   bool      `json:"requireSignature"`
+	AllowedCIDRs       string    `json:"allowedCidrs"`
+	RateLimitPerMinute int       `json:"rateLimitPerMinute"`
+	Path               string    `json:"path"`
+	TitleField         string    `json:"titleField"`
+	MessageField       string    `json:"messageField"`
+	PriorityField      string    `json:"priorityField"`
+	MatchField         string    `json:"matchField"`
+	MatchValue         string    `json:"matchValue"`
+	TitleTemplate      string    `json:"titleTemplate"`
+	MessageTemplate    string    `json:"messageTemplate"`
+	DefaultTitle       string    `json:"defaultTitle"`
+	DefaultPriority    int       `json:"defaultPriority"`
+	CreatedAt          time.Time `json:"createdAt"`
+	UpdatedAt          time.Time `json:"updatedAt"`
 }
 
 // WebhookDelivery records recent inbound webhook outcomes without storing credentials or full payloads.
@@ -62,10 +62,10 @@ type WebhookDelivery struct {
 
 // MQTTIntegration subscribes to one broker/topic and publishes received payloads into a Channel.
 type MQTTIntegration struct {
-	ID            uint      `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name          string    `gorm:"type:text" json:"name"`
-	ApplicationID uint      `gorm:"index" json:"applicationId"`
-	BrokerURL     string    `gorm:"type:text" json:"brokerUrl"`
+	ID                uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name              string     `gorm:"type:text" json:"name"`
+	ApplicationID     uint       `gorm:"index" json:"applicationId"`
+	BrokerURL         string     `gorm:"type:text" json:"brokerUrl"`
 	ClientID          string     `gorm:"type:text" json:"clientId"`
 	Username          string     `gorm:"type:text" json:"username"`
 	Password          string     `gorm:"type:text" json:"-"`
@@ -75,15 +75,15 @@ type MQTTIntegration struct {
 	ClientCertificate string     `gorm:"type:text" json:"clientCertificate,omitempty"`
 	ClientKey         string     `gorm:"type:text" json:"-"`
 	Topic             string     `gorm:"type:text" json:"topic"`
-	Enabled         bool       `json:"enabled"`
-	Status          string     `gorm:"type:varchar(24)" json:"status"`
-	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
-	LastMessageAt   *time.Time `json:"lastMessageAt,omitempty"`
-	LastError       string     `gorm:"type:text" json:"lastError,omitempty"`
-	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
-	ReconnectCount  int        `json:"reconnectCount"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
+	Enabled           bool       `json:"enabled"`
+	Status            string     `gorm:"type:varchar(24)" json:"status"`
+	LastConnectedAt   *time.Time `json:"lastConnectedAt,omitempty"`
+	LastMessageAt     *time.Time `json:"lastMessageAt,omitempty"`
+	LastError         string     `gorm:"type:text" json:"lastError,omitempty"`
+	LastErrorAt       *time.Time `json:"lastErrorAt,omitempty"`
+	ReconnectCount    int        `json:"reconnectCount"`
+	CreatedAt         time.Time  `json:"createdAt"`
+	UpdatedAt         time.Time  `json:"updatedAt"`
 }
 
 // MQTTIntegrationView masks the stored password.
@@ -93,14 +93,14 @@ type MQTTIntegrationView struct {
 	ApplicationID      uint      `json:"applicationId"`
 	BrokerURL           string    `json:"brokerUrl"`
 	ClientID            string    `json:"clientId"`
-	Username             string     `json:"username"`
-	PasswordConfigured  bool       `json:"passwordConfigured"`
+	Username             string    `json:"username"`
+	PasswordConfigured  bool      `json:"passwordConfigured"`
 	ProtocolVersion     int        `json:"protocolVersion"`
 	QoS                 int        `json:"qos"`
 	CACertificate       string     `json:"caCertificate,omitempty"`
 	ClientCertificate   string     `json:"clientCertificate,omitempty"`
 	ClientKeyConfigured bool       `json:"clientKeyConfigured"`
-	Topic                string     `json:"topic"`
+	Topic                string    `json:"topic"`
 	Enabled              bool       `json:"enabled"`
 	Status              string     `json:"status"`
 	LastConnectedAt     *time.Time `json:"lastConnectedAt,omitempty"`
@@ -118,7 +118,7 @@ type HomeAssistantIntegration struct {
 	Name          string    `gorm:"type:text" json:"name"`
 	ApplicationID uint      `gorm:"index" json:"applicationId"`
 	BaseURL       string    `gorm:"type:text" json:"baseUrl"`
-	Token         string    `gorm:"type:text" json:"-"`
+	Token           string     `gorm:"type:text" json:"-"`
 	EventType       string     `gorm:"type:text" json:"eventType"`
 	EntityIDs       string     `gorm:"type:text" json:"entityIds"`
 	DataField       string     `gorm:"type:text" json:"dataField"`
@@ -158,12 +158,12 @@ type HomeAssistantIntegrationView struct {
 
 // ScheduledNotification is a recurring or one-time Channel notification.
 type ScheduledNotification struct {
-	ID            uint       `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name          string     `gorm:"type:text" json:"name"`
-	ApplicationID uint       `gorm:"index" json:"applicationId"`
-	Title         string     `gorm:"type:text" json:"title"`
-	Message       string     `gorm:"type:text" json:"message"`
-	Priority      int        `json:"priority"`
+	ID             uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name           string     `gorm:"type:text" json:"name"`
+	ApplicationID  uint       `gorm:"index" json:"applicationId"`
+	Title          string     `gorm:"type:text" json:"title"`
+	Message        string     `gorm:"type:text" json:"message"`
+	Priority       int        `json:"priority"`
 	ScheduleType   string     `gorm:"type:varchar(16)" json:"scheduleType"`
 	RunAt          *time.Time `json:"runAt,omitempty"`
 	Hour           int        `json:"hour"`
@@ -204,8 +204,8 @@ type DigestPolicy struct {
 	ID               uint       `gorm:"primaryKey;autoIncrement" json:"id"`
 	UserID           uint       `gorm:"uniqueIndex" json:"userId"`
 	Enabled          bool       `json:"enabled"`
-	IntervalMinutes  int        `json:"intervalMinutes"`
-	ImmediatePriority int       `json:"immediatePriority"`
+	IntervalMinutes   int        `json:"intervalMinutes"`
+	ImmediatePriority int        `json:"immediatePriority"`
 	LastSentAt       *time.Time `json:"lastSentAt,omitempty"`
 	NextRunAt        *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
 	CreatedAt        time.Time  `json:"createdAt"`
@@ -261,7 +261,6 @@ type MessageAcknowledgement struct {
 	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }
 
-
 // DeferredNotification queues one realtime notification until Quiet Hours end.
 type DeferredNotification struct {
 	UserID    uint      `gorm:"primaryKey;autoIncrement:false" json:"userId"`
@@ -285,7 +284,6 @@ type MessageAcknowledgementView struct {
 	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }
 
-
 // ScheduledNotificationRun records one scheduler execution attempt.
 type ScheduledNotificationRun struct {
 	ID           uint       `gorm:"primaryKey;autoIncrement" json:"id"`
@@ -297,7 +295,6 @@ type ScheduledNotificationRun struct {
 	MessageID    uint       `gorm:"index" json:"messageId,omitempty"`
 	Error        string     `gorm:"type:text" json:"error,omitempty"`
 }
-
 
 // EscalationTargetApplication maps non-Channel escalation targets to internal history Channels.
 type EscalationTargetApplication struct {
