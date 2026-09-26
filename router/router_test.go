@@ -105,7 +105,7 @@ func (s *IntegrationSuite) TestVersionInfo() {
 
 func (s *IntegrationSuite) TestGotifyInfo() {
 	req := s.newRequest("GET", "gotifyinfo", "")
-	doRequestAndExpect(s.T(), req, 200, `{"version":"1.0.0", "oidc":false, "register":false, "localAuth":true, "oidcIdpName":"Company XYZ SSO", "oidcAutoRedirect":false}`)
+	doRequestAndExpect(s.T(), req, 200, `{"version":"1.0.0", "oidc":false, "register":false, "localAuth":true, "oidcIdpName":"Company XYZ SSO", "oidcAutoRedirect":false, "ldap":false, "ldapIdpName":""}`)
 }
 
 func (s *IntegrationSuite) TestHeaderInProd() {
@@ -414,30 +414,30 @@ func (s *IntegrationSuite) TestPluginLoadFail_expectPanic() {
 func (s *IntegrationSuite) TestAuthentication() {
 	req := s.newRequest("GET", "current/user", "")
 	req.SetBasicAuth("admin", "pw")
-	doRequestAndExpect(s.T(), req, 200, `{"id": 1, "name": "admin", "admin": true, "createdAt":"2020-01-01T00:00:00Z"}`)
+	doRequestAndExpect(s.T(), req, 200, `{"id": 1, "name": "admin", "admin": true, "createdAt":"2020-01-01T00:00:00Z", "mfaEnabled":false, "mfaRequired":false, "authProvider":"local", "passkeyCount":0}`)
 
 	req = s.newRequest("GET", "current/user", "")
 	req.SetBasicAuth("jmattheis", "pw")
 	doRequestAndExpect(s.T(), req, 401, `{"error":"Unauthorized", "errorCode":401, "errorDescription":"you need to provide a valid access token or user credentials to access this api"}`)
 
-	req = s.newRequest("POST", "user", `{"name": "normal", "pass": "secret"}`)
+	req = s.newRequest("POST", "user", `{"name": "normal", "pass": "secret-password-123"}`)
 	req.SetBasicAuth("admin", "pw")
-	doRequestAndExpect(s.T(), req, 200, `{"id": 2, "name": "normal", "admin": false, "createdAt":"2020-01-01T00:00:00Z"}`)
+	doRequestAndExpect(s.T(), req, 200, `{"id": 2, "name": "normal", "admin": false, "createdAt":"2020-01-01T00:00:00Z", "mfaEnabled":false, "mfaRequired":false, "authProvider":"local", "passkeyCount":0}`)
 
-	req = s.newRequest("POST", "user", `{"name": "normal2", "pass": "secret"}`)
-	req.SetBasicAuth("normal", "secret")
+	req = s.newRequest("POST", "user", `{"name": "normal2", "pass": "secret-password-123"}`)
+	req.SetBasicAuth("normal", "secret-password-123")
 	doRequestAndExpect(s.T(), req, 403, forbiddenJSON)
 
 	req = s.newRequest("POST", "message", `{"message": "backup done", "title": "backup"}`)
-	req.SetBasicAuth("normal", "secret")
+	req.SetBasicAuth("normal", "secret-password-123")
 	doRequestAndExpect(s.T(), req, 400, `{"error":"Bad Request", "errorCode":400, "errorDescription":"appid is required when not authenticating with an application token"}`)
 
 	req = s.newRequest("GET", "current/user", "")
-	req.SetBasicAuth("normal", "secret")
+	req.SetBasicAuth("normal", "secret-password-123")
 	doRequestAndExpect(s.T(), req, 200, `{"id": 2, "name": "normal", "admin": false, "createdAt":"2020-01-01T00:00:00Z"}`)
 
 	req = s.newRequest("POST", "client", `{"name": "android-client"}`)
-	req.SetBasicAuth("normal", "secret")
+	req.SetBasicAuth("normal", "secret-password-123")
 	res, err := client.Do(req)
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), 200, res.StatusCode)
@@ -450,7 +450,7 @@ func (s *IntegrationSuite) TestCreateUser_RequiresElevatedAdmin() {
 	s.db.AdminUser(2).ClientWithToken(1, "Cadminplain").ElevatedClientWithToken(2, "Cadminelevated")
 	s.db.User(3).ElevatedClientWithToken(3, "Cnormalelevated")
 
-	body := `{"name": "newadmin", "pass": "secret", "admin": true}`
+	body := `{"name": "newadmin", "pass": "secret-password-123", "admin": true}`
 
 	// admin, but not elevated
 	req := s.newRequest("POST", "user", body)
