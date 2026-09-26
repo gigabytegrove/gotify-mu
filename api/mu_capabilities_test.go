@@ -1,0 +1,37 @@
+package api
+
+import (
+	"encoding/json"
+	"net/http/httptest"
+	"testing"
+
+	"github.com/gin-gonic/gin"
+)
+
+func TestMUCapabilitiesStableContract(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+
+	handler := MUCapabilitiesAPI{Version: "1.0.0"}
+	handler.Get(ctx)
+
+	if recorder.Code != 200 {
+		t.Fatalf("expected HTTP 200, got %d", recorder.Code)
+	}
+
+	var payload MUCapabilities
+	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Product != "gotify-mu" || payload.Version != "1.0.0" || payload.APIVersion != 1 {
+		t.Fatalf("unexpected capability identity: %#v", payload)
+	}
+	if !payload.Features.SharedChannels || !payload.Features.ChatChannels ||
+		!payload.Features.TypingPresence || !payload.Features.ChatNotifications ||
+		!payload.Features.Mentions {
+		t.Fatalf("required stable MU features are not advertised: %#v", payload.Features)
+	}
+	if payload.Features.ChannelTypes {
+		t.Fatal("channelTypes must remain false until an explicit channel-type API is stable")
+	}
+}
