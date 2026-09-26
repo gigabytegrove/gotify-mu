@@ -200,13 +200,22 @@ export class MessagesStore {
         } else {
             await axios.delete(url);
         }
+        const summary = await axios.get<{
+            acknowledged: boolean;
+            acknowledgedAny: boolean;
+            count: number;
+            acknowledgedBy: NonNullable<IMessage['acknowledgedBy']>;
+        }>(url);
 
         runInAction(() => {
             const update = (states: Record<string, MessagesState>) => {
                 Object.values(states).forEach((state) => {
                     const match = state.messages.find((item) => item.id === message.id);
                     if (match) {
-                        match.acknowledged = acknowledged;
+                        match.acknowledged = summary.data.acknowledged;
+                        match.acknowledgedAny = summary.data.acknowledgedAny;
+                        match.acknowledgementCount = summary.data.count;
+                        match.acknowledgedBy = summary.data.acknowledgedBy;
                     }
                 });
             };
