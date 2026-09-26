@@ -54,6 +54,7 @@ type AutomationDatabase interface {
 	GetScheduledNotificationByID(id uint) (*model.ScheduledNotification, error)
 	SaveScheduledNotification(item *model.ScheduledNotification) error
 	DeleteScheduledNotification(id uint) error
+	GetScheduleRuns(scheduleID uint, limit int) ([]*model.ScheduleRun, error)
 
 	GetQuietHoursPolicy(userID uint) (*model.QuietHoursPolicy, error)
 	SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error
@@ -389,15 +390,26 @@ type scheduleParams struct {
 	RunAt         *time.Time `json:"runAt"`
 	Hour          int        `json:"hour"`
 	Minute        int        `json:"minute"`
-	Weekday       int        `json:"weekday"`
-	Timezone      string     `json:"timezone"`
-	Enabled       bool       `json:"enabled"`
+	Weekday        int        `json:"weekday"`
+	IntervalMinutes int       `json:"intervalMinutes"`
+	Timezone       string     `json:"timezone"`
+	ExcludedDates  []string   `json:"excludedDates"`
+	EndAt          *time.Time `json:"endAt"`
+	MaxRuns        int        `json:"maxRuns"`
+	Enabled        bool       `json:"enabled"`
 }
 
 func (a *AutomationAPI) GetSchedules(ctx *gin.Context) {
 	items, err := a.DB.GetScheduledNotifications()
 	if !successOrAbort(ctx, 500, err) { return }
-	ctx.JSON(200, items)
+	result := make([]model.ScheduledNotificationView, 0, len(items))
+	for _, item := range items {
+		result = append(result, model.ScheduledNotificationView{
+			ScheduledNotification:*item,
+			ExcludedDates:splitCSV(item.ExcludeDates),
+		})
+	}
+	ctx.JSON(200, result)
 }
 
 func (a *AutomationAPI) CreateSchedule(ctx *gin.Context) {
@@ -421,12 +433,24 @@ func (a *AutomationAPI) UpdateSchedule(ctx *gin.Context) {
 		if err := ctx.ShouldBindJSON(&params); err != nil { return }
 		if !a.channelExists(ctx, params.ApplicationID) { return }
 		updated := scheduleFromParams(params)
-		updated.ID, updated.CreatedAt = item.ID, item.CreatedAt
+		updated.ID, updated.CreatedAt, updated.RunCount = item.ID, item.CreatedAt, item.RunCount
 		if err := validateSchedule(updated); err != nil { ctx.AbortWithError(400, err); return }
 		updated.NextRunAt = automation.NextScheduleRun(updated, time.Now())
 		if updated.Enabled && updated.NextRunAt == nil { ctx.AbortWithError(400, errors.New("schedule does not have a future run time")); return }
 		if !successOrAbort(ctx, 500, a.DB.SaveScheduledNotification(updated)) { return }
 		ctx.JSON(200, updated)
+	})
+}
+
+func (a *AutomationAPI) GetScheduleRuns(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		limit := 100
+		if raw := ctx.Query("limit"); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil { limit = parsed }
+		}
+		items, err := a.DB.GetScheduleRuns(id, limit)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, items)
 	})
 }
 
@@ -623,7 +647,8 @@ func scheduleFromParams(params scheduleParams) *model.ScheduledNotification {
 	return &model.ScheduledNotification{
 		Name:params.Name,ApplicationID:params.ApplicationID,Title:params.Title,Message:params.Message,Priority:params.Priority,
 		ScheduleType:params.ScheduleType,RunAt:params.RunAt,Hour:params.Hour,Minute:params.Minute,Weekday:params.Weekday,
-		Timezone:valueOr(params.Timezone,"UTC"),Enabled:params.Enabled,
+		IntervalMinutes:params.IntervalMinutes,Timezone:valueOr(params.Timezone,"UTC"),
+		ExcludeDates:strings.Join(params.ExcludedDates,","),EndAt:params.EndAt,MaxRuns:params.MaxRuns,Enabled:params.Enabled,
 	}
 }
 
@@ -631,6 +656,8 @@ func validateSchedule(item *model.ScheduledNotification) error {
 	switch item.ScheduleType {
 	case "once":
 		if item.RunAt == nil { return errors.New("one-time schedules require a date and time") }
+	case "interval":
+		if item.IntervalMinutes < 1 || item.IntervalMinutes > 525600 { return errors.New("interval must be between 1 minute and 1 year") }
 	case "hourly":
 		if item.Minute < 0 || item.Minute > 59 { return errors.New("minute must be between 0 and 59") }
 	case "daily":
@@ -638,9 +665,13 @@ func validateSchedule(item *model.ScheduledNotification) error {
 	case "weekly":
 		if item.Weekday < 0 || item.Weekday > 6 || item.Hour < 0 || item.Hour > 23 || item.Minute < 0 || item.Minute > 59 { return errors.New("invalid weekly schedule") }
 	default:
-		return errors.New("schedule type must be once, hourly, daily, or weekly")
+		return errors.New("schedule type must be once, interval, hourly, daily, or weekly")
 	}
 	if _, err := time.LoadLocation(valueOr(item.Timezone,"UTC")); err != nil { return errors.New("invalid timezone") }
+	if item.MaxRuns < 0 { return errors.New("maximum runs cannot be negative") }
+	for _, value := range splitCSV(item.ExcludeDates) {
+		if _, err := time.Parse("2006-01-02", value); err != nil { return fmt.Errorf("invalid excluded date %q", value) }
+	}
 	return nil
 }
 
