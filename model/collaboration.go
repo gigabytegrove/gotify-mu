@@ -28,9 +28,9 @@ type MessageReaction struct {
 }
 
 type MessageReactionSummary struct {
-	Emoji     string `json:"emoji"`
-	Count     int    `json:"count"`
-	ReactedByMe bool `json:"reactedByMe"`
+	Emoji       string `json:"emoji"`
+	Count       int    `json:"count"`
+	ReactedByMe bool   `json:"reactedByMe"`
 }
 
 type MessageWorkflow struct {
