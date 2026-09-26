@@ -12,6 +12,7 @@ import (
 
 func TestConfigEnv(t *testing.T) {
 	mode.Set(mode.TestDev)
+	t.Setenv(EnvSecuritySecretKey, "1111111111111111111111111111111111111111111111111111111111111111")
 	t.Setenv("GOTIFY_DEFAULTUSER_NAME", "jmattheis")
 	t.Setenv("GOTIFY_SERVER_SSL_LETSENCRYPT_HOSTS", "push.example.tld,push.other.tld")
 	t.Setenv(
@@ -69,6 +70,7 @@ func TestLocalAuthDisabled(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			mode.Set(mode.TestDev)
+			t.Setenv(EnvSecuritySecretKey, "1111111111111111111111111111111111111111111111111111111111111111")
 			for key, value := range tc.env {
 				t.Setenv(key, value)
 			}
