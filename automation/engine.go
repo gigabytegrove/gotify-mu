@@ -1129,12 +1129,23 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 		client := &http.Client{Timeout: 15 * time.Second}
 		response, err := client.Do(request)
 		if err != nil {
+			now := time.Now()
+			_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "error", nil, nil, err.Error(), &now, false)
 			return err
 		}
 		defer response.Body.Close()
 		if response.StatusCode < 200 || response.StatusCode >= 300 {
-			return fmt.Errorf("home assistant integration returned HTTP %d", response.StatusCode)
+			err = fmt.Errorf("home assistant integration returned HTTP %d", response.StatusCode)
+			now := time.Now()
+			status := "error"
+			if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden {
+				status = "repair_required"
+			}
+			_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, status, nil, nil, err.Error(), &now, false)
+			return err
 		}
+		now := time.Now()
+		_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "connected", &now, &now, "", nil, false)
 		return nil
 	}
 
@@ -1169,11 +1180,15 @@ func (e *Engine) ReceiveHomeAssistantEvent(id uint, eventType string, data map[s
 	if !integration.Enabled || !strings.EqualFold(strings.TrimSpace(integration.ConnectionMode), "integration") {
 		return false, nil
 	}
+
+	eventAt := time.Now()
 	eventType = strings.TrimSpace(eventType)
 	if configured := strings.TrimSpace(integration.EventType); configured != "" && configured != eventType {
+		_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "connected", nil, &eventAt, "", nil, false)
 		return false, nil
 	}
 	if !homeAssistantEventMatches(integration, data) {
+		_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "connected", nil, &eventAt, "", nil, false)
 		return false, nil
 	}
 	encoded, _ := json.MarshalIndent(data, "", "  ")
@@ -1185,9 +1200,10 @@ func (e *Engine) ReceiveHomeAssistantEvent(id uint, eventType string, data map[s
 		title += ": " + eventType
 	}
 	if _, err := e.Publish(integration.ApplicationID, title, string(encoded), 0); err != nil {
+		errorAt := time.Now()
+		_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "error", nil, &eventAt, err.Error(), &errorAt, false)
 		return false, err
 	}
-	eventAt := time.Now()
 	_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "connected", nil, &eventAt, "", nil, false)
 	return true, nil
 }

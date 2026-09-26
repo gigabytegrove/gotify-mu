@@ -7,6 +7,10 @@ All notable Gotify MU changes are documented here.
 - Home Assistant connections can use either a Long-Lived Access Token or the native `gotify-mu-ha` integration.
 - Adds one-time native Home Assistant pairing codes, encrypted bridge credentials, inbound event routing, and outbound event delivery without a Home Assistant LLT.
 - Native pairing codes expire after 15 minutes and are invalidated after successful pairing.
+- Native pairing repair now preserves the active bridge until replacement pairing succeeds.
+- Adds authenticated native bridge revocation so Home Assistant can unpair cleanly without deleting the Gotify MU connection.
+- Native Home Assistant outbound health now records successful delivery, transient errors, and repair-required authentication failures.
+- Authenticated inbound native events update Home Assistant connection activity even when server-side filters intentionally do not route them into a Channel.
 
 ## [0.5.0] - 2026-09-26
 

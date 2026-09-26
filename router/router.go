@@ -242,6 +242,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	g.POST("/integrations/webhook/:secret", automationHandler.ReceiveWebhook)
 	g.POST("/integrations/home-assistant/native/pair", automationHandler.PairNativeHomeAssistant)
 	g.POST("/integrations/home-assistant/native/:id/event", automationHandler.ReceiveNativeHomeAssistantEvent)
+	g.DELETE("/integrations/home-assistant/native/:id", automationHandler.RevokeNativeHomeAssistant)
 	g.GET("/swagger", docs.Serve)
 	g.StaticFS("/image", &onlyImageFS{inner: gin.Dir(conf.UploadedImagesDir, false)})
 

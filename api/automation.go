@@ -460,12 +460,13 @@ func prepareHomeAssistantPairing(item *model.HomeAssistantIntegration) (string, 
 	if err != nil {
 		return "", err
 	}
+	wasPaired := strings.TrimSpace(item.NativeWebhookURL) != "" && strings.TrimSpace(item.NativeSecret) != ""
 	expires := time.Now().Add(15 * time.Minute)
 	item.PairingCodeHash = security.HashSecret(code)
 	item.PairingExpiresAt = &expires
-	item.NativeWebhookURL = ""
-	item.NativeSecret = ""
-	item.Status = "pairing"
+	if !wasPaired {
+		item.Status = "pairing"
+	}
 	item.LastError = ""
 	item.LastErrorAt = nil
 	return code, nil
@@ -662,6 +663,25 @@ type homeAssistantEventParams struct {
 	Data      map[string]any `json:"data"`
 }
 
+func validHomeAssistantNativeAuthorization(authorization, secret string) bool {
+	authorization = strings.TrimSpace(authorization)
+	if !strings.HasPrefix(authorization, "Bearer ") || strings.TrimSpace(secret) == "" {
+		return false
+	}
+	provided := strings.TrimSpace(strings.TrimPrefix(authorization, "Bearer "))
+	return provided != "" && hmac.Equal([]byte(provided), []byte(secret))
+}
+
+func clearHomeAssistantNativePairing(item *model.HomeAssistantIntegration) {
+	item.NativeWebhookURL = ""
+	item.NativeSecret = ""
+	item.PairingCodeHash = ""
+	item.PairingExpiresAt = nil
+	item.Status = "not_paired"
+	item.LastError = ""
+	item.LastErrorAt = nil
+}
+
 func (a *AutomationAPI) ReceiveNativeHomeAssistantEvent(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		item, err := a.DB.GetHomeAssistantIntegrationByID(id)
@@ -670,8 +690,7 @@ func (a *AutomationAPI) ReceiveNativeHomeAssistantEvent(ctx *gin.Context) {
 			ctx.AbortWithError(404, errors.New("home assistant native bridge not found"))
 			return
 		}
-		provided := strings.TrimSpace(strings.TrimPrefix(ctx.GetHeader("Authorization"), "Bearer "))
-		if provided == "" || item.NativeSecret == "" || !hmac.Equal([]byte(provided), []byte(item.NativeSecret)) {
+		if !validHomeAssistantNativeAuthorization(ctx.GetHeader("Authorization"), item.NativeSecret) {
 			ctx.AbortWithError(401, errors.New("invalid home assistant native bridge credential"))
 			return
 		}
@@ -681,6 +700,25 @@ func (a *AutomationAPI) ReceiveNativeHomeAssistantEvent(ctx *gin.Context) {
 		routed, err := a.Engine.ReceiveHomeAssistantEvent(id, params.EventType, params.Data)
 		if !successOrAbort(ctx, 500, err) { return }
 		ctx.JSON(202, gin.H{"accepted": true, "routed": routed})
+	})
+}
+
+func (a *AutomationAPI) RevokeNativeHomeAssistant(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetHomeAssistantIntegrationByID(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		if item == nil || normalizeHomeAssistantMode(item.ConnectionMode) != "integration" {
+			ctx.AbortWithError(404, errors.New("home assistant native bridge not found"))
+			return
+		}
+		if !validHomeAssistantNativeAuthorization(ctx.GetHeader("Authorization"), item.NativeSecret) {
+			ctx.AbortWithError(401, errors.New("invalid home assistant native bridge credential"))
+			return
+		}
+		clearHomeAssistantNativePairing(item)
+		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
+		a.Engine.ReloadIntegrations()
+		ctx.Status(http.StatusNoContent)
 	})
 }
 
