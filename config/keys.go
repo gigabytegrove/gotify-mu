@@ -30,6 +30,7 @@ const (
 	EnvDefaultUserPass                  = "GOTIFY_DEFAULTUSER_PASS"
 	EnvPassStrength                     = "GOTIFY_PASSSTRENGTH"
 	EnvPasswordMinLength                = "GOTIFY_MU_PASSWORD_MIN_LENGTH"
+	EnvAuditRetentionDays               = "GOTIFY_MU_AUDIT_RETENTION_DAYS"
 	EnvUploadedImagesDir                = "GOTIFY_UPLOADEDIMAGESDIR"
 	EnvPluginsDir                       = "GOTIFY_PLUGINSDIR"
 	EnvSecretKeyFile                    = "GOTIFY_MU_SECRET_KEY_FILE"
