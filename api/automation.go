@@ -26,6 +26,7 @@ type AutomationEngine interface {
 	Publish(applicationID uint, title, message string, priority int) (*model.Message, error)
 	ReloadIntegrations()
 	SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error
+	TestMQTTConnection(id uint) error
 }
 
 type AutomationDatabase interface {
@@ -287,6 +288,13 @@ func (a *AutomationAPI) UpdateMQTT(ctx *gin.Context) {
 		if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, mqttView(item))
+	})
+}
+
+func (a *AutomationAPI) TestMQTTConnection(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 502, a.Engine.TestMQTTConnection(id)) { return }
+		ctx.JSON(200, gin.H{"connected": true})
 	})
 }
 
