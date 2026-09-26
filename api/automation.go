@@ -26,6 +26,8 @@ type AutomationEngine interface {
 	Publish(applicationID uint, title, message string, priority int) (*model.Message, error)
 	ReloadIntegrations()
 	SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error
+	GetIntegrationStatus(kind string, id uint) automation.IntegrationStatus
+	TestMQTT(id uint) error
 }
 
 type AutomationDatabase interface {
@@ -252,7 +254,7 @@ func (a *AutomationAPI) GetMQTT(ctx *gin.Context) {
 	items, err := a.DB.GetMQTTIntegrations()
 	if !successOrAbort(ctx, 500, err) { return }
 	out := make([]model.MQTTIntegrationView, 0, len(items))
-	for _, item := range items { out = append(out, mqttView(item)) }
+	for _, item := range items { out = append(out, mqttView(item, a.Engine.GetIntegrationStatus("mqtt", item.ID))) }
 	ctx.JSON(200, out)
 }
 
@@ -267,7 +269,7 @@ func (a *AutomationAPI) CreateMQTT(ctx *gin.Context) {
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 	a.Engine.ReloadIntegrations()
-	ctx.JSON(201, mqttView(item))
+	ctx.JSON(201, mqttView(item, a.Engine.GetIntegrationStatus("mqtt", item.ID)))
 }
 
 func (a *AutomationAPI) UpdateMQTT(ctx *gin.Context) {
@@ -284,7 +286,14 @@ func (a *AutomationAPI) UpdateMQTT(ctx *gin.Context) {
 		if params.Password != "" { item.Password = params.Password }
 		if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
-		ctx.JSON(200, mqttView(item))
+		ctx.JSON(200, mqttView(item, a.Engine.GetIntegrationStatus("mqtt", item.ID)))
+	})
+}
+
+func (a *AutomationAPI) TestMQTT(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 502, a.Engine.TestMQTT(id)) { return }
+		ctx.JSON(200, gin.H{"connected": true})
 	})
 }
 
@@ -307,7 +316,7 @@ func (a *AutomationAPI) GetHomeAssistant(ctx *gin.Context) {
 	items, err := a.DB.GetHomeAssistantIntegrations()
 	if !successOrAbort(ctx, 500, err) { return }
 	out := make([]model.HomeAssistantIntegrationView, 0, len(items))
-	for _, item := range items { out = append(out, homeAssistantView(item)) }
+	for _, item := range items { out = append(out, homeAssistantView(item, a.Engine.GetIntegrationStatus("home-assistant", item.ID))) }
 	ctx.JSON(200, out)
 }
 
@@ -323,7 +332,7 @@ func (a *AutomationAPI) CreateHomeAssistant(ctx *gin.Context) {
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 	a.Engine.ReloadIntegrations()
-	ctx.JSON(201, homeAssistantView(item))
+	ctx.JSON(201, homeAssistantView(item, a.Engine.GetIntegrationStatus("home-assistant", item.ID)))
 }
 
 func (a *AutomationAPI) UpdateHomeAssistant(ctx *gin.Context) {
@@ -340,7 +349,7 @@ func (a *AutomationAPI) UpdateHomeAssistant(ctx *gin.Context) {
 		if params.Token != "" { item.Token = params.Token }
 		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
-		ctx.JSON(200, homeAssistantView(item))
+		ctx.JSON(200, homeAssistantView(item, a.Engine.GetIntegrationStatus("home-assistant", item.ID)))
 	})
 }
 
@@ -617,18 +626,24 @@ func webhookView(item *model.WebhookRoute) model.WebhookRouteView {
 	}
 }
 
-func mqttView(item *model.MQTTIntegration) model.MQTTIntegrationView {
+func mqttView(item *model.MQTTIntegration, status automation.IntegrationStatus) model.MQTTIntegrationView {
+	state := status.State
+	if !item.Enabled { state = "disabled" } else if state == "" { state = "starting" }
 	return model.MQTTIntegrationView{
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,BrokerURL:item.BrokerURL,ClientID:item.ClientID,
 		Username:item.Username,PasswordConfigured:item.Password!="",Topic:item.Topic,Enabled:item.Enabled,
+		State:state,StatusMessage:status.Message,LastConnectedAt:status.LastConnectedAt,LastMessageAt:status.LastMessageAt,LastErrorAt:status.LastErrorAt,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
 }
 
-func homeAssistantView(item *model.HomeAssistantIntegration) model.HomeAssistantIntegrationView {
+func homeAssistantView(item *model.HomeAssistantIntegration, status automation.IntegrationStatus) model.HomeAssistantIntegrationView {
+	state := status.State
+	if !item.Enabled { state = "disabled" } else if state == "" { state = "starting" }
 	return model.HomeAssistantIntegrationView{
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,BaseURL:item.BaseURL,
 		TokenConfigured:item.Token!="",EventType:item.EventType,Enabled:item.Enabled,
+		State:state,StatusMessage:status.Message,LastConnectedAt:status.LastConnectedAt,LastMessageAt:status.LastMessageAt,LastErrorAt:status.LastErrorAt,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
 }
