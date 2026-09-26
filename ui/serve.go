@@ -19,6 +19,7 @@ type uiConfig struct {
 	Register         bool              `json:"register"`
 	Version          model.VersionInfo `json:"version"`
 	LocalAuth        bool              `json:"localAuth"`
+	Directory        bool              `json:"directory"`
 	OIDC             bool              `json:"oidc"`
 	OIDCIDPName      string            `json:"oidcIdpName"`
 	OIDCAutoRedirect bool              `json:"oidcAutoRedirect"`
@@ -30,6 +31,7 @@ func Register(
 	version model.VersionInfo,
 	register bool,
 	localAuthEnabled bool,
+	directoryEnabled bool,
 	oidcEnabled bool,
 	oidcIDPName string,
 	oidcAutoRedirect bool,
@@ -38,6 +40,7 @@ func Register(
 		Version:          version,
 		Register:         register,
 		LocalAuth:        localAuthEnabled,
+		Directory:        directoryEnabled,
 		OIDC:             oidcEnabled,
 		OIDCIDPName:      oidcIDPName,
 		OIDCAutoRedirect: oidcAutoRedirect,

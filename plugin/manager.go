@@ -44,6 +44,10 @@ type Notifier interface {
 	Notify(userID uint, message *model.MessageExternal)
 }
 
+type MessageDispatcher interface {
+	StoreAndDeliverForUser(message *model.Message, userID uint) (*model.MessageExternal, error)
+}
+
 // Manager is an encapsulating layer for plugins and manages all plugins and its instances.
 type Manager struct {
 	mutex     *sync.RWMutex
@@ -52,7 +56,8 @@ type Manager struct {
 	messages  chan MessageWithUserID
 	db        Database
 	mux       *gin.RouterGroup
-	directory string
+	directory  string
+	dispatcher MessageDispatcher
 }
 
 // NewManager created a Manager from configurations.
@@ -80,9 +85,21 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 			if message.Message.Extras != nil {
 				internalMsg.Extras, _ = json.Marshal(message.Message.Extras)
 			}
-			db.CreateMessage(internalMsg)
-			message.Message.ID = internalMsg.ID
-			notifier.Notify(message.UserID, &message.Message)
+			if manager.dispatcher != nil {
+				external, err := manager.dispatcher.StoreAndDeliverForUser(internalMsg, message.UserID)
+				if err != nil {
+					log.Error().Err(err).Uint("user_id", message.UserID).Msg("Plugin message delivery failed")
+					continue
+				}
+				message.Message = *external
+			} else {
+				if err := db.CreateMessage(internalMsg); err != nil {
+					log.Error().Err(err).Uint("user_id", message.UserID).Msg("Plugin message storage failed")
+					continue
+				}
+				message.Message.ID = internalMsg.ID
+				notifier.Notify(message.UserID, &message.Message)
+			}
 		}
 	}()
 
@@ -101,6 +118,12 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 	}
 
 	return manager, nil
+}
+
+func (m *Manager) SetMessageDispatcher(dispatcher MessageDispatcher) {
+	m.mutex.Lock()
+	m.dispatcher = dispatcher
+	m.mutex.Unlock()
 }
 
 // MaxPluginUploadBytes is the maximum size accepted for a plugin uploaded through the API.

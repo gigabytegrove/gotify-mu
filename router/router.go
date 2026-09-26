@@ -1,8 +1,12 @@
 package router
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -17,10 +21,12 @@ import (
 	"github.com/gotify/server/v3/automation"
 	"github.com/gotify/server/v3/config"
 	"github.com/gotify/server/v3/database"
+	"github.com/gotify/server/v3/directory"
 	"github.com/gotify/server/v3/docs"
 	gerror "github.com/gotify/server/v3/error"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/plugin"
+	"github.com/gotify/server/v3/security"
 	"github.com/gotify/server/v3/ui"
 	"github.com/rs/zerolog/log"
 )
@@ -86,11 +92,24 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			}
 		}
 	}()
+	loginLimiter := security.NewLimiter(12, 5)
+	webhookLimiter := security.NewLimiter(240, 30)
+	directoryService := &directory.Service{DB: db, Strength: conf.PassStrength}
+	policyProvider := func() *model.SecurityPolicy {
+		policy, err := db.GetSecurityPolicy()
+		if err != nil {
+			log.Error().Err(err).Msg("Could not load security policy")
+			return model.DefaultSecurityPolicy()
+		}
+		return policy
+	}
 	authentication := auth.Auth{
 		DB:               db,
 		SecureCookie:     conf.Server.SecureCookie,
 		LocalAuthEnabled: conf.LocalAuthEnabled,
+		Directory:        directoryService,
 		CrossOrigin:      http.NewCrossOriginProtection(),
+		LoginLimiter:     loginLimiter,
 	}
 	automationEngine := automation.New(db, streamHandler)
 	messageHandler := api.MessageAPI{Notifier: streamHandler, DB: db, Dispatcher: automationEngine}
@@ -99,6 +118,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		DB:            db,
 		ImageDir:      conf.UploadedImagesDir,
 		NotifyDeleted: streamHandler.NotifyDeletedClient,
+		Policy:        policyProvider,
 	}
 	applicationHandler := api.ApplicationAPI{
 		DB:       db,
@@ -108,29 +128,69 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	applicationMembershipHandler := api.ApplicationMembershipAPI{
 		DB: db,
 	}
-	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled}
+	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled, Directory: directoryService, Policy: policyProvider, LoginLimiter: loginLimiter}
 	userChangeNotifier := new(api.UserChangeNotifier)
-	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
+	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration, Policy: policyProvider}
 	auditHandler := api.AuditAPI{DB: db}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
+	serviceAccountHandler := api.ServiceAccountAPI{DB: db, Dispatcher: automationEngine}
+	securityPolicyHandler := api.SecurityPolicyAPI{DB: db}
+	directoryHandler := api.DirectoryAPI{DB: db, Service: directoryService}
+	mfaHandler := api.MFAAPI{DB: db}
+	operationsHandler := api.OperationsAPI{
+		DB: db,
+		NotifyDeleted: streamHandler.NotifyDeletedClient,
+		DatabaseDialect: conf.Database.Dialect,
+		DatabaseConnection: conf.Database.Connection,
+		DataPaths: []string{conf.UploadedImagesDir, conf.PluginsDir, filepath.Dir(conf.Database.Connection)},
+		UploadedImagesDir: conf.UploadedImagesDir,
+		PluginsDir: conf.PluginsDir,
+		Version: vInfo,
+	}
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
 		panic(err)
 	}
+	pluginManager.SetMessageDispatcher(automationEngine)
 	pluginHandler := api.PluginAPI{
 		Manager:  pluginManager,
 		Notifier: streamHandler,
 		DB:       db,
+		Policy:   policyProvider,
 	}
+
+	go func() {
+		ticker := time.NewTicker(time.Hour)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ticker.C:
+				now := time.Now()
+				loginLimiter.Cleanup(24*time.Hour)
+				webhookLimiter.Cleanup(24*time.Hour)
+				policy := policyProvider()
+				if policy.AuditRetentionDays > 0 {
+					if err := db.DeleteAuditEventsBefore(now.AddDate(0, 0, -policy.AuditRetentionDays)); err != nil {
+						log.Error().Err(err).Msg("Could not apply audit retention policy")
+					}
+				}
+				if policy.AutomationRetentionDays > 0 {
+					if err := db.DeleteAutomationRunsBefore(now.AddDate(0, 0, -policy.AutomationRetentionDays)); err != nil {
+						log.Error().Err(err).Msg("Could not apply automation history retention policy")
+					}
+				}
+			}
+		}
+	}()
 
 	userChangeNotifier.OnUserDeleted(streamHandler.NotifyDeletedUser)
 	userChangeNotifier.OnUserDeleted(pluginManager.RemoveUser)
 	userChangeNotifier.OnUserAdded(pluginManager.InitializeForUserID)
 
-	ui.Register(g, *vInfo, conf.Registration, conf.LocalAuthEnabled, conf.OIDC.Enabled, conf.OIDC.IDPName, conf.OIDC.AutoRedirect)
+	ui.Register(g, *vInfo, conf.Registration, conf.LocalAuthEnabled, directoryService.Enabled(), conf.OIDC.Enabled, conf.OIDC.IDPName, conf.OIDC.AutoRedirect)
 
 	if conf.OIDC.Enabled {
 		oidcHandler := api.NewOIDC(conf, db, userChangeNotifier)
@@ -143,7 +203,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}
 
 	g.Match([]string{"GET", "HEAD"}, "/health", healthHandler.Health)
-	g.POST("/integrations/webhook/:secret", automationHandler.ReceiveWebhook)
+	g.POST("/integrations/webhook/:secret", func(ctx *gin.Context) {
+		if !webhookLimiter.Allow(ctx.ClientIP()) {
+			ctx.Header("Retry-After", "60")
+			ctx.AbortWithStatus(http.StatusTooManyRequests)
+			return
+		}
+		automationHandler.ReceiveWebhook(ctx)
+	})
 	g.GET("/swagger", docs.Serve)
 	g.StaticFS("/image", &onlyImageFS{inner: gin.Dir(conf.UploadedImagesDir, false)})
 
@@ -156,6 +223,13 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		}
 	})
 	g.Use(cors.New(auth.CorsConfig(conf)))
+
+	serviceAPI := g.Group("/service/v1")
+	{
+		serviceAPI.GET("/channels", serviceAccountHandler.Channels)
+		serviceAPI.GET("/messages", serviceAccountHandler.Messages)
+		serviceAPI.POST("/message", serviceAccountHandler.Publish)
+	}
 
 	{
 		g.GET("/plugin", authentication.RequireClient, pluginHandler.GetPlugins)
@@ -172,6 +246,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	g.Group("/user").Use(authentication.OptionalAdmin).POST("", userHandler.CreateUser)
 
+	g.POST("/auth/login", sessionHandler.Login)
 	g.POST("/auth/local/login", sessionHandler.Login)
 
 	g.OPTIONS("/*any")
@@ -208,6 +283,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			Oidc:             conf.OIDC.Enabled,
 			Register:         conf.Registration,
 			LocalAuth:        conf.LocalAuthEnabled,
+			Directory:        directoryService.Enabled(),
 			OIDCIDPName:      conf.OIDC.IDPName,
 			OIDCAutoRedirect: conf.OIDC.AutoRedirect,
 		})
@@ -264,6 +340,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientAuth.PUT("/automation/quiet-hours", automationHandler.SaveQuietHours)
 		clientAuth.GET("/automation/digest", automationHandler.GetDigest)
 		clientAuth.PUT("/automation/digest", automationHandler.SaveDigest)
+		clientAuth.GET("/security/mfa", mfaHandler.Status)
 	}
 
 	clientElevated := g.Group("")
@@ -276,12 +353,18 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.GET("/application/:id/assignable-users", applicationMembershipHandler.GetAssignableUsers)
 		clientElevated.POST("/application/:id/members", applicationMembershipHandler.UpsertMember)
 		clientElevated.DELETE("/application/:id/members/:userId", applicationMembershipHandler.DeleteMember)
+		clientElevated.GET("/application/:id/groups", applicationMembershipHandler.GetGroups)
+		clientElevated.POST("/application/:id/groups", applicationMembershipHandler.UpsertGroup)
+		clientElevated.DELETE("/application/:id/groups/:groupId", applicationMembershipHandler.DeleteGroup)
 		clientElevated.PUT("/application/:id/auto-assign", applicationMembershipHandler.SetAutoAssign)
 		clientElevated.PUT("/application/:id/owner", applicationMembershipHandler.TransferOwnership)
 		clientElevated.PUT("/application/:id/member-posting", applicationMembershipHandler.SetMemberPosting)
 		clientElevated.DELETE("/application/:id/message/all", messageHandler.DeleteMessagesForEveryone)
 		clientElevated.DELETE("/client/:id", clientHandler.DeleteClient)
 		clientElevated.POST("/current/user/password", userHandler.ChangePassword)
+		clientElevated.POST("/security/mfa/start", mfaHandler.Start)
+		clientElevated.POST("/security/mfa/enable", mfaHandler.Enable)
+		clientElevated.POST("/security/mfa/disable", mfaHandler.Disable)
 	}
 
 	authAdmin := g.Group("/user")
@@ -296,6 +379,23 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	adminPlatform := g.Group("")
 	{
 		adminPlatform.Use(authentication.RequireAdmin)
+		adminPlatform.GET("/operations/sessions", operationsHandler.Sessions)
+		adminPlatform.DELETE("/operations/sessions/:id", operationsHandler.RevokeSession)
+		adminPlatform.GET("/operations/stats", operationsHandler.Stats)
+		adminPlatform.GET("/operations/diagnostics", operationsHandler.Diagnostics)
+		adminPlatform.GET("/operations/backup", operationsHandler.Backup)
+		adminPlatform.POST("/operations/restore", operationsHandler.StageRestore)
+
+		adminPlatform.GET("/service-account", serviceAccountHandler.List)
+		adminPlatform.POST("/service-account", serviceAccountHandler.Create)
+		adminPlatform.DELETE("/service-account/:id", serviceAccountHandler.Delete)
+
+		adminPlatform.GET("/directory", directoryHandler.Get)
+		adminPlatform.PUT("/directory", directoryHandler.Save)
+		adminPlatform.POST("/directory/test", directoryHandler.Test)
+
+		adminPlatform.GET("/security/policy", securityPolicyHandler.Get)
+		adminPlatform.PUT("/security/policy", securityPolicyHandler.Save)
 		adminPlatform.GET("/audit", auditHandler.GetAuditEvents)
 		adminPlatform.GET("/group", groupHandler.GetGroups)
 		adminPlatform.POST("/group", groupHandler.CreateGroup)
@@ -307,6 +407,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/update/status", updateHandler.Status)
 		adminPlatform.POST("/update/install", updateHandler.Install)
 
+		adminPlatform.GET("/integration/status", automationHandler.GetIntegrationStatuses)
+		adminPlatform.GET("/automation/run", automationHandler.GetAutomationRuns)
+		adminPlatform.DELETE("/automation/run", automationHandler.CleanupAutomationRuns)
+
 		adminPlatform.GET("/integration/webhook", automationHandler.GetWebhookRoutes)
 		adminPlatform.POST("/integration/webhook", automationHandler.CreateWebhookRoute)
 		adminPlatform.PUT("/integration/webhook/:id", automationHandler.UpdateWebhookRoute)
@@ -316,13 +420,42 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/integration/mqtt", automationHandler.GetMQTT)
 		adminPlatform.POST("/integration/mqtt", automationHandler.CreateMQTT)
 		adminPlatform.PUT("/integration/mqtt/:id", automationHandler.UpdateMQTT)
+		adminPlatform.POST("/integration/mqtt/:id/test", automationHandler.TestMQTT)
 		adminPlatform.DELETE("/integration/mqtt/:id", automationHandler.DeleteMQTT)
 
 		adminPlatform.GET("/integration/home-assistant", automationHandler.GetHomeAssistant)
 		adminPlatform.POST("/integration/home-assistant", automationHandler.CreateHomeAssistant)
 		adminPlatform.PUT("/integration/home-assistant/:id", automationHandler.UpdateHomeAssistant)
+		adminPlatform.POST("/integration/home-assistant/:id/test", automationHandler.TestHomeAssistant)
 		adminPlatform.POST("/integration/home-assistant/:id/event", automationHandler.SendHomeAssistantEvent)
 		adminPlatform.DELETE("/integration/home-assistant/:id", automationHandler.DeleteHomeAssistant)
+
+		adminPlatform.GET("/integration/rss", automationHandler.GetRSS)
+		adminPlatform.POST("/integration/rss", automationHandler.CreateRSS)
+		adminPlatform.PUT("/integration/rss/:id", automationHandler.UpdateRSS)
+		adminPlatform.DELETE("/integration/rss/:id", automationHandler.DeleteRSS)
+
+		adminPlatform.GET("/integration/calendar", automationHandler.GetCalendars)
+		adminPlatform.POST("/integration/calendar", automationHandler.CreateCalendar)
+		adminPlatform.PUT("/integration/calendar/:id", automationHandler.UpdateCalendar)
+		adminPlatform.DELETE("/integration/calendar/:id", automationHandler.DeleteCalendar)
+
+		adminPlatform.GET("/integration/email-gateway", automationHandler.GetEmailGateways)
+		adminPlatform.POST("/integration/email-gateway", automationHandler.CreateEmailGateway)
+		adminPlatform.PUT("/integration/email-gateway/:id", automationHandler.UpdateEmailGateway)
+		adminPlatform.DELETE("/integration/email-gateway/:id", automationHandler.DeleteEmailGateway)
+
+		adminPlatform.GET("/integration/smtp-receiver", automationHandler.GetSMTPReceiver)
+		adminPlatform.PUT("/integration/smtp-receiver", automationHandler.SaveSMTPReceiver)
+		adminPlatform.GET("/integration/smtp-route", automationHandler.GetSMTPRoutes)
+		adminPlatform.POST("/integration/smtp-route", automationHandler.CreateSMTPRoute)
+		adminPlatform.PUT("/integration/smtp-route/:id", automationHandler.UpdateSMTPRoute)
+		adminPlatform.DELETE("/integration/smtp-route/:id", automationHandler.DeleteSMTPRoute)
+
+		adminPlatform.GET("/integration/syslog", automationHandler.GetSyslog)
+		adminPlatform.POST("/integration/syslog", automationHandler.CreateSyslog)
+		adminPlatform.PUT("/integration/syslog/:id", automationHandler.UpdateSyslog)
+		adminPlatform.DELETE("/integration/syslog/:id", automationHandler.DeleteSyslog)
 
 		adminPlatform.GET("/automation/schedule", automationHandler.GetSchedules)
 		adminPlatform.POST("/automation/schedule", automationHandler.CreateSchedule)
@@ -342,28 +475,54 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		ctx.Next()
-
 		method := ctx.Request.Method
-		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
-			return
+		mutation := method != http.MethodGet && method != http.MethodHead && method != http.MethodOptions
+		var capturedBody []byte
+		contentType := strings.ToLower(ctx.GetHeader("Content-Type"))
+		if mutation && strings.Contains(contentType, "application/json") && ctx.Request.Body != nil {
+			capturedBody, _ = io.ReadAll(io.LimitReader(ctx.Request.Body, 64*1024))
+			ctx.Request.Body = io.NopCloser(bytes.NewReader(capturedBody))
 		}
-		if ctx.Writer.Status() >= 400 {
-			return
-		}
+
+		ctx.Next()
 
 		path := ctx.FullPath()
 		if path == "" {
 			path = ctx.Request.URL.Path
 		}
-		if !shouldAuditMutation(path) {
+		status := ctx.Writer.Status()
+		authFailure := (status == http.StatusUnauthorized || status == http.StatusForbidden) &&
+			(strings.HasPrefix(path, "/auth/") || strings.TrimSpace(ctx.GetHeader("Authorization")) != "")
+
+		if !shouldAuditMutation(path) && !authFailure {
+			return
+		}
+		if status >= 400 && !authFailure {
 			return
 		}
 
+		action := strings.ToLower(method)
+		if authFailure {
+			action = "authentication_failed"
+		}
+
+		details := map[string]any{
+			"status":    status,
+			"userAgent": ctx.GetHeader("User-Agent"),
+		}
+		if len(capturedBody) > 0 && !authFailure {
+			var payload any
+			if json.Unmarshal(capturedBody, &payload) == nil {
+				details["request"] = redactAuditValue(payload)
+			}
+		}
+		detailJSON, _ := json.Marshal(details)
+
 		event := &model.AuditEvent{
-			Action:    strings.ToLower(method),
+			Action:    action,
 			Target:    path,
 			IPAddress: ctx.ClientIP(),
+			Details:   string(detailJSON),
 		}
 		if id := ctx.Param("id"); id != "" {
 			event.TargetID = id
@@ -382,9 +541,38 @@ func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 	}
 }
 
+func redactAuditValue(value any) any {
+	switch typed := value.(type) {
+	case map[string]any:
+		out := make(map[string]any, len(typed))
+		for key, child := range typed {
+			lower := strings.ToLower(key)
+			if strings.Contains(lower, "password") ||
+				strings.Contains(lower, "token") ||
+				strings.Contains(lower, "secret") ||
+				strings.Contains(lower, "credential") ||
+				strings.Contains(lower, "authorization") ||
+				strings.HasSuffix(lower, "key") {
+				out[key] = "[redacted]"
+				continue
+			}
+			out[key] = redactAuditValue(child)
+		}
+		return out
+	case []any:
+		out := make([]any, len(typed))
+		for i := range typed {
+			out[i] = redactAuditValue(typed[i])
+		}
+		return out
+	default:
+		return value
+	}
+}
+
 func shouldAuditMutation(path string) bool {
 	switch {
-	case path == "/auth/logout":
+	case path == "/auth/logout" || path == "/auth/local/login":
 		return true
 	case path == "/current/user/password":
 		return true
@@ -406,6 +594,12 @@ func shouldAuditMutation(path string) bool {
 		return true
 	case strings.HasPrefix(path, "/automation"):
 		return true
+	case strings.HasPrefix(path, "/service-account"):
+		return true
+	case strings.HasPrefix(path, "/directory"):
+		return true
+	case strings.HasPrefix(path, "/operations"):
+		return true
 	case strings.Contains(path, "/acknowledgement"):
 		return true
 	default:
@@ -413,13 +607,38 @@ func shouldAuditMutation(path string) bool {
 	}
 }
 
-var tokenRegexp = regexp.MustCompile("token=[^&]+")
+var tokenRegexp = regexp.MustCompile("(?i)(token|code|state|key|secret|password|access_token|refresh_token|id_token)=[^&]+")
+
+func sanitizedLogPath(requestURL *url.URL) string {
+	path := requestURL.Path
+	if strings.HasPrefix(path, "/integrations/webhook/") {
+		path = "/integrations/webhook/[masked]"
+	}
+	if requestURL.RawQuery == "" {
+		return path
+	}
+
+	values, err := url.ParseQuery(requestURL.RawQuery)
+	if err != nil {
+		return tokenRegexp.ReplaceAllString(path+"?"+requestURL.RawQuery, "$1=[masked]")
+	}
+	for key := range values {
+		lower := strings.ToLower(key)
+		if strings.Contains(lower, "token") ||
+			strings.Contains(lower, "secret") ||
+			strings.Contains(lower, "password") ||
+			lower == "code" ||
+			lower == "state" ||
+			lower == "key" {
+			values.Set(key, "[masked]")
+		}
+	}
+	return path + "?" + values.Encode()
+}
 
 func accessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-
-		rawQuery := c.Request.URL.RawQuery
 		path := c.Request.URL.Path
 
 		c.Next()
@@ -429,10 +648,7 @@ func accessLogger() gin.HandlerFunc {
 			return
 		}
 
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
-		}
-		path = tokenRegexp.ReplaceAllString(path, "token=[masked]")
+		path = sanitizedLogPath(c.Request.URL)
 
 		latency := time.Since(start)
 		if latency > time.Minute {

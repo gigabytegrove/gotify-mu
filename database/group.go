@@ -36,6 +36,9 @@ func (d *GormDatabase) DeleteUserGroup(id uint) error {
 		if err := tx.Where("group_id = ?", id).Delete(&model.UserGroupMembership{}).Error; err != nil {
 			return err
 		}
+		if err := tx.Where("group_id = ?", id).Delete(&model.ApplicationGroupAssignment{}).Error; err != nil {
+			return err
+		}
 		return tx.Delete(&model.UserGroup{}, id).Error
 	})
 }

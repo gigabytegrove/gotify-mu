@@ -685,16 +685,17 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		}
 
 		if fetchedApp.UserID != userID {
-			if !fetchedApp.AllowMemberPost {
-				ctx.AbortWithError(400, errors.New("appid not found"))
-				return
-			}
 			membership, err := a.DB.GetApplicationMembership(fetchedApp.ID, userID)
-			if success := successOrAbort(ctx, 500, err); !success {
-				return
-			}
+			if success := successOrAbort(ctx, 500, err); !success { return }
 			if membership == nil {
 				ctx.AbortWithError(400, errors.New("appid not found"))
+				return
+			}
+			canPublish := membership.Role == model.ChannelRoleManager ||
+				membership.Role == model.ChannelRolePublisher ||
+				(fetchedApp.AllowMemberPost && membership.Role == model.ChannelRoleMember)
+			if !canPublish {
+				ctx.AbortWithError(403, errors.New("Channel role does not allow posting"))
 				return
 			}
 		}
@@ -780,7 +781,10 @@ func toExternalMessage(msg *model.Message) *model.MessageExternal {
 		Date:          msg.Date,
 		SenderUserID:  msg.SenderUserID,
 		SenderName:    msg.SenderName,
-		Acknowledged:  msg.Acknowledged,
+		Acknowledged:         msg.Acknowledged,
+		AcknowledgementCount: msg.AckCount,
+		AcknowledgedBy:       msg.Acknowledgements,
+		ParentMessageID:      msg.ParentMessageID,
 	}
 	if len(msg.Extras) != 0 {
 		res.Extras = make(map[string]any)

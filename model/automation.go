@@ -14,6 +14,10 @@ type WebhookRoute struct {
 	PriorityField   string    `gorm:"type:text" json:"priorityField"`
 	DefaultTitle    string    `gorm:"type:text" json:"defaultTitle"`
 	DefaultPriority int       `json:"defaultPriority"`
+	AllowedCIDRs     string    `gorm:"type:text" json:"allowedCidrs,omitempty"`
+	RequireSignature bool     `json:"requireSignature"`
+	SigningSecret    string    `gorm:"type:text" json:"-"`
+	MaxAgeSeconds    int       `json:"maxAgeSeconds"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
@@ -30,6 +34,11 @@ type WebhookRouteView struct {
 	PriorityField   string    `json:"priorityField"`
 	DefaultTitle    string    `json:"defaultTitle"`
 	DefaultPriority int       `json:"defaultPriority"`
+	AllowedCIDRs     string    `json:"allowedCidrs,omitempty"`
+	RequireSignature bool     `json:"requireSignature"`
+	SigningSecretConfigured bool `json:"signingSecretConfigured"`
+	MaxAgeSeconds    int       `json:"maxAgeSeconds"`
+	SigningSecret    string    `json:"signingSecret,omitempty"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
@@ -103,7 +112,13 @@ type ScheduledNotification struct {
 	Hour          int        `json:"hour"`
 	Minute        int        `json:"minute"`
 	Weekday       int        `json:"weekday"`
+	CronExpression string    `gorm:"type:varchar(160)" json:"cronExpression,omitempty"`
 	Timezone      string     `gorm:"type:text" json:"timezone"`
+	EndAt         *time.Time `json:"endAt,omitempty"`
+	MaxRuns       int        `json:"maxRuns"`
+	RunCount      int        `json:"runCount"`
+	MisfirePolicy string     `gorm:"type:varchar(16);default:send" json:"misfirePolicy"`
+	ExcludeDates  string     `gorm:"type:text" json:"excludeDates,omitempty"`
 	Enabled       bool       `json:"enabled"`
 	LastRunAt     *time.Time `json:"lastRunAt,omitempty"`
 	NextRunAt     *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
@@ -120,8 +135,18 @@ type QuietHoursPolicy struct {
 	EndMinute     int       `json:"endMinute"`
 	Timezone      string    `gorm:"type:text" json:"timezone"`
 	AllowPriority int       `json:"allowPriority"`
+	Behavior      string    `gorm:"type:varchar(16);default:suppress" json:"behavior"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
+}
+
+// DeferredNotification holds a realtime notification until Quiet Hours ends.
+type DeferredNotification struct {
+	UserID        uint      `gorm:"primaryKey;autoIncrement:false" json:"userId"`
+	MessageID     uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
+	ApplicationID uint      `gorm:"index" json:"applicationId"`
+	DueAt         time.Time `gorm:"index" json:"dueAt"`
+	CreatedAt     time.Time `json:"createdAt"`
 }
 
 // DigestPolicy controls summary delivery for lower-priority notifications.

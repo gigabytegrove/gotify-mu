@@ -20,12 +20,15 @@ import LockOutlined from '@mui/icons-material/LockOutlined';
 const Login = observer(() => {
     const [username, setUsername] = React.useState('');
     const [password, setPassword] = React.useState('');
+    const [mfaCode, setMfaCode] = React.useState('');
     const [registerDialog, setRegisterDialog] = React.useState(false);
     const {currentUser} = useStores();
     const navigate = useNavigate();
     const [searchParams] = useSearchParams();
 
     const localAuthEnabled = config.get('localAuth');
+    const directoryEnabled = config.get('directory');
+    const passwordSignInEnabled = localAuthEnabled || directoryEnabled;
     const oidcEnabled = config.get('oidc');
     const oidcIdpName = config.get('oidcIdpName');
 
@@ -58,7 +61,7 @@ const Login = observer(() => {
 
     const login = (event: React.FormEvent) => {
         event.preventDefault();
-        void currentUser.login(username, password);
+        void currentUser.login(username, password, mfaCode);
     };
 
     return (
@@ -79,7 +82,7 @@ const Login = observer(() => {
                         </Typography>
                     </Box>
 
-                    {localAuthEnabled && (
+                    {passwordSignInEnabled && (
                         <Box component="form" id="login-form" onSubmit={login}>
                             <Stack spacing={2}>
                                 <TextField
@@ -104,6 +107,17 @@ const Login = observer(() => {
                                     onChange={(event) => setPassword(event.target.value)}
                                     fullWidth
                                 />
+                                {currentUser.mfaRequired && (
+                                    <TextField
+                                        autoFocus
+                                        id="mfa-code"
+                                        label="Authenticator or recovery code"
+                                        value={mfaCode}
+                                        onChange={(event) => setMfaCode(event.target.value)}
+                                        autoComplete="one-time-code"
+                                        fullWidth
+                                    />
+                                )}
                                 <Button
                                     type="submit"
                                     startIcon={<LockOutlined />}
@@ -124,7 +138,7 @@ const Login = observer(() => {
 
                     {oidcEnabled && (
                         <>
-                            {localAuthEnabled && <Divider>or</Divider>}
+                            {passwordSignInEnabled && <Divider>or</Divider>}
                             <Button
                                 id="oidc-login"
                                 component="a"
@@ -157,7 +171,10 @@ const Login = observer(() => {
                             label={`@${config.get('version').version}`}
                         />
                         {localAuthEnabled && (
-                            <Chip size="small" variant="outlined" label="Local auth" />
+                            <Chip size="small" variant="outlined" label="Local account" />
+                        )}
+                        {directoryEnabled && (
+                            <Chip size="small" variant="outlined" label="Directory" />
                         )}
                         {oidcEnabled && (
                             <Chip size="small" variant="outlined" label={oidcIdpName} />

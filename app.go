@@ -9,6 +9,7 @@ import (
 	"runtime/debug"
 	"time"
 
+	"github.com/gotify/server/v3/backup"
 	"github.com/gotify/server/v3/config"
 	"github.com/gotify/server/v3/config/migrate"
 	"github.com/gotify/server/v3/database"
@@ -161,6 +162,21 @@ func serve(vInfo *model.VersionInfo) int {
 	if err := os.MkdirAll(conf.UploadedImagesDir, 0o755); err != nil {
 		log.Error().Err(err).Str("dir", conf.UploadedImagesDir).Msg("Cannot create uploaded images directory")
 		return 1
+	}
+
+	if conf.Database.Dialect == "sqlite3" {
+		restored, restoreErr := backup.ApplyPending(
+			conf.Database.Connection,
+			conf.UploadedImagesDir,
+			conf.PluginsDir,
+		)
+		if restoreErr != nil {
+			log.Error().Err(restoreErr).Msg("A staged backup could not be restored; database startup was stopped")
+			return 1
+		}
+		if restored {
+			log.Info().Msg("Staged Gotify MU backup restored successfully before database startup")
+		}
 	}
 
 	db, err := database.New(conf.Database.Dialect, conf.Database.Connection, conf.DefaultUser.Name, conf.DefaultUser.Pass, conf.PassStrength, conf.LocalAuthEnabled, time.Now)

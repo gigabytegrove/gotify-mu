@@ -25,7 +25,13 @@ import {ThemeKey} from '../layout/theme';
 import {useStores} from '../stores';
 import * as config from '../config';
 import {UpdateStatusCard} from '../update/UpdateStatus';
-import {IDigestPolicy, IQuietHoursPolicy} from '../types';
+import {
+    IDigestPolicy,
+    IDirectoryConfig,
+    IQuietHoursPolicy,
+    ISecurityPolicy,
+    IMFAStatus,
+} from '../types';
 
 interface IProps {
     themeMode: ThemeKey;
@@ -41,7 +47,10 @@ const Settings = ({themeMode, setTheme}: IProps) => {
         description="Account preferences and sign-in settings."
         maxWidth={900}>
         {currentUser.user.admin && <UpdateStatusCard />}
+        {currentUser.user.admin && <AdministratorSecurityPolicy />}
+        {currentUser.user.admin && <DirectoryAuthentication />}
 
+        <MFASettings />
         <NotificationPreferences />
 
         <SurfaceCard
@@ -82,22 +91,624 @@ const Settings = ({themeMode, setTheme}: IProps) => {
                     direction={{xs: 'column', sm: 'row'}}
                     spacing={1}
                     sx={{justifyContent: 'space-between'}}> 
+                    <Typography>Directory sign-in</Typography>
+                    <Chip size="small" label={config.get('directory') ? 'Enabled' : 'Disabled'} />
+                </Stack>
+                <Stack
+                    direction={{xs: 'column', sm: 'row'}}
+                    spacing={1}
+                    sx={{justifyContent: 'space-between'}}> 
                     <Typography>Single sign-on</Typography>
                     <Chip size="small" label={config.get('oidc') ? 'Enabled' : 'Disabled'} />
                 </Stack>
             </Stack>
         </SurfaceCard>
 
-        <SurfaceCard
-            title="Change Password"
-            subtitle="Choose a new password for your account."
-            action={<Key color="action" />}>
-            <ChangePasswordForm />
-        </SurfaceCard>
+        {!currentUser.user.directoryManaged && (
+            <SurfaceCard
+                title="Change Password"
+                subtitle="Choose a new password for your account."
+                action={<Key color="action" />}>
+                <ChangePasswordForm />
+            </SurfaceCard>
+        )}
     </DefaultPage>
     );
 };
 
+
+const DirectoryAuthentication = () => {
+    const {elevateStore, snackManager} = useStores();
+    const [settings, setSettings] = React.useState<IDirectoryConfig>();
+    const [bindPassword, setBindPassword] = React.useState('');
+    const [testUsername, setTestUsername] = React.useState('');
+    const [testPassword, setTestPassword] = React.useState('');
+    const [saving, setSaving] = React.useState(false);
+    const [testing, setTesting] = React.useState(false);
+
+    const refresh = React.useCallback(async () => {
+        const response = await axios.get<IDirectoryConfig>(config.get('url') + 'directory');
+        setSettings(response.data);
+    }, []);
+
+    React.useEffect(() => {
+        void refresh();
+    }, [refresh]);
+
+    if (!settings) {
+        return (
+            <SurfaceCard
+                title="Directory Authentication"
+                subtitle="Connect LDAP or Active Directory without replacing Gotify MU authorization.">
+                <Typography color="text.secondary">Loading directory configuration…</Typography>
+            </SurfaceCard>
+        );
+    }
+    if (!elevateStore.elevated) {
+        return (
+            <SurfaceCard
+                title="Directory Authentication"
+                subtitle="Connect LDAP or Active Directory without replacing Gotify MU authorization.">
+                <ElevationForm />
+            </SurfaceCard>
+        );
+    }
+
+    const payload = () => ({
+        enabled: settings.enabled,
+        url: settings.url,
+        startTls: settings.startTls,
+        bindDn: settings.bindDn,
+        bindPassword,
+        userBaseDn: settings.userBaseDn,
+        userAttribute: settings.userAttribute,
+        displayNameAttribute: settings.displayNameAttribute,
+        adminGroupDn: settings.adminGroupDn,
+        autoRegister: settings.autoRegister,
+        linkByUsername: settings.linkByUsername,
+        caCertificatePem: settings.caCertificatePem,
+    });
+
+    const save = async () => {
+        setSaving(true);
+        try {
+            const response = await axios.put<IDirectoryConfig>(
+                config.get('url') + 'directory',
+                payload()
+            );
+            setSettings(response.data);
+            setBindPassword('');
+            snackManager.snack('Directory authentication settings saved');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const test = async () => {
+        setTesting(true);
+        try {
+            await axios.post(config.get('url') + 'directory/test', {
+                ...payload(),
+                username: testUsername,
+                password: testPassword,
+            });
+            snackManager.snack('Directory connection and sign-in succeeded');
+        } finally {
+            setTesting(false);
+        }
+    };
+
+    return (
+        <SurfaceCard
+            title="Directory Authentication"
+            subtitle="LDAP and Active Directory authentication with certificate validation."
+            action={<Security color="action" />}>
+            <Stack spacing={2}>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={settings.enabled}
+                            onChange={(event) =>
+                                setSettings({...settings, enabled: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Enable directory sign-in"
+                />
+                <TextField
+                    label="Directory URL"
+                    value={settings.url}
+                    onChange={(event) => setSettings({...settings, url: event.target.value})}
+                    placeholder="ldaps://ad.example.com:636"
+                    helperText="Use ldap:// with STARTTLS or ldaps://. Certificate verification cannot be disabled."
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={settings.startTls}
+                            disabled={settings.url.toLowerCase().startsWith('ldaps://')}
+                            onChange={(event) =>
+                                setSettings({...settings, startTls: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Use STARTTLS for ldap:// connections"
+                />
+                <TextField
+                    label="Bind DN"
+                    value={settings.bindDn}
+                    onChange={(event) => setSettings({...settings, bindDn: event.target.value})}
+                    placeholder="CN=Gotify MU,OU=Service Accounts,DC=example,DC=com"
+                />
+                <TextField
+                    label={settings.bindPasswordConfigured ? 'New bind password' : 'Bind password'}
+                    type="password"
+                    value={bindPassword}
+                    onChange={(event) => setBindPassword(event.target.value)}
+                    helperText={
+                        settings.bindPasswordConfigured
+                            ? 'Leave blank to keep the saved encrypted bind password.'
+                            : 'Optional when anonymous directory search is allowed.'
+                    }
+                />
+                <TextField
+                    label="User search base"
+                    value={settings.userBaseDn}
+                    onChange={(event) =>
+                        setSettings({...settings, userBaseDn: event.target.value})
+                    }
+                    placeholder="OU=Users,DC=example,DC=com"
+                    required
+                />
+                <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                    <TextField
+                        label="Username attribute"
+                        value={settings.userAttribute}
+                        onChange={(event) =>
+                            setSettings({...settings, userAttribute: event.target.value})
+                        }
+                        placeholder="sAMAccountName"
+                        fullWidth
+                    />
+                    <TextField
+                        label="Display name attribute"
+                        value={settings.displayNameAttribute}
+                        onChange={(event) =>
+                            setSettings({
+                                ...settings,
+                                displayNameAttribute: event.target.value,
+                            })
+                        }
+                        placeholder="displayName"
+                        fullWidth
+                    />
+                </Stack>
+                <TextField
+                    label="Administrator group DN"
+                    value={settings.adminGroupDn}
+                    onChange={(event) =>
+                        setSettings({...settings, adminGroupDn: event.target.value})
+                    }
+                    placeholder="CN=Gotify MU Admins,OU=Groups,DC=example,DC=com"
+                    helperText="Optional. Exact memberOf matches are granted administrator access."
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={settings.autoRegister}
+                            onChange={(event) =>
+                                setSettings({...settings, autoRegister: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Create Gotify MU users automatically after successful directory sign-in"
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={settings.linkByUsername}
+                            onChange={(event) =>
+                                setSettings({...settings, linkByUsername: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Allow a matching local username to become directory managed"
+                />
+                <TextField
+                    label="Private CA certificate"
+                    value={settings.caCertificatePem}
+                    onChange={(event) =>
+                        setSettings({...settings, caCertificatePem: event.target.value})
+                    }
+                    multiline
+                    minRows={3}
+                    placeholder="-----BEGIN CERTIFICATE-----"
+                    helperText="Optional PEM certificate for an internal directory CA."
+                />
+                <Button
+                    variant="contained"
+                    disabled={saving}
+                    onClick={() => void save()}
+                    sx={{alignSelf: 'flex-start'}}>
+                    Save Directory Settings
+                </Button>
+
+                <Typography sx={{fontWeight: 700}}>Test Configuration</Typography>
+                <Typography variant="body2" color="text.secondary">
+                    The test uses the values above without saving them first.
+                </Typography>
+                <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                    <TextField
+                        label="Test username"
+                        value={testUsername}
+                        onChange={(event) => setTestUsername(event.target.value)}
+                        fullWidth
+                    />
+                    <TextField
+                        label="Test password"
+                        type="password"
+                        value={testPassword}
+                        onChange={(event) => setTestPassword(event.target.value)}
+                        fullWidth
+                    />
+                </Stack>
+                <Button
+                    variant="outlined"
+                    disabled={testing || !testUsername || !testPassword}
+                    onClick={() => void test()}
+                    sx={{alignSelf: 'flex-start'}}>
+                    Test Directory Sign-In
+                </Button>
+            </Stack>
+        </SurfaceCard>
+    );
+};
+
+const MFASettings = () => {
+    const {elevateStore, snackManager} = useStores();
+    const [status, setStatus] = React.useState<IMFAStatus>();
+    const [secret, setSecret] = React.useState('');
+    const [otpauthUri, setOtpauthUri] = React.useState('');
+    const [code, setCode] = React.useState('');
+    const [recoveryCodes, setRecoveryCodes] = React.useState<string[]>([]);
+
+    const refresh = React.useCallback(async () => {
+        const response = await axios.get<IMFAStatus>(config.get('url') + 'security/mfa');
+        setStatus(response.data);
+    }, []);
+
+    React.useEffect(() => {
+        void refresh();
+    }, [refresh]);
+
+    if (!status) {
+        return (
+            <SurfaceCard title="Multi-factor Authentication" subtitle="Protect local sign-in with an authenticator app.">
+                <Typography color="text.secondary">Loading multi-factor authentication…</Typography>
+            </SurfaceCard>
+        );
+    }
+
+    if (!elevateStore.elevated) {
+        return (
+            <SurfaceCard title="Multi-factor Authentication" subtitle="Protect local sign-in with an authenticator app.">
+                <ElevationForm />
+            </SurfaceCard>
+        );
+    }
+
+    const start = async () => {
+        const response = await axios.post<{secret: string; otpauthUri: string}>(
+            config.get('url') + 'security/mfa/start'
+        );
+        setSecret(response.data.secret);
+        setOtpauthUri(response.data.otpauthUri);
+        setRecoveryCodes([]);
+    };
+
+    const enable = async () => {
+        const response = await axios.post<{enabled: boolean; recoveryCodes: string[]}>(
+            config.get('url') + 'security/mfa/enable',
+            {code}
+        );
+        setRecoveryCodes(response.data.recoveryCodes);
+        setCode('');
+        setSecret('');
+        setOtpauthUri('');
+        await refresh();
+        snackManager.snack('Multi-factor authentication enabled');
+    };
+
+    const disable = async () => {
+        await axios.post(config.get('url') + 'security/mfa/disable', {code});
+        setCode('');
+        setRecoveryCodes([]);
+        await refresh();
+        snackManager.snack('Multi-factor authentication disabled');
+    };
+
+    return (
+        <SurfaceCard
+            title="Multi-factor Authentication"
+            subtitle="Protect local sign-in with an authenticator app and recovery codes."
+            action={<Security color="action" />}>
+            <Stack spacing={2}>
+                <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                    <Chip
+                        size="small"
+                        color={status.enabled ? 'success' : 'default'}
+                        label={status.enabled ? 'Enabled' : 'Not enabled'}
+                    />
+                    {status.enabled && (
+                        <Typography variant="body2" color="text.secondary">
+                            {status.recoveryCodesRemaining} recovery codes remaining
+                        </Typography>
+                    )}
+                </Stack>
+
+                {!status.enabled && !secret && (
+                    <Button variant="contained" onClick={() => void start()} sx={{alignSelf: 'flex-start'}}>
+                        Set Up Authenticator
+                    </Button>
+                )}
+
+                {!status.enabled && secret && (
+                    <>
+                        <Typography>
+                            Add this secret to your authenticator app, then enter the current six-digit code.
+                        </Typography>
+                        <TextField
+                            label="Authenticator secret"
+                            value={secret}
+                            slotProps={{input: {readOnly: true}}}
+                            fullWidth
+                        />
+                        <TextField
+                            label="Authenticator setup URI"
+                            value={otpauthUri}
+                            slotProps={{input: {readOnly: true}}}
+                            fullWidth
+                        />
+                        <TextField
+                            label="Verification code"
+                            value={code}
+                            onChange={(event) => setCode(event.target.value)}
+                            autoComplete="one-time-code"
+                            fullWidth
+                        />
+                        <Button
+                            variant="contained"
+                            disabled={!code}
+                            onClick={() => void enable()}
+                            sx={{alignSelf: 'flex-start'}}>
+                            Enable MFA
+                        </Button>
+                    </>
+                )}
+
+                {status.enabled && (
+                    <>
+                        <TextField
+                            label="Authenticator or recovery code"
+                            value={code}
+                            onChange={(event) => setCode(event.target.value)}
+                            autoComplete="one-time-code"
+                            helperText="Required to disable multi-factor authentication."
+                            fullWidth
+                        />
+                        <Button
+                            color="error"
+                            variant="outlined"
+                            disabled={!code}
+                            onClick={() => void disable()}
+                            sx={{alignSelf: 'flex-start'}}>
+                            Disable MFA
+                        </Button>
+                    </>
+                )}
+
+                {recoveryCodes.length > 0 && (
+                    <Box sx={{p: 1.5, border: 1, borderColor: 'warning.main', borderRadius: 2}}>
+                        <Typography sx={{fontWeight: 700}}>Save these recovery codes now</Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
+                            Each code works once. They will not be shown again.
+                        </Typography>
+                        <Typography component="pre" sx={{m: 0, whiteSpace: 'pre-wrap'}}>
+                            {recoveryCodes.join('\n')}
+                        </Typography>
+                    </Box>
+                )}
+            </Stack>
+        </SurfaceCard>
+    );
+};
+
+const AdministratorSecurityPolicy = () => {
+    const {snackManager} = useStores();
+    const [policy, setPolicy] = React.useState<ISecurityPolicy>();
+    const [saving, setSaving] = React.useState(false);
+
+    React.useEffect(() => {
+        void axios
+            .get<ISecurityPolicy>(config.get('url') + 'security/policy')
+            .then((response) => setPolicy(response.data));
+    }, []);
+
+    if (!policy) {
+        return (
+            <SurfaceCard
+                title="Server Security"
+                subtitle="Authentication, retention, and native extension policy."
+                action={<Security color="action" />}>
+                <Typography color="text.secondary">Loading server security policy…</Typography>
+            </SurfaceCard>
+        );
+    }
+
+    const save = async () => {
+        setSaving(true);
+        try {
+            const response = await axios.put<ISecurityPolicy>(
+                config.get('url') + 'security/policy',
+                policy
+            );
+            setPolicy(response.data);
+            snackManager.snack('Server security policy saved');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <SurfaceCard
+            title="Server Security"
+            subtitle="Authentication, retention, and native extension policy."
+            action={<Security color="action" />}>
+            <Stack spacing={2}>
+                <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                    <TextField
+                        label="Minimum password length"
+                        type="number"
+                        value={policy.minPasswordLength}
+                        onChange={(event) =>
+                            setPolicy({...policy, minPasswordLength: Number(event.target.value)})
+                        }
+                        slotProps={{htmlInput: {min: 8, max: 72}}}
+                        fullWidth
+                    />
+                    <TextField
+                        label="Web session lifetime"
+                        type="number"
+                        value={policy.sessionLifetimeHours}
+                        onChange={(event) =>
+                            setPolicy({...policy, sessionLifetimeHours: Number(event.target.value)})
+                        }
+                        helperText="Hours"
+                        slotProps={{htmlInput: {min: 1, max: 8760}}}
+                        fullWidth
+                    />
+                    <TextField
+                        label="Elevated session"
+                        type="number"
+                        value={policy.elevationMinutes}
+                        onChange={(event) =>
+                            setPolicy({...policy, elevationMinutes: Number(event.target.value)})
+                        }
+                        helperText="Minutes"
+                        slotProps={{htmlInput: {min: 1, max: 1440}}}
+                        fullWidth
+                    />
+                </Stack>
+                <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                    <TextField
+                        label="Audit retention"
+                        type="number"
+                        value={policy.auditRetentionDays}
+                        onChange={(event) =>
+                            setPolicy({...policy, auditRetentionDays: Number(event.target.value)})
+                        }
+                        helperText="Days"
+                        slotProps={{htmlInput: {min: 1, max: 3650}}}
+                        fullWidth
+                    />
+                    <TextField
+                        label="Automation history retention"
+                        type="number"
+                        value={policy.automationRetentionDays}
+                        onChange={(event) =>
+                            setPolicy({
+                                ...policy,
+                                automationRetentionDays: Number(event.target.value),
+                            })
+                        }
+                        helperText="Days"
+                        slotProps={{htmlInput: {min: 1, max: 3650}}}
+                        fullWidth
+                    />
+                </Stack>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.requireMfaAdmins}
+                            onChange={(event) =>
+                                setPolicy({...policy, requireMfaAdmins: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Require multi-factor authentication for administrators"
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.requireMfaAll}
+                            onChange={(event) =>
+                                setPolicy({...policy, requireMfaAll: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Require multi-factor authentication for all local users"
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.allowNativePluginUploads}
+                            onChange={(event) =>
+                                setPolicy({
+                                    ...policy,
+                                    allowNativePluginUploads: event.target.checked,
+                                })
+                            }
+                        />
+                    }
+                    label="Allow administrators to upload native plugin binaries"
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.requirePluginChecksum}
+                            onChange={(event) =>
+                                setPolicy({
+                                    ...policy,
+                                    requirePluginChecksum: event.target.checked,
+                                })
+                            }
+                        />
+                    }
+                    label="Require a matching SHA-256 checksum for native plugin uploads"
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={policy.requirePluginSignature}
+                            onChange={(event) =>
+                                setPolicy({
+                                    ...policy,
+                                    requirePluginSignature: event.target.checked,
+                                    requirePluginChecksum: event.target.checked
+                                        ? true
+                                        : policy.requirePluginChecksum,
+                                })
+                            }
+                        />
+                    }
+                    label="Require a signature from a trusted plugin signing key"
+                />
+                <Typography variant="caption" color="text.secondary">
+                    Native plugin binaries execute inside the Gotify MU server process. Uploads are
+                    disabled by default. Signature verification uses trusted Ed25519 public keys
+                    configured by the server administrator.
+                </Typography>
+                <Button
+                    variant="contained"
+                    disabled={saving}
+                    onClick={() => void save()}
+                    sx={{alignSelf: 'flex-start'}}>
+                    Save Server Security
+                </Button>
+            </Stack>
+        </SurfaceCard>
+    );
+};
 
 const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
@@ -234,6 +845,19 @@ const NotificationPreferences = () => {
                         }
                         helperText="Messages at this priority or higher are delivered immediately during quiet hours."
                     />
+                    <TextField
+                        select
+                        label="During Quiet Hours"
+                        value={quiet.behavior || 'suppress'}
+                        onChange={(event) =>
+                            setQuiet({
+                                ...quiet,
+                                behavior: event.target.value as 'suppress' | 'defer',
+                            })
+                        }>
+                        <MenuItem value="suppress">Do not send a realtime alert</MenuItem>
+                        <MenuItem value="defer">Deliver the realtime alert when Quiet Hours end</MenuItem>
+                    </TextField>
                     <Button
                         variant="contained"
                         disabled={savingQuiet}

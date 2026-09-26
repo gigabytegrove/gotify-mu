@@ -1,6 +1,9 @@
 package database
 
 import (
+	"errors"
+	"time"
+
 	"github.com/gotify/server/v3/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -8,37 +11,61 @@ import (
 
 
 func (d *GormDatabase) markAcknowledged(userID uint, messages []*model.Message) error {
-	if len(messages) == 0 {
-		return nil
-	}
+	if len(messages) == 0 { return nil }
 	ids := make([]uint, 0, len(messages))
-	for _, message := range messages {
-		ids = append(ids, message.ID)
+	for _, message := range messages { ids = append(ids, message.ID) }
+
+	type acknowledgementRow struct {
+		MessageID      uint
+		UserID         uint
+		Name           string
+		DisplayName    string
+		AcknowledgedAt time.Time
 	}
-	var acknowledged []uint
-	if err := d.DB.Model(&model.MessageAcknowledgement{}).
-		Where("user_id = ? AND message_id IN ?", userID, ids).
-		Pluck("message_id", &acknowledged).Error; err != nil {
+	var rows []acknowledgementRow
+	if err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.message_id, ma.user_id, users.name, users.display_name, ma.acknowledged_at").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id IN ?", ids).
+		Order("ma.acknowledged_at ASC").
+		Scan(&rows).Error; err != nil {
 		return err
 	}
-	set := make(map[uint]struct{}, len(acknowledged))
-	for _, id := range acknowledged {
-		set[id] = struct{}{}
+	byMessage := make(map[uint][]model.MessageAcknowledgementExternal)
+	for _, row := range rows {
+		byMessage[row.MessageID] = append(byMessage[row.MessageID], model.MessageAcknowledgementExternal{
+			UserID:row.UserID, Name:row.Name, DisplayName:row.DisplayName, AcknowledgedAt:row.AcknowledgedAt,
+		})
 	}
 	for _, message := range messages {
-		_, message.Acknowledged = set[message.ID]
+		message.Acknowledgements = byMessage[message.ID]
+		message.AckCount = int64(len(message.Acknowledgements))
+		for _, acknowledgement := range message.Acknowledgements {
+			if acknowledgement.UserID == userID {
+				message.Acknowledged = true
+				break
+			}
+		}
 	}
 	return nil
 }
 
+func accessibleMessageQuery(db *gorm.DB, userID uint) *gorm.DB {
+	return db.Where(
+		"EXISTS (SELECT 1 FROM application_memberships am WHERE am.application_id = messages.application_id AND am.user_id = ?) OR "+
+			"EXISTS (SELECT 1 FROM application_group_assignments aga JOIN user_group_memberships ugm ON ugm.group_id = aga.group_id WHERE aga.application_id = messages.application_id AND ugm.user_id = ?)",
+		userID, userID,
+	)
+}
+
 func visibleMessages(db *gorm.DB, userID uint) *gorm.DB {
-	return db.Joins("JOIN application_memberships AS am ON am.application_id = messages.application_id AND am.user_id = ?", userID).
+	return accessibleMessageQuery(db, userID).
 		Joins("LEFT JOIN message_dismissals AS md ON md.message_id = messages.id AND md.user_id = ?", userID).
 		Where("md.message_id IS NULL")
 }
 
 func archivedMessages(db *gorm.DB, userID uint) *gorm.DB {
-	return db.Joins("JOIN application_memberships AS am ON am.application_id = messages.application_id AND am.user_id = ?", userID).
+	return accessibleMessageQuery(db, userID).
 		Joins("JOIN message_dismissals AS md ON md.message_id = messages.id AND md.user_id = ?", userID).
 		Where("md.archived = ?", true)
 }
@@ -59,6 +86,26 @@ func (d *GormDatabase) GetMessageByID(id uint) (*model.Message, error) {
 // CreateMessage creates a message.
 func (d *GormDatabase) CreateMessage(message *model.Message) error {
 	return d.DB.Create(message).Error
+}
+
+// CreateMessageOnce inserts an idempotent message. When the deduplication key already exists,
+// the existing message is returned and created is false.
+func (d *GormDatabase) CreateMessageOnce(message *model.Message) (*model.Message, bool, error) {
+	if message.DedupKey == "" {
+		if err := d.DB.Create(message).Error; err != nil { return nil, false, err }
+		return message, true, nil
+	}
+	if err := d.DB.Create(message).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			existing := new(model.Message)
+			if loadErr := d.DB.Where("dedup_key = ?", message.DedupKey).First(existing).Error; loadErr != nil {
+				return nil, false, loadErr
+			}
+			return existing, false, nil
+		}
+		return nil, false, err
+	}
+	return message, true, nil
 }
 
 // GetMessagesByUser returns all messages from a user.
@@ -318,6 +365,7 @@ func (d *GormDatabase) DeleteMessageByID(id uint) error {
 		if err := tx.Where("message_id = ?", id).Delete(&model.MessageDismissal{}).Error; err != nil { return err }
 		if err := tx.Where("message_id = ?", id).Delete(&model.MessageAcknowledgement{}).Error; err != nil { return err }
 		if err := tx.Where("message_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
+		if err := tx.Where("message_id = ?", id).Delete(&model.DeferredNotification{}).Error; err != nil { return err }
 		if err := tx.Where("message_id = ?", id).Delete(&model.EscalationState{}).Error; err != nil { return err }
 		return tx.Where("id = ?", id).Delete(&model.Message{}).Error
 	})
@@ -330,6 +378,7 @@ func (d *GormDatabase) DeleteMessagesByApplication(applicationID uint) error {
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.MessageDismissal{}).Error; err != nil { return err }
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.MessageAcknowledgement{}).Error; err != nil { return err }
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.DigestItem{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.DeferredNotification{}).Error; err != nil { return err }
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.EscalationState{}).Error; err != nil { return err }
 		return tx.Where("application_id = ?", applicationID).Delete(&model.Message{}).Error
 	})

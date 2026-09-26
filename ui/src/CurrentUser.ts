@@ -18,6 +18,7 @@ export class CurrentUser {
         createdAt: '',
     };
     @observable accessor connectionErrorMessage: string | null = null;
+    @observable accessor mfaRequired = false;
 
     public constructor(private readonly snack: SnackReporter) {}
 
@@ -48,7 +49,7 @@ export class CurrentUser {
         return (browser && browser.name + ' ' + browser.version) || 'unknown browser';
     };
 
-    public login = async (username: string, password: string) => {
+    public login = async (username: string, password: string, mfaCode = '') => {
         runInAction(() => {
             this.loggedIn = false;
             this.authenticating = true;
@@ -57,10 +58,13 @@ export class CurrentUser {
         axios
             .create()
             .request({
-                url: config.get('url') + 'auth/local/login',
+                url: config.get('url') + 'auth/login',
                 method: 'POST',
                 data: {name},
-                headers: {Authorization: 'Basic ' + btoa(username + ':' + password)},
+                headers: {
+                    Authorization: 'Basic ' + btoa(username + ':' + password),
+                    ...(mfaCode ? {'X-Gotify-MU-MFA': mfaCode} : {}),
+                },
             })
             .then(
                 action((resp: AxiosResponse<ICurrentUser>) => {
@@ -69,13 +73,21 @@ export class CurrentUser {
                     this.loggedIn = true;
                     this.authenticating = false;
                     this.connectionErrorMessage = null;
+                    this.mfaRequired = false;
                     this.reconnectTime = 7500;
                 })
             )
             .catch(
-                action(() => {
+                action((error: AxiosError<{error?: string; errorDescription?: string}>) => {
                     this.authenticating = false;
-                    return this.snack('Login failed');
+                    if (error.response?.status === 428) {
+                        this.mfaRequired = true;
+                        this.snack('Enter your authenticator or recovery code.');
+                        return;
+                    }
+                    this.mfaRequired = false;
+                    const detail = error.response?.data?.errorDescription;
+                    this.snack(detail ? 'Login failed: ' + detail : 'Login failed');
                 })
             );
     };

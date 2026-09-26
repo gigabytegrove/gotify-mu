@@ -1,12 +1,16 @@
 package api
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strconv"
 	"strings"
 	"time"
@@ -15,12 +19,15 @@ import (
 	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/automation"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 )
 
 type AutomationEngine interface {
 	Publish(applicationID uint, title, message string, priority int) (*model.Message, error)
 	ReloadIntegrations()
 	SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error
+	TestMQTT(id uint) error
+	TestHomeAssistant(id uint) error
 }
 
 type AutomationDatabase interface {
@@ -53,6 +60,7 @@ type AutomationDatabase interface {
 	SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error
 	GetDigestPolicy(userID uint) (*model.DigestPolicy, error)
 	SaveDigestPolicy(item *model.DigestPolicy) error
+	DeleteDigestItems(userID uint) error
 
 	GetEscalationRules() ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
@@ -61,6 +69,10 @@ type AutomationDatabase interface {
 
 	SetMessageAcknowledgement(userID, messageID uint, acknowledged bool, now time.Time) error
 	IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error)
+	GetMessageAcknowledgements(messageID uint) ([]model.MessageAcknowledgementExternal, error)
+	GetIntegrationStatuses() ([]*model.IntegrationStatus, error)
+	GetAutomationRuns(kind string, objectID uint, limit int) ([]*model.AutomationRun, error)
+	DeleteAutomationRunsBefore(before time.Time) error
 }
 
 type AutomationAPI struct {
@@ -77,6 +89,46 @@ type webhookParams struct {
 	PriorityField   string `json:"priorityField"`
 	DefaultTitle    string `json:"defaultTitle"`
 	DefaultPriority int    `json:"defaultPriority"`
+	AllowedCIDRs     string `json:"allowedCidrs"`
+	RequireSignature bool   `json:"requireSignature"`
+	SigningSecret    string `json:"signingSecret"`
+	MaxAgeSeconds    int    `json:"maxAgeSeconds"`
+}
+
+func (a *AutomationAPI) GetIntegrationStatuses(ctx *gin.Context) {
+	items, err := a.DB.GetIntegrationStatuses()
+	if !successOrAbort(ctx, 500, err) { return }
+	ctx.JSON(200, items)
+}
+
+func (a *AutomationAPI) GetAutomationRuns(ctx *gin.Context) {
+	limit := 100
+	if raw := strings.TrimSpace(ctx.Query("limit")); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil { limit = parsed }
+	}
+	var objectID uint
+	if raw := strings.TrimSpace(ctx.Query("objectId")); raw != "" {
+		parsed, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil { ctx.AbortWithError(400, errors.New("objectId must be an integer")); return }
+		objectID = uint(parsed)
+	}
+	items, err := a.DB.GetAutomationRuns(strings.TrimSpace(ctx.Query("kind")), objectID, limit)
+	if !successOrAbort(ctx, 500, err) { return }
+	ctx.JSON(200, items)
+}
+
+func (a *AutomationAPI) CleanupAutomationRuns(ctx *gin.Context) {
+	days := 90
+	if raw := strings.TrimSpace(ctx.Query("days")); raw != "" {
+		parsed, err := strconv.Atoi(raw)
+		if err != nil || parsed < 1 || parsed > 3650 {
+			ctx.AbortWithError(400, errors.New("days must be between 1 and 3650"))
+			return
+		}
+		days = parsed
+	}
+	if !successOrAbort(ctx, 500, a.DB.DeleteAutomationRunsBefore(time.Now().AddDate(0,0,-days))) { return }
+	ctx.Status(204)
 }
 
 func (a *AutomationAPI) GetWebhookRoutes(ctx *gin.Context) {
@@ -93,14 +145,31 @@ func (a *AutomationAPI) CreateWebhookRoute(ctx *gin.Context) {
 	if !a.channelExists(ctx, params.ApplicationID) { return }
 	secret, err := generateIntegrationSecret()
 	if !successOrAbort(ctx, 500, err) { return }
+	if err := validateAllowedCIDRs(params.AllowedCIDRs); err != nil {
+		ctx.AbortWithError(400, err)
+		return
+	}
+	signingSecret := strings.TrimSpace(params.SigningSecret)
+	if params.RequireSignature && signingSecret == "" {
+		signingSecret, err = generateIntegrationSecret()
+		if !successOrAbort(ctx, 500, err) { return }
+	}
+	protectedSigning, err := security.Protect(signingSecret)
+	if !successOrAbort(ctx, 500, err) { return }
+	maxAge := params.MaxAgeSeconds
+	if maxAge <= 0 { maxAge = 300 }
 	item := &model.WebhookRoute{
-		Name: params.Name, ApplicationID: params.ApplicationID, Secret: secret, Enabled: params.Enabled,
+		Name: params.Name, ApplicationID: params.ApplicationID, Secret: security.WebhookVerifier(secret), Enabled: params.Enabled,
 		TitleField: valueOr(params.TitleField, "title"), MessageField: valueOr(params.MessageField, "message"),
 		PriorityField: valueOr(params.PriorityField, "priority"), DefaultTitle: params.DefaultTitle,
-		DefaultPriority: params.DefaultPriority,
+		DefaultPriority: params.DefaultPriority, AllowedCIDRs: strings.TrimSpace(params.AllowedCIDRs),
+		RequireSignature: params.RequireSignature, SigningSecret: protectedSigning, MaxAgeSeconds: maxAge,
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
-	ctx.JSON(201, webhookView(item))
+	view := webhookView(item)
+	view.Path = "/integrations/webhook/" + secret
+	if signingSecret != "" { view.SigningSecret = signingSecret }
+	ctx.JSON(201, view)
 }
 
 func (a *AutomationAPI) UpdateWebhookRoute(ctx *gin.Context) {
@@ -111,11 +180,31 @@ func (a *AutomationAPI) UpdateWebhookRoute(ctx *gin.Context) {
 		var params webhookParams
 		if err := ctx.ShouldBindJSON(&params); err != nil { return }
 		if !a.channelExists(ctx, params.ApplicationID) { return }
+		if err := validateAllowedCIDRs(params.AllowedCIDRs); err != nil {
+			ctx.AbortWithError(400, err)
+			return
+		}
 		item.Name, item.ApplicationID, item.Enabled = params.Name, params.ApplicationID, params.Enabled
 		item.TitleField, item.MessageField = valueOr(params.TitleField, "title"), valueOr(params.MessageField, "message")
 		item.PriorityField, item.DefaultTitle, item.DefaultPriority = valueOr(params.PriorityField, "priority"), params.DefaultTitle, params.DefaultPriority
+		item.AllowedCIDRs, item.RequireSignature = strings.TrimSpace(params.AllowedCIDRs), params.RequireSignature
+		if params.MaxAgeSeconds > 0 { item.MaxAgeSeconds = params.MaxAgeSeconds } else if item.MaxAgeSeconds <= 0 { item.MaxAgeSeconds = 300 }
+		generatedSigning := ""
+		if strings.TrimSpace(params.SigningSecret) != "" {
+			protected, protectErr := security.Protect(strings.TrimSpace(params.SigningSecret))
+			if !successOrAbort(ctx, 500, protectErr) { return }
+			item.SigningSecret = protected
+		} else if params.RequireSignature && item.SigningSecret == "" {
+			generatedSigning, err = generateIntegrationSecret()
+			if !successOrAbort(ctx, 500, err) { return }
+			protected, protectErr := security.Protect(generatedSigning)
+			if !successOrAbort(ctx, 500, protectErr) { return }
+			item.SigningSecret = protected
+		}
 		if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
-		ctx.JSON(200, webhookView(item))
+		view := webhookView(item)
+		if generatedSigning != "" { view.SigningSecret = generatedSigning }
+		ctx.JSON(200, view)
 	})
 }
 
@@ -126,9 +215,11 @@ func (a *AutomationAPI) RegenerateWebhookSecret(ctx *gin.Context) {
 		if item == nil { ctx.AbortWithError(404, errors.New("webhook not found")); return }
 		secret, err := generateIntegrationSecret()
 		if !successOrAbort(ctx, 500, err) { return }
-		item.Secret = secret
+		item.Secret = security.WebhookVerifier(secret)
 		if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
-		ctx.JSON(200, webhookView(item))
+		view := webhookView(item)
+		view.Path = "/integrations/webhook/" + secret
+		ctx.JSON(200, view)
 	})
 }
 
@@ -142,8 +233,23 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 	if !successOrAbort(ctx, 500, err) { return }
 	if item == nil { ctx.AbortWithStatus(404); return }
 
-	body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, 1024*1024))
+	if !webhookSourceAllowed(item.AllowedCIDRs, ctx.ClientIP()) {
+		ctx.AbortWithStatus(403)
+		return
+	}
+	const maxWebhookBody = 1024 * 1024
+	body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, maxWebhookBody+1))
 	if !successOrAbort(ctx, 400, err) { return }
+	if len(body) > maxWebhookBody {
+		ctx.AbortWithError(413, errors.New("webhook payload exceeds 1 MiB limit"))
+		return
+	}
+	if item.RequireSignature {
+		if err := verifyWebhookSignature(item, body, ctx.GetHeader("X-Gotify-MU-Timestamp"), ctx.GetHeader("X-Gotify-MU-Signature"), time.Now()); err != nil {
+			ctx.AbortWithError(401, err)
+			return
+		}
+	}
 
 	title := item.DefaultTitle
 	message := strings.TrimSpace(string(body))
@@ -195,9 +301,11 @@ func (a *AutomationAPI) CreateMQTT(ctx *gin.Context) {
 	if err := ctx.ShouldBindJSON(&params); err != nil { return }
 	if !a.channelExists(ctx, params.ApplicationID) { return }
 	if !validMQTTURL(params.BrokerURL) { ctx.AbortWithError(400, errors.New("broker URL must use mqtt, mqtts, tcp, or tls")); return }
+	protectedPassword, err := security.Protect(params.Password)
+	if !successOrAbort(ctx, 500, err) { return }
 	item := &model.MQTTIntegration{
 		Name: params.Name, ApplicationID: params.ApplicationID, BrokerURL: params.BrokerURL,
-		ClientID: params.ClientID, Username: params.Username, Password: params.Password, Topic: params.Topic, Enabled: params.Enabled,
+		ClientID: params.ClientID, Username: params.Username, Password: protectedPassword, Topic: params.Topic, Enabled: params.Enabled,
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 	a.Engine.ReloadIntegrations()
@@ -215,10 +323,21 @@ func (a *AutomationAPI) UpdateMQTT(ctx *gin.Context) {
 		if !validMQTTURL(params.BrokerURL) { ctx.AbortWithError(400, errors.New("broker URL must use mqtt, mqtts, tcp, or tls")); return }
 		item.Name, item.ApplicationID, item.BrokerURL, item.ClientID = params.Name, params.ApplicationID, params.BrokerURL, params.ClientID
 		item.Username, item.Topic, item.Enabled = params.Username, params.Topic, params.Enabled
-		if params.Password != "" { item.Password = params.Password }
+		if params.Password != "" {
+			protectedPassword, protectErr := security.Protect(params.Password)
+			if !successOrAbort(ctx, 500, protectErr) { return }
+			item.Password = protectedPassword
+		}
 		if !successOrAbort(ctx, 500, a.DB.SaveMQTTIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, mqttView(item))
+	})
+}
+
+func (a *AutomationAPI) TestMQTT(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 502, a.Engine.TestMQTT(id)) { return }
+		ctx.JSON(200, gin.H{"connected":true})
 	})
 }
 
@@ -251,9 +370,11 @@ func (a *AutomationAPI) CreateHomeAssistant(ctx *gin.Context) {
 	if !a.channelExists(ctx, params.ApplicationID) { return }
 	if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("Home Assistant URL must use http or https")); return }
 	if strings.TrimSpace(params.Token) == "" { ctx.AbortWithError(400, errors.New("access token is required")); return }
+	protectedToken, err := security.Protect(params.Token)
+	if !successOrAbort(ctx, 500, err) { return }
 	item := &model.HomeAssistantIntegration{
 		Name: params.Name, ApplicationID: params.ApplicationID, BaseURL: strings.TrimRight(params.BaseURL, "/"),
-		Token: params.Token, EventType: params.EventType, Enabled: params.Enabled,
+		Token: protectedToken, EventType: params.EventType, Enabled: params.Enabled,
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 	a.Engine.ReloadIntegrations()
@@ -271,10 +392,21 @@ func (a *AutomationAPI) UpdateHomeAssistant(ctx *gin.Context) {
 		if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("Home Assistant URL must use http or https")); return }
 		item.Name, item.ApplicationID, item.BaseURL = params.Name, params.ApplicationID, strings.TrimRight(params.BaseURL, "/")
 		item.EventType, item.Enabled = params.EventType, params.Enabled
-		if params.Token != "" { item.Token = params.Token }
+		if params.Token != "" {
+			protectedToken, protectErr := security.Protect(params.Token)
+			if !successOrAbort(ctx, 500, protectErr) { return }
+			item.Token = protectedToken
+		}
 		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 		a.Engine.ReloadIntegrations()
 		ctx.JSON(200, homeAssistantView(item))
+	})
+}
+
+func (a *AutomationAPI) TestHomeAssistant(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 502, a.Engine.TestHomeAssistant(id)) { return }
+		ctx.JSON(200, gin.H{"connected":true})
 	})
 }
 
@@ -300,18 +432,23 @@ func (a *AutomationAPI) DeleteHomeAssistant(ctx *gin.Context) {
 }
 
 type scheduleParams struct {
-	Name          string     `json:"name" binding:"required"`
-	ApplicationID uint       `json:"applicationId" binding:"required"`
-	Title         string     `json:"title"`
-	Message       string     `json:"message" binding:"required"`
-	Priority      int        `json:"priority"`
-	ScheduleType  string     `json:"scheduleType" binding:"required"`
-	RunAt         *time.Time `json:"runAt"`
-	Hour          int        `json:"hour"`
-	Minute        int        `json:"minute"`
-	Weekday       int        `json:"weekday"`
-	Timezone      string     `json:"timezone"`
-	Enabled       bool       `json:"enabled"`
+	Name           string     `json:"name" binding:"required"`
+	ApplicationID  uint       `json:"applicationId" binding:"required"`
+	Title          string     `json:"title"`
+	Message        string     `json:"message" binding:"required"`
+	Priority       int        `json:"priority"`
+	ScheduleType   string     `json:"scheduleType" binding:"required"`
+	RunAt          *time.Time `json:"runAt"`
+	Hour           int        `json:"hour"`
+	Minute         int        `json:"minute"`
+	Weekday        int        `json:"weekday"`
+	CronExpression string     `json:"cronExpression"`
+	Timezone       string     `json:"timezone"`
+	EndAt          *time.Time `json:"endAt"`
+	MaxRuns        int        `json:"maxRuns"`
+	MisfirePolicy  string     `json:"misfirePolicy"`
+	ExcludeDates   string     `json:"excludeDates"`
+	Enabled        bool       `json:"enabled"`
 }
 
 func (a *AutomationAPI) GetSchedules(ctx *gin.Context) {
@@ -341,7 +478,7 @@ func (a *AutomationAPI) UpdateSchedule(ctx *gin.Context) {
 		if err := ctx.ShouldBindJSON(&params); err != nil { return }
 		if !a.channelExists(ctx, params.ApplicationID) { return }
 		updated := scheduleFromParams(params)
-		updated.ID, updated.CreatedAt = item.ID, item.CreatedAt
+		updated.ID, updated.CreatedAt, updated.RunCount = item.ID, item.CreatedAt, item.RunCount
 		if err := validateSchedule(updated); err != nil { ctx.AbortWithError(400, err); return }
 		updated.NextRunAt = automation.NextScheduleRun(updated, time.Now())
 		if updated.Enabled && updated.NextRunAt == nil { ctx.AbortWithError(400, errors.New("schedule does not have a future run time")); return }
@@ -360,6 +497,7 @@ type quietHoursParams struct {
 	EndMinute     int    `json:"endMinute"`
 	Timezone      string `json:"timezone"`
 	AllowPriority int    `json:"allowPriority"`
+	Behavior      string `json:"behavior"`
 }
 
 func (a *AutomationAPI) GetQuietHours(ctx *gin.Context) {
@@ -367,7 +505,7 @@ func (a *AutomationAPI) GetQuietHours(ctx *gin.Context) {
 	item, err := a.DB.GetQuietHoursPolicy(userID)
 	if !successOrAbort(ctx, 500, err) { return }
 	if item == nil {
-		item = &model.QuietHoursPolicy{UserID:userID, StartMinute:1320, EndMinute:420, Timezone:"UTC", AllowPriority:8}
+		item = &model.QuietHoursPolicy{UserID:userID, StartMinute:1320, EndMinute:420, Timezone:"UTC", AllowPriority:8, Behavior:"suppress"}
 	}
 	ctx.JSON(200, item)
 }
@@ -381,7 +519,12 @@ func (a *AutomationAPI) SaveQuietHours(ctx *gin.Context) {
 	if _, err := time.LoadLocation(valueOr(params.Timezone, "UTC")); err != nil {
 		ctx.AbortWithError(400, errors.New("invalid timezone")); return
 	}
-	item := &model.QuietHoursPolicy{UserID:auth.GetUserID(ctx), Enabled:params.Enabled, StartMinute:params.StartMinute, EndMinute:params.EndMinute, Timezone:valueOr(params.Timezone,"UTC"), AllowPriority:params.AllowPriority}
+	behavior := valueOr(params.Behavior, "suppress")
+	if behavior != "suppress" && behavior != "defer" {
+		ctx.AbortWithError(400, errors.New("Quiet Hours behavior must be suppress or defer"))
+		return
+	}
+	item := &model.QuietHoursPolicy{UserID:auth.GetUserID(ctx), Enabled:params.Enabled, StartMinute:params.StartMinute, EndMinute:params.EndMinute, Timezone:valueOr(params.Timezone,"UTC"), AllowPriority:params.AllowPriority, Behavior:behavior}
 	if !successOrAbort(ctx, 500, a.DB.SaveQuietHoursPolicy(item)) { return }
 	ctx.JSON(200, item)
 }
@@ -414,6 +557,9 @@ func (a *AutomationAPI) SaveDigest(ctx *gin.Context) {
 	if params.Enabled {
 		next := time.Now().Add(time.Duration(params.IntervalMinutes)*time.Minute)
 		item.NextRunAt = &next
+	} else {
+		item.NextRunAt = nil
+		if !successOrAbort(ctx, 500, a.DB.DeleteDigestItems(userID)) { return }
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveDigestPolicy(item)) { return }
 	ctx.JSON(200, item)
@@ -469,7 +615,9 @@ func (a *AutomationAPI) GetAcknowledgement(ctx *gin.Context) {
 		if !a.canAccessMessage(ctx, id) { return }
 		value, err := a.DB.IsMessageAcknowledgedByUser(auth.GetUserID(ctx), id)
 		if !successOrAbort(ctx, 500, err) { return }
-		ctx.JSON(200, gin.H{"acknowledged":value})
+		items, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{"acknowledged":value,"count":len(items),"acknowledgedBy":items})
 	})
 }
 
@@ -477,7 +625,9 @@ func (a *AutomationAPI) AcknowledgeMessage(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		if !a.canAccessMessage(ctx, id) { return }
 		if !successOrAbort(ctx, 500, a.DB.SetMessageAcknowledgement(auth.GetUserID(ctx), id, true, time.Now())) { return }
-		ctx.JSON(200, gin.H{"acknowledged":true})
+		items, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{"acknowledged":true,"count":len(items),"acknowledgedBy":items})
 	})
 }
 
@@ -485,7 +635,9 @@ func (a *AutomationAPI) UnacknowledgeMessage(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		if !a.canAccessMessage(ctx, id) { return }
 		if !successOrAbort(ctx, 500, a.DB.SetMessageAcknowledgement(auth.GetUserID(ctx), id, false, time.Now())) { return }
-		ctx.JSON(200, gin.H{"acknowledged":false})
+		items, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{"acknowledged":false,"count":len(items),"acknowledgedBy":items})
 	})
 }
 
@@ -510,7 +662,9 @@ func scheduleFromParams(params scheduleParams) *model.ScheduledNotification {
 	return &model.ScheduledNotification{
 		Name:params.Name,ApplicationID:params.ApplicationID,Title:params.Title,Message:params.Message,Priority:params.Priority,
 		ScheduleType:params.ScheduleType,RunAt:params.RunAt,Hour:params.Hour,Minute:params.Minute,Weekday:params.Weekday,
-		Timezone:valueOr(params.Timezone,"UTC"),Enabled:params.Enabled,
+		CronExpression:strings.TrimSpace(params.CronExpression),Timezone:valueOr(params.Timezone,"UTC"),EndAt:params.EndAt,
+		MaxRuns:params.MaxRuns,MisfirePolicy:valueOr(params.MisfirePolicy,"send"),ExcludeDates:strings.TrimSpace(params.ExcludeDates),
+		Enabled:params.Enabled,
 	}
 }
 
@@ -524,18 +678,32 @@ func validateSchedule(item *model.ScheduledNotification) error {
 		if item.Hour < 0 || item.Hour > 23 || item.Minute < 0 || item.Minute > 59 { return errors.New("invalid daily time") }
 	case "weekly":
 		if item.Weekday < 0 || item.Weekday > 6 || item.Hour < 0 || item.Hour > 23 || item.Minute < 0 || item.Minute > 59 { return errors.New("invalid weekly schedule") }
+	case "cron":
+		if err := automation.ValidateCronExpression(item.CronExpression); err != nil { return err }
 	default:
-		return errors.New("schedule type must be once, hourly, daily, or weekly")
+		return errors.New("schedule type must be once, hourly, daily, weekly, or cron")
 	}
 	if _, err := time.LoadLocation(valueOr(item.Timezone,"UTC")); err != nil { return errors.New("invalid timezone") }
+	if item.MaxRuns < 0 { return errors.New("maximum runs cannot be negative") }
+	switch item.MisfirePolicy {
+	case "", "send", "skip":
+	default:
+		return errors.New("misfire policy must be send or skip")
+	}
+	if item.EndAt != nil && !item.EndAt.After(time.Now()) {
+		return errors.New("schedule end time must be in the future")
+	}
+	if err := automation.ValidateExcludeDates(item.ExcludeDates); err != nil { return err }
 	return nil
 }
 
 func webhookView(item *model.WebhookRoute) model.WebhookRouteView {
 	return model.WebhookRouteView{
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,Enabled:item.Enabled,
-		Path:"/integrations/webhook/"+item.Secret,TitleField:item.TitleField,MessageField:item.MessageField,
+		Path:"",TitleField:item.TitleField,MessageField:item.MessageField,
 		PriorityField:item.PriorityField,DefaultTitle:item.DefaultTitle,DefaultPriority:item.DefaultPriority,
+		AllowedCIDRs:item.AllowedCIDRs,RequireSignature:item.RequireSignature,
+		SigningSecretConfigured:item.SigningSecret!="",MaxAgeSeconds:item.MaxAgeSeconds,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
 }
@@ -554,6 +722,60 @@ func homeAssistantView(item *model.HomeAssistantIntegration) model.HomeAssistant
 		TokenConfigured:item.Token!="",EventType:item.EventType,Enabled:item.Enabled,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
+}
+
+func validateAllowedCIDRs(raw string) error {
+	for _, part := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(part)
+		if value == "" { continue }
+		if ip := net.ParseIP(value); ip != nil { continue }
+		if _, _, err := net.ParseCIDR(value); err != nil {
+			return fmt.Errorf("invalid allowed IP/CIDR %q", value)
+		}
+	}
+	return nil
+}
+
+func webhookSourceAllowed(raw, client string) bool {
+	if strings.TrimSpace(raw) == "" { return true }
+	ip := net.ParseIP(strings.TrimSpace(client))
+	if ip == nil { return false }
+	for _, part := range strings.Split(raw, ",") {
+		value := strings.TrimSpace(part)
+		if value == "" { continue }
+		if allowed := net.ParseIP(value); allowed != nil && allowed.Equal(ip) { return true }
+		if _, network, err := net.ParseCIDR(value); err == nil && network.Contains(ip) { return true }
+	}
+	return false
+}
+
+func verifyWebhookSignature(item *model.WebhookRoute, body []byte, timestamp, signature string, now time.Time) error {
+	if strings.TrimSpace(timestamp) == "" || strings.TrimSpace(signature) == "" {
+		return errors.New("webhook signature and timestamp are required")
+	}
+	seconds, err := strconv.ParseInt(strings.TrimSpace(timestamp), 10, 64)
+	if err != nil { return errors.New("webhook timestamp is invalid") }
+	maxAge := item.MaxAgeSeconds
+	if maxAge <= 0 { maxAge = 300 }
+	requestTime := time.Unix(seconds, 0)
+	delta := now.Sub(requestTime)
+	if delta < 0 { delta = -delta }
+	if delta > time.Duration(maxAge)*time.Second {
+		return errors.New("webhook timestamp is outside the allowed replay window")
+	}
+	secret, err := security.Reveal(item.SigningSecret)
+	if err != nil || secret == "" { return errors.New("webhook signing secret is unavailable") }
+	mac := hmac.New(sha256.New, []byte(secret))
+	_, _ = mac.Write([]byte(strings.TrimSpace(timestamp)))
+	_, _ = mac.Write([]byte("."))
+	_, _ = mac.Write(body)
+	expected := mac.Sum(nil)
+	provided := strings.TrimPrefix(strings.TrimSpace(signature), "sha256=")
+	decoded, err := hex.DecodeString(provided)
+	if err != nil || !hmac.Equal(expected, decoded) {
+		return errors.New("webhook signature is invalid")
+	}
+	return nil
 }
 
 func generateIntegrationSecret() (string, error) {

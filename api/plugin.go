@@ -1,9 +1,13 @@
 package api
 
 import (
+	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/location"
@@ -11,6 +15,7 @@ import (
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/plugin"
 	"github.com/gotify/server/v3/plugin/compat"
+	"github.com/gotify/server/v3/security"
 	"gopkg.in/yaml.v3"
 )
 
@@ -26,11 +31,21 @@ type PluginAPI struct {
 	Notifier Notifier
 	Manager  *plugin.Manager
 	DB       PluginDatabase
+	Policy   func() *model.SecurityPolicy
 }
 
 // InstallPlugin installs a server-wide plugin binary uploaded by an administrator.
 // The route is protected by elevated administrator authentication in router.Create.
 func (c *PluginAPI) InstallPlugin(ctx *gin.Context) {
+	policy := model.DefaultSecurityPolicy()
+	if c.Policy != nil {
+		if configured := c.Policy(); configured != nil { policy = configured }
+	}
+	if !policy.AllowNativePluginUploads {
+		ctx.AbortWithError(403, errors.New("native plugin uploads are disabled by security policy"))
+		return
+	}
+
 	header, err := ctx.FormFile("plugin")
 	if err != nil {
 		ctx.AbortWithError(400, errors.New("plugin file is required"))
@@ -52,16 +67,54 @@ func (c *PluginAPI) InstallPlugin(ctx *gin.Context) {
 	}
 	defer file.Close()
 
-	info, warnings, err := c.Manager.InstallPlugin(header.Filename, file)
+	data, err := io.ReadAll(io.LimitReader(file, plugin.MaxPluginUploadBytes+1))
+	if err != nil {
+		ctx.AbortWithError(500, err)
+		return
+	}
+	if int64(len(data)) > plugin.MaxPluginUploadBytes {
+		ctx.AbortWithError(400, fmt.Errorf("plugin exceeds the %d MiB upload limit", plugin.MaxPluginUploadBytes>>20))
+		return
+	}
+
+	digest := sha256.Sum256(data)
+	actualSHA256 := hex.EncodeToString(digest[:])
+	expectedSHA256 := strings.ToLower(strings.TrimSpace(ctx.PostForm("sha256")))
+	if policy.RequirePluginChecksum && expectedSHA256 == "" {
+		ctx.AbortWithError(400, errors.New("plugin SHA-256 checksum is required by server policy"))
+		return
+	}
+	if expectedSHA256 != "" && expectedSHA256 != actualSHA256 {
+		ctx.AbortWithError(400, errors.New("plugin SHA-256 checksum does not match the uploaded file"))
+		return
+	}
+
+	signature := strings.TrimSpace(ctx.PostForm("signature"))
+	if policy.RequirePluginSignature && signature == "" {
+		ctx.AbortWithError(400, errors.New("plugin signature is required by server policy"))
+		return
+	}
+	signatureVerified := false
+	if signature != "" {
+		if err := security.VerifyPluginDigest(digest[:], signature); err != nil {
+			ctx.AbortWithError(400, err)
+			return
+		}
+		signatureVerified = true
+	}
+
+	info, warnings, err := c.Manager.InstallPlugin(header.Filename, bytes.NewReader(data))
 	if err != nil {
 		ctx.AbortWithError(400, err)
 		return
 	}
 
 	ctx.JSON(201, gin.H{
-		"name":       info.String(),
-		"modulePath": info.ModulePath,
-		"warnings":   warnings,
+		"name":              info.String(),
+		"modulePath":        info.ModulePath,
+		"warnings":          warnings,
+		"sha256":            actualSHA256,
+		"signatureVerified": signatureVerified,
 	})
 }
 

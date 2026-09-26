@@ -22,6 +22,7 @@ import Schedule from '@mui/icons-material/Schedule';
 import TrendingUp from '@mui/icons-material/TrendingUp';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
+import ConfirmDialog from '../common/ConfirmDialog';
 import * as config from '../config';
 import {useStores} from '../stores';
 import {IEscalationRule, IScheduledNotification} from '../types';
@@ -43,6 +44,11 @@ const Automation = () => {
     const [escalationEdit, setEscalationEdit] =
         React.useState<IEscalationRule | null | undefined>();
     const [loading, setLoading] = React.useState(true);
+    const [deleteTarget, setDeleteTarget] = React.useState<{
+        title: string;
+        text: string;
+        run: () => Promise<void>;
+    }>();
 
     const refresh = React.useCallback(async () => {
         setLoading(true);
@@ -107,9 +113,15 @@ const Automation = () => {
                                 }
                                 onEdit={() => setScheduleEdit(item)}
                                 onDelete={async () => {
-                                    await axios.delete(api('automation/schedule/' + item.id));
-                                    await refresh();
-                                    snackManager.snack('Schedule deleted');
+                                    setDeleteTarget({
+                                        title: 'Delete scheduled notification?',
+                                        text: 'This schedule will stop running. Existing messages are not removed.',
+                                        run: async () => {
+                                            await axios.delete(api('automation/schedule/' + item.id));
+                                            await refresh();
+                                            snackManager.snack('Schedule deleted');
+                                        },
+                                    });
                                 }}
                             />
                         ))}
@@ -154,9 +166,15 @@ const Automation = () => {
                                 }
                                 onEdit={() => setEscalationEdit(item)}
                                 onDelete={async () => {
-                                    await axios.delete(api('automation/escalation/' + item.id));
-                                    await refresh();
-                                    snackManager.snack('Escalation deleted');
+                                    setDeleteTarget({
+                                        title: 'Delete escalation rule?',
+                                        text: 'Pending and future escalations for this rule will be removed.',
+                                        run: async () => {
+                                            await axios.delete(api('automation/escalation/' + item.id));
+                                            await refresh();
+                                            snackManager.snack('Escalation deleted');
+                                        },
+                                    });
                                 }}
                             />
                         ))}
@@ -173,6 +191,15 @@ const Automation = () => {
                         setScheduleEdit(undefined);
                         await refresh();
                     }}
+                />
+            )}
+            {deleteTarget && (
+                <ConfirmDialog
+                    title={deleteTarget.title}
+                    text={deleteTarget.text}
+                    requireElevated
+                    fClose={() => setDeleteTarget(undefined)}
+                    fOnSubmit={() => void deleteTarget.run()}
                 />
             )}
             {escalationEdit !== undefined && (
@@ -309,6 +336,8 @@ const scheduleSummary = (
                 ' ' +
                 item.timezone
             );
+        case 'cron':
+            return channel + ' · Custom schedule: ' + (item.cronExpression || '');
         default:
             return channel;
     }
@@ -344,7 +373,14 @@ const ScheduleDialog = ({
     const [hour, setHour] = React.useState(item?.hour ?? 9);
     const [minute, setMinute] = React.useState(item?.minute ?? 0);
     const [weekday, setWeekday] = React.useState(item?.weekday ?? 1);
+    const [cronExpression, setCronExpression] = React.useState(item?.cronExpression || '0 9 * * *');
     const [timezoneValue, setTimezoneValue] = React.useState(item?.timezone || timezone);
+    const [endAt, setEndAt] = React.useState(item?.endAt ? localInputValue(item.endAt) : '');
+    const [maxRuns, setMaxRuns] = React.useState(item?.maxRuns ?? 0);
+    const [misfirePolicy, setMisfirePolicy] = React.useState<'send' | 'skip'>(
+        item?.misfirePolicy || 'send'
+    );
+    const [excludeDates, setExcludeDates] = React.useState(item?.excludeDates || '');
     const [enabled, setEnabled] = React.useState(item?.enabled ?? true);
     const [saving, setSaving] = React.useState(false);
 
@@ -362,7 +398,12 @@ const ScheduleDialog = ({
                 hour,
                 minute,
                 weekday,
+                cronExpression: scheduleType === 'cron' ? cronExpression : '',
                 timezone: timezoneValue,
+                endAt: endAt ? new Date(endAt).toISOString() : null,
+                maxRuns,
+                misfirePolicy,
+                excludeDates,
                 enabled,
             };
             if (item) {
@@ -409,6 +450,7 @@ const ScheduleDialog = ({
                         <MenuItem value="hourly">Hourly</MenuItem>
                         <MenuItem value="daily">Daily</MenuItem>
                         <MenuItem value="weekly">Weekly</MenuItem>
+                        <MenuItem value="cron">Custom (cron)</MenuItem>
                     </TextField>
 
                     {scheduleType === 'once' && (
@@ -463,13 +505,54 @@ const ScheduleDialog = ({
                             />
                         </Stack>
                     )}
-                    {scheduleType !== 'once' && (
+                    {scheduleType === 'cron' && (
                         <TextField
-                            label="Timezone"
-                            value={timezoneValue}
-                            onChange={(e) => setTimezoneValue(e.target.value)}
-                            helperText="Use an IANA timezone such as America/New_York."
+                            label="Custom schedule"
+                            value={cronExpression}
+                            onChange={(e) => setCronExpression(e.target.value)}
+                            helperText="Five fields: minute hour day month weekday. Example: 0 9 * * 1-5."
+                            required
                         />
+                    )}
+                    <TextField
+                        label="Timezone"
+                        value={timezoneValue}
+                        onChange={(e) => setTimezoneValue(e.target.value)}
+                        helperText="IANA timezone, for example America/New_York."
+                    />
+                    {scheduleType !== 'once' && (
+                        <>
+                            <TextField
+                                type="datetime-local"
+                                label="Stop after"
+                                value={endAt}
+                                onChange={(e) => setEndAt(e.target.value)}
+                                helperText="Optional. Leave blank for no end date."
+                                slotProps={{inputLabel: {shrink: true}}}
+                            />
+                            <TextField
+                                type="number"
+                                label="Maximum runs"
+                                value={maxRuns}
+                                onChange={(e) => setMaxRuns(Number(e.target.value))}
+                                helperText="0 means no run-count limit."
+                                slotProps={{htmlInput: {min: 0}}}
+                            />
+                            <TextField
+                                select
+                                label="If a scheduled time was missed"
+                                value={misfirePolicy}
+                                onChange={(e) => setMisfirePolicy(e.target.value as 'send' | 'skip')}>
+                                <MenuItem value="send">Send when service resumes</MenuItem>
+                                <MenuItem value="skip">Skip the missed occurrence</MenuItem>
+                            </TextField>
+                            <TextField
+                                label="Excluded dates"
+                                value={excludeDates}
+                                onChange={(e) => setExcludeDates(e.target.value)}
+                                helperText="Optional comma-separated dates in YYYY-MM-DD format."
+                            />
+                        </>
                     )}
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}

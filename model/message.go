@@ -14,8 +14,12 @@ type Message struct {
 	Extras        []byte
 	Date          time.Time
 	SenderUserID  uint `gorm:"index"`
-	SenderName    string `gorm:"type:text"`
-	Acknowledged  bool   `gorm:"-" json:"-"`
+	SenderName      string `gorm:"type:text"`
+	DedupKey        string `gorm:"type:varchar(220);uniqueIndex" json:"-"`
+	ParentMessageID uint   `gorm:"index" json:"-"`
+	Acknowledged    bool   `gorm:"-" json:"-"`
+	AckCount        int64  `gorm:"-" json:"-"`
+	Acknowledgements []MessageAcknowledgementExternal `gorm:"-" json:"-"`
 }
 
 // MessageExternal Model
@@ -76,6 +80,12 @@ type MessageExternal struct {
 	SenderName string `json:"senderName,omitempty"`
 	// Whether the current requesting user has acknowledged this message.
 	Acknowledged bool `json:"acknowledged,omitempty"`
+	// Number of users that have acknowledged this message.
+	AcknowledgementCount int64 `json:"acknowledgementCount,omitempty"`
+	// Users who acknowledged this message.
+	AcknowledgedBy []MessageAcknowledgementExternal `json:"acknowledgedBy,omitempty"`
+	// The original message id when this message was created by escalation/reply automation.
+	ParentMessageID uint `json:"parentMessageId,omitempty"`
 }
 
 // CreateMessage Model
@@ -112,4 +122,12 @@ type CreateMessage struct {
 	//
 	// example: {"home::appliances::thermostat::change_temperature":{"temperature":23},"home::appliances::lighting::on":{"brightness":15}}
 	Extras map[string]any `form:"-" query:"-" json:"extras,omitempty"`
+}
+
+
+type MessageAcknowledgementExternal struct {
+	UserID         uint      `json:"userId"`
+	Name           string    `json:"name"`
+	DisplayName    string    `json:"displayName,omitempty"`
+	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }

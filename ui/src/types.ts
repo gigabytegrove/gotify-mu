@@ -49,6 +49,9 @@ export interface IMessage {
     senderUserId?: number;
     senderName?: string;
     acknowledged?: boolean;
+    acknowledgementCount?: number;
+    acknowledgedBy?: IMessageAcknowledgement[];
+    parentMessageId?: number;
     image?: string;
     extras?: IMessageExtras;
 }
@@ -74,6 +77,7 @@ export interface IUser {
     name: string;
     displayName?: string;
     admin: boolean;
+    directoryManaged?: boolean;
     createdAt: string;
 }
 
@@ -136,6 +140,11 @@ export interface IWebhookRoute {
     priorityField: string;
     defaultTitle: string;
     defaultPriority: number;
+    allowedCidrs?: string;
+    requireSignature?: boolean;
+    signingSecretConfigured?: boolean;
+    signingSecret?: string;
+    maxAgeSeconds?: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -173,12 +182,18 @@ export interface IScheduledNotification {
     title: string;
     message: string;
     priority: number;
-    scheduleType: 'once' | 'hourly' | 'daily' | 'weekly';
+    scheduleType: 'once' | 'hourly' | 'daily' | 'weekly' | 'cron';
     runAt?: string;
     hour: number;
     minute: number;
     weekday: number;
+    cronExpression?: string;
     timezone: string;
+    endAt?: string;
+    maxRuns: number;
+    runCount: number;
+    misfirePolicy: 'send' | 'skip';
+    excludeDates?: string;
     enabled: boolean;
     lastRunAt?: string;
     nextRunAt?: string;
@@ -194,6 +209,7 @@ export interface IQuietHoursPolicy {
     endMinute: number;
     timezone: string;
     allowPriority: number;
+    behavior: 'suppress' | 'defer';
 }
 
 export interface IDigestPolicy {
@@ -214,6 +230,197 @@ export interface IEscalationRule {
     minPriority: number;
     delayMinutes: number;
     enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+
+export interface IMessageAcknowledgement {
+    userId: number;
+    name: string;
+    displayName?: string;
+    acknowledgedAt: string;
+}
+
+export interface IIntegrationStatus {
+    kind: string;
+    objectId: number;
+    state: string;
+    lastConnectedAt?: string;
+    lastActivityAt?: string;
+    lastError?: string;
+    updatedAt: string;
+}
+
+export interface IAutomationRun {
+    id: number;
+    kind: string;
+    objectId: number;
+    triggerKey: string;
+    status: string;
+    messageId?: number;
+    error?: string;
+    startedAt: string;
+    finishedAt?: string;
+}
+
+export interface ISecurityPolicy {
+    id: number;
+    minPasswordLength: number;
+    sessionLifetimeHours: number;
+    elevationMinutes: number;
+    auditRetentionDays: number;
+    automationRetentionDays: number;
+    allowNativePluginUploads: boolean;
+    requirePluginChecksum: boolean;
+    requirePluginSignature: boolean;
+    requireMfaAdmins: boolean;
+    requireMfaAll: boolean;
+    updatedAt: string;
+}
+
+
+export interface IMFAStatus {
+    enabled: boolean;
+    recoveryCodesRemaining: number;
+}
+
+
+export interface IRSSIntegration {
+    id: number;
+    name: string;
+    applicationId: number;
+    url: string;
+    pollMinutes: number;
+    titlePrefix: string;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ICalendarIntegration {
+    id: number;
+    name: string;
+    applicationId: number;
+    url: string;
+    pollMinutes: number;
+    advanceMinutes: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IEmailGateway {
+    id: number;
+    name: string;
+    applicationId: number;
+    host: string;
+    port: number;
+    useTls: boolean;
+    startTls: boolean;
+    username: string;
+    passwordConfigured: boolean;
+    fromAddress: string;
+    toAddresses: string;
+    minPriority: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ISMTPReceiver {
+    id: number;
+    listenAddress: string;
+    username: string;
+    passwordConfigured: boolean;
+    allowedCidrs: string;
+    maxMessageBytes: number;
+    enabled: boolean;
+    updatedAt: string;
+}
+
+export interface ISMTPRoute {
+    id: number;
+    recipient: string;
+    applicationId: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface ISyslogReceiver {
+    id: number;
+    name: string;
+    applicationId: number;
+    listenAddress: string;
+    protocol: 'udp' | 'tcp';
+    allowedCidrs: string;
+    minSeverity: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IAdminSession {
+    id: number;
+    userId: number;
+    username: string;
+    displayName?: string;
+    name: string;
+    createdAt: string;
+    lastUsed?: string;
+    elevatedUntil?: string;
+    expiresAt?: string;
+}
+
+export interface ISystemStats {
+    users: number;
+    channels: number;
+    messages: number;
+    clients: number;
+    groups: number;
+    webhooks: number;
+    mqttConnections: number;
+    homeAssistantConnections: number;
+    schedules: number;
+    escalationRules: number;
+    auditEvents: number;
+    automationRuns: number;
+    databaseBytes?: number;
+    dataBytes?: number;
+}
+
+
+export interface IServiceAccount {
+    id: number;
+    name: string;
+    userId: number;
+    scopes: string;
+    channelIds: string;
+    lastUsed?: string;
+    expiresAt?: string;
+    createdAt: string;
+}
+
+export interface IServiceAccountCreated extends IServiceAccount {
+    token: string;
+}
+
+
+export interface IDirectoryConfig {
+    id: number;
+    enabled: boolean;
+    url: string;
+    startTls: boolean;
+    bindDn: string;
+    bindPasswordConfigured: boolean;
+    userBaseDn: string;
+    userAttribute: string;
+    displayNameAttribute: string;
+    adminGroupDn: string;
+    autoRegister: boolean;
+    linkByUsername: boolean;
+    caCertificatePem: string;
     createdAt: string;
     updatedAt: string;
 }

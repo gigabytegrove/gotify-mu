@@ -25,10 +25,13 @@ import Sensors from '@mui/icons-material/Sensors';
 import Home from '@mui/icons-material/Home';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
+import ConfirmDialog from '../common/ConfirmDialog';
+import FirstPartyIntegrations from './FirstPartyIntegrations';
 import * as config from '../config';
 import {useStores} from '../stores';
 import {
     IHomeAssistantIntegration,
+    IIntegrationStatus,
     IMQTTIntegration,
     IWebhookRoute,
 } from '../types';
@@ -45,6 +48,9 @@ const Integrations = () => {
     const [webhooks, setWebhooks] = React.useState<IWebhookRoute[]>([]);
     const [mqtt, setMqtt] = React.useState<IMQTTIntegration[]>([]);
     const [homeAssistant, setHomeAssistant] = React.useState<IHomeAssistantIntegration[]>([]);
+    const [statuses, setStatuses] = React.useState<IIntegrationStatus[]>([]);
+    const [revealedWebhook, setRevealedWebhook] = React.useState<IWebhookRoute>();
+    const [regenerateWebhook, setRegenerateWebhook] = React.useState<IWebhookRoute>();
     const [loading, setLoading] = React.useState(true);
     const [webhookEdit, setWebhookEdit] = React.useState<IWebhookRoute | null | undefined>();
     const [mqttEdit, setMqttEdit] = React.useState<IMQTTIntegration | null | undefined>();
@@ -55,14 +61,17 @@ const Integrations = () => {
         setLoading(true);
         try {
             await appStore.refresh();
-            const [webhookResponse, mqttResponse, homeAssistantResponse] = await Promise.all([
-                axios.get<IWebhookRoute[]>(api('integration/webhook')),
-                axios.get<IMQTTIntegration[]>(api('integration/mqtt')),
-                axios.get<IHomeAssistantIntegration[]>(api('integration/home-assistant')),
-            ]);
+            const [webhookResponse, mqttResponse, homeAssistantResponse, statusResponse] =
+                await Promise.all([
+                    axios.get<IWebhookRoute[]>(api('integration/webhook')),
+                    axios.get<IMQTTIntegration[]>(api('integration/mqtt')),
+                    axios.get<IHomeAssistantIntegration[]>(api('integration/home-assistant')),
+                    axios.get<IIntegrationStatus[]>(api('integration/status')),
+                ]);
             setWebhooks(webhookResponse.data);
             setMqtt(mqttResponse.data);
             setHomeAssistant(homeAssistantResponse.data);
+            setStatuses(statusResponse.data);
         } finally {
             setLoading(false);
         }
@@ -73,6 +82,12 @@ const Integrations = () => {
     }, [refresh]);
 
     const channels = appStore.getItems();
+
+    const statusFor = (kind: string, id: number) =>
+        statuses.find((status) => status.kind === kind && status.objectId === id);
+
+    const webhookURL = (path: string) =>
+        path ? api(path.replace(/^\//, '')) : '';
 
     return (
         <DefaultPage
@@ -109,34 +124,17 @@ const Integrations = () => {
                         enabled: item.enabled,
                         details: (
                             <Stack spacing={0.75}>
-                                <Typography variant="body2" sx={{wordBreak: 'break-all'}}>
-                                    {api(item.path.replace(/^\//, ''))}
+                                <Typography variant="body2" color="text.secondary">
+                                    {item.requireSignature ? 'Signed requests required' : 'Secret URL authentication'}
+                                    {item.allowedCidrs ? ' · Source restrictions enabled' : ''}
                                 </Typography>
-                                <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
-                                    <Button
-                                        size="small"
-                                        startIcon={<ContentCopy />}
-                                        onClick={() => {
-                                            void navigator.clipboard.writeText(
-                                                api(item.path.replace(/^\//, ''))
-                                            );
-                                            snackManager.snack('Webhook URL copied');
-                                        }}>
-                                        Copy URL
-                                    </Button>
-                                    <Button
-                                        size="small"
-                                        startIcon={<Refresh />}
-                                        onClick={async () => {
-                                            await axios.post(
-                                                api(`integration/webhook/${item.id}/regenerate`)
-                                            );
-                                            await refresh();
-                                            snackManager.snack('Webhook URL regenerated');
-                                        }}>
-                                        Regenerate URL
-                                    </Button>
-                                </Stack>
+                                <Button
+                                    size="small"
+                                    startIcon={<Refresh />}
+                                    sx={{alignSelf: 'flex-start'}}
+                                    onClick={() => setRegenerateWebhook(item)}>
+                                    Regenerate URL
+                                </Button>
                             </Stack>
                         ),
                         onEdit: () => setWebhookEdit(item),
@@ -171,6 +169,24 @@ const Integrations = () => {
                             item.applicationId
                         )}`,
                         enabled: item.enabled,
+                        details: (
+                            <Stack direction="row" spacing={1} sx={{alignItems: 'center', flexWrap: 'wrap'}}>
+                                <Chip
+                                    size="small"
+                                    label={statusFor('mqtt', item.id)?.state || 'Not connected yet'}
+                                    color={statusFor('mqtt', item.id)?.state === 'connected' ? 'success' : 'default'}
+                                />
+                                <Button
+                                    size="small"
+                                    onClick={async () => {
+                                        await axios.post(api('integration/mqtt/' + item.id + '/test'));
+                                        snackManager.snack('MQTT connection successful');
+                                        await refresh();
+                                    }}>
+                                    Test Connection
+                                </Button>
+                            </Stack>
+                        ),
                         onEdit: () => setMqttEdit(item),
                         onDelete: async () => {
                             await axios.delete(api(`integration/mqtt/${item.id}`));
@@ -204,20 +220,36 @@ const Integrations = () => {
                         )}`,
                         enabled: item.enabled,
                         details: (
-                            <Button
-                                size="small"
-                                onClick={async () => {
-                                    await axios.post(
-                                        api('integration/home-assistant/' + item.id + '/event'),
-                                        {
-                                            eventType: 'gotify_mu_test',
-                                            data: {message: 'Gotify MU connection test'},
-                                        }
-                                    );
-                                    snackManager.snack('Test event sent to Home Assistant');
-                                }}>
-                                Send Test Event
-                            </Button>
+                            <Stack direction="row" spacing={1} sx={{alignItems: 'center', flexWrap: 'wrap'}}>
+                                <Chip
+                                    size="small"
+                                    label={statusFor('home-assistant', item.id)?.state || 'Not connected yet'}
+                                    color={statusFor('home-assistant', item.id)?.state === 'connected' ? 'success' : 'default'}
+                                />
+                                <Button
+                                    size="small"
+                                    onClick={async () => {
+                                        await axios.post(api('integration/home-assistant/' + item.id + '/test'));
+                                        snackManager.snack('Home Assistant connection successful');
+                                        await refresh();
+                                    }}>
+                                    Test Connection
+                                </Button>
+                                <Button
+                                    size="small"
+                                    onClick={async () => {
+                                        await axios.post(
+                                            api('integration/home-assistant/' + item.id + '/event'),
+                                            {
+                                                eventType: 'gotify_mu_test',
+                                                data: {message: 'Gotify MU connection test'},
+                                            }
+                                        );
+                                        snackManager.snack('Test event sent to Home Assistant');
+                                    }}>
+                                    Send Test Event
+                                </Button>
+                            </Stack>
                         ),
                         onEdit: () => setHomeAssistantEdit(item),
                         onDelete: async () => {
@@ -229,13 +261,81 @@ const Integrations = () => {
                 />
             </SurfaceCard>
 
+            <FirstPartyIntegrations channels={channels} />
+
+            {regenerateWebhook && (
+                <ConfirmDialog
+                    title="Regenerate webhook URL?"
+                    text="The current webhook URL will stop working immediately. The new URL is shown once after confirmation."
+                    requireElevated
+                    fClose={() => setRegenerateWebhook(undefined)}
+                    fOnSubmit={() => {
+                        void axios
+                            .post<IWebhookRoute>(
+                                api('integration/webhook/' + regenerateWebhook.id + '/regenerate')
+                            )
+                            .then(async (response) => {
+                                setRegenerateWebhook(undefined);
+                                setRevealedWebhook(response.data);
+                                await refresh();
+                                snackManager.snack('Webhook URL regenerated');
+                            });
+                    }}
+                />
+            )}
+            {revealedWebhook && (
+                <Dialog open onClose={() => setRevealedWebhook(undefined)} fullWidth maxWidth="sm">
+                    <DialogTitle>Save Webhook Credentials</DialogTitle>
+                    <DialogContent>
+                        <Stack spacing={2} sx={{pt: 1}}>
+                            <Alert severity="warning">
+                                These values are shown once. Save them before closing this window.
+                            </Alert>
+                            {revealedWebhook.path && (
+                                <TextField
+                                    label="Webhook URL"
+                                    value={webhookURL(revealedWebhook.path)}
+                                    slotProps={{input: {readOnly: true}}}
+                                    fullWidth
+                                />
+                            )}
+                            {revealedWebhook.signingSecret && (
+                                <TextField
+                                    label="Signing secret"
+                                    value={revealedWebhook.signingSecret}
+                                    slotProps={{input: {readOnly: true}}}
+                                    fullWidth
+                                />
+                            )}
+                            {revealedWebhook.path && (
+                                <Button
+                                    startIcon={<ContentCopy />}
+                                    onClick={() => {
+                                        void navigator.clipboard.writeText(webhookURL(revealedWebhook.path));
+                                        snackManager.snack('Webhook URL copied');
+                                    }}>
+                                    Copy Webhook URL
+                                </Button>
+                            )}
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button variant="contained" onClick={() => setRevealedWebhook(undefined)}>
+                            I Saved These Values
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            )}
             {webhookEdit !== undefined && (
                 <WebhookDialog
                     item={webhookEdit}
                     channels={channels}
                     onClose={() => setWebhookEdit(undefined)}
-                    onSaved={async () => {
+                    onSaved={async (saved) => {
                         setWebhookEdit(undefined);
+                        if (saved.path || saved.signingSecret) {
+                            setRevealedWebhook(saved);
+                        }
                         await refresh();
                     }}
                 />
@@ -370,7 +470,7 @@ const WebhookDialog = ({
     item: IWebhookRoute | null;
     channels: Array<{id: number; name: string}>;
     onClose: VoidFunction;
-    onSaved: () => Promise<void>;
+    onSaved: (saved: IWebhookRoute) => Promise<void>;
 }) => {
     const [name, setName] = React.useState(item?.name || '');
     const [applicationId, setApplicationId] = React.useState(item?.applicationId || 0);
@@ -380,6 +480,10 @@ const WebhookDialog = ({
     const [priorityField, setPriorityField] = React.useState(item?.priorityField || 'priority');
     const [defaultTitle, setDefaultTitle] = React.useState(item?.defaultTitle || '');
     const [defaultPriority, setDefaultPriority] = React.useState(item?.defaultPriority || 0);
+    const [allowedCidrs, setAllowedCidrs] = React.useState(item?.allowedCidrs || '');
+    const [requireSignature, setRequireSignature] = React.useState(item?.requireSignature || false);
+    const [signingSecret, setSigningSecret] = React.useState('');
+    const [maxAgeSeconds, setMaxAgeSeconds] = React.useState(item?.maxAgeSeconds || 300);
     const [saving, setSaving] = React.useState(false);
 
     const save = async () => {
@@ -394,13 +498,15 @@ const WebhookDialog = ({
                 priorityField,
                 defaultTitle,
                 defaultPriority,
+                allowedCidrs,
+                requireSignature,
+                signingSecret,
+                maxAgeSeconds,
             };
-            if (item) {
-                await axios.put(api(`integration/webhook/${item.id}`), payload);
-            } else {
-                await axios.post(api('integration/webhook'), payload);
-            }
-            await onSaved();
+            const response = item
+                ? await axios.put<IWebhookRoute>(api(`integration/webhook/${item.id}`), payload)
+                : await axios.post<IWebhookRoute>(api('integration/webhook'), payload);
+            await onSaved(response.data);
         } finally {
             setSaving(false);
         }
@@ -441,6 +547,44 @@ const WebhookDialog = ({
                         value={defaultPriority}
                         onChange={(e) => setDefaultPriority(Number(e.target.value))}
                     />
+                    <TextField
+                        label="Allowed source networks"
+                        value={allowedCidrs}
+                        onChange={(e) => setAllowedCidrs(e.target.value)}
+                        helperText="Optional comma-separated IP addresses or CIDR ranges."
+                    />
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={requireSignature}
+                                onChange={(e) => setRequireSignature(e.target.checked)}
+                            />
+                        }
+                        label="Require signed requests"
+                    />
+                    {requireSignature && (
+                        <>
+                            <TextField
+                                label={item?.signingSecretConfigured ? 'New signing secret' : 'Signing secret'}
+                                type="password"
+                                value={signingSecret}
+                                onChange={(e) => setSigningSecret(e.target.value)}
+                                helperText={
+                                    item?.signingSecretConfigured
+                                        ? 'Leave blank to keep the existing signing secret.'
+                                        : 'Leave blank to generate a secure signing secret.'
+                                }
+                            />
+                            <TextField
+                                label="Replay window"
+                                type="number"
+                                value={maxAgeSeconds}
+                                onChange={(e) => setMaxAgeSeconds(Number(e.target.value))}
+                                helperText="Maximum request age in seconds."
+                                slotProps={{htmlInput: {min: 30, max: 3600}}}
+                            />
+                        </>
+                    )}
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
                         label="Enabled"
