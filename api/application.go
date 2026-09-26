@@ -134,6 +134,20 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 	}
 }
 
+// GetCurrentApplication returns the application identified by the supplied
+// application token. The token itself is intentionally omitted from the response.
+func (a *ApplicationAPI) GetCurrentApplication(ctx *gin.Context) {
+	app := auth.GetApplication(ctx)
+	if app == nil {
+		ctx.AbortWithError(http.StatusUnauthorized, errors.New("application token required"))
+		return
+	}
+
+	result := *app
+	result.Token = ""
+	ctx.JSON(http.StatusOK, withResolvedImage(&result))
+}
+
 // GetApplications returns all applications a user has.
 // swagger:operation GET /application application getApps
 //
@@ -158,20 +172,6 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 //	    description: Forbidden
 //	    schema:
 //	        $ref: "#/definitions/Error"
-// GetCurrentApplication returns the application identified by the supplied
-// application token. The token itself is intentionally omitted from the response.
-func (a *ApplicationAPI) GetCurrentApplication(ctx *gin.Context) {
-	app := auth.GetApplication(ctx)
-	if app == nil {
-		ctx.AbortWithError(http.StatusUnauthorized, errors.New("application token required"))
-		return
-	}
-
-	result := *app
-	result.Token = ""
-	ctx.JSON(http.StatusOK, withResolvedImage(&result))
-}
-
 func (a *ApplicationAPI) GetApplications(ctx *gin.Context) {
 	userID := auth.GetUserID(ctx)
 	apps, err := a.DB.GetAccessibleApplicationsByUser(userID)
