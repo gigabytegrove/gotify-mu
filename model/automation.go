@@ -100,6 +100,7 @@ type HomeAssistantIntegrationView struct {
 	Enabled         bool      `json:"enabled"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
+	Status          *IntegrationStatus `gorm:"-" json:"status,omitempty"`
 }
 
 // ScheduledNotification is a recurring or one-time Channel notification.
