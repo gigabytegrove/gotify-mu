@@ -13,5 +13,7 @@ type AuditEvent struct {
 	TargetID  string    `gorm:"type:varchar(180)" json:"targetId,omitempty"`
 	Details   string    `gorm:"type:text" json:"details,omitempty"`
 	IPAddress string    `gorm:"type:varchar(180)" json:"ipAddress,omitempty"`
+	StatusCode int       `gorm:"index" json:"statusCode"`
+	Success    bool      `gorm:"index" json:"success"`
 	CreatedAt time.Time `gorm:"index" json:"createdAt"`
 }
