@@ -120,6 +120,9 @@ const Messages = observer(() => {
                 void messagesStore.setAcknowledged(message, !Boolean(message.acknowledged))
             }
             acknowledged={Boolean(message.acknowledged)}
+            acknowledgedByAnyone={Boolean(message.acknowledgedByAnyone)}
+            acknowledgedByName={message.acknowledgedByName}
+            acknowledgedCount={message.acknowledgedCount || 0}
             senderName={message.senderName}
             onExpand={(expanded) => (expandedState.current[message.id] = expanded)}
             title={message.title}
