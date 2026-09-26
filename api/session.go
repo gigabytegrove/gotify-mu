@@ -29,6 +29,7 @@ type SessionAPI struct {
 	NotifyDeleted    func(uint, string)
 	SecureCookie     bool
 	LocalAuthEnabled bool
+	Directory        auth.DirectoryAuthenticator
 	Policy           func() *model.SecurityPolicy
 	LoginLimiter     *security.Limiter
 }
@@ -66,14 +67,15 @@ type SessionAPI struct {
 //	    schema:
 //	        $ref: "#/definitions/Error"
 func (a *SessionAPI) Login(ctx *gin.Context) {
-	if !a.LocalAuthEnabled {
-		ctx.AbortWithError(403, errors.New("local authentication is disabled"))
+	directoryEnabled := a.Directory != nil && a.Directory.Enabled()
+	if !a.LocalAuthEnabled && !directoryEnabled {
+		ctx.AbortWithError(403, errors.New("password and directory sign-in are disabled"))
 		return
 	}
 
 	name, pass, ok := ctx.Request.BasicAuth()
 	if !ok {
-		ctx.AbortWithError(401, errors.New("basic auth required"))
+		ctx.AbortWithError(401, errors.New("credentials required"))
 		return
 	}
 
@@ -83,12 +85,27 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusTooManyRequests, errors.New("too many authentication attempts"))
 		return
 	}
-	user, err := a.DB.GetUserByName(name)
-	if err != nil {
-		ctx.AbortWithError(500, err)
-		return
+
+	var user *model.User
+	if a.LocalAuthEnabled {
+		local, err := a.DB.GetUserByName(name)
+		if err != nil {
+			ctx.AbortWithError(500, err)
+			return
+		}
+		if local != nil && password.ComparePassword(local.Pass, []byte(pass)) {
+			user = local
+		}
 	}
-	if user == nil || !password.ComparePassword(user.Pass, []byte(pass)) {
+	if user == nil && directoryEnabled {
+		directoryUser, err := a.Directory.Authenticate(name, pass)
+		if err != nil {
+			ctx.AbortWithError(503, errors.New("directory authentication is temporarily unavailable"))
+			return
+		}
+		user = directoryUser
+	}
+	if user == nil {
 		ctx.AbortWithError(401, errors.New("invalid credentials"))
 		return
 	}
