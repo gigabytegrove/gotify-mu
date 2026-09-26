@@ -2,6 +2,7 @@ package database
 
 import (
 	"crypto/sha256"
+	"errors"
 	"encoding/hex"
 	"time"
 
@@ -301,4 +302,29 @@ func (d *GormDatabase) encryptStoredIntegrationSecrets() error {
 		if err := d.DB.Model(item).Update("token", encrypted).Error; err != nil { return err }
 	}
 	return nil
+}
+
+
+func (d *GormDatabase) TryAcquireAutomationLease(name, owner string, now time.Time, ttl time.Duration) (bool, error) {
+	until := now.Add(ttl)
+	result := d.DB.Model(&model.AutomationLease{}).
+		Where("name = ? AND (lease_until < ? OR owner = ?)", name, now, owner).
+		Updates(map[string]any{"owner": owner, "lease_until": until, "updated_at": now})
+	if result.Error != nil { return false, result.Error }
+	if result.RowsAffected > 0 { return true, nil }
+
+	item := &model.AutomationLease{Name:name, Owner:owner, LeaseUntil:until, UpdatedAt:now}
+	if err := d.DB.Create(item).Error; err != nil {
+		if errors.Is(err, gorm.ErrDuplicatedKey) {
+			return false, nil
+		}
+		return false, err
+	}
+	return true, nil
+}
+
+func (d *GormDatabase) ReleaseAutomationLease(name, owner string, now time.Time) error {
+	return d.DB.Model(&model.AutomationLease{}).
+		Where("name = ? AND owner = ?", name, owner).
+		Updates(map[string]any{"lease_until": now, "updated_at": now}).Error
 }
