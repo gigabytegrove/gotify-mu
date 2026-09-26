@@ -46,6 +46,7 @@ const Integrations = () => {
     const [mqtt, setMqtt] = React.useState<IMQTTIntegration[]>([]);
     const [homeAssistant, setHomeAssistant] = React.useState<IHomeAssistantIntegration[]>([]);
     const [loading, setLoading] = React.useState(true);
+    const [webhookSigningSecret, setWebhookSigningSecret] = React.useState<string>();
     const [webhookEdit, setWebhookEdit] = React.useState<IWebhookRoute | null | undefined>();
     const [mqttEdit, setMqttEdit] = React.useState<IMQTTIntegration | null | undefined>();
     const [homeAssistantEdit, setHomeAssistantEdit] =
@@ -88,6 +89,24 @@ const Integrations = () => {
                 or access token blank while editing to keep the current value.
             </Alert>
 
+            {webhookSigningSecret && (
+                <Alert
+                    severity="success"
+                    action={
+                        <Button
+                            size="small"
+                            onClick={() => {
+                                void navigator.clipboard.writeText(webhookSigningSecret);
+                                snackManager.snack('Signing secret copied');
+                            }}>
+                            Copy
+                        </Button>
+                    }
+                    onClose={() => setWebhookSigningSecret(undefined)}>
+                    Save this webhook signing secret now. It will not be shown again.
+                </Alert>
+            )}
+
             <SurfaceCard
                 title="Webhooks"
                 subtitle="Create inbound URLs that route JSON or plain text into a Channel."
@@ -112,6 +131,14 @@ const Integrations = () => {
                                 <Typography variant="body2" sx={{wordBreak: 'break-all'}}>
                                     {api(item.path.replace(/^\//, ''))}
                                 </Typography>
+                                <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
+                                    {item.requireSignature && (
+                                        <Chip size="small" color="success" variant="outlined" label="Signed requests required" />
+                                    )}
+                                    {item.allowedCidrs && (
+                                        <Chip size="small" variant="outlined" label="Network restricted" />
+                                    )}
+                                </Stack>
                                 <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
                                     <Button
                                         size="small"
@@ -136,6 +163,24 @@ const Integrations = () => {
                                         }}>
                                         Regenerate URL
                                     </Button>
+                                    {item.requireSignature && (
+                                        <Button
+                                            size="small"
+                                            onClick={async () => {
+                                                const response = await axios.post<{
+                                                    webhook: IWebhookRoute;
+                                                    signingSecret: string;
+                                                }>(
+                                                    api(
+                                                        `integration/webhook/${item.id}/signing-secret/regenerate`
+                                                    )
+                                                );
+                                                setWebhookSigningSecret(response.data.signingSecret);
+                                                await refresh();
+                                            }}>
+                                            Rotate Signing Secret
+                                        </Button>
+                                    )}
                                 </Stack>
                             </Stack>
                         ),
@@ -171,6 +216,30 @@ const Integrations = () => {
                             item.applicationId
                         )}`,
                         enabled: item.enabled,
+                        details: (
+                            <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap', alignItems: 'center'}}>
+                                <Chip
+                                    size="small"
+                                    variant="outlined"
+                                    color={item.state === 'connected' ? 'success' : item.state === 'reconnecting' ? 'warning' : 'default'}
+                                    label={item.state || 'Starting'}
+                                />
+                                {item.lastMessageAt && (
+                                    <Typography variant="caption" color="text.secondary">
+                                        Last message {new Date(item.lastMessageAt).toLocaleString()}
+                                    </Typography>
+                                )}
+                                <Button
+                                    size="small"
+                                    onClick={async () => {
+                                        await axios.post(api(`integration/mqtt/${item.id}/test`));
+                                        snackManager.snack('MQTT connection successful');
+                                        await refresh();
+                                    }}>
+                                    Test Connection
+                                </Button>
+                            </Stack>
+                        ),
                         onEdit: () => setMqttEdit(item),
                         onDelete: async () => {
                             await axios.delete(api(`integration/mqtt/${item.id}`));
@@ -204,8 +273,20 @@ const Integrations = () => {
                         )}`,
                         enabled: item.enabled,
                         details: (
-                            <Button
-                                size="small"
+                            <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap', alignItems: 'center'}}>
+                                <Chip
+                                    size="small"
+                                    variant="outlined"
+                                    color={item.state === 'connected' ? 'success' : item.state === 'reconnecting' ? 'warning' : 'default'}
+                                    label={item.state || 'Starting'}
+                                />
+                                {item.lastMessageAt && (
+                                    <Typography variant="caption" color="text.secondary">
+                                        Last event {new Date(item.lastMessageAt).toLocaleString()}
+                                    </Typography>
+                                )}
+                                <Button
+                                    size="small"
                                 onClick={async () => {
                                     await axios.post(
                                         api('integration/home-assistant/' + item.id + '/event'),
@@ -217,7 +298,8 @@ const Integrations = () => {
                                     snackManager.snack('Test event sent to Home Assistant');
                                 }}>
                                 Send Test Event
-                            </Button>
+                                </Button>
+                            </Stack>
                         ),
                         onEdit: () => setHomeAssistantEdit(item),
                         onDelete: async () => {
@@ -234,8 +316,9 @@ const Integrations = () => {
                     item={webhookEdit}
                     channels={channels}
                     onClose={() => setWebhookEdit(undefined)}
-                    onSaved={async () => {
+                    onSaved={async (signingSecret) => {
                         setWebhookEdit(undefined);
+                        if (signingSecret) setWebhookSigningSecret(signingSecret);
                         await refresh();
                     }}
                 />
@@ -370,7 +453,7 @@ const WebhookDialog = ({
     item: IWebhookRoute | null;
     channels: Array<{id: number; name: string}>;
     onClose: VoidFunction;
-    onSaved: () => Promise<void>;
+    onSaved: (signingSecret?: string) => Promise<void>;
 }) => {
     const [name, setName] = React.useState(item?.name || '');
     const [applicationId, setApplicationId] = React.useState(item?.applicationId || 0);
@@ -380,6 +463,9 @@ const WebhookDialog = ({
     const [priorityField, setPriorityField] = React.useState(item?.priorityField || 'priority');
     const [defaultTitle, setDefaultTitle] = React.useState(item?.defaultTitle || '');
     const [defaultPriority, setDefaultPriority] = React.useState(item?.defaultPriority || 0);
+    const [requireSignature, setRequireSignature] = React.useState(item?.requireSignature ?? false);
+    const [allowedCidrs, setAllowedCidrs] = React.useState(item?.allowedCidrs || '');
+    const [replayWindowSeconds, setReplayWindowSeconds] = React.useState(item?.replayWindowSeconds || 300);
     const [saving, setSaving] = React.useState(false);
 
     const save = async () => {
@@ -394,13 +480,20 @@ const WebhookDialog = ({
                 priorityField,
                 defaultTitle,
                 defaultPriority,
+                requireSignature,
+                allowedCidrs,
+                replayWindowSeconds,
             };
-            if (item) {
-                await axios.put(api(`integration/webhook/${item.id}`), payload);
-            } else {
-                await axios.post(api('integration/webhook'), payload);
-            }
-            await onSaved();
+            const response = item
+                ? await axios.put<{webhook: IWebhookRoute; signingSecret?: string}>(
+                      api(`integration/webhook/${item.id}`),
+                      payload
+                  )
+                : await axios.post<{webhook: IWebhookRoute; signingSecret?: string}>(
+                      api('integration/webhook'),
+                      payload
+                  );
+            await onSaved(response.data.signingSecret);
         } finally {
             setSaving(false);
         }
@@ -441,6 +534,38 @@ const WebhookDialog = ({
                         value={defaultPriority}
                         onChange={(e) => setDefaultPriority(Number(e.target.value))}
                     />
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={requireSignature}
+                                onChange={(e) => setRequireSignature(e.target.checked)}
+                            />
+                        }
+                        label="Require signed requests"
+                    />
+                    {requireSignature && (
+                        <>
+                            <TextField
+                                label="Allowed networks"
+                                value={allowedCidrs}
+                                onChange={(e) => setAllowedCidrs(e.target.value)}
+                                placeholder="192.168.1.0/24, 10.0.0.0/8"
+                                helperText="Optional comma-separated CIDR allowlist."
+                            />
+                            <TextField
+                                label="Signature time window"
+                                type="number"
+                                value={replayWindowSeconds}
+                                onChange={(e) => setReplayWindowSeconds(Number(e.target.value))}
+                                helperText="Maximum age of signed requests in seconds."
+                            />
+                            {item?.signingSecretConfigured && (
+                                <Typography variant="caption" color="text.secondary">
+                                    A signing secret is already configured. Rotating it immediately invalidates the previous secret.
+                                </Typography>
+                            )}
+                        </>
+                    )}
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
                         label="Enabled"
