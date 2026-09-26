@@ -75,7 +75,10 @@ func (s *UserSuite) Test_GetCurrentUser() {
 	s.a.GetCurrentUser(s.ctx)
 
 	assert.Equal(s.T(), 200, s.recorder.Code)
-	test.BodyEquals(s.T(), externalOf(user), s.recorder)
+	test.BodyEquals(s.T(), &model.CurrentUserExternal{
+		ID: user.ID, Name: user.Name, Admin: user.Admin, CreatedAt: user.CreatedAt,
+		MFAEnabled: false, MFARequired: false, AuthProvider: "local", PasskeyCount: 0,
+	}, s.recorder)
 }
 
 func (s *UserSuite) Test_GetUserByID() {
