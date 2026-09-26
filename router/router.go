@@ -3,6 +3,7 @@ package router
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -154,7 +155,6 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		DB:            db,
 		ImageDir:      conf.UploadedImagesDir,
 		NotifyDeleted: streamHandler.NotifyDeletedClient,
-		ConnectedClients: streamHandler.ConnectedClientCount,
 	}
 	applicationHandler := api.ApplicationAPI{
 		DB:       db,
@@ -181,6 +181,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		DatabaseFile: operations.DatabaseFile(conf.Database.Dialect, conf.Database.Connection),
 		VersionInfo: vInfo,
 		NotifyDeleted: streamHandler.NotifyDeletedClient,
+		ConnectedClients: streamHandler.ConnectedClientCount,
 	}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
