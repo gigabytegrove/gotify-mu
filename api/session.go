@@ -171,6 +171,7 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		Name:          user.Name,
 		DisplayName:   user.DisplayName,
 		Admin:         user.Admin,
+		DirectoryManaged: user.DirectoryManaged,
 		CreatedAt:     user.CreatedAt,
 		ClientID:      client.ID,
 		ElevatedUntil: client.ElevatedUntil,
