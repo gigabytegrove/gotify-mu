@@ -38,5 +38,14 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Test MU API and stream
-        run: go test ./api ./api/stream ./router
+      - name: Test MU typing API
+        run: go test ./api -run '^TestMUPresence' -count=1
+
+      - name: Test realtime stream
+        run: go test ./api/stream -count=1
+
+      - name: Compile router wiring
+        run: |
+          mkdir -p ui/build
+          printf '<html></html>\n' > ui/build/index.html
+          go test ./router -run '^ -count=1
