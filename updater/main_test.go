@@ -1,6 +1,8 @@
 package main
 
 import (
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -123,4 +125,35 @@ func containsAdjacent(values []string, first string, rest ...string) bool {
 		}
 	}
 	return false
+}
+
+
+func TestParseExpectedSHA256(t *testing.T) {
+	content := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa  gotify-mu-v0.5.0-source.zip\n"
+	got, err := parseExpectedSHA256(content, "gotify-mu-v0.5.0-source.zip")
+	if err != nil { t.Fatal(err) }
+	if got != "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" {
+		t.Fatalf("unexpected checksum %q", got)
+	}
+}
+
+func TestVerifyFileSHA256(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "source.zip")
+	if err := os.WriteFile(path, []byte("hello"), 0o600); err != nil { t.Fatal(err) }
+	const expected = "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824"
+	if err := verifyFileSHA256(path, expected); err != nil { t.Fatal(err) }
+	if err := verifyFileSHA256(path, "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"); err == nil {
+		t.Fatal("expected checksum mismatch")
+	}
+}
+
+func TestRedactDockerArgs(t *testing.T) {
+	args := []string{"create", "--env", "PASSWORD=secret", "--env", "SAFE=value", "--name", "gotify-mu"}
+	got := redactDockerArgs(args)
+	if slices.Contains(got, "PASSWORD=secret") || slices.Contains(got, "SAFE=value") {
+		t.Fatalf("environment values leaked: %v", got)
+	}
+	if !slices.Contains(got, "PASSWORD=[masked]") || !slices.Contains(got, "SAFE=[masked]") {
+		t.Fatalf("expected masked environment values: %v", got)
+	}
 }
