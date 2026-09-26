@@ -2,6 +2,34 @@
 
 All notable Gotify MU changes are documented here.
 
+## [1.0.0] - 2026-09-26
+
+First stable Gotify MU release, promoting the completed multi-user platform and the final 1.0 interoperability work.
+
+### Home Assistant
+
+- Adds two supported Home Assistant connection methods: Long-Lived Access Token and native `gotify-mu-ha` pairing.
+- Adds one-time 15-minute pairing codes stored only as hashes and invalidated after successful pairing.
+- Preserves an active native bridge while generating a repair code, so repair does not tear down a working connection before replacement succeeds.
+- Adds authenticated native unpair/revoke and explicit repair-required health when bridge credentials are rejected.
+- Encrypts native bridge secrets and Home Assistant webhook URLs at rest.
+- Adds authenticated bidirectional Home Assistant event delivery without requiring a Home Assistant Long-Lived Access Token for native pairing.
+
+### Chat and MU-aware clients
+
+- Adds authenticated `/api/mu/v1/capabilities` discovery for MU-aware clients.
+- Adds a separate `/api/mu/v1/events` WebSocket for ephemeral MU events while preserving the stock Gotify `/stream` contract.
+- Adds Chat typing presence for member-posting Channels.
+- Adds mention candidates and targeted `@username` notification delivery, including delivery to muted mentioned members.
+- Prevents Chat senders from receiving a duplicate notification for their own message.
+- Keeps the existing Gotify application/client token and notification compatibility paths intact.
+
+### Release quality
+
+- Retains the v0.5 security, automation, collaboration, connector, plugin, operations, updater, SBOM, checksum, provenance, and vulnerability-gate work as the 1.0 platform baseline.
+- Adds focused Chat/mobile CI for typing presence, mentions, sender suppression, realtime stream compilation, and delivery-policy behavior.
+- Publishes stable semantic versions such as `1.0.0` as normal GitHub releases while keeping `-rc` versions marked prerelease.
+
 ## [0.5.0] - 2026-09-26
 
 Security, reliability, automation, collaboration, connector, plugin, and operations completion release.
