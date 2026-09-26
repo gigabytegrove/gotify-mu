@@ -4,11 +4,10 @@ This document is the maintained deployment, validation, update, backup, and roll
 
 ## Release state
 
-- **Current published baseline:** v0.2.2
-- **Current preview candidate:** v0.5.0 on PR #22
-- v0.5.0 is not the published baseline until the complete validation gate passes and the preview is accepted, merged, tagged, and released.
+- **Current published release:** v0.5.0 (pre-release)
+- **Previous rollback baseline:** v0.2.2
 
-The release candidate must be validated at the exact commit that is merged. Documentation-only changes are part of the release candidate and must pass the same repository gate.
+The v0.5.0 release commit is validated through the repository gate before publication. Documentation-only changes are part of the release candidate and pass the same gate.
 
 ## Supported deployment models
 
