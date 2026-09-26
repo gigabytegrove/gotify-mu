@@ -48,7 +48,6 @@ type ApplicationNotificationParams struct {
 	Enabled bool `json:"enabled"`
 }
 
-
 type ApplicationOwnerParams struct {
 	UserID uint `json:"userId" binding:"required"`
 }

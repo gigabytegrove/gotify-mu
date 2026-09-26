@@ -1,8 +1,6 @@
 package model
 
-import (
-	"time"
-)
+import "time"
 
 // Message holds information about a message.
 type Message struct {
@@ -13,8 +11,8 @@ type Message struct {
 	Priority      int
 	Extras        []byte
 	Date          time.Time
-	SenderUserID  uint `gorm:"index"`
-	SenderName    string `gorm:"type:text"`
+	SenderUserID uint   `gorm:"index"`
+	SenderName   string `gorm:"type:text"`
 }
 
 // MessageExternal Model
