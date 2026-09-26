@@ -76,6 +76,9 @@ func (d *GormDatabase) GetMessageByID(id uint) (*model.Message, error) {
 
 // CreateMessage creates a message.
 func (d *GormDatabase) CreateMessage(message *model.Message) error {
+	if message.DeduplicationKey == "" {
+		return d.DB.Omit("DeduplicationKey").Create(message).Error
+	}
 	return d.DB.Create(message).Error
 }
 
@@ -83,7 +86,7 @@ func (d *GormDatabase) CreateMessage(message *model.Message) error {
 // It returns false with the existing message populated when the same key was already stored.
 func (d *GormDatabase) CreateMessageOnce(message *model.Message) (bool, error) {
 	if message.DeduplicationKey == "" {
-		return true, d.DB.Create(message).Error
+		return true, d.CreateMessage(message)
 	}
 	err := d.DB.Create(message).Error
 	if err == nil { return true, nil }
