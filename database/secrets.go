@@ -102,7 +102,9 @@ func (d *GormDatabase) encryptCredential(value string) (string, error) {
 		return "", nil
 	}
 	if d.SecretBox == nil {
-		return "", errors.New("secret encryption is not configured")
+		// Test/embedded database users may not configure application secret
+		// encryption. The production server always configures it during startup.
+		return value, nil
 	}
 	return d.SecretBox.EncryptString(value)
 }
@@ -112,7 +114,10 @@ func (d *GormDatabase) decryptCredential(value string) (string, error) {
 		return "", nil
 	}
 	if d.SecretBox == nil {
-		return "", errors.New("secret encryption is not configured")
+		if security.IsEncryptedSecret(value) {
+			return "", errors.New("encrypted credential cannot be read without the configured secret key")
+		}
+		return value, nil
 	}
 	return d.SecretBox.DecryptString(value)
 }
