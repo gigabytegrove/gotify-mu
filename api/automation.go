@@ -28,6 +28,7 @@ type AutomationEngine interface {
 	Publish(applicationID uint, title, message string, priority int) (*model.Message, error)
 	ReloadIntegrations()
 	SendHomeAssistantEvent(id uint, eventType string, data map[string]any) error
+	ReceiveHomeAssistantEvent(id uint, eventType string, data map[string]any) (bool, error)
 	TestMQTTConnection(id uint) error
 }
 
@@ -1068,9 +1069,12 @@ func mqttView(item *model.MQTTIntegration) model.MQTTIntegrationView {
 }
 
 func homeAssistantView(item *model.HomeAssistantIntegration) model.HomeAssistantIntegrationView {
+	mode := normalizeHomeAssistantMode(item.ConnectionMode)
+	if mode == "" { mode = "token" }
 	return model.HomeAssistantIntegrationView{
-		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,BaseURL:item.BaseURL,
-		TokenConfigured:item.Token!="",EventType:item.EventType,EntityIDs:item.EntityIDs,DataField:item.DataField,DataValue:item.DataValue,Enabled:item.Enabled,
+		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,ConnectionMode:mode,BaseURL:item.BaseURL,
+		TokenConfigured:item.Token!="",NativePaired:item.NativeWebhookURL!="" && item.NativeSecret!="",PairingExpiresAt:item.PairingExpiresAt,
+		EventType:item.EventType,EntityIDs:item.EntityIDs,DataField:item.DataField,DataValue:item.DataValue,Enabled:item.Enabled,
 		Status:item.Status,LastConnectedAt:item.LastConnectedAt,LastEventAt:item.LastEventAt,
 		LastError:item.LastError,LastErrorAt:item.LastErrorAt,ReconnectCount:item.ReconnectCount,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
