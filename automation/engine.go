@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -32,6 +34,7 @@ type Notifier interface {
 type Database interface {
 	CreateMessage(message *model.Message) error
 	GetMessageByID(id uint) (*model.Message, error)
+	GetMessageByAutomationKey(key string) (*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
 
@@ -42,21 +45,26 @@ type Database interface {
 	DeleteDigestItems(userID uint) error
 	GetDueDigestPolicies(now time.Time) ([]*model.DigestPolicy, error)
 	SaveDigestPolicy(item *model.DigestPolicy) error
+	ClaimDigestPolicy(id uint, owner string, now, until time.Time) (bool, error)
 
 	GetScheduledNotifications() ([]*model.ScheduledNotification, error)
 	GetDueScheduledNotifications(now time.Time) ([]*model.ScheduledNotification, error)
 	SaveScheduledNotification(item *model.ScheduledNotification) error
+	ClaimScheduledNotification(id uint, owner string, now, until time.Time) (bool, error)
 
 	GetEscalationRulesForMessage(applicationID uint, priority int) ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
 	QueueEscalation(item *model.EscalationState) error
 	GetDueEscalations(now time.Time) ([]*model.EscalationState, error)
 	SaveEscalationState(item *model.EscalationState) error
+	ClaimEscalation(id uint, owner string, now, until time.Time) (bool, error)
 	IsMessageAcknowledged(messageID uint) (bool, error)
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
 	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
+	AcquireAutomationLease(name, owner string, now, until time.Time) (bool, error)
+	ReleaseAutomationLease(name, owner string) error
 }
 
 // Engine runs scheduled work and persistent native integrations.
@@ -72,6 +80,8 @@ type Engine struct {
 	integrationCancels []context.CancelFunc
 	integrationWG      sync.WaitGroup
 	reload             chan struct{}
+	instanceID         string
+	integrationLeader  bool
 }
 
 func New(db Database, notifier Notifier) *Engine {
@@ -82,6 +92,7 @@ func New(db Database, notifier Notifier) *Engine {
 		ctx: ctx,
 		cancel: cancel,
 		reload: make(chan struct{}, 1),
+		instanceID: newInstanceID(),
 	}
 	e.wg.Add(2)
 	go e.schedulerLoop()
@@ -92,6 +103,11 @@ func New(db Database, notifier Notifier) *Engine {
 func (e *Engine) Close() {
 	e.cancel()
 	e.stopIntegrations()
+	if e.integrationLeader {
+		if err := e.db.ReleaseAutomationLease("native-integrations", e.instanceID); err != nil {
+			log.Warn().Err(err).Msg("Could not release native integration lease")
+		}
+	}
 	e.wg.Wait()
 }
 
@@ -136,7 +152,24 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 	if msg.Date.IsZero() {
 		msg.Date = time.Now()
 	}
+	if msg.AutomationKey != nil && strings.TrimSpace(*msg.AutomationKey) != "" {
+		existing, err := e.db.GetMessageByAutomationKey(*msg.AutomationKey)
+		if err != nil {
+			return nil, err
+		}
+		if existing != nil {
+			msg.ID = existing.ID
+			return externalMessage(existing), nil
+		}
+	}
 	if err := e.db.CreateMessage(msg); err != nil {
+		if msg.AutomationKey != nil && strings.TrimSpace(*msg.AutomationKey) != "" {
+			existing, lookupErr := e.db.GetMessageByAutomationKey(*msg.AutomationKey)
+			if lookupErr == nil && existing != nil {
+				msg.ID = existing.ID
+				return externalMessage(existing), nil
+			}
+		}
 		return nil, err
 	}
 	recipients, err := e.db.GetApplicationRecipientUserIDs(msg.ApplicationID)
@@ -255,8 +288,32 @@ func (e *Engine) runSchedules(now time.Time) {
 		return
 	}
 	for _, item := range items {
-		if _, err := e.Publish(item.ApplicationID, item.Title, item.Message, item.Priority); err != nil {
+		claimed, err := e.db.ClaimScheduledNotification(item.ID, e.instanceID, now, now.Add(2*time.Minute))
+		if err != nil {
+			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not claim scheduled notification")
+			continue
+		}
+		if !claimed {
+			continue
+		}
+		dueAt := now
+		if item.NextRunAt != nil {
+			dueAt = *item.NextRunAt
+		}
+		key := fmt.Sprintf("schedule:%d:%d", item.ID, dueAt.UTC().UnixNano())
+		msg := &model.Message{
+			ApplicationID: item.ApplicationID,
+			Title: item.Title,
+			Message: item.Message,
+			Priority: item.Priority,
+			Date: now,
+			AutomationKey: &key,
+		}
+		if _, err := e.storeAndDeliver(msg, true); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
+			item.ClaimOwner = ""
+			item.ClaimUntil = nil
+			_ = e.db.SaveScheduledNotification(item)
 			continue
 		}
 		runAt := now
@@ -267,6 +324,8 @@ func (e *Engine) runSchedules(now time.Time) {
 		} else {
 			item.NextRunAt = NextScheduleRun(item, now.Add(time.Second))
 		}
+		item.ClaimOwner = ""
+		item.ClaimUntil = nil
 		if err := e.db.SaveScheduledNotification(item); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not update schedule")
 		}
@@ -324,11 +383,24 @@ func (e *Engine) runDigests(now time.Time) {
 		return
 	}
 	for _, policy := range policies {
+		claimed, err := e.db.ClaimDigestPolicy(policy.ID, e.instanceID, now, now.Add(2*time.Minute))
+		if err != nil {
+			log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not claim digest")
+			continue
+		}
+		if !claimed {
+			continue
+		}
 		items, err := e.db.GetDigestItems(policy.UserID)
 		if err != nil {
 			log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not load digest items")
+			policy.ClaimOwner = ""
+			policy.ClaimUntil = nil
+			_ = e.db.SaveDigestPolicy(policy)
 			continue
 		}
+
+		var summary *model.MessageExternal
 		if len(items) > 0 {
 			lines := make([]string, 0, len(items))
 			highest := 0
@@ -346,18 +418,16 @@ func (e *Engine) runDigests(now time.Time) {
 				lines = append(lines, "• "+line)
 			}
 			last := items[len(items)-1]
-			e.notifier.Notify(policy.UserID, &model.MessageExternal{
-				ID: last.MessageID,
+			summary = &model.MessageExternal{
+				ID: 0,
 				ApplicationID: last.ApplicationID,
 				Title: fmt.Sprintf("%d notification digest", len(items)),
 				Message: strings.Join(lines, "\n"),
 				Priority: &highest,
 				Date: now,
-			})
-			if err := e.db.DeleteDigestItems(policy.UserID); err != nil {
-				log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not clear digest")
 			}
 		}
+
 		lastSent := now
 		policy.LastSentAt = &lastSent
 		interval := policy.IntervalMinutes
@@ -366,8 +436,23 @@ func (e *Engine) runDigests(now time.Time) {
 		}
 		next := now.Add(time.Duration(interval) * time.Minute)
 		policy.NextRunAt = &next
+		policy.ClaimOwner = ""
+		policy.ClaimUntil = nil
+
+		// Commit the digest state before realtime delivery so a process crash
+		// cannot cause the same digest batch to be sent twice. The underlying
+		// notifications remain in normal message history even if delivery is
+		// interrupted after this point.
+		if err := e.db.DeleteDigestItems(policy.UserID); err != nil {
+			log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not clear digest")
+			continue
+		}
 		if err := e.db.SaveDigestPolicy(policy); err != nil {
 			log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not update digest policy")
+			continue
+		}
+		if summary != nil {
+			e.notifier.Notify(policy.UserID, summary)
 		}
 	}
 }
@@ -379,9 +464,20 @@ func (e *Engine) runEscalations(now time.Time) {
 		return
 	}
 	for _, state := range states {
+		claimed, err := e.db.ClaimEscalation(state.ID, e.instanceID, now, now.Add(2*time.Minute))
+		if err != nil {
+			log.Error().Err(err).Uint("escalation_id", state.ID).Msg("Could not claim escalation")
+			continue
+		}
+		if !claimed {
+			continue
+		}
 		acknowledged, err := e.db.IsMessageAcknowledged(state.MessageID)
 		if err != nil {
 			log.Error().Err(err).Uint("message_id", state.MessageID).Msg("Could not inspect acknowledgement")
+			state.ClaimOwner = ""
+			state.ClaimUntil = nil
+			_ = e.db.SaveEscalationState(state)
 			continue
 		}
 		if !acknowledged {
@@ -400,9 +496,20 @@ func (e *Engine) runEscalations(now time.Time) {
 						title = "Escalated: " + title
 					}
 					body := msg.Message + "\n\nThis notification was escalated because it was not acknowledged."
-					escalated := &model.Message{ApplicationID:rule.TargetApplicationID,Title:title,Message:body,Priority:msg.Priority,Date:time.Now()}
+					key := fmt.Sprintf("escalation:%d", state.ID)
+					escalated := &model.Message{
+						ApplicationID: rule.TargetApplicationID,
+						Title: title,
+						Message: body,
+						Priority: msg.Priority,
+						Date: now,
+						AutomationKey: &key,
+					}
 					if _, publishErr := e.storeAndDeliver(escalated, false); publishErr != nil {
 						log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
+						state.ClaimOwner = ""
+						state.ClaimUntil = nil
+						_ = e.db.SaveEscalationState(state)
 						continue
 					}
 					state.Completed = true
@@ -413,6 +520,8 @@ func (e *Engine) runEscalations(now time.Time) {
 		}
 		done := now
 		state.DoneAt = &done
+		state.ClaimOwner = ""
+		state.ClaimUntil = nil
 		if err := e.db.SaveEscalationState(state); err != nil {
 			log.Error().Err(err).Uint("escalation_id", state.ID).Msg("Could not complete escalation")
 		}
@@ -421,14 +530,50 @@ func (e *Engine) runEscalations(now time.Time) {
 
 func (e *Engine) integrationLoop() {
 	defer e.wg.Done()
-	e.restartIntegrations()
+	ticker := time.NewTicker(15 * time.Second)
+	defer ticker.Stop()
+	e.refreshIntegrationLeadership(true)
 	for {
 		select {
 		case <-e.ctx.Done():
 			return
 		case <-e.reload:
-			e.restartIntegrations()
+			if e.integrationLeader {
+				e.restartIntegrations()
+			}
+		case <-ticker.C:
+			e.refreshIntegrationLeadership(false)
 		}
+	}
+}
+
+func (e *Engine) refreshIntegrationLeadership(forceReload bool) {
+	now := time.Now()
+	acquired, err := e.db.AcquireAutomationLease(
+		"native-integrations",
+		e.instanceID,
+		now,
+		now.Add(45*time.Second),
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("Could not renew native integration lease")
+		if e.integrationLeader {
+			e.integrationLeader = false
+			e.stopIntegrations()
+		}
+		return
+	}
+	if !acquired {
+		if e.integrationLeader {
+			e.integrationLeader = false
+			e.stopIntegrations()
+		}
+		return
+	}
+	wasLeader := e.integrationLeader
+	e.integrationLeader = true
+	if !wasLeader || forceReload {
+		e.restartIntegrations()
 	}
 }
 
@@ -878,6 +1023,14 @@ func externalMessage(msg *model.Message) *model.MessageExternal {
 		SenderName: msg.SenderName,
 		Acknowledged: msg.Acknowledged,
 	}
+}
+
+func newInstanceID() string {
+	raw := make([]byte, 12)
+	if _, err := rand.Read(raw); err != nil {
+		return fmt.Sprintf("instance-%d", time.Now().UnixNano())
+	}
+	return hex.EncodeToString(raw)
 }
 
 func numberAsInt(value any) (int, bool) {
