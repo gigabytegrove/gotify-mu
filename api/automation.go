@@ -829,6 +829,9 @@ func validateSchedule(item *model.ScheduledNotification) error {
 	}
 	if _, err := time.LoadLocation(valueOr(item.Timezone,"UTC")); err != nil { return errors.New("invalid timezone") }
 	if item.MaxRuns < 0 { return errors.New("maximum runs cannot be negative") }
+	if strings.TrimSpace(item.MisfirePolicy) == "" {
+		item.MisfirePolicy = "send"
+	}
 	if item.MisfirePolicy != "send" && item.MisfirePolicy != "skip" {
 		return errors.New("misfire policy must be send or skip")
 	}
