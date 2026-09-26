@@ -175,12 +175,12 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}
 	auditHandler := api.AuditAPI{DB: db}
 	systemHandler := api.SystemAPI{
-		DB: db,
-		Dialect: conf.Database.Dialect,
-		DataDir: operations.DataDirectory(conf.Database.Dialect, conf.Database.Connection),
-		DatabaseFile: operations.DatabaseFile(conf.Database.Dialect, conf.Database.Connection),
-		VersionInfo: vInfo,
-		NotifyDeleted: streamHandler.NotifyDeletedClient,
+		DB:               db,
+		Dialect:          conf.Database.Dialect,
+		DataDir:          operations.DataDirectory(conf.Database.Dialect, conf.Database.Connection),
+		DatabaseFile:     operations.DatabaseFile(conf.Database.Dialect, conf.Database.Connection),
+		VersionInfo:      vInfo,
+		NotifyDeleted:    streamHandler.NotifyDeletedClient,
 		ConnectedClients: streamHandler.ConnectedClientCount,
 	}
 	groupHandler := api.UserGroupAPI{DB: db}
@@ -188,14 +188,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	muCapabilitiesHandler := api.MUCapabilitiesAPI{Version: vInfo.Version}
 	muPresenceHandler := api.MUPresenceAPI{DB: db, Notifier: streamHandler}
 	automationHandler := api.AutomationAPI{
-		DB: db,
-		Engine: automationEngine,
+		DB:             db,
+		Engine:         automationEngine,
 		WebhookLimiter: security.NewDynamicLimiter(),
-		WebhookReplay: security.NewReplayCache(),
+		WebhookReplay:  security.NewReplayCache(),
 	}
 	collaborationHandler := api.CollaborationAPI{
-		DB: db,
-		Dispatcher: automationEngine,
+		DB:            db,
+		Dispatcher:    automationEngine,
 		AttachmentDir: attachmentDir,
 	}
 	connectorHandler := api.ConnectorAPI{DB: db, Runtime: connectorManager}
@@ -362,20 +362,20 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			message.DELETE("/:id", messageHandler.DeleteMessage)
 			message.POST("/:id/archive", messageHandler.ArchiveMessage)
 			message.DELETE("/:id/archive", messageHandler.UnarchiveMessage)
-		message.GET("/:id/acknowledgement", automationHandler.GetAcknowledgement)
-		message.POST("/:id/acknowledgement", automationHandler.AcknowledgeMessage)
-		message.DELETE("/:id/acknowledgement", automationHandler.UnacknowledgeMessage)
-		message.GET("/:id/thread", collaborationHandler.Thread)
-		message.POST("/:id/reply", collaborationHandler.Reply)
-		message.POST("/:id/reaction", collaborationHandler.AddReaction)
-		message.DELETE("/:id/reaction", collaborationHandler.DeleteReaction)
-		message.PUT("/:id/assignment", collaborationHandler.Assign)
-		message.PUT("/:id/status", collaborationHandler.SetStatus)
-		message.POST("/:id/read", collaborationHandler.MarkRead)
-		message.DELETE("/:id/read", collaborationHandler.MarkUnread)
-		message.POST("/:id/attachment", collaborationHandler.UploadAttachment)
-		message.GET("/:id/attachment/:attachmentId", collaborationHandler.DownloadAttachment)
-		message.DELETE("/:id/attachment/:attachmentId", collaborationHandler.DeleteAttachment)
+			message.GET("/:id/acknowledgement", automationHandler.GetAcknowledgement)
+			message.POST("/:id/acknowledgement", automationHandler.AcknowledgeMessage)
+			message.DELETE("/:id/acknowledgement", automationHandler.UnacknowledgeMessage)
+			message.GET("/:id/thread", collaborationHandler.Thread)
+			message.POST("/:id/reply", collaborationHandler.Reply)
+			message.POST("/:id/reaction", collaborationHandler.AddReaction)
+			message.DELETE("/:id/reaction", collaborationHandler.DeleteReaction)
+			message.PUT("/:id/assignment", collaborationHandler.Assign)
+			message.PUT("/:id/status", collaborationHandler.SetStatus)
+			message.POST("/:id/read", collaborationHandler.MarkRead)
+			message.DELETE("/:id/read", collaborationHandler.MarkUnread)
+			message.POST("/:id/attachment", collaborationHandler.UploadAttachment)
+			message.GET("/:id/attachment/:attachmentId", collaborationHandler.DownloadAttachment)
+			message.DELETE("/:id/attachment/:attachmentId", collaborationHandler.DeleteAttachment)
 		}
 
 		clientAuth.GET("/api/mu/v1/capabilities", muCapabilitiesHandler.Get)
@@ -660,7 +660,9 @@ func safeAuditRequestDetails(ctx *gin.Context) string {
 		encoded, encodeErr := json.Marshal(payload)
 		if encodeErr == nil {
 			value := string(encoded)
-			if len(value) > 8000 { value = value[:8000] + "…" }
+			if len(value) > 8000 {
+				value = value[:8000] + "…"
+			}
 			return "request=" + value
 		}
 	}
@@ -669,10 +671,14 @@ func safeAuditRequestDetails(ctx *gin.Context) string {
 		values, parseErr := url.ParseQuery(string(body))
 		if parseErr == nil {
 			for key := range values {
-				if auditSensitiveKey(key) { values.Set(key, "[redacted]") }
+				if auditSensitiveKey(key) {
+					values.Set(key, "[redacted]")
+				}
 			}
 			value := values.Encode()
-			if len(value) > 8000 { value = value[:8000] + "…" }
+			if len(value) > 8000 {
+				value = value[:8000] + "…"
+			}
 			return "request=" + value
 		}
 	}
@@ -690,7 +696,9 @@ func sanitizeAuditValue(value any) {
 			sanitizeAuditValue(item)
 		}
 	case []any:
-		for _, item := range typed { sanitizeAuditValue(item) }
+		for _, item := range typed {
+			sanitizeAuditValue(item)
+		}
 	}
 }
 
@@ -832,15 +840,27 @@ func (fs *onlyImageFS) Open(name string) (http.File, error) {
 
 func cleanupOrphanAttachments(db *database.GormDatabase, directory string) error {
 	names, err := db.GetAttachmentStorageNames()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	keep := make(map[string]struct{}, len(names))
-	for _, name := range names { keep[filepath.Base(name)] = struct{}{} }
+	for _, name := range names {
+		keep[filepath.Base(name)] = struct{}{}
+	}
 	entries, err := os.ReadDir(directory)
-	if errors.Is(err, os.ErrNotExist) { return nil }
-	if err != nil { return err }
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 	for _, entry := range entries {
-		if entry.IsDir() { continue }
-		if _, ok := keep[entry.Name()]; ok { continue }
+		if entry.IsDir() {
+			continue
+		}
+		if _, ok := keep[entry.Name()]; ok {
+			continue
+		}
 		if err := os.Remove(filepath.Join(directory, entry.Name())); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}

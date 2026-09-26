@@ -672,13 +672,23 @@ func handleApplicationError(ctx *gin.Context, err error) {
 }
 
 func (a *ApplicationAPI) canManageApplication(userID uint, app *model.Application) (bool, error) {
-	if app == nil { return false, nil }
-	if app.UserID == userID { return true, nil }
+	if app == nil {
+		return false, nil
+	}
+	if app.UserID == userID {
+		return true, nil
+	}
 	user, err := a.DB.GetUserByID(userID)
-	if err != nil { return false, err }
-	if user != nil && user.Admin { return true, nil }
+	if err != nil {
+		return false, err
+	}
+	if user != nil && user.Admin {
+		return true, nil
+	}
 	membership, err := a.DB.GetApplicationMembership(app.ID, userID)
-	if err != nil { return false, err }
+	if err != nil {
+		return false, err
+	}
 	return membership != nil && membership.EffectiveRole == model.ChannelRoleManager, nil
 }
 
