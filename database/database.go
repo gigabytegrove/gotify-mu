@@ -11,6 +11,7 @@ import (
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/fracdex"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -31,6 +32,14 @@ var mkdirAll = os.MkdirAll
 
 // New creates a new wrapper for the gorm database framework.
 func New(dialect, connection, defaultUser, defaultPass string, strength int, createDefaultUserIfNotExist bool, now func() time.Time) (*GormDatabase, error) {
+	return newDatabase(dialect, connection, defaultUser, defaultPass, strength, createDefaultUserIfNotExist, now, nil)
+}
+
+func NewWithSecretStore(dialect, connection, defaultUser, defaultPass string, strength int, createDefaultUserIfNotExist bool, now func() time.Time, secrets *security.SecretStore) (*GormDatabase, error) {
+	return newDatabase(dialect, connection, defaultUser, defaultPass, strength, createDefaultUserIfNotExist, now, secrets)
+}
+
+func newDatabase(dialect, connection, defaultUser, defaultPass string, strength int, createDefaultUserIfNotExist bool, now func() time.Time, secrets *security.SecretStore) (*GormDatabase, error) {
 	createDirectoryIfSqlite(dialect, connection)
 
 	dbLogger := logger.New(gormLogWriter{}, logger.Config{
@@ -134,7 +143,13 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
-	return &GormDatabase{DB: db}, nil
+	wrapped := &GormDatabase{DB: db, Secrets: secrets}
+	if secrets != nil {
+		if err := wrapped.encryptStoredIntegrationSecrets(); err != nil {
+			return nil, err
+		}
+	}
+	return wrapped, nil
 }
 
 func fillMissingCreatedAt(db *gorm.DB, now time.Time) error {
@@ -197,7 +212,8 @@ func createDirectoryIfSqlite(dialect, connection string) {
 
 // GormDatabase is a wrapper for the gorm framework.
 type GormDatabase struct {
-	DB *gorm.DB
+	DB      *gorm.DB
+	Secrets *security.SecretStore
 }
 
 // Close closes the gorm database connection.
