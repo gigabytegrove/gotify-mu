@@ -108,6 +108,8 @@ type ScheduledNotification struct {
 	Enabled       bool       `json:"enabled"`
 	LastRunAt     *time.Time `json:"lastRunAt,omitempty"`
 	NextRunAt     *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
+	ClaimOwner    string     `gorm:"type:text;index" json:"-"`
+	ClaimUntil    *time.Time `gorm:"index" json:"-"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
 }
@@ -134,6 +136,8 @@ type DigestPolicy struct {
 	ImmediatePriority int       `json:"immediatePriority"`
 	LastSentAt       *time.Time `json:"lastSentAt,omitempty"`
 	NextRunAt        *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
+	ClaimOwner       string     `gorm:"type:text;index" json:"-"`
+	ClaimUntil       *time.Time `gorm:"index" json:"-"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	UpdatedAt        time.Time  `json:"updatedAt"`
 }
@@ -169,7 +173,9 @@ type EscalationState struct {
 	RuleID    uint       `gorm:"index;uniqueIndex:uix_escalation_rule_message,priority:1" json:"ruleId"`
 	MessageID uint       `gorm:"index;uniqueIndex:uix_escalation_rule_message,priority:2" json:"messageId"`
 	DueAt     time.Time  `gorm:"index" json:"dueAt"`
-	Completed bool       `gorm:"index" json:"completed"`
+	Completed  bool       `gorm:"index" json:"completed"`
+	ClaimOwner string     `gorm:"type:text;index" json:"-"`
+	ClaimUntil *time.Time `gorm:"index" json:"-"`
 	CreatedAt time.Time  `json:"createdAt"`
 	DoneAt    *time.Time `json:"doneAt,omitempty"`
 }
@@ -179,4 +185,13 @@ type MessageAcknowledgement struct {
 	UserID         uint      `gorm:"primaryKey;autoIncrement:false" json:"userId"`
 	MessageID      uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
 	AcknowledgedAt time.Time `json:"acknowledgedAt"`
+}
+
+
+// AutomationLease coordinates singleton background integrations across multiple Gotify MU instances.
+type AutomationLease struct {
+	Name      string    `gorm:"primaryKey;type:varchar(128)" json:"name"`
+	Owner     string    `gorm:"type:text;index" json:"owner"`
+	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
 }
