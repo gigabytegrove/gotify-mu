@@ -117,6 +117,7 @@ func newDatabase(dialect, connection, defaultUser, defaultPass string, strength 
 		new(model.EscalationRule),
 		new(model.EscalationState),
 		new(model.MessageAcknowledgement),
+		new(model.AutomationLease),
 	); err != nil {
 		return nil, err
 	}
