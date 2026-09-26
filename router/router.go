@@ -3,8 +3,8 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -430,7 +430,58 @@ func shouldAuditMutation(path string) bool {
 	}
 }
 
-var tokenRegexp = regexp.MustCompile("token=[^&]+")
+var sensitiveQueryFragments = []string{
+	"token",
+	"secret",
+	"password",
+	"passwd",
+	"code",
+	"state",
+	"key",
+	"authorization",
+	"access_token",
+	"id_token",
+	"refresh_token",
+	"client_secret",
+}
+
+func sanitizeLoggedRequest(path, rawQuery string) string {
+	path = redactSensitivePath(path)
+	if rawQuery == "" {
+		return path
+	}
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return path + "?[redacted]"
+	}
+	for key := range values {
+		if isSensitiveQueryKey(key) {
+			values.Set(key, "[masked]")
+		}
+	}
+	return path + "?" + values.Encode()
+}
+
+func redactSensitivePath(path string) string {
+	parts := strings.Split(path, "/")
+	if len(parts) >= 4 && parts[1] == "integrations" && parts[2] == "webhook" && parts[3] != "" {
+		parts[3] = "[masked]"
+	}
+	if len(parts) >= 5 && parts[1] == "plugin" && parts[3] == "custom" && parts[4] != "" {
+		parts[4] = "[masked]"
+	}
+	return strings.Join(parts, "/")
+}
+
+func isSensitiveQueryKey(key string) bool {
+	lower := strings.ToLower(strings.TrimSpace(key))
+	for _, fragment := range sensitiveQueryFragments {
+		if lower == fragment || strings.Contains(lower, fragment) {
+			return true
+		}
+	}
+	return false
+}
 
 func accessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -446,10 +497,7 @@ func accessLogger() gin.HandlerFunc {
 			return
 		}
 
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
-		}
-		path = tokenRegexp.ReplaceAllString(path, "token=[masked]")
+		path = sanitizeLoggedRequest(path, rawQuery)
 
 		latency := time.Since(start)
 		if latency > time.Minute {
