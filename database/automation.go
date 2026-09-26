@@ -307,3 +307,24 @@ func (d *GormDatabase) IsMessageAcknowledged(messageID uint) (bool, error) {
 func (d *GormDatabase) DeleteMessageAcknowledgements(messageID uint) error {
 	return d.DB.Where("message_id = ?", messageID).Delete(&model.MessageAcknowledgement{}).Error
 }
+
+
+func (d *GormDatabase) AcquireAutomationLease(name, owner string, now time.Time, ttl time.Duration) (bool, error) {
+	expires := now.Add(ttl)
+	result := d.DB.Model(&model.AutomationLease{}).
+		Where("name = ? AND (expires_at <= ? OR owner = ?)", name, now, owner).
+		Updates(map[string]any{"owner": owner, "expires_at": expires, "updated_at": now})
+	if result.Error != nil { return false, result.Error }
+	if result.RowsAffected == 1 { return true, nil }
+
+	item := &model.AutomationLease{Name:name, Owner:owner, ExpiresAt:expires, UpdatedAt:now}
+	if err := d.DB.Create(item).Error; err != nil {
+		if err == gorm.ErrDuplicatedKey { return false, nil }
+		return false, err
+	}
+	return true, nil
+}
+
+func (d *GormDatabase) ReleaseAutomationLease(name, owner string) error {
+	return d.DB.Where("name = ? AND owner = ?", name, owner).Delete(&model.AutomationLease{}).Error
+}
