@@ -1,9 +1,13 @@
 package api
 
 import (
+	"bytes"
+	"encoding/json"
+	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/security"
 )
@@ -206,5 +210,203 @@ func TestClearHomeAssistantNativePairing(t *testing.T) {
 	}
 	if item.LastError != "" || item.LastErrorAt != nil {
 		t.Fatal("stale native bridge errors should be cleared")
+	}
+}
+
+
+type homeAssistantEndpointTestDB struct {
+	AutomationDatabase
+	item *model.HomeAssistantIntegration
+}
+
+func (d *homeAssistantEndpointTestDB) GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error) {
+	if d.item == nil || d.item.ID != id {
+		return nil, nil
+	}
+	return d.item, nil
+}
+
+func (d *homeAssistantEndpointTestDB) SaveHomeAssistantIntegration(item *model.HomeAssistantIntegration) error {
+	d.item = item
+	return nil
+}
+
+type homeAssistantEndpointTestEngine struct {
+	AutomationEngine
+	received bool
+	reloaded int
+	routed   bool
+}
+
+func (e *homeAssistantEndpointTestEngine) ReceiveHomeAssistantEvent(id uint, eventType string, data map[string]any) (bool, error) {
+	e.received = true
+	return e.routed, nil
+}
+
+func (e *homeAssistantEndpointTestEngine) ReloadIntegrations() {
+	e.reloaded++
+}
+
+func nativePairingContext(t *testing.T, body any) (*gin.Context, *httptest.ResponseRecorder) {
+	t.Helper()
+	raw, err := json.Marshal(body)
+	if err != nil {
+		t.Fatal(err)
+	}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest("POST", "/", bytes.NewReader(raw))
+	ctx.Request.Header.Set("Content-Type", "application/json")
+	return ctx, recorder
+}
+
+func TestPairNativeHomeAssistantEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	expires := time.Now().Add(10 * time.Minute)
+	db := &homeAssistantEndpointTestDB{
+		item: &model.HomeAssistantIntegration{
+			ID:               7,
+			ConnectionMode:   "integration",
+			PairingCodeHash:  security.HashSecret("pair-secret"),
+			PairingExpiresAt: &expires,
+			Enabled:          true,
+		},
+	}
+	api := &AutomationAPI{DB: db, Engine: &homeAssistantEndpointTestEngine{}}
+	ctx, recorder := nativePairingContext(t, map[string]any{
+		"pairingCode": "7.pair-secret",
+		"webhookUrl":  "https://ha.example/api/webhook/bridge",
+	})
+
+	api.PairNativeHomeAssistant(ctx)
+
+	if recorder.Code != 200 {
+		t.Fatalf("unexpected status %d: %s", recorder.Code, recorder.Body.String())
+	}
+	var response homeAssistantNativePairResponse
+	if err := json.Unmarshal(recorder.Body.Bytes(), &response); err != nil {
+		t.Fatal(err)
+	}
+	if response.IntegrationID != 7 || response.Secret == "" || response.EventPath != "/integrations/home-assistant/native/7/event" {
+		t.Fatalf("unexpected pairing response: %#v", response)
+	}
+	if db.item.NativeWebhookURL != "https://ha.example/api/webhook/bridge" || db.item.NativeSecret == "" {
+		t.Fatal("native bridge credentials were not stored")
+	}
+	if db.item.PairingCodeHash != "" || db.item.PairingExpiresAt != nil {
+		t.Fatal("pairing code was not invalidated after successful pairing")
+	}
+}
+
+func TestPairNativeHomeAssistantRejectsBadAndExpiredCodes(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	future := time.Now().Add(10 * time.Minute)
+	past := time.Now().Add(-time.Minute)
+
+	for name, secret, expires, wantStatus := range []struct {
+		name       string
+		secret     string
+		expires    *time.Time
+		wantStatus int
+	}{
+		{name: "bad secret", secret: "wrong-secret", expires: &future, wantStatus: 401},
+		{name: "expired", secret: "pair-secret", expires: &past, wantStatus: 410},
+	} {
+		t.Run(name, func(t *testing.T) {
+			db := &homeAssistantEndpointTestDB{
+				item: &model.HomeAssistantIntegration{
+					ID:               7,
+					ConnectionMode:   "integration",
+					PairingCodeHash:  security.HashSecret("pair-secret"),
+					PairingExpiresAt: expires,
+				},
+			}
+			api := &AutomationAPI{DB: db, Engine: &homeAssistantEndpointTestEngine{}}
+			ctx, recorder := nativePairingContext(t, map[string]any{
+				"pairingCode": "7." + secret,
+				"webhookUrl":  "https://ha.example/api/webhook/bridge",
+			})
+
+			api.PairNativeHomeAssistant(ctx)
+
+			if recorder.Code != wantStatus {
+				t.Fatalf("unexpected status %d, want %d", recorder.Code, wantStatus)
+			}
+		})
+	}
+}
+
+func TestReceiveNativeHomeAssistantEventAuthorizationAndRouting(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := &homeAssistantEndpointTestDB{
+		item: &model.HomeAssistantIntegration{
+			ID:             7,
+			ConnectionMode: "integration",
+			NativeSecret:   "shared-secret",
+			Enabled:        true,
+		},
+	}
+	engine := &homeAssistantEndpointTestEngine{routed: true}
+	api := &AutomationAPI{DB: db, Engine: engine}
+
+	for name, authHeader, wantStatus, wantReceived := range []struct {
+		name         string
+		authHeader   string
+		wantStatus   int
+		wantReceived bool
+	}{
+		{name: "bad bearer", authHeader: "Bearer wrong-secret", wantStatus: 401, wantReceived: false},
+		{name: "valid bearer", authHeader: "Bearer shared-secret", wantStatus: 202, wantReceived: true},
+	} {
+		t.Run(name, func(t *testing.T) {
+			engine.received = false
+			ctx, recorder := nativePairingContext(t, map[string]any{
+				"eventType": "state_changed",
+				"data":      map[string]any{"entity_id": "light.kitchen"},
+			})
+			ctx.Params = gin.Params{{Key: "id", Value: "7"}}
+			ctx.Request.Header.Set("Authorization", authHeader)
+
+			api.ReceiveNativeHomeAssistantEvent(ctx)
+
+			if recorder.Code != wantStatus {
+				t.Fatalf("unexpected status %d, want %d: %s", recorder.Code, wantStatus, recorder.Body.String())
+			}
+			if engine.received != wantReceived {
+				t.Fatalf("received=%v, want %v", engine.received, wantReceived)
+			}
+		})
+	}
+}
+
+func TestRevokeNativeHomeAssistantEndpoint(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	db := &homeAssistantEndpointTestDB{
+		item: &model.HomeAssistantIntegration{
+			ID:               7,
+			ConnectionMode:   "integration",
+			NativeWebhookURL: "https://ha.example/api/webhook/bridge",
+			NativeSecret:     "shared-secret",
+			Status:           "connected",
+		},
+	}
+	engine := &homeAssistantEndpointTestEngine{}
+	api := &AutomationAPI{DB: db, Engine: engine}
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest("DELETE", "/", nil)
+	ctx.Request.Header.Set("Authorization", "Bearer shared-secret")
+	ctx.Params = gin.Params{{Key: "id", Value: "7"}}
+
+	api.RevokeNativeHomeAssistant(ctx)
+
+	if recorder.Code != 204 {
+		t.Fatalf("unexpected status %d: %s", recorder.Code, recorder.Body.String())
+	}
+	if db.item.NativeWebhookURL != "" || db.item.NativeSecret != "" || db.item.Status != "not_paired" {
+		t.Fatal("native bridge was not revoked")
+	}
+	if engine.reloaded != 1 {
+		t.Fatalf("expected integration reload, got %d", engine.reloaded)
 	}
 }
