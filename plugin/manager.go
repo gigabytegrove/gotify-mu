@@ -39,9 +39,14 @@ type Database interface {
 	GetApplicationByToken(token string) (*model.Application, error)
 }
 
-// Notifier notifies when a new message was created.
+// Notifier is retained for Gotify plugin compatibility tests and legacy embedding.
 type Notifier interface {
 	Notify(userID uint, message *model.MessageExternal)
+}
+
+// MessageDispatcher routes plugin messages through Gotify MU delivery policies.
+type MessageDispatcher interface {
+	StoreAndDeliver(message *model.Message) (*model.MessageExternal, error)
 }
 
 // Manager is an encapsulating layer for plugins and manages all plugins and its instances.
@@ -52,24 +57,38 @@ type Manager struct {
 	messages  chan MessageWithUserID
 	db        Database
 	mux       *gin.RouterGroup
-	directory string
+	directory  string
+	dispatcher MessageDispatcher
+	notifier   Notifier
 }
 
 // NewManager created a Manager from configurations.
 func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier Notifier) (*Manager, error) {
+	return newManager(db, directory, mux, notifier, nil)
+}
+
+// NewManagerWithDispatcher routes plugin messages through the same delivery
+// engine used by application-token, Webhook, MQTT, Home Assistant and
+// scheduled notifications.
+func NewManagerWithDispatcher(db Database, directory string, mux *gin.RouterGroup, dispatcher MessageDispatcher) (*Manager, error) {
+	return newManager(db, directory, mux, nil, dispatcher)
+}
+
+func newManager(db Database, directory string, mux *gin.RouterGroup, notifier Notifier, dispatcher MessageDispatcher) (*Manager, error) {
 	manager := &Manager{
-		mutex:     &sync.RWMutex{},
-		instances: map[uint]compat.PluginInstance{},
-		plugins:   map[string]compat.Plugin{},
-		messages:  make(chan MessageWithUserID),
-		db:        db,
-		mux:       mux,
-		directory: directory,
+		mutex:      &sync.RWMutex{},
+		instances:  map[uint]compat.PluginInstance{},
+		plugins:    map[string]compat.Plugin{},
+		messages:   make(chan MessageWithUserID),
+		db:         db,
+		mux:        mux,
+		directory:  directory,
+		dispatcher: dispatcher,
+		notifier:   notifier,
 	}
 
 	go func() {
-		for {
-			message := <-manager.messages
+		for message := range manager.messages {
 			internalMsg := &model.Message{
 				ApplicationID: message.Message.ApplicationID,
 				Title:         message.Message.Title,
@@ -80,9 +99,22 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 			if message.Message.Extras != nil {
 				internalMsg.Extras, _ = json.Marshal(message.Message.Extras)
 			}
-			db.CreateMessage(internalMsg)
+			if manager.dispatcher != nil {
+				if _, err := manager.dispatcher.StoreAndDeliver(internalMsg); err != nil {
+					log.Error().Err(err).
+						Uint("application_id", internalMsg.ApplicationID).
+						Msg("Plugin message delivery failed")
+				}
+				continue
+			}
+			if err := db.CreateMessage(internalMsg); err != nil {
+				log.Error().Err(err).Uint("application_id", internalMsg.ApplicationID).Msg("Plugin message persistence failed")
+				continue
+			}
 			message.Message.ID = internalMsg.ID
-			notifier.Notify(message.UserID, &message.Message)
+			if manager.notifier != nil {
+				manager.notifier.Notify(message.UserID, &message.Message)
+			}
 		}
 	}()
 

@@ -11,6 +11,7 @@ import (
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/fracdex"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -99,6 +100,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.UserGroup),
 		new(model.UserGroupMembership),
 		new(model.WebhookRoute),
+		new(model.WebhookReplay),
 		new(model.MQTTIntegration),
 		new(model.HomeAssistantIntegration),
 		new(model.ScheduledNotification),
@@ -107,6 +109,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.DigestItem),
 		new(model.EscalationRule),
 		new(model.EscalationState),
+		new(model.AutomationLease),
 		new(model.MessageAcknowledgement),
 	); err != nil {
 		return nil, err
@@ -197,7 +200,8 @@ func createDirectoryIfSqlite(dialect, connection string) {
 
 // GormDatabase is a wrapper for the gorm framework.
 type GormDatabase struct {
-	DB *gorm.DB
+	DB        *gorm.DB
+	SecretBox *security.SecretBox
 }
 
 // Close closes the gorm database connection.

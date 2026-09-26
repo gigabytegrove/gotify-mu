@@ -2,12 +2,16 @@ package api
 
 import (
 	"errors"
+	"net/http"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 )
 
 // SessionDatabase is the interface for session-related database access.
@@ -24,6 +28,7 @@ type SessionAPI struct {
 	NotifyDeleted    func(uint, string)
 	SecureCookie     bool
 	LocalAuthEnabled bool
+	LoginLimiter     *security.FailureLimiter
 }
 
 // swagger:operation POST /auth/local/login auth localLogin
@@ -70,14 +75,33 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		return
 	}
 
+	limitKey := ctx.ClientIP() + "|" + strings.ToLower(strings.TrimSpace(name))
+	if a.LoginLimiter != nil {
+		if allowed, retry := a.LoginLimiter.Allow(limitKey); !allowed {
+			seconds := int(retry.Seconds())
+			if seconds < 1 {
+				seconds = 1
+			}
+			ctx.Header("Retry-After", strconv.Itoa(seconds))
+			ctx.AbortWithError(http.StatusTooManyRequests, errors.New("too many failed authentication attempts"))
+			return
+		}
+	}
+
 	user, err := a.DB.GetUserByName(name)
 	if err != nil {
 		ctx.AbortWithError(500, err)
 		return
 	}
 	if user == nil || !password.ComparePassword(user.Pass, []byte(pass)) {
+		if a.LoginLimiter != nil {
+			a.LoginLimiter.Failure(limitKey)
+		}
 		ctx.AbortWithError(401, errors.New("invalid credentials"))
 		return
+	}
+	if a.LoginLimiter != nil {
+		a.LoginLimiter.Success(limitKey)
 	}
 
 	clientParams := ClientParams{}

@@ -3,12 +3,14 @@ package auth
 import (
 	"errors"
 	"net/http"
+	"strconv"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,6 +22,7 @@ const (
 	authStateNotElevated
 	authStateOk
 	authStateLocalAuthDisabled
+	authStateRateLimited
 )
 
 const (
@@ -45,6 +48,7 @@ type Auth struct {
 	SecureCookie     bool
 	LocalAuthEnabled bool
 	CrossOrigin      *http.CrossOriginProtection
+	LoginLimiter     *security.FailureLimiter
 }
 
 // RequireAdmin requires an elevated client token or basic auth, the user must be an admin.
@@ -124,6 +128,9 @@ func (a *Auth) evaluate(ctx *gin.Context, funcs ...func(ctx *gin.Context) (authS
 		case authStateLocalAuthDisabled:
 			ctx.AbortWithError(403, errors.New("local authentication is disabled"))
 			return true
+		case authStateRateLimited:
+			ctx.AbortWithError(http.StatusTooManyRequests, errors.New("too many failed authentication attempts"))
+			return true
 		case authStateOk:
 			ctx.Next()
 			return true
@@ -165,9 +172,23 @@ func (a *Auth) handleUser(checks ...func(*model.User) (authState, error)) func(c
 			if !a.LocalAuthEnabled {
 				return authStateLocalAuthDisabled, nil
 			}
+			limitKey := ctx.ClientIP() + "|" + strings.ToLower(strings.TrimSpace(name))
+			if a.LoginLimiter != nil {
+				if allowed, retry := a.LoginLimiter.Allow(limitKey); !allowed {
+					seconds := int(retry.Seconds())
+					if seconds < 1 {
+						seconds = 1
+					}
+					ctx.Header("Retry-After", strconv.Itoa(seconds))
+					return authStateRateLimited, nil
+				}
+			}
 			if user, err := a.DB.GetUserByName(name); err != nil {
 				return authStateSkip, err
 			} else if user != nil && password.ComparePassword(user.Pass, []byte(pass)) {
+				if a.LoginLimiter != nil {
+					a.LoginLimiter.Success(limitKey)
+				}
 				RegisterUser(ctx, user)
 
 				for _, check := range checks {
@@ -177,6 +198,9 @@ func (a *Auth) handleUser(checks ...func(*model.User) (authState, error)) func(c
 				}
 
 				return authStateOk, nil
+			}
+			if a.LoginLimiter != nil {
+				a.LoginLimiter.Failure(limitKey)
 			}
 		}
 		return authStateSkip, nil

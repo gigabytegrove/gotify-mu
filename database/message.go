@@ -25,8 +25,25 @@ func (d *GormDatabase) markAcknowledged(userID uint, messages []*model.Message) 
 	for _, id := range acknowledged {
 		set[id] = struct{}{}
 	}
+	type acknowledgementCount struct {
+		MessageID uint
+		Count     int
+	}
+	var counts []acknowledgementCount
+	if err := d.DB.Model(&model.MessageAcknowledgement{}).
+		Select("message_id, COUNT(*) as count").
+		Where("message_id IN ?", ids).
+		Group("message_id").
+		Scan(&counts).Error; err != nil {
+		return err
+	}
+	countByMessage := make(map[uint]int, len(counts))
+	for _, count := range counts {
+		countByMessage[count.MessageID] = count.Count
+	}
 	for _, message := range messages {
 		_, message.Acknowledged = set[message.ID]
+		message.AcknowledgementCount = countByMessage[message.ID]
 	}
 	return nil
 }
@@ -41,6 +58,17 @@ func archivedMessages(db *gorm.DB, userID uint) *gorm.DB {
 	return db.Joins("JOIN application_memberships AS am ON am.application_id = messages.application_id AND am.user_id = ?", userID).
 		Joins("JOIN message_dismissals AS md ON md.message_id = messages.id AND md.user_id = ?", userID).
 		Where("md.archived = ?", true)
+}
+
+func (d *GormDatabase) GetMessageByAutomationKey(key string) (*model.Message, error) {
+	message := new(model.Message)
+	if err := d.DB.Where("automation_key = ?", key).First(message).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return message, nil
 }
 
 // GetMessageByID returns the messages for the given id or nil.

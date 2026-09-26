@@ -1,8 +1,13 @@
 import React from 'react';
+import axios from 'axios';
 import {
     Box,
     Button,
     Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
     Grid,
     InputAdornment,
     Stack,
@@ -27,10 +32,11 @@ import SurfaceCard from '../common/SurfaceCard';
 import ConfirmDialog from '../common/ConfirmDialog';
 import LoadingSpinner from '../common/LoadingSpinner';
 import Message from './Message';
-import {IMessage} from '../types';
+import {IMessage, IMessageAcknowledgementStatus} from '../types';
 import {useStores} from '../stores';
 import {PushMessageDialog} from './PushMessageDialog';
 import ChatComposer from './ChatComposer';
+import * as config from '../config';
 
 const UndoAutoHideMs = 5000;
 
@@ -43,6 +49,9 @@ const Messages = observer(() => {
     const [archivedView, setArchivedView] = React.useState(false);
     const [isLoadingMore, setLoadingMore] = React.useState(false);
     const [query, setQuery] = React.useState('');
+    const [acknowledgementDetails, setAcknowledgementDetails] =
+        React.useState<IMessageAcknowledgementStatus>();
+    const [acknowledgementMessageTitle, setAcknowledgementMessageTitle] = React.useState('');
 
     const {messagesStore, appStore, currentUser} = useStores();
     const messages = archivedView ? messagesStore.getArchived(appId) : messagesStore.get(appId);
@@ -102,6 +111,14 @@ const Messages = observer(() => {
         messagesStore.addPendingDelete({message, key});
     };
 
+    const showAcknowledgements = async (message: IMessage) => {
+        const response = await axios.get<IMessageAcknowledgementStatus>(
+            config.get('url') + 'message/' + message.id + '/acknowledgement'
+        );
+        setAcknowledgementMessageTitle(message.title || 'Message');
+        setAcknowledgementDetails(response.data);
+    };
+
     const renderMessage = (_index: number, message: IMessage) => (
         <Message
             key={message.id}
@@ -120,6 +137,12 @@ const Messages = observer(() => {
                 void messagesStore.setAcknowledged(message, !Boolean(message.acknowledged))
             }
             acknowledged={Boolean(message.acknowledged)}
+            acknowledgementCount={message.acknowledgementCount ?? 0}
+            fShowAcknowledgements={
+                (message.acknowledgementCount ?? 0) > 0
+                    ? () => void showAcknowledgements(message)
+                    : undefined
+            }
             senderName={message.senderName}
             onExpand={(expanded) => (expandedState.current[message.id] = expanded)}
             title={message.title}
@@ -334,7 +357,45 @@ const Messages = observer(() => {
             )}
 
             {pushMessageOpen && app && (
-                <PushMessageDialog
+                <Dialog
+                open={acknowledgementDetails !== undefined}
+                onClose={() => setAcknowledgementDetails(undefined)}
+                fullWidth
+                maxWidth="sm">
+                <DialogTitle>Acknowledgements · {acknowledgementMessageTitle}</DialogTitle>
+                <DialogContent>
+                    {acknowledgementDetails?.history.length ? (
+                        <Stack spacing={1} sx={{pt: 0.5}}>
+                            {acknowledgementDetails.history.map((entry) => (
+                                <Box
+                                    key={entry.userId}
+                                    sx={{
+                                        p: 1.25,
+                                        border: 1,
+                                        borderColor: 'divider',
+                                        borderRadius: 2,
+                                    }}>
+                                    <Typography sx={{fontWeight: 700}}>
+                                        {entry.displayName || entry.name}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {new Date(entry.acknowledgedAt).toLocaleString()}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Stack>
+                    ) : (
+                        <Typography color="text.secondary" sx={{pt: 1}}>
+                            Nobody has acknowledged this message.
+                        </Typography>
+                    )}
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setAcknowledgementDetails(undefined)}>Close</Button>
+                </DialogActions>
+            </Dialog>
+
+            <PushMessageDialog
                     appName={app.name}
                     defaultPriority={app.defaultPriority}
                     fClose={() => setPushMessageOpen(false)}

@@ -66,3 +66,39 @@ func TestURLValidation(t *testing.T) {
 		t.Fatal("https URL should be valid for Home Assistant")
 	}
 }
+
+
+func TestWebhookSourceAllowed(t *testing.T) {
+	if !webhookSourceAllowed("", "203.0.113.20") {
+		t.Fatal("blank source policy should allow requests")
+	}
+	if !webhookSourceAllowed("192.168.0.0/16,10.0.0.0/8", "192.168.10.20") {
+		t.Fatal("address inside configured network should be allowed")
+	}
+	if webhookSourceAllowed("192.168.0.0/16", "203.0.113.20") {
+		t.Fatal("address outside configured network should be rejected")
+	}
+	if webhookSourceAllowed("not-a-network", "192.168.1.1") {
+		t.Fatal("invalid network must not match")
+	}
+}
+
+func TestValidateWebhookSecurity(t *testing.T) {
+	if err := validateWebhookSecurity(&model.WebhookRoute{
+		RequireSignature: true,
+	}); err == nil {
+		t.Fatal("signed Webhook without signing secret should fail")
+	}
+	if err := validateWebhookSecurity(&model.WebhookRoute{
+		RequireSignature: true,
+		SigningSecret:    "secret",
+		AllowedCIDRs:     "192.168.0.0/16,10.0.0.0/8",
+	}); err != nil {
+		t.Fatalf("valid Webhook security rejected: %v", err)
+	}
+	if err := validateWebhookSecurity(&model.WebhookRoute{
+		AllowedCIDRs: "invalid",
+	}); err == nil {
+		t.Fatal("invalid source network should fail")
+	}
+}

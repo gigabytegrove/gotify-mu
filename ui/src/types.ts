@@ -49,6 +49,7 @@ export interface IMessage {
     senderUserId?: number;
     senderName?: string;
     acknowledged?: boolean;
+    acknowledgementCount?: number;
     image?: string;
     extras?: IMessageExtras;
 }
@@ -136,6 +137,9 @@ export interface IWebhookRoute {
     priorityField: string;
     defaultTitle: string;
     defaultPriority: number;
+    requireSignature: boolean;
+    signatureConfigured: boolean;
+    allowedCidrs: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -216,4 +220,30 @@ export interface IEscalationRule {
     enabled: boolean;
     createdAt: string;
     updatedAt: string;
+}
+
+
+export interface IIntegrationRuntimeStatus {
+    type: 'mqtt' | 'home-assistant';
+    id: number;
+    state: 'connecting' | 'connected' | 'error' | 'standby' | string;
+    message?: string;
+    lastConnectedAt?: string;
+    lastEventAt?: string;
+    lastErrorAt?: string;
+}
+
+
+export interface IMessageAcknowledgement {
+    userId: number;
+    name: string;
+    displayName?: string;
+    acknowledgedAt: string;
+}
+
+export interface IMessageAcknowledgementStatus {
+    acknowledged: boolean;
+    acknowledgedByAnyone: boolean;
+    count: number;
+    history: IMessageAcknowledgement[];
 }

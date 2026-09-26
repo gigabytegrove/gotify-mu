@@ -22,6 +22,29 @@ var (
 	forbiddenJSON = `{"error":"Forbidden", "errorCode":403, "errorDescription":"you are not allowed to access this api"}`
 )
 
+func TestSanitizeLoggedRequest(t *testing.T) {
+	got := sanitizeLoggedRequest(
+		"/integrations/webhook/secret-value",
+		"code=oidc-code&state=oidc-state&token=client-token&safe=value",
+	)
+	assert.NotContains(t, got, "secret-value")
+	assert.NotContains(t, got, "oidc-code")
+	assert.NotContains(t, got, "oidc-state")
+	assert.NotContains(t, got, "client-token")
+	assert.Contains(t, got, "/integrations/webhook/[masked]")
+	assert.Contains(t, got, "safe=value")
+}
+
+func TestSanitizePluginWebhookPath(t *testing.T) {
+	got := sanitizeLoggedRequest("/plugin/7/custom/Psupersecret/webhook", "")
+	assert.Equal(t, "/plugin/7/custom/[masked]/webhook", got)
+}
+
+func TestMalformedSensitiveQueryIsRedacted(t *testing.T) {
+	got := sanitizeLoggedRequest("/auth/oidc/callback", "%zz")
+	assert.Equal(t, "/auth/oidc/callback?[redacted]", got)
+}
+
 func TestShouldAuditMutation(t *testing.T) {
 	assert.True(t, shouldAuditMutation("/user/:id"))
 	assert.True(t, shouldAuditMutation("/group/:id/members"))

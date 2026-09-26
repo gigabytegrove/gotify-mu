@@ -29,6 +29,7 @@ import * as config from '../config';
 import {useStores} from '../stores';
 import {
     IHomeAssistantIntegration,
+    IIntegrationRuntimeStatus,
     IMQTTIntegration,
     IWebhookRoute,
 } from '../types';
@@ -45,6 +46,7 @@ const Integrations = () => {
     const [webhooks, setWebhooks] = React.useState<IWebhookRoute[]>([]);
     const [mqtt, setMqtt] = React.useState<IMQTTIntegration[]>([]);
     const [homeAssistant, setHomeAssistant] = React.useState<IHomeAssistantIntegration[]>([]);
+    const [statuses, setStatuses] = React.useState<IIntegrationRuntimeStatus[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [webhookEdit, setWebhookEdit] = React.useState<IWebhookRoute | null | undefined>();
     const [mqttEdit, setMqttEdit] = React.useState<IMQTTIntegration | null | undefined>();
@@ -55,14 +57,17 @@ const Integrations = () => {
         setLoading(true);
         try {
             await appStore.refresh();
-            const [webhookResponse, mqttResponse, homeAssistantResponse] = await Promise.all([
-                axios.get<IWebhookRoute[]>(api('integration/webhook')),
-                axios.get<IMQTTIntegration[]>(api('integration/mqtt')),
-                axios.get<IHomeAssistantIntegration[]>(api('integration/home-assistant')),
-            ]);
+            const [webhookResponse, mqttResponse, homeAssistantResponse, statusResponse] =
+                await Promise.all([
+                    axios.get<IWebhookRoute[]>(api('integration/webhook')),
+                    axios.get<IMQTTIntegration[]>(api('integration/mqtt')),
+                    axios.get<IHomeAssistantIntegration[]>(api('integration/home-assistant')),
+                    axios.get<IIntegrationRuntimeStatus[]>(api('integration/status')),
+                ]);
             setWebhooks(webhookResponse.data);
             setMqtt(mqttResponse.data);
             setHomeAssistant(homeAssistantResponse.data);
+            setStatuses(statusResponse.data);
         } finally {
             setLoading(false);
         }
@@ -73,6 +78,8 @@ const Integrations = () => {
     }, [refresh]);
 
     const channels = appStore.getItems();
+    const runtimeStatus = (type: IIntegrationRuntimeStatus['type'], id: number) =>
+        statuses.find((status) => status.type === type && status.id === id);
 
     return (
         <DefaultPage
@@ -112,6 +119,25 @@ const Integrations = () => {
                                 <Typography variant="body2" sx={{wordBreak: 'break-all'}}>
                                     {api(item.path.replace(/^\//, ''))}
                                 </Typography>
+                                <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
+                                    <Chip
+                                        size="small"
+                                        variant="outlined"
+                                        color={item.requireSignature ? 'success' : 'warning'}
+                                        label={
+                                            item.requireSignature
+                                                ? 'Signed requests'
+                                                : 'URL secret only'
+                                        }
+                                    />
+                                    {item.allowedCidrs && (
+                                        <Chip
+                                            size="small"
+                                            variant="outlined"
+                                            label="Source restricted"
+                                        />
+                                    )}
+                                </Stack>
                                 <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
                                     <Button
                                         size="small"
@@ -126,8 +152,46 @@ const Integrations = () => {
                                     </Button>
                                     <Button
                                         size="small"
+                                        onClick={async () => {
+                                            await axios.post(
+                                                api(`integration/webhook/${item.id}/test`)
+                                            );
+                                            snackManager.snack('Test notification sent');
+                                        }}>
+                                        Send Test
+                                    </Button>
+                                    {item.requireSignature && (
+                                        <Button
+                                            size="small"
+                                            onClick={async () => {
+                                                const response = await axios.post<{
+                                                    signingSecret: string;
+                                                }>(
+                                                    api(
+                                                        `integration/webhook/${item.id}/signing-secret/regenerate`
+                                                    )
+                                                );
+                                                await navigator.clipboard.writeText(
+                                                    response.data.signingSecret
+                                                );
+                                                snackManager.snack(
+                                                    'New signing secret copied. Update the sending system now.'
+                                                );
+                                            }}>
+                                            New Signing Secret
+                                        </Button>
+                                    )}
+                                    <Button
+                                        size="small"
                                         startIcon={<Refresh />}
                                         onClick={async () => {
+                                            if (
+                                                !window.confirm(
+                                                    'Regenerate this Webhook URL? The current URL will stop working immediately.'
+                                                )
+                                            ) {
+                                                return;
+                                            }
                                             await axios.post(
                                                 api(`integration/webhook/${item.id}/regenerate`)
                                             );
@@ -141,6 +205,7 @@ const Integrations = () => {
                         ),
                         onEdit: () => setWebhookEdit(item),
                         onDelete: async () => {
+                            if (!window.confirm('Delete this Webhook? This cannot be undone.')) return;
                             await axios.delete(api(`integration/webhook/${item.id}`));
                             await refresh();
                             snackManager.snack('Webhook deleted');
@@ -171,8 +236,19 @@ const Integrations = () => {
                             item.applicationId
                         )}`,
                         enabled: item.enabled,
+                        details: (
+                            <IntegrationHealth
+                                status={runtimeStatus('mqtt', item.id)}
+                                onTest={async () => {
+                                    await axios.post(api(`integration/mqtt/${item.id}/test`));
+                                    snackManager.snack('MQTT connection successful');
+                                }}
+                                testLabel="Test Connection"
+                            />
+                        ),
                         onEdit: () => setMqttEdit(item),
                         onDelete: async () => {
+                            if (!window.confirm('Delete this MQTT connection? This cannot be undone.')) return;
                             await axios.delete(api(`integration/mqtt/${item.id}`));
                             await refresh();
                             snackManager.snack('MQTT connection deleted');
@@ -204,9 +280,9 @@ const Integrations = () => {
                         )}`,
                         enabled: item.enabled,
                         details: (
-                            <Button
-                                size="small"
-                                onClick={async () => {
+                            <IntegrationHealth
+                                status={runtimeStatus('home-assistant', item.id)}
+                                onTest={async () => {
                                     await axios.post(
                                         api('integration/home-assistant/' + item.id + '/event'),
                                         {
@@ -215,12 +291,13 @@ const Integrations = () => {
                                         }
                                     );
                                     snackManager.snack('Test event sent to Home Assistant');
-                                }}>
-                                Send Test Event
-                            </Button>
+                                }}
+                                testLabel="Send Test Event"
+                            />
                         ),
                         onEdit: () => setHomeAssistantEdit(item),
                         onDelete: async () => {
+                            if (!window.confirm('Delete this Home Assistant connection? This cannot be undone.')) return;
                             await axios.delete(api(`integration/home-assistant/${item.id}`));
                             await refresh();
                             snackManager.snack('Home Assistant connection deleted');
@@ -265,6 +342,58 @@ const Integrations = () => {
         </DefaultPage>
     );
 };
+
+const IntegrationHealth = ({
+    status,
+    onTest,
+    testLabel,
+}: {
+    status?: IIntegrationRuntimeStatus;
+    onTest: () => Promise<void>;
+    testLabel: string;
+}) => (
+    <Stack spacing={0.75}>
+        <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
+            <Chip
+                size="small"
+                variant="outlined"
+                color={
+                    status?.state === 'connected'
+                        ? 'success'
+                        : status?.state === 'error'
+                          ? 'error'
+                          : 'default'
+                }
+                label={
+                    status?.state === 'connected'
+                        ? 'Connected'
+                        : status?.state === 'error'
+                          ? 'Connection issue'
+                          : status?.state === 'standby'
+                            ? 'Standby'
+                            : status?.state === 'connecting'
+                              ? 'Connecting'
+                              : 'Waiting'
+                }
+            />
+            {status?.lastEventAt && (
+                <Chip
+                    size="small"
+                    variant="outlined"
+                    label={'Last event ' + new Date(status.lastEventAt).toLocaleString()}
+                />
+            )}
+        </Stack>
+        {status?.message && status.state === 'error' && (
+            <Typography variant="caption" color="error">
+                {status.message}
+            </Typography>
+        )}
+        <Button size="small" sx={{alignSelf: 'flex-start'}} onClick={() => void onTest()}>
+            {testLabel}
+        </Button>
+    </Stack>
+);
 
 interface ListItem {
     id: number;
@@ -380,6 +509,10 @@ const WebhookDialog = ({
     const [priorityField, setPriorityField] = React.useState(item?.priorityField || 'priority');
     const [defaultTitle, setDefaultTitle] = React.useState(item?.defaultTitle || '');
     const [defaultPriority, setDefaultPriority] = React.useState(item?.defaultPriority || 0);
+    const [requireSignature, setRequireSignature] = React.useState(
+        item?.requireSignature ?? true
+    );
+    const [allowedCidrs, setAllowedCidrs] = React.useState(item?.allowedCidrs || '');
     const [saving, setSaving] = React.useState(false);
 
     const save = async () => {
@@ -394,6 +527,8 @@ const WebhookDialog = ({
                 priorityField,
                 defaultTitle,
                 defaultPriority,
+                requireSignature,
+                allowedCidrs,
             };
             if (item) {
                 await axios.put(api(`integration/webhook/${item.id}`), payload);
@@ -440,6 +575,23 @@ const WebhookDialog = ({
                         type="number"
                         value={defaultPriority}
                         onChange={(e) => setDefaultPriority(Number(e.target.value))}
+                    />
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={requireSignature}
+                                onChange={(e) => setRequireSignature(e.target.checked)}
+                            />
+                        }
+                        label="Require signed requests"
+                    />
+                    <TextField
+                        label="Allowed source networks"
+                        value={allowedCidrs}
+                        onChange={(e) => setAllowedCidrs(e.target.value)}
+                        placeholder="192.168.1.0/24, 10.0.0.0/8"
+                        helperText="Optional. Leave blank to allow any source address."
+                        multiline
                     />
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}

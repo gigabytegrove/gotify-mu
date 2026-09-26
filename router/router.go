@@ -3,8 +3,8 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -21,6 +21,7 @@ import (
 	gerror "github.com/gotify/server/v3/error"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/plugin"
+	"github.com/gotify/server/v3/security"
 	"github.com/gotify/server/v3/ui"
 	"github.com/rs/zerolog/log"
 )
@@ -86,11 +87,21 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			}
 		}
 	}()
+	loginLimiter := security.NewFailureLimiter(
+		conf.Security.LoginMaxAttempts,
+		time.Duration(conf.Security.LoginWindowSeconds)*time.Second,
+		time.Duration(conf.Security.LoginBlockSeconds)*time.Second,
+	)
+	webhookLimiter := security.NewWindowLimiter(
+		conf.Security.WebhookRequestsPerMinute,
+		time.Minute,
+	)
 	authentication := auth.Auth{
 		DB:               db,
 		SecureCookie:     conf.Server.SecureCookie,
 		LocalAuthEnabled: conf.LocalAuthEnabled,
 		CrossOrigin:      http.NewCrossOriginProtection(),
+		LoginLimiter:     loginLimiter,
 	}
 	automationEngine := automation.New(db, streamHandler)
 	messageHandler := api.MessageAPI{Notifier: streamHandler, DB: db, Dispatcher: automationEngine}
@@ -108,15 +119,21 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	applicationMembershipHandler := api.ApplicationMembershipAPI{
 		DB: db,
 	}
-	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled}
+	sessionHandler := api.SessionAPI{
+		DB:               db,
+		NotifyDeleted:    streamHandler.NotifyDeletedClient,
+		SecureCookie:     conf.Server.SecureCookie,
+		LocalAuthEnabled: conf.LocalAuthEnabled,
+		LoginLimiter:     loginLimiter,
+	}
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
 	auditHandler := api.AuditAPI{DB: db}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
-	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
+	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine, WebhookLimiter: webhookLimiter}
 
-	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
+	pluginManager, err := plugin.NewManagerWithDispatcher(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), automationEngine)
 	if err != nil {
 		panic(err)
 	}
@@ -307,15 +324,19 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/update/status", updateHandler.Status)
 		adminPlatform.POST("/update/install", updateHandler.Install)
 
+		adminPlatform.GET("/integration/status", automationHandler.GetIntegrationStatus)
 		adminPlatform.GET("/integration/webhook", automationHandler.GetWebhookRoutes)
 		adminPlatform.POST("/integration/webhook", automationHandler.CreateWebhookRoute)
 		adminPlatform.PUT("/integration/webhook/:id", automationHandler.UpdateWebhookRoute)
 		adminPlatform.POST("/integration/webhook/:id/regenerate", automationHandler.RegenerateWebhookSecret)
+		adminPlatform.POST("/integration/webhook/:id/signing-secret/regenerate", automationHandler.RegenerateWebhookSigningSecret)
+		adminPlatform.POST("/integration/webhook/:id/test", automationHandler.TestWebhookRoute)
 		adminPlatform.DELETE("/integration/webhook/:id", automationHandler.DeleteWebhookRoute)
 
 		adminPlatform.GET("/integration/mqtt", automationHandler.GetMQTT)
 		adminPlatform.POST("/integration/mqtt", automationHandler.CreateMQTT)
 		adminPlatform.PUT("/integration/mqtt/:id", automationHandler.UpdateMQTT)
+		adminPlatform.POST("/integration/mqtt/:id/test", automationHandler.TestMQTT)
 		adminPlatform.DELETE("/integration/mqtt/:id", automationHandler.DeleteMQTT)
 
 		adminPlatform.GET("/integration/home-assistant", automationHandler.GetHomeAssistant)
@@ -413,7 +434,58 @@ func shouldAuditMutation(path string) bool {
 	}
 }
 
-var tokenRegexp = regexp.MustCompile("token=[^&]+")
+var sensitiveQueryFragments = []string{
+	"token",
+	"secret",
+	"password",
+	"passwd",
+	"code",
+	"state",
+	"key",
+	"authorization",
+	"access_token",
+	"id_token",
+	"refresh_token",
+	"client_secret",
+}
+
+func sanitizeLoggedRequest(path, rawQuery string) string {
+	path = redactSensitivePath(path)
+	if rawQuery == "" {
+		return path
+	}
+	values, err := url.ParseQuery(rawQuery)
+	if err != nil {
+		return path + "?[redacted]"
+	}
+	for key := range values {
+		if isSensitiveQueryKey(key) {
+			values.Set(key, "[masked]")
+		}
+	}
+	return path + "?" + values.Encode()
+}
+
+func redactSensitivePath(path string) string {
+	parts := strings.Split(path, "/")
+	if len(parts) >= 4 && parts[1] == "integrations" && parts[2] == "webhook" && parts[3] != "" {
+		parts[3] = "[masked]"
+	}
+	if len(parts) >= 5 && parts[1] == "plugin" && parts[3] == "custom" && parts[4] != "" {
+		parts[4] = "[masked]"
+	}
+	return strings.Join(parts, "/")
+}
+
+func isSensitiveQueryKey(key string) bool {
+	lower := strings.ToLower(strings.TrimSpace(key))
+	for _, fragment := range sensitiveQueryFragments {
+		if lower == fragment || strings.Contains(lower, fragment) {
+			return true
+		}
+	}
+	return false
+}
 
 func accessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -429,10 +501,7 @@ func accessLogger() gin.HandlerFunc {
 			return
 		}
 
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
-		}
-		path = tokenRegexp.ReplaceAllString(path, "token=[masked]")
+		path = sanitizeLoggedRequest(path, rawQuery)
 
 		latency := time.Since(start)
 		if latency > time.Minute {

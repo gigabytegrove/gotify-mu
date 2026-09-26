@@ -15,7 +15,9 @@ type Message struct {
 	Date          time.Time
 	SenderUserID  uint `gorm:"index"`
 	SenderName    string `gorm:"type:text"`
-	Acknowledged  bool   `gorm:"-" json:"-"`
+	Acknowledged       bool    `gorm:"-" json:"-"`
+	AcknowledgementCount int     `gorm:"-" json:"-"`
+	AutomationKey *string `gorm:"type:text;uniqueIndex" json:"-"`
 }
 
 // MessageExternal Model
@@ -75,7 +77,8 @@ type MessageExternal struct {
 	// read only: true
 	SenderName string `json:"senderName,omitempty"`
 	// Whether the current requesting user has acknowledged this message.
-	Acknowledged bool `json:"acknowledged,omitempty"`
+	Acknowledged        bool `json:"acknowledged,omitempty"`
+	AcknowledgementCount int  `json:"acknowledgementCount,omitempty"`
 }
 
 // CreateMessage Model

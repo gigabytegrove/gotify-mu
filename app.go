@@ -16,6 +16,7 @@ import (
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/router"
 	"github.com/gotify/server/v3/runner"
+	"github.com/gotify/server/v3/security"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -169,6 +170,16 @@ func serve(vInfo *model.VersionInfo) int {
 		return 1
 	}
 	defer db.Close()
+
+	secretBox, err := security.NewSecretBox(conf.Security.SecretKey)
+	if err != nil {
+		log.Error().Err(err).Msg("Cannot initialize credential encryption")
+		return 1
+	}
+	if err := db.ConfigureSecretBox(secretBox); err != nil {
+		log.Error().Err(err).Msg("Cannot encrypt existing integration credentials")
+		return 1
+	}
 
 	engine, closeable := router.Create(db, vInfo, conf)
 	defer closeable()

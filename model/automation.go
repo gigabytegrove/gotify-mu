@@ -7,13 +7,17 @@ type WebhookRoute struct {
 	ID              uint      `gorm:"primaryKey;autoIncrement" json:"id"`
 	Name            string    `gorm:"type:text" json:"name"`
 	ApplicationID   uint      `gorm:"index" json:"applicationId"`
-	Secret          string    `gorm:"type:varchar(96);uniqueIndex" json:"-"`
+	Secret          string    `gorm:"type:text" json:"-"`
+	SecretHash      string    `gorm:"type:char(64);uniqueIndex" json:"-"`
 	Enabled         bool      `json:"enabled"`
 	TitleField      string    `gorm:"type:text" json:"titleField"`
 	MessageField    string    `gorm:"type:text" json:"messageField"`
 	PriorityField   string    `gorm:"type:text" json:"priorityField"`
 	DefaultTitle    string    `gorm:"type:text" json:"defaultTitle"`
 	DefaultPriority int       `json:"defaultPriority"`
+	RequireSignature bool      `json:"requireSignature"`
+	SigningSecret    string    `gorm:"type:text" json:"-"`
+	AllowedCIDRs     string    `gorm:"type:text" json:"allowedCidrs"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
@@ -29,8 +33,11 @@ type WebhookRouteView struct {
 	MessageField    string    `json:"messageField"`
 	PriorityField   string    `json:"priorityField"`
 	DefaultTitle    string    `json:"defaultTitle"`
-	DefaultPriority int       `json:"defaultPriority"`
-	CreatedAt       time.Time `json:"createdAt"`
+	DefaultPriority      int       `json:"defaultPriority"`
+	RequireSignature     bool      `json:"requireSignature"`
+	SignatureConfigured  bool      `json:"signatureConfigured"`
+	AllowedCIDRs          string    `json:"allowedCidrs"`
+	CreatedAt             time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
@@ -107,6 +114,8 @@ type ScheduledNotification struct {
 	Enabled       bool       `json:"enabled"`
 	LastRunAt     *time.Time `json:"lastRunAt,omitempty"`
 	NextRunAt     *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
+	ClaimOwner    string     `gorm:"type:text;index" json:"-"`
+	ClaimUntil    *time.Time `gorm:"index" json:"-"`
 	CreatedAt     time.Time  `json:"createdAt"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
 }
@@ -133,6 +142,8 @@ type DigestPolicy struct {
 	ImmediatePriority int       `json:"immediatePriority"`
 	LastSentAt       *time.Time `json:"lastSentAt,omitempty"`
 	NextRunAt        *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
+	ClaimOwner       string     `gorm:"type:text;index" json:"-"`
+	ClaimUntil       *time.Time `gorm:"index" json:"-"`
 	CreatedAt        time.Time  `json:"createdAt"`
 	UpdatedAt        time.Time  `json:"updatedAt"`
 }
@@ -168,7 +179,9 @@ type EscalationState struct {
 	RuleID    uint       `gorm:"index;uniqueIndex:uix_escalation_rule_message,priority:1" json:"ruleId"`
 	MessageID uint       `gorm:"index;uniqueIndex:uix_escalation_rule_message,priority:2" json:"messageId"`
 	DueAt     time.Time  `gorm:"index" json:"dueAt"`
-	Completed bool       `gorm:"index" json:"completed"`
+	Completed  bool       `gorm:"index" json:"completed"`
+	ClaimOwner string     `gorm:"type:text;index" json:"-"`
+	ClaimUntil *time.Time `gorm:"index" json:"-"`
 	CreatedAt time.Time  `json:"createdAt"`
 	DoneAt    *time.Time `json:"doneAt,omitempty"`
 }
@@ -177,5 +190,43 @@ type EscalationState struct {
 type MessageAcknowledgement struct {
 	UserID         uint      `gorm:"primaryKey;autoIncrement:false" json:"userId"`
 	MessageID      uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
+	AcknowledgedAt time.Time `json:"acknowledgedAt"`
+}
+
+
+// AutomationLease coordinates singleton background integrations across multiple Gotify MU instances.
+type AutomationLease struct {
+	Name      string    `gorm:"primaryKey;type:varchar(128)" json:"name"`
+	Owner     string    `gorm:"type:text;index" json:"owner"`
+	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+
+// WebhookReplay prevents signed Webhook requests from being replayed across server instances.
+type WebhookReplay struct {
+	Key       string    `gorm:"primaryKey;type:char(64)" json:"-"`
+	ExpiresAt time.Time `gorm:"index" json:"-"`
+	CreatedAt time.Time `json:"-"`
+}
+
+
+// IntegrationRuntimeStatus describes live connectivity without exposing credentials.
+type IntegrationRuntimeStatus struct {
+	Type            string     `json:"type"`
+	ID              uint       `json:"id"`
+	State           string     `json:"state"`
+	Message         string     `json:"message,omitempty"`
+	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
+	LastEventAt     *time.Time `json:"lastEventAt,omitempty"`
+	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
+}
+
+
+// MessageAcknowledgementView identifies who acknowledged a message and when.
+type MessageAcknowledgementView struct {
+	UserID         uint      `json:"userId"`
+	Name           string    `json:"name"`
+	DisplayName    string    `json:"displayName,omitempty"`
 	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }
