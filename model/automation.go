@@ -133,6 +133,7 @@ type QuietHoursPolicy struct {
 	EndMinute     int       `json:"endMinute"`
 	Timezone      string    `gorm:"type:text" json:"timezone"`
 	AllowPriority int       `json:"allowPriority"`
+	Mode          string    `gorm:"type:varchar(16)" json:"mode"`
 	CreatedAt     time.Time `json:"createdAt"`
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
@@ -237,4 +238,16 @@ type AutomationRecipientDispatch struct {
 	LastError     string     `gorm:"type:text" json:"lastError,omitempty"`
 	CompletedAt   *time.Time `json:"completedAt,omitempty"`
 	UpdatedAt     time.Time  `json:"updatedAt"`
+}
+
+
+// DeferredNotification holds one realtime alert until the user's Quiet Hours window ends.
+type DeferredNotification struct {
+	UserID        uint      `gorm:"primaryKey;autoIncrement:false;index" json:"userId"`
+	MessageID     uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
+	ApplicationID uint      `gorm:"index" json:"applicationId"`
+	Title         string    `gorm:"type:text" json:"title"`
+	Message       string    `gorm:"type:text" json:"message"`
+	Priority      int       `json:"priority"`
+	CreatedAt     time.Time `gorm:"index" json:"createdAt"`
 }
