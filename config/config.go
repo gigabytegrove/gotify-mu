@@ -82,6 +82,7 @@ type Configuration struct {
 	Database          Database
 	DefaultUser       DefaultUser
 	PassStrength      int
+	PasswordMinLength int
 	UploadedImagesDir string
 	PluginsDir        string
 	SecretKeyFile     string
@@ -117,6 +118,7 @@ func Get() (*Configuration, []FutureLog) {
 			Pass: "admin",
 		},
 		PassStrength:      10,
+		PasswordMinLength: 12,
 		UploadedImagesDir: "data/images",
 		PluginsDir:        "data/plugins",
 		SecretKeyFile:     "data/secret.key",
@@ -176,6 +178,7 @@ func Get() (*Configuration, []FutureLog) {
 	add(parseString(&c.DefaultUser.Pass, EnvDefaultUserPass))
 
 	add(parseInt(&c.PassStrength, EnvPassStrength))
+	add(parseInt(&c.PasswordMinLength, EnvPasswordMinLength))
 	add(parseString(&c.UploadedImagesDir, EnvUploadedImagesDir))
 	add(parseString(&c.PluginsDir, EnvPluginsDir))
 	add(parseString(&c.SecretKeyFile, EnvSecretKeyFile))
