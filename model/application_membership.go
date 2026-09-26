@@ -6,18 +6,18 @@ import "time"
 // Application.UserID remains the canonical owner for upstream compatibility;
 // memberships add the many-to-many access model used by Gotify MU.
 type ApplicationMembership struct {
-	ApplicationID        uint `gorm:"primaryKey;autoIncrement:false"`
-	UserID               uint `gorm:"primaryKey;autoIncrement:false;index"`
-	ReceiveNotifications bool   `gorm:"not null"`
-	NotificationOverride *bool  `json:"-"`
-	AutoAssigned         bool   `gorm:"not null"`
+	ApplicationID             uint   `gorm:"primaryKey;autoIncrement:false"`
+	UserID                    uint   `gorm:"primaryKey;autoIncrement:false;index"`
+	ReceiveNotifications      bool   `gorm:"not null"`
+	NotificationOverride      *bool  `json:"-"`
+	AutoAssigned              bool   `gorm:"not null"`
 	Role                      string `gorm:"type:varchar(16)"`
 	GroupRole                 string `gorm:"type:varchar(16)"`
 	GroupAssigned             bool   `gorm:"not null"`
 	GroupReceiveNotifications bool   `gorm:"not null"`
 	EffectiveRole             string `gorm:"-" json:"-"`
-	CreatedAt            time.Time
-	UpdatedAt            time.Time
+	CreatedAt                 time.Time
+	UpdatedAt                 time.Time
 }
 
 // TableName keeps the table name stable across all supported GORM dialects.
