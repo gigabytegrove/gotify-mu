@@ -2,7 +2,6 @@ package directory
 
 import (
 	"bufio"
-	"bytes"
 	"crypto/rand"
 	"crypto/tls"
 	"crypto/x509"
@@ -394,4 +393,3 @@ func readLength(data []byte,offset *int)(int,error){
 }
 func decodeInteger(data []byte)int{value:=0;for _,b:=range data{value=value<<8|int(b)};return value}
 
-var _ = bytes.Equal
