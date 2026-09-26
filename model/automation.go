@@ -13,9 +13,13 @@ type WebhookRoute struct {
 	TitleField      string    `gorm:"type:text" json:"titleField"`
 	MessageField    string    `gorm:"type:text" json:"messageField"`
 	PriorityField   string    `gorm:"type:text" json:"priorityField"`
-	DefaultTitle    string    `gorm:"type:text" json:"defaultTitle"`
-	DefaultPriority int       `json:"defaultPriority"`
-	CreatedAt       time.Time `json:"createdAt"`
+	DefaultTitle         string    `gorm:"type:text" json:"defaultTitle"`
+	DefaultPriority      int       `json:"defaultPriority"`
+	RequireSignature     bool      `json:"requireSignature"`
+	SigningSecret        string    `gorm:"type:text" json:"-"`
+	AllowedCIDRs         string    `gorm:"type:text" json:"allowedCidrs"`
+	ReplayWindowSeconds  int       `json:"replayWindowSeconds"`
+	CreatedAt            time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
@@ -29,9 +33,13 @@ type WebhookRouteView struct {
 	TitleField      string    `json:"titleField"`
 	MessageField    string    `json:"messageField"`
 	PriorityField   string    `json:"priorityField"`
-	DefaultTitle    string    `json:"defaultTitle"`
-	DefaultPriority int       `json:"defaultPriority"`
-	CreatedAt       time.Time `json:"createdAt"`
+	DefaultTitle            string    `json:"defaultTitle"`
+	DefaultPriority         int       `json:"defaultPriority"`
+	RequireSignature        bool      `json:"requireSignature"`
+	SigningSecretConfigured bool      `json:"signingSecretConfigured"`
+	AllowedCIDRs            string    `json:"allowedCidrs"`
+	ReplayWindowSeconds     int       `json:"replayWindowSeconds"`
+	CreatedAt               time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
