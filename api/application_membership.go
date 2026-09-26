@@ -181,7 +181,7 @@ func (a *ApplicationMembershipAPI) UpsertMember(ctx *gin.Context) {
 		switch role {
 		case model.ChannelRoleReadOnly, model.ChannelRoleMember, model.ChannelRolePublisher, model.ChannelRoleManager:
 		default:
-			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid Channel role"))
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid channel role"))
 			return
 		}
 
@@ -443,7 +443,7 @@ func (a *ApplicationMembershipAPI) UpsertGroupAssignment(ctx *gin.Context) {
 		app, ok := a.getAuthorizedApplication(ctx, id)
 		if !ok { return }
 		if app.Internal {
-			ctx.AbortWithError(http.StatusBadRequest, errors.New("internal applications cannot be assigned to Groups"))
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("internal applications cannot be assigned to groups"))
 			return
 		}
 		var params ApplicationGroupAssignmentParams
@@ -451,7 +451,7 @@ func (a *ApplicationMembershipAPI) UpsertGroupAssignment(ctx *gin.Context) {
 		group, err := a.DB.GetUserGroupByID(params.GroupID)
 		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
 		if group == nil {
-			ctx.AbortWithError(http.StatusNotFound, errors.New("Group does not exist"))
+			ctx.AbortWithError(http.StatusNotFound, errors.New("group does not exist"))
 			return
 		}
 		role := strings.ToLower(strings.TrimSpace(params.Role))
