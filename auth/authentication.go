@@ -13,6 +13,11 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+type DirectoryAuthenticator interface {
+	Authenticate(username, password string) (*model.User, error)
+	Enabled() bool
+}
+
 type authState int
 
 const (
@@ -45,6 +50,7 @@ type Auth struct {
 	DB               Database
 	SecureCookie     bool
 	LocalAuthEnabled bool
+	Directory        DirectoryAuthenticator
 	CrossOrigin      *http.CrossOriginProtection
 	LoginLimiter     *security.Limiter
 }
@@ -163,31 +169,50 @@ func (a *Auth) rejectForeignOrigin(ctx *gin.Context) bool {
 
 func (a *Auth) handleUser(checks ...func(*model.User) (authState, error)) func(ctx *gin.Context) (authState, error) {
 	return func(ctx *gin.Context) (authState, error) {
-		if name, pass, ok := ctx.Request.BasicAuth(); ok {
-			if !a.LocalAuthEnabled {
-				return authStateLocalAuthDisabled, nil
-			}
-			limiterKey := ctx.ClientIP() + "|" + strings.ToLower(strings.TrimSpace(name))
-			if a.LoginLimiter != nil && !a.LoginLimiter.Allow(limiterKey) {
-				ctx.Header("Retry-After", "60")
-				return authStateForbidden, errors.New("too many authentication attempts")
-			}
-			if user, err := a.DB.GetUserByName(name); err != nil {
+		name, pass, ok := ctx.Request.BasicAuth()
+		if !ok {
+			return authStateSkip, nil
+		}
+		directoryEnabled := a.Directory != nil && a.Directory.Enabled()
+		if !a.LocalAuthEnabled && !directoryEnabled {
+			return authStateLocalAuthDisabled, nil
+		}
+
+		limiterKey := ctx.ClientIP() + "|" + strings.ToLower(strings.TrimSpace(name))
+		if a.LoginLimiter != nil && !a.LoginLimiter.Allow(limiterKey) {
+			ctx.Header("Retry-After", "60")
+			return authStateForbidden, errors.New("too many authentication attempts")
+		}
+
+		var user *model.User
+		if a.LocalAuthEnabled {
+			local, err := a.DB.GetUserByName(name)
+			if err != nil {
 				return authStateSkip, err
-			} else if user != nil && password.ComparePassword(user.Pass, []byte(pass)) {
-				if a.LoginLimiter != nil { a.LoginLimiter.Reset(limiterKey) }
-				RegisterUser(ctx, user)
-
-				for _, check := range checks {
-					if state, err := check(user); err != nil || state != authStateOk {
-						return state, err
-					}
-				}
-
-				return authStateOk, nil
+			}
+			if local != nil && password.ComparePassword(local.Pass, []byte(pass)) {
+				user = local
 			}
 		}
-		return authStateSkip, nil
+		if user == nil && directoryEnabled {
+			directoryUser, err := a.Directory.Authenticate(name, pass)
+			if err != nil {
+				return authStateSkip, err
+			}
+			user = directoryUser
+		}
+		if user == nil {
+			return authStateSkip, nil
+		}
+
+		if a.LoginLimiter != nil { a.LoginLimiter.Reset(limiterKey) }
+		RegisterUser(ctx, user)
+		for _, check := range checks {
+			if state, err := check(user); err != nil || state != authStateOk {
+				return state, err
+			}
+		}
+		return authStateOk, nil
 	}
 }
 
