@@ -443,7 +443,7 @@ func (e *Engine) runEscalations(now time.Time) {
 						title = "Escalated: " + title
 					}
 					body := msg.Message + "\n\nThis notification was escalated because it was not acknowledged."
-					escalated := &model.Message{ApplicationID:rule.TargetApplicationID,Title:title,Message:body,Priority:msg.Priority,Date:time.Now()}
+					escalated := &model.Message{ApplicationID:rule.TargetApplicationID,Title:title,Message:body,Priority:msg.Priority,Date:time.Now(),ParentMessageID:msg.ID,EscalationRuleID:rule.ID}
 					if _, publishErr := e.storeAndDeliver(escalated, false); publishErr != nil {
 						log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
 						continue
@@ -986,6 +986,11 @@ func externalMessage(msg *model.Message) *model.MessageExternal {
 		SenderUserID: msg.SenderUserID,
 		SenderName: msg.SenderName,
 		Acknowledged: msg.Acknowledged,
+		AcknowledgedAny: msg.AcknowledgedAny,
+		AcknowledgementCount: msg.AcknowledgementCount,
+		AcknowledgedBy: msg.AcknowledgedBy,
+		ParentMessageID: msg.ParentMessageID,
+		EscalationRuleID: msg.EscalationRuleID,
 	}
 }
 
