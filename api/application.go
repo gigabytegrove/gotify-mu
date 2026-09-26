@@ -177,7 +177,11 @@ func (a *ApplicationAPI) GetApplications(ctx *gin.Context) {
 			receiveNotifications := membership.ReceiveNotifications
 			app.ReceiveNotifications = &receiveNotifications
 		}
-		app.CurrentRole = model.EffectiveChannelRole(app.UserID == userID, membership)
+		if app.UserID == userID {
+			app.CurrentRole = model.ChannelRoleOwner
+		} else {
+			app.CurrentRole = model.EffectiveChannelRole(false, membership)
+		}
 		app.Token = ""
 		withResolvedImage(app)
 	}
