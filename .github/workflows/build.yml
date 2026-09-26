@@ -143,3 +143,72 @@ jobs:
           prerelease: true
           overwrite: true
           file_glob: true
+
+
+  gotify-mu-android-test:
+    name: Gotify MU Android Tailwind phone test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out Gotify MU server assets
+        uses: actions/checkout@v4
+        with:
+          path: server
+
+      - name: Check out Android Tailwind test branch
+        uses: actions/checkout@v4
+        with:
+          repository: gigabytegrove/gotify-mu-android
+          ref: feature/gotify-mu-v0.2.0-tailwind-admin
+          path: android
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: android/webui/package.json
+
+      - name: Build Tailwind CSS
+        working-directory: android/webui
+        run: |
+          npm install --no-audit --no-fund
+          npm run build
+
+      - name: Apply Gotify MU branding assets
+        run: |
+          cp server/assets/gotify-mu-logo.png android/app/src/main/assets/mu/gotify-mu-logo.png
+          cp server/assets/gotify-mu-logo.png android/app/src/main/res/drawable/gotify_mu_logo.png
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build debug APK
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --stacktrace
+
+      - name: Package phone test and generated web assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p dist/generated
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/Gotify-MU-v0.2.0-tailwind-test.apk
+          cp android/app/src/main/assets/mu/app.css dist/generated/app.css
+          cp android/app/src/main/assets/mu/gotify-mu-logo.png dist/generated/gotify-mu-logo.png
+          cp android/app/src/main/res/drawable/gotify_mu_logo.png dist/generated/gotify_mu_logo.png
+          sha256sum dist/Gotify-MU-v0.2.0-tailwind-test.apk | tee dist/SHA256SUMS.txt
+          {
+            echo "Gotify MU Android v0.2.0 Tailwind test build"
+            echo "Android repository: gigabytegrove/gotify-mu-android"
+            echo "Android ref: feature/gotify-mu-v0.2.0-tailwind-admin"
+            echo "Built: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          } > dist/build-info.txt
+
+      - name: Upload phone test artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: gotify-mu-android-v0.2.0-tailwind-test
+          path: dist/
+          if-no-files-found: error
