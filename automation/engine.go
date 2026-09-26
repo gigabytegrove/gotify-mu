@@ -187,10 +187,16 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 		return nil, err
 	}
 	if msg.SenderUserID != 0 {
+		app, appErr := e.db.GetApplicationByID(msg.ApplicationID)
+		if appErr != nil {
+			return nil, appErr
+		}
+		if app != nil && app.AllowMemberPost {
+			// Chat Channel senders intentionally receive their own message notification,
+			// even when their per-channel notification toggle is muted.
+			recipients = append(recipients, msg.SenderUserID)
+		}
 		for _, userID := range mentionRecipientUserIDs(msg) {
-			if userID == msg.SenderUserID {
-				continue
-			}
 			membership, membershipErr := e.db.GetApplicationMembership(msg.ApplicationID, userID)
 			if membershipErr != nil {
 				return nil, membershipErr
@@ -203,9 +209,6 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 
 	delivered := make(map[uint]struct{}, len(recipients))
 	for _, userID := range recipients {
-		if msg.SenderUserID != 0 && userID == msg.SenderUserID {
-			continue
-		}
 		if _, exists := delivered[userID]; exists {
 			continue
 		}
