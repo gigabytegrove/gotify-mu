@@ -11,6 +11,7 @@ import (
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/fracdex"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -197,7 +198,8 @@ func createDirectoryIfSqlite(dialect, connection string) {
 
 // GormDatabase is a wrapper for the gorm framework.
 type GormDatabase struct {
-	DB *gorm.DB
+	DB        *gorm.DB
+	SecretBox *security.SecretBox
 }
 
 // Close closes the gorm database connection.
