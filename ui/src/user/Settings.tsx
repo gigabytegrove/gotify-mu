@@ -25,7 +25,13 @@ import {ThemeKey} from '../layout/theme';
 import {useStores} from '../stores';
 import * as config from '../config';
 import {UpdateStatusCard} from '../update/UpdateStatus';
-import {IDigestPolicy, IQuietHoursPolicy, ISecurityPolicy, IMFAStatus} from '../types';
+import {
+    IDigestPolicy,
+    IDirectoryConfig,
+    IQuietHoursPolicy,
+    ISecurityPolicy,
+    IMFAStatus,
+} from '../types';
 
 interface IProps {
     themeMode: ThemeKey;
@@ -42,6 +48,7 @@ const Settings = ({themeMode, setTheme}: IProps) => {
         maxWidth={900}>
         {currentUser.user.admin && <UpdateStatusCard />}
         {currentUser.user.admin && <AdministratorSecurityPolicy />}
+        {currentUser.user.admin && <DirectoryAuthentication />}
 
         <MFASettings />
         <NotificationPreferences />
@@ -84,22 +91,278 @@ const Settings = ({themeMode, setTheme}: IProps) => {
                     direction={{xs: 'column', sm: 'row'}}
                     spacing={1}
                     sx={{justifyContent: 'space-between'}}> 
+                    <Typography>Directory sign-in</Typography>
+                    <Chip size="small" label={config.get('directory') ? 'Enabled' : 'Disabled'} />
+                </Stack>
+                <Stack
+                    direction={{xs: 'column', sm: 'row'}}
+                    spacing={1}
+                    sx={{justifyContent: 'space-between'}}> 
                     <Typography>Single sign-on</Typography>
                     <Chip size="small" label={config.get('oidc') ? 'Enabled' : 'Disabled'} />
                 </Stack>
             </Stack>
         </SurfaceCard>
 
-        <SurfaceCard
-            title="Change Password"
-            subtitle="Choose a new password for your account."
-            action={<Key color="action" />}>
-            <ChangePasswordForm />
-        </SurfaceCard>
+        {!currentUser.user.directoryManaged && (
+            <SurfaceCard
+                title="Change Password"
+                subtitle="Choose a new password for your account."
+                action={<Key color="action" />}>
+                <ChangePasswordForm />
+            </SurfaceCard>
+        )}
     </DefaultPage>
     );
 };
 
+
+const DirectoryAuthentication = () => {
+    const {elevateStore, snackManager} = useStores();
+    const [settings, setSettings] = React.useState<IDirectoryConfig>();
+    const [bindPassword, setBindPassword] = React.useState('');
+    const [testUsername, setTestUsername] = React.useState('');
+    const [testPassword, setTestPassword] = React.useState('');
+    const [saving, setSaving] = React.useState(false);
+    const [testing, setTesting] = React.useState(false);
+
+    const refresh = React.useCallback(async () => {
+        const response = await axios.get<IDirectoryConfig>(config.get('url') + 'directory');
+        setSettings(response.data);
+    }, []);
+
+    React.useEffect(() => {
+        void refresh();
+    }, [refresh]);
+
+    if (!settings) {
+        return (
+            <SurfaceCard
+                title="Directory Authentication"
+                subtitle="Connect LDAP or Active Directory without replacing Gotify MU authorization.">
+                <Typography color="text.secondary">Loading directory configuration…</Typography>
+            </SurfaceCard>
+        );
+    }
+    if (!elevateStore.elevated) {
+        return (
+            <SurfaceCard
+                title="Directory Authentication"
+                subtitle="Connect LDAP or Active Directory without replacing Gotify MU authorization.">
+                <ElevationForm />
+            </SurfaceCard>
+        );
+    }
+
+    const payload = () => ({
+        enabled: settings.enabled,
+        url: settings.url,
+        startTls: settings.startTls,
+        bindDn: settings.bindDn,
+        bindPassword,
+        userBaseDn: settings.userBaseDn,
+        userAttribute: settings.userAttribute,
+        displayNameAttribute: settings.displayNameAttribute,
+        adminGroupDn: settings.adminGroupDn,
+        autoRegister: settings.autoRegister,
+        linkByUsername: settings.linkByUsername,
+        caCertificatePem: settings.caCertificatePem,
+    });
+
+    const save = async () => {
+        setSaving(true);
+        try {
+            const response = await axios.put<IDirectoryConfig>(
+                config.get('url') + 'directory',
+                payload()
+            );
+            setSettings(response.data);
+            setBindPassword('');
+            snackManager.snack('Directory authentication settings saved');
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const test = async () => {
+        setTesting(true);
+        try {
+            await axios.post(config.get('url') + 'directory/test', {
+                ...payload(),
+                username: testUsername,
+                password: testPassword,
+            });
+            snackManager.snack('Directory connection and sign-in succeeded');
+        } finally {
+            setTesting(false);
+        }
+    };
+
+    return (
+        <SurfaceCard
+            title="Directory Authentication"
+            subtitle="LDAP and Active Directory authentication with certificate validation."
+            action={<Security color="action" />}>
+            <Stack spacing={2}>
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={settings.enabled}
+                            onChange={(event) =>
+                                setSettings({...settings, enabled: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Enable directory sign-in"
+                />
+                <TextField
+                    label="Directory URL"
+                    value={settings.url}
+                    onChange={(event) => setSettings({...settings, url: event.target.value})}
+                    placeholder="ldaps://ad.example.com:636"
+                    helperText="Use ldap:// with STARTTLS or ldaps://. Certificate verification cannot be disabled."
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={settings.startTls}
+                            disabled={settings.url.toLowerCase().startsWith('ldaps://')}
+                            onChange={(event) =>
+                                setSettings({...settings, startTls: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Use STARTTLS for ldap:// connections"
+                />
+                <TextField
+                    label="Bind DN"
+                    value={settings.bindDn}
+                    onChange={(event) => setSettings({...settings, bindDn: event.target.value})}
+                    placeholder="CN=Gotify MU,OU=Service Accounts,DC=example,DC=com"
+                />
+                <TextField
+                    label={settings.bindPasswordConfigured ? 'New bind password' : 'Bind password'}
+                    type="password"
+                    value={bindPassword}
+                    onChange={(event) => setBindPassword(event.target.value)}
+                    helperText={
+                        settings.bindPasswordConfigured
+                            ? 'Leave blank to keep the saved encrypted bind password.'
+                            : 'Optional when anonymous directory search is allowed.'
+                    }
+                />
+                <TextField
+                    label="User search base"
+                    value={settings.userBaseDn}
+                    onChange={(event) =>
+                        setSettings({...settings, userBaseDn: event.target.value})
+                    }
+                    placeholder="OU=Users,DC=example,DC=com"
+                    required
+                />
+                <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                    <TextField
+                        label="Username attribute"
+                        value={settings.userAttribute}
+                        onChange={(event) =>
+                            setSettings({...settings, userAttribute: event.target.value})
+                        }
+                        placeholder="sAMAccountName"
+                        fullWidth
+                    />
+                    <TextField
+                        label="Display name attribute"
+                        value={settings.displayNameAttribute}
+                        onChange={(event) =>
+                            setSettings({
+                                ...settings,
+                                displayNameAttribute: event.target.value,
+                            })
+                        }
+                        placeholder="displayName"
+                        fullWidth
+                    />
+                </Stack>
+                <TextField
+                    label="Administrator group DN"
+                    value={settings.adminGroupDn}
+                    onChange={(event) =>
+                        setSettings({...settings, adminGroupDn: event.target.value})
+                    }
+                    placeholder="CN=Gotify MU Admins,OU=Groups,DC=example,DC=com"
+                    helperText="Optional. Exact memberOf matches are granted administrator access."
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={settings.autoRegister}
+                            onChange={(event) =>
+                                setSettings({...settings, autoRegister: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Create Gotify MU users automatically after successful directory sign-in"
+                />
+                <FormControlLabel
+                    control={
+                        <Switch
+                            checked={settings.linkByUsername}
+                            onChange={(event) =>
+                                setSettings({...settings, linkByUsername: event.target.checked})
+                            }
+                        />
+                    }
+                    label="Allow a matching local username to become directory managed"
+                />
+                <TextField
+                    label="Private CA certificate"
+                    value={settings.caCertificatePem}
+                    onChange={(event) =>
+                        setSettings({...settings, caCertificatePem: event.target.value})
+                    }
+                    multiline
+                    minRows={3}
+                    placeholder="-----BEGIN CERTIFICATE-----"
+                    helperText="Optional PEM certificate for an internal directory CA."
+                />
+                <Button
+                    variant="contained"
+                    disabled={saving}
+                    onClick={() => void save()}
+                    sx={{alignSelf: 'flex-start'}}>
+                    Save Directory Settings
+                </Button>
+
+                <Typography sx={{fontWeight: 700}}>Test Configuration</Typography>
+                <Typography variant="body2" color="text.secondary">
+                    The test uses the values above without saving them first.
+                </Typography>
+                <Stack direction={{xs: 'column', sm: 'row'}} spacing={2}>
+                    <TextField
+                        label="Test username"
+                        value={testUsername}
+                        onChange={(event) => setTestUsername(event.target.value)}
+                        fullWidth
+                    />
+                    <TextField
+                        label="Test password"
+                        type="password"
+                        value={testPassword}
+                        onChange={(event) => setTestPassword(event.target.value)}
+                        fullWidth
+                    />
+                </Stack>
+                <Button
+                    variant="outlined"
+                    disabled={testing || !testUsername || !testPassword}
+                    onClick={() => void test()}
+                    sx={{alignSelf: 'flex-start'}}>
+                    Test Directory Sign-In
+                </Button>
+            </Stack>
+        </SurfaceCard>
+    );
+};
 
 const MFASettings = () => {
     const {elevateStore, snackManager} = useStores();
