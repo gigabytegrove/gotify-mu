@@ -77,6 +77,7 @@ export interface IUser {
     name: string;
     displayName?: string;
     admin: boolean;
+    directoryManaged?: boolean;
     createdAt: string;
 }
 
