@@ -440,6 +440,7 @@ type quietHoursParams struct {
 	EndMinute     int    `json:"endMinute"`
 	Timezone      string `json:"timezone"`
 	AllowPriority int    `json:"allowPriority"`
+	Mode          string `json:"mode"`
 }
 
 func (a *AutomationAPI) GetQuietHours(ctx *gin.Context) {
@@ -447,7 +448,7 @@ func (a *AutomationAPI) GetQuietHours(ctx *gin.Context) {
 	item, err := a.DB.GetQuietHoursPolicy(userID)
 	if !successOrAbort(ctx, 500, err) { return }
 	if item == nil {
-		item = &model.QuietHoursPolicy{UserID:userID, StartMinute:1320, EndMinute:420, Timezone:"UTC", AllowPriority:8}
+		item = &model.QuietHoursPolicy{UserID:userID, StartMinute:1320, EndMinute:420, Timezone:"UTC", AllowPriority:8, Mode:"suppress"}
 	}
 	ctx.JSON(200, item)
 }
@@ -461,7 +462,12 @@ func (a *AutomationAPI) SaveQuietHours(ctx *gin.Context) {
 	if _, err := time.LoadLocation(valueOr(params.Timezone, "UTC")); err != nil {
 		ctx.AbortWithError(400, errors.New("invalid timezone")); return
 	}
-	item := &model.QuietHoursPolicy{UserID:auth.GetUserID(ctx), Enabled:params.Enabled, StartMinute:params.StartMinute, EndMinute:params.EndMinute, Timezone:valueOr(params.Timezone,"UTC"), AllowPriority:params.AllowPriority}
+	mode := valueOr(params.Mode, "suppress")
+	if mode != "suppress" && mode != "defer" {
+		ctx.AbortWithError(400, errors.New("Quiet Hours mode must be suppress or defer"))
+		return
+	}
+	item := &model.QuietHoursPolicy{UserID:auth.GetUserID(ctx), Enabled:params.Enabled, StartMinute:params.StartMinute, EndMinute:params.EndMinute, Timezone:valueOr(params.Timezone,"UTC"), AllowPriority:params.AllowPriority, Mode:mode}
 	if !successOrAbort(ctx, 500, a.DB.SaveQuietHoursPolicy(item)) { return }
 	ctx.JSON(200, item)
 }
