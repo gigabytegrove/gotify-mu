@@ -391,3 +391,15 @@ func (d *GormDatabase) GetIntegrationEvents(kind string, integrationID uint, lim
 func (d *GormDatabase) DeleteIntegrationEventsBefore(before time.Time) error {
 	return d.DB.Where("created_at < ?", before).Delete(&model.IntegrationEvent{}).Error
 }
+
+
+func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]model.MessageAcknowledgementView, error) {
+	var rows []model.MessageAcknowledgementView
+	err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.user_id, users.name, users.display_name, ma.acknowledged_at").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id = ?", messageID).
+		Order("ma.acknowledged_at ASC").
+		Scan(&rows).Error
+	return rows, err
+}
