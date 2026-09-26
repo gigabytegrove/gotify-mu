@@ -49,8 +49,41 @@ export interface IMessage {
     senderUserId?: number;
     senderName?: string;
     acknowledged?: boolean;
+    acknowledgedAny?: boolean;
+    acknowledgementCount?: number;
+    acknowledgedBy?: IMessageAcknowledgement[];
+    parentMessageId?: number;
+    escalationRuleId?: number;
     image?: string;
     extras?: IMessageExtras;
+}
+
+export interface IMessageAcknowledgement {
+    userId: number;
+    name: string;
+    displayName?: string;
+    acknowledgedAt: string;
+}
+
+export interface IIntegrationStatus {
+    kind: string;
+    integrationId: number;
+    state: string;
+    message?: string;
+    lastConnectedAt?: string;
+    lastEventAt?: string;
+    lastErrorAt?: string;
+    updatedAt: string;
+}
+
+export interface IIntegrationEvent {
+    id: number;
+    kind: string;
+    integrationId: number;
+    level: string;
+    event: string;
+    message: string;
+    createdAt: string;
 }
 
 export interface IMessageExtras {
@@ -138,6 +171,7 @@ export interface IWebhookRoute {
     defaultPriority: number;
     createdAt: string;
     updatedAt: string;
+    status?: IIntegrationStatus;
 }
 
 export interface IMQTTIntegration {
@@ -152,6 +186,7 @@ export interface IMQTTIntegration {
     enabled: boolean;
     createdAt: string;
     updatedAt: string;
+    status?: IIntegrationStatus;
 }
 
 export interface IHomeAssistantIntegration {
@@ -164,6 +199,7 @@ export interface IHomeAssistantIntegration {
     enabled: boolean;
     createdAt: string;
     updatedAt: string;
+    status?: IIntegrationStatus;
 }
 
 export interface IScheduledNotification {
