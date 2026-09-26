@@ -44,6 +44,10 @@ type Notifier interface {
 	Notify(userID uint, message *model.MessageExternal)
 }
 
+type Dispatcher interface {
+	StoreAndDeliver(message *model.Message) (*model.MessageExternal, error)
+}
+
 // Manager is an encapsulating layer for plugins and manages all plugins and its instances.
 type Manager struct {
 	mutex     *sync.RWMutex
@@ -52,11 +56,12 @@ type Manager struct {
 	messages  chan MessageWithUserID
 	db        Database
 	mux       *gin.RouterGroup
-	directory string
+	directory  string
+	dispatcher Dispatcher
 }
 
 // NewManager created a Manager from configurations.
-func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier Notifier) (*Manager, error) {
+func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier Notifier, dispatcher Dispatcher) (*Manager, error) {
 	manager := &Manager{
 		mutex:     &sync.RWMutex{},
 		instances: map[uint]compat.PluginInstance{},
@@ -64,7 +69,8 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 		messages:  make(chan MessageWithUserID),
 		db:        db,
 		mux:       mux,
-		directory: directory,
+		directory:  directory,
+		dispatcher: dispatcher,
 	}
 
 	go func() {
@@ -80,7 +86,19 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 			if message.Message.Extras != nil {
 				internalMsg.Extras, _ = json.Marshal(message.Message.Extras)
 			}
-			db.CreateMessage(internalMsg)
+			if manager.dispatcher != nil {
+				external, err := manager.dispatcher.StoreAndDeliver(internalMsg)
+				if err != nil {
+					log.Error().Err(err).Uint("application_id", internalMsg.ApplicationID).Msg("Plugin message delivery failed")
+					continue
+				}
+				message.Message.ID = external.ID
+				continue
+			}
+			if err := db.CreateMessage(internalMsg); err != nil {
+				log.Error().Err(err).Uint("application_id", internalMsg.ApplicationID).Msg("Plugin message storage failed")
+				continue
+			}
 			message.Message.ID = internalMsg.ID
 			notifier.Notify(message.UserID, &message.Message)
 		}
