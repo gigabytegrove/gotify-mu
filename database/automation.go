@@ -20,6 +20,11 @@ func (d *GormDatabase) GetWebhookRoutes() ([]*model.WebhookRoute, error) {
 			return nil, err
 		}
 		item.Secret = plain
+		signing, signErr := d.decryptCredential(item.SigningSecret)
+		if signErr != nil {
+			return nil, signErr
+		}
+		item.SigningSecret = signing
 	}
 	return items, nil
 }
@@ -35,6 +40,11 @@ func (d *GormDatabase) GetWebhookRouteByID(id uint) (*model.WebhookRoute, error)
 		return nil, err
 	}
 	item.Secret = plain
+	signing, signErr := d.decryptCredential(item.SigningSecret)
+	if signErr != nil {
+		return nil, signErr
+	}
+	item.SigningSecret = signing
 	return item, nil
 }
 
@@ -52,6 +62,11 @@ func (d *GormDatabase) GetWebhookRouteBySecret(secret string) (*model.WebhookRou
 		return nil, nil
 	}
 	item.Secret = plain
+	signing, signErr := d.decryptCredential(item.SigningSecret)
+	if signErr != nil {
+		return nil, signErr
+	}
+	item.SigningSecret = signing
 	return item, nil
 }
 
@@ -63,6 +78,11 @@ func (d *GormDatabase) SaveWebhookRoute(item *model.WebhookRoute) error {
 		return err
 	}
 	copyItem.Secret = encrypted
+	signingEncrypted, err := d.encryptCredential(item.SigningSecret)
+	if err != nil {
+		return err
+	}
+	copyItem.SigningSecret = signingEncrypted
 	if err := d.DB.Save(&copyItem).Error; err != nil {
 		return err
 	}
@@ -322,4 +342,19 @@ func (d *GormDatabase) AcquireAutomationLease(name, owner string, now, until tim
 
 func (d *GormDatabase) ReleaseAutomationLease(name, owner string) error {
 	return d.DB.Where("name = ? AND owner = ?", name, owner).Delete(&model.AutomationLease{}).Error
+}
+
+func (d *GormDatabase) RegisterWebhookReplay(key string, expiresAt time.Time) (bool, error) {
+	now := time.Now()
+	if err := d.DB.Where("expires_at <= ?", now).Delete(&model.WebhookReplay{}).Error; err != nil {
+		return false, err
+	}
+	result := d.DB.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.WebhookReplay{
+		Key:       key,
+		ExpiresAt: expiresAt,
+	})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
 }
