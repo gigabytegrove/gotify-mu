@@ -61,6 +61,8 @@ type ApplicationParams struct {
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
 	// Whether assigned users may publish messages to this Gotify MU channel.
 	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
+	// The Gotify MU channel interaction mode: "notification" or "chat".
+	ChannelType string `form:"channelType" query:"channelType" json:"channelType"`
 }
 
 // CreateApplication creates an application and returns the access token.
@@ -99,6 +101,11 @@ type ApplicationParams struct {
 func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 	applicationParams := ApplicationParams{}
 	if err := ctx.Bind(&applicationParams); err == nil {
+		channelType, err := normalizeRequestedChannelType(applicationParams.ChannelType, applicationParams.AllowMemberPost)
+		if err != nil {
+			ctx.AbortWithError(http.StatusBadRequest, err)
+			return
+		}
 		if applicationParams.AutoAssign || applicationParams.AllowMemberPost {
 			current, err := a.DB.GetUserByID(auth.GetUserID(ctx))
 			if success := successOrAbort(ctx, 500, err); !success {
@@ -123,6 +130,7 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			Internal:        false,
 			AutoAssign:      applicationParams.AutoAssign,
 			AllowMemberPost: applicationParams.AllowMemberPost,
+			ChannelType:     channelType,
 		}
 
 		if err := a.DB.CreateApplication(&app); err != nil {
@@ -173,6 +181,7 @@ func (a *ApplicationAPI) GetApplications(ctx *gin.Context) {
 			receiveNotifications := membership.ReceiveNotifications
 			app.ReceiveNotifications = &receiveNotifications
 		}
+		normalizeStoredChannelType(app)
 		app.Token = ""
 		withResolvedImage(app)
 	}
@@ -315,6 +324,14 @@ func (a *ApplicationAPI) UpdateApplication(ctx *gin.Context) {
 				app.Description = applicationParams.Description
 				app.Name = applicationParams.Name
 				app.DefaultPriority = applicationParams.DefaultPriority
+				if applicationParams.ChannelType != "" {
+					channelType, err := normalizeRequestedChannelType(applicationParams.ChannelType, app.AllowMemberPost)
+					if err != nil {
+						ctx.AbortWithError(http.StatusBadRequest, err)
+						return
+					}
+					app.ChannelType = channelType
+				}
 				if applicationParams.SortKey != "" {
 					app.SortKey = applicationParams.SortKey
 				}
@@ -586,7 +603,36 @@ func (a *ApplicationAPI) RemoveApplicationImage(ctx *gin.Context) {
 	})
 }
 
+func normalizeRequestedChannelType(channelType string, allowMemberPost bool) (string, error) {
+	channelType = strings.ToLower(strings.TrimSpace(channelType))
+	if channelType == "" {
+		// Gotify MU 0.2.x represented experimental Chat Channels solely with
+		// allowMemberPost. Preserve that behavior for old clients and payloads.
+		if allowMemberPost {
+			return model.ChannelTypeChat, nil
+		}
+		return model.ChannelTypeNotification, nil
+	}
+	switch channelType {
+	case model.ChannelTypeNotification, model.ChannelTypeChat:
+		return channelType, nil
+	default:
+		return "", fmt.Errorf("unsupported channelType %q", channelType)
+	}
+}
+
+func normalizeStoredChannelType(app *model.Application) {
+	if app == nil {
+		return
+	}
+	channelType, err := normalizeRequestedChannelType(app.ChannelType, app.AllowMemberPost)
+	if err == nil {
+		app.ChannelType = channelType
+	}
+}
+
 func withResolvedImage(app *model.Application) *model.Application {
+	normalizeStoredChannelType(app)
 	if app.Image == "" {
 		// This must stay in sync with the isDefaultImage check in ui/src/application/Applications.tsx.
 		app.Image = "static/defaultapp.png"
