@@ -68,7 +68,12 @@ type MQTTIntegrationView struct {
 	Username            string    `json:"username"`
 	PasswordConfigured bool      `json:"passwordConfigured"`
 	Topic               string    `json:"topic"`
-	Enabled             bool      `json:"enabled"`
+	Enabled             bool       `json:"enabled"`
+	State               string     `json:"state,omitempty"`
+	StatusMessage       string     `json:"statusMessage,omitempty"`
+	LastConnectedAt     *time.Time `json:"lastConnectedAt,omitempty"`
+	LastMessageAt       *time.Time `json:"lastMessageAt,omitempty"`
+	LastErrorAt         *time.Time `json:"lastErrorAt,omitempty"`
 	CreatedAt           time.Time `json:"createdAt"`
 	UpdatedAt           time.Time `json:"updatedAt"`
 }
@@ -94,7 +99,12 @@ type HomeAssistantIntegrationView struct {
 	BaseURL         string    `json:"baseUrl"`
 	TokenConfigured bool      `json:"tokenConfigured"`
 	EventType       string    `json:"eventType"`
-	Enabled         bool      `json:"enabled"`
+	Enabled         bool       `json:"enabled"`
+	State           string     `json:"state,omitempty"`
+	StatusMessage   string     `json:"statusMessage,omitempty"`
+	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
+	LastMessageAt   *time.Time `json:"lastMessageAt,omitempty"`
+	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
