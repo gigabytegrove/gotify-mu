@@ -51,6 +51,11 @@ func (d *GormDatabase) SaveWebhookRoute(item *model.WebhookRoute) error {
 		encrypted, err := d.Secrets.Encrypt(item.Secret)
 		if err != nil { return err }
 		stored.Secret = encrypted
+		if item.SigningSecret != "" {
+			signingSecret, err := d.Secrets.Encrypt(item.SigningSecret)
+			if err != nil { return err }
+			stored.SigningSecret = signingSecret
+		}
 	}
 	if err := d.DB.Save(&stored).Error; err != nil { return err }
 	item.ID, item.SecretHash, item.CreatedAt, item.UpdatedAt = stored.ID, stored.SecretHash, stored.CreatedAt, stored.UpdatedAt
@@ -245,6 +250,11 @@ func (d *GormDatabase) decryptWebhook(item *model.WebhookRoute) error {
 	plain, err := d.Secrets.Decrypt(item.Secret)
 	if err != nil { return err }
 	item.Secret = plain
+	if item.SigningSecret != "" {
+		signingSecret, err := d.Secrets.Decrypt(item.SigningSecret)
+		if err != nil { return err }
+		item.SigningSecret = signingSecret
+	}
 	return nil
 }
 
@@ -274,10 +284,18 @@ func (d *GormDatabase) encryptStoredIntegrationSecrets() error {
 		if err != nil { return err }
 		encrypted, err := d.Secrets.Encrypt(plain)
 		if err != nil { return err }
-		if err := d.DB.Model(item).Updates(map[string]any{
+		updates := map[string]any{
 			"secret": encrypted,
 			"secret_hash": secretHash(plain),
-		}).Error; err != nil { return err }
+		}
+		if item.SigningSecret != "" {
+			signingPlain, err := d.Secrets.Decrypt(item.SigningSecret)
+			if err != nil { return err }
+			signingEncrypted, err := d.Secrets.Encrypt(signingPlain)
+			if err != nil { return err }
+			updates["signing_secret"] = signingEncrypted
+		}
+		if err := d.DB.Model(item).Updates(updates).Error; err != nil { return err }
 	}
 
 	var mqtt []*model.MQTTIntegration
