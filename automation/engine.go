@@ -1099,7 +1099,7 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 		return err
 	}
 	if integration == nil {
-		return errors.New("Home Assistant connection not found")
+		return errors.New("home Assistant connection not found")
 	}
 	eventType = strings.TrimSpace(eventType)
 	if eventType == "" {
@@ -1124,7 +1124,7 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("Home Assistant returned HTTP %d", response.StatusCode)
+		return fmt.Errorf("home Assistant returned HTTP %d", response.StatusCode)
 	}
 	return nil
 }
@@ -1159,7 +1159,7 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 	case "http":
 		parsed.Scheme = "ws"
 	default:
-		return errors.New("Home Assistant URL must use http or https")
+		return errors.New("home Assistant URL must use http or https")
 	}
 	parsed.Path = strings.TrimRight(parsed.Path, "/") + "/api/websocket"
 
