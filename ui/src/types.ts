@@ -234,6 +234,7 @@ export interface IQuietHoursPolicy {
     endMinute: number;
     timezone: string;
     allowPriority: number;
+    mode: 'suppress' | 'defer';
 }
 
 export interface IDigestPolicy {
