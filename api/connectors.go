@@ -52,7 +52,7 @@ func (a *ConnectorAPI) channel(ctx *gin.Context, id uint) bool {
 	item, err := a.DB.GetApplicationByID(id)
 	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return false }
 	if item == nil {
-		ctx.AbortWithError(http.StatusBadRequest, errors.New("Channel not found"))
+		ctx.AbortWithError(http.StatusBadRequest, errors.New("channel not found"))
 		return false
 	}
 	return true
