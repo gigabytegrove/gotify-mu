@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/model"
@@ -100,8 +101,9 @@ func TestMUPresenceSendsTypingToOtherChatMembers(t *testing.T) {
 		got.event.UserID != 1 || got.event.UserName != "alice" || !got.event.Typing {
 		t.Fatalf("unexpected typing event: %#v", got)
 	}
-	if !got.event.ExpiresAt.After(got.event.ExpiresAt.Add(-5 * 1e9)) {
-		t.Fatal("typing event expiry was not populated")
+	remaining := time.Until(got.event.ExpiresAt)
+	if remaining < 4*time.Second || remaining > 7*time.Second {
+		t.Fatalf("unexpected typing expiry window: %s", remaining)
 	}
 }
 
