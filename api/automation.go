@@ -455,11 +455,11 @@ func (a *AutomationAPI) UpdateHomeAssistant(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		item, err := a.DB.GetHomeAssistantIntegrationByID(id)
 		if !successOrAbort(ctx, 500, err) { return }
-		if item == nil { ctx.AbortWithError(404, errors.New("Home Assistant connection not found")); return }
+		if item == nil { ctx.AbortWithError(404, errors.New("home Assistant connection not found")); return }
 		var params homeAssistantParams
 		if err := ctx.ShouldBindJSON(&params); err != nil { return }
 		if !a.channelExists(ctx, params.ApplicationID) { return }
-		if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("Home Assistant URL must use http or https")); return }
+		if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("home Assistant URL must use http or https")); return }
 		item.Name, item.ApplicationID, item.BaseURL = params.Name, params.ApplicationID, strings.TrimRight(params.BaseURL, "/")
 		item.EventType = strings.TrimSpace(params.EventType)
 		item.EntityIDs = strings.TrimSpace(params.EntityIDs)
