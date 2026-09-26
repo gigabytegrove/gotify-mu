@@ -1,12 +1,16 @@
 package api
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
+	"crypto/sha256"
 	"encoding/base64"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -34,6 +38,7 @@ type AutomationDatabase interface {
 	GetWebhookRouteByID(id uint) (*model.WebhookRoute, error)
 	GetWebhookRouteBySecret(secret string) (*model.WebhookRoute, error)
 	SaveWebhookRoute(item *model.WebhookRoute) error
+	RegisterWebhookReplay(key string, expiresAt time.Time) (bool, error)
 	DeleteWebhookRoute(id uint) error
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
@@ -79,7 +84,9 @@ type webhookParams struct {
 	MessageField    string `json:"messageField"`
 	PriorityField   string `json:"priorityField"`
 	DefaultTitle    string `json:"defaultTitle"`
-	DefaultPriority int    `json:"defaultPriority"`
+	DefaultPriority  int    `json:"defaultPriority"`
+	RequireSignature bool   `json:"requireSignature"`
+	AllowedCIDRs      string `json:"allowedCidrs"`
 }
 
 func (a *AutomationAPI) GetWebhookRoutes(ctx *gin.Context) {
@@ -100,7 +107,17 @@ func (a *AutomationAPI) CreateWebhookRoute(ctx *gin.Context) {
 		Name: params.Name, ApplicationID: params.ApplicationID, Secret: secret, Enabled: params.Enabled,
 		TitleField: valueOr(params.TitleField, "title"), MessageField: valueOr(params.MessageField, "message"),
 		PriorityField: valueOr(params.PriorityField, "priority"), DefaultTitle: params.DefaultTitle,
-		DefaultPriority: params.DefaultPriority,
+		DefaultPriority: params.DefaultPriority, RequireSignature: params.RequireSignature,
+		AllowedCIDRs: strings.TrimSpace(params.AllowedCIDRs),
+	}
+	if item.RequireSignature {
+		signingSecret, signErr := generateIntegrationSecret()
+		if !successOrAbort(ctx, 500, signErr) { return }
+		item.SigningSecret = signingSecret
+	}
+	if err := validateWebhookSecurity(item); err != nil {
+		ctx.AbortWithError(400, err)
+		return
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
 	ctx.JSON(201, webhookView(item))
@@ -117,6 +134,17 @@ func (a *AutomationAPI) UpdateWebhookRoute(ctx *gin.Context) {
 		item.Name, item.ApplicationID, item.Enabled = params.Name, params.ApplicationID, params.Enabled
 		item.TitleField, item.MessageField = valueOr(params.TitleField, "title"), valueOr(params.MessageField, "message")
 		item.PriorityField, item.DefaultTitle, item.DefaultPriority = valueOr(params.PriorityField, "priority"), params.DefaultTitle, params.DefaultPriority
+		item.RequireSignature = params.RequireSignature
+		item.AllowedCIDRs = strings.TrimSpace(params.AllowedCIDRs)
+		if item.RequireSignature && item.SigningSecret == "" {
+			signingSecret, signErr := generateIntegrationSecret()
+			if !successOrAbort(ctx, 500, signErr) { return }
+			item.SigningSecret = signingSecret
+		}
+		if err := validateWebhookSecurity(item); err != nil {
+			ctx.AbortWithError(400, err)
+			return
+		}
 		if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
 		ctx.JSON(200, webhookView(item))
 	})
@@ -132,6 +160,35 @@ func (a *AutomationAPI) RegenerateWebhookSecret(ctx *gin.Context) {
 		item.Secret = secret
 		if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
 		ctx.JSON(200, webhookView(item))
+	})
+}
+
+func (a *AutomationAPI) RegenerateWebhookSigningSecret(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetWebhookRouteByID(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		if item == nil { ctx.AbortWithError(404, errors.New("webhook not found")); return }
+		secret, err := generateIntegrationSecret()
+		if !successOrAbort(ctx, 500, err) { return }
+		item.SigningSecret = secret
+		item.RequireSignature = true
+		if !successOrAbort(ctx, 500, a.DB.SaveWebhookRoute(item)) { return }
+		ctx.JSON(200, gin.H{"signingSecret": secret})
+	})
+}
+
+func (a *AutomationAPI) TestWebhookRoute(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetWebhookRouteByID(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		if item == nil { ctx.AbortWithError(404, errors.New("webhook not found")); return }
+		title := item.DefaultTitle
+		if strings.TrimSpace(title) == "" {
+			title = item.Name
+		}
+		msg, err := a.Engine.Publish(item.ApplicationID, title, "Gotify MU Webhook test", item.DefaultPriority)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{"sent": true, "messageId": msg.ID})
 	})
 }
 
@@ -167,6 +224,17 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 			return
 		}
 		if !successOrAbort(ctx, 400, err) { return }
+	}
+
+	if !webhookSourceAllowed(item.AllowedCIDRs, ctx.ClientIP()) {
+		ctx.AbortWithStatus(http.StatusForbidden)
+		return
+	}
+	if item.RequireSignature {
+		if err := a.validateWebhookSignature(ctx, item, body); err != nil {
+			ctx.AbortWithError(http.StatusUnauthorized, err)
+			return
+		}
 	}
 
 	title := item.DefaultTitle
@@ -560,6 +628,8 @@ func webhookView(item *model.WebhookRoute) model.WebhookRouteView {
 		ID:item.ID,Name:item.Name,ApplicationID:item.ApplicationID,Enabled:item.Enabled,
 		Path:"/integrations/webhook/"+item.Secret,TitleField:item.TitleField,MessageField:item.MessageField,
 		PriorityField:item.PriorityField,DefaultTitle:item.DefaultTitle,DefaultPriority:item.DefaultPriority,
+		RequireSignature:item.RequireSignature,SignatureConfigured:item.SigningSecret!="",
+		AllowedCIDRs:item.AllowedCIDRs,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
 }
@@ -578,6 +648,93 @@ func homeAssistantView(item *model.HomeAssistantIntegration) model.HomeAssistant
 		TokenConfigured:item.Token!="",EventType:item.EventType,Enabled:item.Enabled,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
+}
+
+const webhookSignatureWindow = 5 * time.Minute
+
+func validateWebhookSecurity(item *model.WebhookRoute) error {
+	if item.RequireSignature && strings.TrimSpace(item.SigningSecret) == "" {
+		return errors.New("signed Webhooks require a signing secret")
+	}
+	if strings.TrimSpace(item.AllowedCIDRs) != "" {
+		for _, raw := range splitCIDRs(item.AllowedCIDRs) {
+			if _, _, err := net.ParseCIDR(raw); err != nil {
+				return fmt.Errorf("invalid allowed source network %q", raw)
+			}
+		}
+	}
+	return nil
+}
+
+func splitCIDRs(raw string) []string {
+	fields := strings.FieldsFunc(raw, func(r rune) bool {
+		return r == ',' || r == '\n' || r == '\r' || r == ';'
+	})
+	out := make([]string, 0, len(fields))
+	for _, field := range fields {
+		if value := strings.TrimSpace(field); value != "" {
+			out = append(out, value)
+		}
+	}
+	return out
+}
+
+func webhookSourceAllowed(raw, clientIP string) bool {
+	if strings.TrimSpace(raw) == "" {
+		return true
+	}
+	ip := net.ParseIP(strings.TrimSpace(clientIP))
+	if ip == nil {
+		return false
+	}
+	for _, cidr := range splitCIDRs(raw) {
+		_, network, err := net.ParseCIDR(cidr)
+		if err == nil && network.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
+
+func (a *AutomationAPI) validateWebhookSignature(ctx *gin.Context, item *model.WebhookRoute, body []byte) error {
+	timestampRaw := strings.TrimSpace(ctx.GetHeader("X-Gotify-MU-Timestamp"))
+	signatureRaw := strings.TrimSpace(ctx.GetHeader("X-Gotify-MU-Signature"))
+	if timestampRaw == "" || signatureRaw == "" {
+		return errors.New("signed Webhook requires timestamp and signature headers")
+	}
+	timestamp, err := strconv.ParseInt(timestampRaw, 10, 64)
+	if err != nil {
+		return errors.New("invalid Webhook timestamp")
+	}
+	requestTime := time.Unix(timestamp, 0)
+	now := time.Now()
+	if requestTime.Before(now.Add(-webhookSignatureWindow)) || requestTime.After(now.Add(webhookSignatureWindow)) {
+		return errors.New("Webhook timestamp is outside the allowed window")
+	}
+	signatureHex := strings.TrimPrefix(strings.ToLower(signatureRaw), "sha256=")
+	provided, err := hex.DecodeString(signatureHex)
+	if err != nil || len(provided) != sha256.Size {
+		return errors.New("invalid Webhook signature")
+	}
+	mac := hmac.New(sha256.New, []byte(item.SigningSecret))
+	_, _ = mac.Write([]byte(timestampRaw))
+	_, _ = mac.Write([]byte("."))
+	_, _ = mac.Write(body)
+	expected := mac.Sum(nil)
+	if !hmac.Equal(provided, expected) {
+		return errors.New("invalid Webhook signature")
+	}
+	replayMaterial := append(append([]byte{}, provided...), []byte(timestampRaw)...)
+	replayHash := sha256.Sum256(replayMaterial)
+	replayKey := hex.EncodeToString(replayHash[:])
+	registered, err := a.DB.RegisterWebhookReplay(replayKey, now.Add(webhookSignatureWindow))
+	if err != nil {
+		return err
+	}
+	if !registered {
+		return errors.New("Webhook request was already received")
+	}
+	return nil
 }
 
 func generateIntegrationSecret() (string, error) {
