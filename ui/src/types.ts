@@ -4,6 +4,7 @@ export interface IApplication {
     ownerId?: number;
     autoAssign?: boolean;
     allowMemberPost?: boolean;
+    channelType?: "notification" | "chat";
     receiveNotifications?: boolean;
     name: string;
     sortKey: string;
@@ -214,8 +215,11 @@ export interface IHomeAssistantIntegration {
     id: number;
     name: string;
     applicationId: number;
+    connectionMode: 'token' | 'integration';
     baseUrl: string;
     tokenConfigured: boolean;
+    nativePaired: boolean;
+    pairingExpiresAt?: string;
     eventType: string;
     entityIds: string;
     dataField: string;
@@ -533,3 +537,15 @@ export interface INotificationField {
     label: string;
     value: string;
 }
+
+
+export interface IMUTypingEvent {
+    type: 'typing';
+    applicationId: number;
+    userId: number;
+    userName: string;
+    typing: boolean;
+    expiresAt: string;
+}
+
+export type IMURealtimeEvent = IMUTypingEvent;

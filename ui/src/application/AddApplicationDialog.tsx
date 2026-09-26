@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import ExpandMore from '@mui/icons-material/ExpandMore';
 import Public from '@mui/icons-material/Public';
-import Science from '@mui/icons-material/Science';
+import Forum from '@mui/icons-material/Forum';
 import {useStores} from '../stores';
 import {NumberField} from '../common/NumberField';
 
@@ -31,7 +31,8 @@ interface IProps {
         description: string,
         defaultPriority: number,
         autoAssign?: boolean,
-        allowMemberPost?: boolean
+        allowMemberPost?: boolean,
+        channelType?: 'notification' | 'chat'
     ) => Promise<string>;
 }
 
@@ -41,6 +42,7 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
     const [defaultPriority, setDefaultPriority] = useState(0);
     const [autoAssign, setAutoAssign] = useState(false);
     const [allowMemberPost, setAllowMemberPost] = useState(false);
+    const [chatChannel, setChatChannel] = useState(false);
     const {currentUser} = useStores();
 
     const submitEnabled = name.trim().length !== 0;
@@ -51,7 +53,8 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
             description,
             defaultPriority,
             autoAssign,
-            allowMemberPost
+            allowMemberPost,
+            chatChannel ? 'chat' : 'notification'
         );
         fClose(token);
     };
@@ -133,32 +136,51 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                             <Accordion elevation={0} disableGutters sx={{border: 1, borderColor: 'divider'}}>
                                 <AccordionSummary expandIcon={<ExpandMore />}>
                                     <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
-                                        <Typography sx={{fontWeight: 600}}>Advanced</Typography>
-                                        <Chip
-                                            size="small"
-                                            icon={<Science fontSize="small" />}
-                                            label="Experimental"
-                                            variant="outlined"
-                                        />
+                                        <Typography sx={{fontWeight: 600}}>Channel behavior</Typography>
+                                        {chatChannel && (
+                                            <Chip
+                                                size="small"
+                                                icon={<Forum fontSize="small" />}
+                                                label="Chat"
+                                                color="primary"
+                                                variant="outlined"
+                                            />
+                                        )}
                                     </Stack>
                                 </AccordionSummary>
                                 <AccordionDetails>
-                                    <FormControlLabel
-                                        control={
-                                            <Switch
-                                                checked={allowMemberPost}
-                                                onChange={(event) =>
-                                                    setAllowMemberPost(event.target.checked)
+                                    <Stack spacing={1.5}>
+                                        <FormControlLabel
+                                            control={
+                                                <Switch
+                                                    checked={chatChannel}
+                                                    onChange={(event) => {
+                                                        const enabled = event.target.checked;
+                                                        setChatChannel(enabled);
+                                                        setAllowMemberPost(enabled);
+                                                    }}
+                                                />
+                                            }
+                                            label="Two-way Chat Channel"
+                                        />
+                                        <Typography variant="body2" color="text.secondary">
+                                            Chat Channels use the conversation interface in Gotify MU
+                                            desktop and mobile clients instead of the notification feed.
+                                        </Typography>
+                                        {chatChannel && (
+                                            <FormControlLabel
+                                                control={
+                                                    <Switch
+                                                        checked={allowMemberPost}
+                                                        onChange={(event) =>
+                                                            setAllowMemberPost(event.target.checked)
+                                                        }
+                                                    />
                                                 }
+                                                label="Allow assigned members to post"
                                             />
-                                        }
-                                        label="Allow assigned members to post"
-                                    />
-                                    <Typography variant="body2" color="text.secondary">
-                                        Experimental server-side chat capability. Official Gotify
-                                        Android clients can receive these messages but do not
-                                        provide a compose interface.
-                                    </Typography>
+                                        )}
+                                    </Stack>
                                 </AccordionDetails>
                             </Accordion>
                         </>

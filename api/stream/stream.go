@@ -65,6 +65,9 @@ func (a *API) ConnectedClientCount() int {
 	for _, clients := range a.clients {
 		count += len(clients)
 	}
+	for _, clients := range a.muClients {
+		count += len(clients)
+	}
 	return count
 }
 
@@ -131,12 +134,13 @@ func (a *API) NotifyMUEvent(userID uint, event any) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
 	if clients, ok := a.muClients[userID]; ok {
-		for _, client := range clients {
+		for _, c := range clients {
 			select {
-			case client.write <- event:
-			case <-client.closed:
+			case c.write <- event:
+			case <-c.closed:
 			default:
-				// Presence is ephemeral. Drop stale events rather than blocking message delivery.
+				// Presence is ephemeral. Drop stale state rather than block
+				// the normal message-delivery stream.
 			}
 		}
 	}
@@ -219,13 +223,13 @@ func (a *API) HandleMUEvents(ctx *gin.Context) {
 	}
 
 	var token string
-	if client := auth.GetClient(ctx); client != nil {
-		token = client.Token
+	if c := auth.GetClient(ctx); c != nil {
+		token = c.Token
 	}
-	muClient := newMUEventClient(conn, auth.GetUserID(ctx), token, a.removeMU)
-	a.registerMU(muClient)
-	go muClient.startReading(a.pongTimeout)
-	go muClient.startWriteHandler(a.pingPeriod)
+	client := newMUEventClient(conn, auth.GetUserID(ctx), token, a.removeMU)
+	a.registerMU(client)
+	go client.startReading(a.pongTimeout)
+	go client.startWriteHandler(a.pingPeriod)
 }
 
 func (a *API) Handle(ctx *gin.Context) {

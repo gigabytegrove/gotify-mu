@@ -50,9 +50,9 @@ describe('User', () => {
                 await page.click($dialog.button('.save-create'));
                 await waitToDisappear(page, $dialog.selector());
             };
-        it('nicories', createUser('nicories', '123', false));
-        it('jmattheis', createUser('jmattheis', 'noice', true));
-        it('dude', createUser('dude', '1', false));
+        it('nicories', createUser('nicories', 'nicories-pass-123', false));
+        it('jmattheis', createUser('jmattheis', 'jmattheis-pass-123', true));
+        it('dude', createUser('dude', 'dude-pass-123', false));
     });
     const hasUser =
         (name: string, isAdmin: boolean, row: number): (() => Promise<void>) =>
@@ -75,7 +75,7 @@ describe('User', () => {
         it('changes password of jmattheis', async () => {
             await page.click($table.cell(3, Col.EditDelete, '.edit'));
             await page.waitForSelector($dialog.selector());
-            await page.type($dialog.input('.password'), 'unicorn');
+            await page.type($dialog.input('.password'), 'unicorn-pass-123');
             await page.click($dialog.button('.save-create'));
             await waitToDisappear(page, $dialog.selector());
         });
@@ -127,16 +127,16 @@ describe('User', () => {
         await waitToDisappear(page, '.MuiBackdrop-root');
         await waitForExists(page, selector.heading(), 'Settings');
         await page.waitForSelector($changepw.selector());
-        await page.type($changepw.input('.newpass'), 'changed');
+        await page.type($changepw.input('.newpass'), 'changed-pass-123');
         await page.click($changepw.button('.change'));
     });
     it('does logout', async () => await auth.logout(page));
     it('can login with new password (admin)', async () =>
-        await auth.login(page, 'admin', 'changed'));
+        await auth.login(page, 'admin', 'changed-pass-123'));
     it('does logout admin', async () => await auth.logout(page));
 
-    it('can login with nicolas', async () => await auth.login(page, 'nicolas', '123'));
+    it('can login with nicolas', async () => await auth.login(page, 'nicolas', 'nicories-pass-123'));
     it('does logout nicolas', async () => await auth.logout(page));
-    it('can login with jmattheis', async () => await auth.login(page, 'jmattheis', 'unicorn'));
+    it('can login with jmattheis', async () => await auth.login(page, 'jmattheis', 'unicorn-pass-123'));
     it('does logout jmattheis', async () => await auth.logout(page));
 });

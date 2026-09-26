@@ -117,8 +117,13 @@ type HomeAssistantIntegration struct {
 	ID              uint       `gorm:"primaryKey;autoIncrement" json:"id"`
 	Name            string     `gorm:"type:text" json:"name"`
 	ApplicationID   uint       `gorm:"index" json:"applicationId"`
+	ConnectionMode  string     `gorm:"type:varchar(24)" json:"connectionMode"`
 	BaseURL         string     `gorm:"type:text" json:"baseUrl"`
 	Token           string     `gorm:"type:text" json:"-"`
+	NativeWebhookURL string    `gorm:"type:text" json:"-"`
+	NativeSecret    string     `gorm:"type:text" json:"-"`
+	PairingCodeHash string     `gorm:"type:varchar(64)" json:"-"`
+	PairingExpiresAt *time.Time `json:"-"`
 	EventType       string     `gorm:"type:text" json:"eventType"`
 	EntityIDs       string     `gorm:"type:text" json:"entityIds"`
 	DataField       string     `gorm:"type:text" json:"dataField"`
@@ -139,8 +144,11 @@ type HomeAssistantIntegrationView struct {
 	ID              uint       `json:"id"`
 	Name            string     `json:"name"`
 	ApplicationID   uint       `json:"applicationId"`
+	ConnectionMode  string     `json:"connectionMode"`
 	BaseURL         string     `json:"baseUrl"`
 	TokenConfigured bool       `json:"tokenConfigured"`
+	NativePaired    bool       `json:"nativePaired"`
+	PairingExpiresAt *time.Time `json:"pairingExpiresAt,omitempty"`
 	EventType       string     `json:"eventType"`
 	EntityIDs       string     `json:"entityIds"`
 	DataField       string     `json:"dataField"`

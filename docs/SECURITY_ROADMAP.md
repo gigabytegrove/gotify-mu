@@ -1,6 +1,6 @@
 # Gotify MU Security Status
 
-This document tracks the security controls implemented in the Gotify MU v0.5 preview and the remaining architectural boundaries administrators should understand.
+This document tracks the security controls implemented in Gotify MU 1.0 and the remaining architectural boundaries administrators should understand.
 
 ## Authentication providers
 
@@ -111,7 +111,7 @@ Inbound Webhooks can use:
 
 Native Gotify-compatible Go plugins execute inside the Gotify MU process. They must therefore be treated as trusted server code.
 
-v0.5 reduces plugin supply-chain risk through:
+v1.0 reduces plugin supply-chain risk through:
 
 - SHA-256 verification
 - Ed25519 signatures
@@ -143,7 +143,7 @@ The updater should only be enabled where managed in-app Docker updates are desir
 
 ## CI and release integrity
 
-v0.5 uses:
+v1.0 uses:
 
 - read-only pull-request workflow permissions
 - SHA-pinned GitHub Actions

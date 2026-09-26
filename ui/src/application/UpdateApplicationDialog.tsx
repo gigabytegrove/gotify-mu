@@ -6,7 +6,9 @@ import {
     DialogContent,
     DialogContentText,
     DialogTitle,
+    FormControlLabel,
     Stack,
+    Switch,
     TextField,
     Tooltip,
 } from '@mui/material';
@@ -14,11 +16,18 @@ import {NumberField} from '../common/NumberField';
 
 interface IProps {
     fClose: VoidFunction;
-    fOnSubmit: (name: string, description: string, defaultPriority: number, retentionDays: number) => Promise<void>;
+    fOnSubmit: (
+        name: string,
+        description: string,
+        defaultPriority: number,
+        retentionDays: number,
+        channelType: 'notification' | 'chat'
+    ) => Promise<void>;
     initialName: string;
     initialDescription: string;
     initialDefaultPriority: number;
     initialRetentionDays: number;
+    initialChannelType?: 'notification' | 'chat';
 }
 
 export const UpdateApplicationDialog = ({
@@ -26,6 +35,7 @@ export const UpdateApplicationDialog = ({
     initialDescription,
     initialDefaultPriority,
     initialRetentionDays,
+    initialChannelType = 'notification',
     fClose,
     fOnSubmit,
 }: IProps) => {
@@ -33,11 +43,12 @@ export const UpdateApplicationDialog = ({
     const [description, setDescription] = useState(initialDescription);
     const [defaultPriority, setDefaultPriority] = useState(initialDefaultPriority);
     const [retentionDays, setRetentionDays] = useState(initialRetentionDays);
+    const [channelType, setChannelType] = useState<'notification' | 'chat'>(initialChannelType);
 
     const submitEnabled = name.trim().length !== 0;
 
     const submitAndClose = async () => {
-        await fOnSubmit(name.trim(), description, defaultPriority, retentionDays);
+        await fOnSubmit(name.trim(), description, defaultPriority, retentionDays, channelType);
         fClose();
     };
 
@@ -73,6 +84,17 @@ export const UpdateApplicationDialog = ({
                         value={defaultPriority}
                         onChange={setDefaultPriority}
                         fullWidth
+                    />
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={channelType === 'chat'}
+                                onChange={(event) =>
+                                    setChannelType(event.target.checked ? 'chat' : 'notification')
+                                }
+                            />
+                        }
+                        label="Present this Channel as a two-way Chat Channel"
                     />
                     <TextField
                         type="number"

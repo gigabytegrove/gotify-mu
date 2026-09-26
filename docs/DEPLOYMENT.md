@@ -4,10 +4,10 @@ This document is the maintained deployment, validation, update, backup, and roll
 
 ## Release state
 
-- **Current published release:** v0.5.0 (pre-release)
-- **Previous rollback baseline:** v0.2.2
+- **Current published release:** v1.0.0
+- **Previous rollback baseline:** v0.5.0
 
-The v0.5.0 release commit is validated through the repository gate before publication. Documentation-only changes are part of the release candidate and pass the same gate.
+The v1.0.0 release commit is validated through the repository gate before publication. Documentation-only changes are part of the release candidate and pass the same gate.
 
 ## Supported deployment models
 
@@ -245,9 +245,9 @@ Preview branches are deployed manually and must pass the full validation gate.
 
 The in-app updater is intended for **published numbered releases**. A preview branch should not be presented as a normal downloadable release until it has been accepted, merged, tagged, and published.
 
-## v0.5.0 live validation checklist
+## v1.0.0 live validation checklist
 
-Before v0.5.0 is locked as a release:
+Before v1.0.0 is locked as a release:
 
 ### Core compatibility
 
