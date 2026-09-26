@@ -19,7 +19,7 @@ import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
 import TimeAgo from 'react-timeago';
 import {Markdown} from '../common/Markdown';
 import * as config from '../config';
-import {IMessageExtras} from '../types';
+import {IMessageAcknowledgement, IMessageExtras} from '../types';
 import {contentType, RenderMode} from './extras';
 import {TimeAgoFormatter} from '../common/TimeAgoFormatter';
 
@@ -37,6 +37,11 @@ interface IProps {
     fRestore?: VoidFunction;
     fAcknowledge?: VoidFunction;
     acknowledged?: boolean;
+    acknowledgedAny?: boolean;
+    acknowledgementCount?: number;
+    acknowledgedBy?: IMessageAcknowledgement[];
+    parentMessageId?: number;
+    escalationRuleId?: number;
     senderName?: string;
     extras?: IMessageExtras;
     expanded: boolean;
@@ -49,6 +54,11 @@ const Message = ({
     fRestore,
     fAcknowledge,
     acknowledged = false,
+    acknowledgedAny = false,
+    acknowledgementCount = 0,
+    acknowledgedBy = [],
+    parentMessageId,
+    escalationRuleId,
     senderName,
     title,
     date,
@@ -129,13 +139,47 @@ const Message = ({
                             {priority >= 4 && priority < 8 && (
                                 <Chip size="small" color="warning" variant="outlined" label="High" />
                             )}
-                            {acknowledged && (
+                            {acknowledgedAny && (
+                                <Tooltip
+                                    title={
+                                        acknowledgedBy.length > 0
+                                            ? acknowledgedBy
+                                                  .map(
+                                                      (entry) =>
+                                                          (entry.displayName || entry.name) +
+                                                          ' · ' +
+                                                          new Date(entry.acknowledgedAt).toLocaleString()
+                                                  )
+                                                  .join('\n')
+                                            : 'Acknowledged'
+                                    }>
+                                    <Chip
+                                        size="small"
+                                        color="success"
+                                        variant="outlined"
+                                        icon={<TaskAlt fontSize="small" />}
+                                        label={
+                                            acknowledged
+                                                ? acknowledgementCount > 1
+                                                    ? `Acknowledged by you + ${acknowledgementCount - 1}`
+                                                    : 'Acknowledged by you'
+                                                : `Acknowledged by ${acknowledgementCount}`
+                                        }
+                                    />
+                                </Tooltip>
+                            )}
+                            {parentMessageId != null && parentMessageId > 0 && (
                                 <Chip
                                     size="small"
-                                    color="success"
                                     variant="outlined"
-                                    icon={<TaskAlt fontSize="small" />}
-                                    label="Acknowledged"
+                                    label={`Escalated from #${parentMessageId}`}
+                                />
+                            )}
+                            {escalationRuleId != null && escalationRuleId > 0 && (
+                                <Chip
+                                    size="small"
+                                    variant="outlined"
+                                    label={`Escalation rule #${escalationRuleId}`}
                                 />
                             )}
                         </Stack>
