@@ -115,9 +115,14 @@ type ScheduledNotification struct {
 	RunAt         *time.Time `json:"runAt,omitempty"`
 	Hour          int        `json:"hour"`
 	Minute        int        `json:"minute"`
-	Weekday       int        `json:"weekday"`
-	Timezone      string     `gorm:"type:text" json:"timezone"`
-	Enabled       bool       `json:"enabled"`
+	Weekday        int        `json:"weekday"`
+	IntervalMinutes int       `json:"intervalMinutes"`
+	Timezone       string     `gorm:"type:text" json:"timezone"`
+	ExcludeDates   string     `gorm:"type:text" json:"-"`
+	EndAt          *time.Time `json:"endAt,omitempty"`
+	MaxRuns        int        `json:"maxRuns"`
+	RunCount       int        `json:"runCount"`
+	Enabled        bool       `json:"enabled"`
 	LastRunAt     *time.Time `json:"lastRunAt,omitempty"`
 	NextRunAt     *time.Time `gorm:"index" json:"nextRunAt,omitempty"`
 	CreatedAt     time.Time  `json:"createdAt"`
@@ -250,4 +255,23 @@ type DeferredNotification struct {
 	Message       string    `gorm:"type:text" json:"message"`
 	Priority      int       `json:"priority"`
 	CreatedAt     time.Time `gorm:"index" json:"createdAt"`
+}
+
+
+// ScheduledNotificationView includes parsed exclusion dates for the Web UI.
+type ScheduledNotificationView struct {
+	ScheduledNotification
+	ExcludedDates []string `json:"excludedDates,omitempty"`
+}
+
+// ScheduleRun is persistent execution history for Scheduled Notifications.
+type ScheduleRun struct {
+	ID          uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	ScheduleID  uint       `gorm:"index;uniqueIndex:uix_schedule_due,priority:1" json:"scheduleId"`
+	ScheduledFor time.Time  `gorm:"index;uniqueIndex:uix_schedule_due,priority:2" json:"scheduledFor"`
+	MessageID   uint       `gorm:"index" json:"messageId,omitempty"`
+	Status      string     `gorm:"type:varchar(24);index" json:"status"`
+	Error       string     `gorm:"type:text" json:"error,omitempty"`
+	StartedAt   time.Time  `json:"startedAt"`
+	FinishedAt  *time.Time `json:"finishedAt,omitempty"`
 }
