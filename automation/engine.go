@@ -26,6 +26,8 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+const maxMQTTPacketBytes = 1 << 20
+
 // Notifier delivers a realtime Gotify-compatible message to one user.
 type Notifier interface {
 	Notify(userID uint, message *model.MessageExternal)
@@ -823,6 +825,9 @@ func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 		}
 		remaining += int(value&127) * multiplier
 		if value&128 == 0 {
+			if remaining > maxMQTTPacketBytes {
+				return 0, nil, fmt.Errorf("MQTT packet exceeds %d byte limit", maxMQTTPacketBytes)
+			}
 			body := make([]byte, remaining)
 			_, err = io.ReadFull(reader, body)
 			return header, body, err
@@ -843,6 +848,9 @@ func decodePublish(header byte, body []byte) (string, []byte, uint16, byte, erro
 	topic := string(body[2 : 2+length])
 	offset := 2 + length
 	qos := (header >> 1) & 0x03
+	if qos > 1 {
+		return "", nil, 0, qos, errors.New("MQTT QoS 2 publish packets are not supported")
+	}
 	var packetID uint16
 	if qos > 0 {
 		if len(body) < offset+2 {
