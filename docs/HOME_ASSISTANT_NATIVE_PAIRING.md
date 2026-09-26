@@ -149,7 +149,7 @@ A successful revoke returns HTTP 204. Gotify MU clears the stored native webhook
 
 Home Assistant must not silently discard local credentials when the revoke request fails. A force-local-remove escape hatch may be offered for recovery when the Gotify MU server is unavailable or the remote connection has already been replaced.
 
-Regenerating a pairing code for an already paired connection does not tear down the working native bridge. The existing webhook and shared secret remain valid until a replacement pairing succeeds.
+Regenerating a pairing code for an already paired connection does not tear down the working native bridge. The existing webhook and shared secret remain valid until a replacement pairing succeeds. The Gotify MU admin UI exposes **Generate Repair Code** for an already paired native connection.
 
 ## Health and delivery expectations
 

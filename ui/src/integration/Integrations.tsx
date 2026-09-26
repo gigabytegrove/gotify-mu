@@ -287,7 +287,7 @@ const Integrations = () => {
                                         label={item.nativePaired ? 'Native integration paired' : 'Waiting for Home Assistant pairing'}
                                     />
                                 )}
-                                {item.connectionMode === 'integration' && !item.nativePaired && (
+                                {item.connectionMode === 'integration' && (
                                     <Button
                                         size="small"
                                         onClick={async () => {
@@ -295,10 +295,14 @@ const Integrations = () => {
                                                 api(`integration/home-assistant/${item.id}/pairing`)
                                             );
                                             await navigator.clipboard.writeText(response.data.pairingCode);
-                                            snackManager.snack('Home Assistant pairing code copied');
+                                            snackManager.snack(
+                                                item.nativePaired
+                                                    ? 'Home Assistant repair pairing code copied'
+                                                    : 'Home Assistant pairing code copied'
+                                            );
                                             await refresh();
                                         }}>
-                                        Copy Pairing Code
+                                        {item.nativePaired ? 'Generate Repair Code' : 'Copy Pairing Code'}
                                     </Button>
                                 )}
                                 <Button
