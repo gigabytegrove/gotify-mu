@@ -62,6 +62,7 @@ type AutomationDatabase interface {
 
 	SetMessageAcknowledgement(userID, messageID uint, acknowledged bool, now time.Time) error
 	IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error)
+	GetMessageAcknowledgements(messageID uint) ([]*model.MessageAcknowledgementView, error)
 }
 
 type AutomationAPI struct {
@@ -471,9 +472,15 @@ func (a *AutomationAPI) DeleteEscalation(ctx *gin.Context) {
 func (a *AutomationAPI) GetAcknowledgement(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		if !a.canAccessMessage(ctx, id) { return }
-		value, err := a.DB.IsMessageAcknowledgedByUser(auth.GetUserID(ctx), id)
+		mine, err := a.DB.IsMessageAcknowledgedByUser(auth.GetUserID(ctx), id)
 		if !successOrAbort(ctx, 500, err) { return }
-		ctx.JSON(200, gin.H{"acknowledged":value})
+		items, err := a.DB.GetMessageAcknowledgements(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, gin.H{
+			"acknowledged": mine,
+			"acknowledgedByAnyone": len(items) > 0,
+			"acknowledgements": items,
+		})
 	})
 }
 
