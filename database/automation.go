@@ -415,3 +415,28 @@ func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]model.Messa
 		Scan(&rows).Error
 	return rows, err
 }
+
+
+func (d *GormDatabase) EnsureAutomationRecipientDispatches(key string, messageID uint, userIDs []uint, now time.Time) error {
+	if len(userIDs) == 0 { return nil }
+	items := make([]*model.AutomationRecipientDispatch, 0, len(userIDs))
+	for _, userID := range userIDs {
+		items = append(items, &model.AutomationRecipientDispatch{
+			AutomationKey:key, UserID:userID, MessageID:messageID, UpdatedAt:now,
+		})
+	}
+	return d.DB.Clauses(clause.OnConflict{DoNothing:true}).Create(&items).Error
+}
+
+func (d *GormDatabase) GetAutomationRecipientDispatches(key string) ([]*model.AutomationRecipientDispatch, error) {
+	var items []*model.AutomationRecipientDispatch
+	return items, d.DB.Where("automation_key = ?", key).Order("user_id asc").Find(&items).Error
+}
+
+func (d *GormDatabase) SaveAutomationRecipientDispatch(item *model.AutomationRecipientDispatch) error {
+	return d.DB.Save(item).Error
+}
+
+func (d *GormDatabase) DeleteAutomationRecipientDispatchesForMessage(messageID uint) error {
+	return d.DB.Where("message_id = ?", messageID).Delete(&model.AutomationRecipientDispatch{}).Error
+}
