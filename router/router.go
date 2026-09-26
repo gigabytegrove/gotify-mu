@@ -3,6 +3,7 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
 	"regexp"
 	"strings"
@@ -413,26 +414,29 @@ func shouldAuditMutation(path string) bool {
 	}
 }
 
-var tokenRegexp = regexp.MustCompile("token=[^&]+")
+var sensitiveQueryKey = regexp.MustCompile("(?i)(token|code|state|secret|password|passwd|key|credential|authorization|access[_-]?token|refresh[_-]?token)")
 
 func accessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
 
 		rawQuery := c.Request.URL.RawQuery
-		path := c.Request.URL.Path
+		rawPath := c.Request.URL.Path
 
 		c.Next()
 
 		clientIP := c.ClientIP()
-		if (clientIP == "127.0.0.1" || clientIP == "::1") && path == "/health" {
+		if (clientIP == "127.0.0.1" || clientIP == "::1") && rawPath == "/health" {
 			return
 		}
 
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
+		path := c.FullPath()
+		if path == "" {
+			path = rawPath
 		}
-		path = tokenRegexp.ReplaceAllString(path, "token=[masked]")
+		if rawQuery != "" {
+			path += "?" + sanitizeQueryForLog(rawQuery)
+		}
 
 		latency := time.Since(start)
 		if latency > time.Minute {
@@ -461,6 +465,19 @@ func accessLogger() gin.HandlerFunc {
 
 		evt.Msg("HTTP")
 	}
+}
+
+func sanitizeQueryForLog(raw string) string {
+	values, err := url.ParseQuery(raw)
+	if err != nil {
+		return "[invalid-query]"
+	}
+	for key := range values {
+		if sensitiveQueryKey.MatchString(key) {
+			values.Set(key, "[masked]")
+		}
+	}
+	return values.Encode()
 }
 
 type onlyImageFS struct {
