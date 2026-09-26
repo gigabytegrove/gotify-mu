@@ -125,6 +125,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	if err != nil {
 		panic(err)
 	}
+	pluginManager.SetTrustedInstallHashes(conf.PluginTrustedSHA256)
 	pluginHandler := api.PluginAPI{
 		Manager:  pluginManager,
 		Notifier: streamHandler,
