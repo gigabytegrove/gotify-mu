@@ -361,6 +361,7 @@ func (d *GormDatabase) DeleteMessageByID(id uint) error {
 		if err := tx.Where("message_id = ?", id).Delete(&model.MessageAcknowledgement{}).Error; err != nil { return err }
 		if err := tx.Where("message_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
 		if err := tx.Where("message_id = ?", id).Delete(&model.EscalationState{}).Error; err != nil { return err }
+		if err := tx.Where("message_id = ?", id).Delete(&model.AutomationRecipientDispatch{}).Error; err != nil { return err }
 		return tx.Where("id = ?", id).Delete(&model.Message{}).Error
 	})
 }
@@ -373,6 +374,7 @@ func (d *GormDatabase) DeleteMessagesByApplication(applicationID uint) error {
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.MessageAcknowledgement{}).Error; err != nil { return err }
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.DigestItem{}).Error; err != nil { return err }
 		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.EscalationState{}).Error; err != nil { return err }
+		if err := tx.Where("message_id IN (?)", subQuery).Delete(&model.AutomationRecipientDispatch{}).Error; err != nil { return err }
 		return tx.Where("application_id = ?", applicationID).Delete(&model.Message{}).Error
 	})
 }
