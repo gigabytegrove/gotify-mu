@@ -38,7 +38,23 @@ jobs:
         run: go mod download
 
       - name: Test chat API behavior
-        run: go test ./api -run '^(TestMUPresence|TestApplicationMembershipMentionableUsers|TestMessageSuite)$' -count=1
+        run: >-
+          go test ./api
+          -run '^(TestMUPresence|TestApplicationMembershipMentionableUsers|TestMessageSuite/(Test_CreateMessage_ChatDoesNotNotifySender|Test_CreateMessage_MentionNotifiesMutedChatMember|Test_CreateMessage_MentionIgnoresEmailAndNonMember))
+
+      - name: Test automation delivery behavior
+        run: go test ./automation -run '^TestMUDeliverySuppressesSenderAndIncludesMutedMention$' -count=1
+
+      - name: Test realtime stream
+        run: go test ./api/stream -count=1
+
+      - name: Compile router wiring
+        run: |
+          mkdir -p ui/build
+          printf '<html></html>\n' > ui/build/index.html
+          go test ./router -run TestDoesNotExist -count=1
+
+          -count=1
 
       - name: Test automation delivery behavior
         run: go test ./automation -run '^TestMUDeliverySuppressesSenderAndIncludesMutedMention$' -count=1
