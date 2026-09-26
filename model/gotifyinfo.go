@@ -19,6 +19,8 @@ type GotifyInfo struct {
 	// required: true
 	// example: true
 	LocalAuth bool `json:"localAuth"`
+	// If LDAP/Active Directory authentication is enabled.
+	Directory bool `json:"directory"`
 	// If oidc is enabled.
 	//
 	// required: true
