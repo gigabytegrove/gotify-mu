@@ -48,5 +48,4 @@ jobs:
         run: |
           mkdir -p ui/build
           printf '<html></html>\n' > ui/build/index.html
-          go test ./router -run '^TestDoesNotExist
- -count=1
+          go test ./router -run TestDoesNotExist -count=1
