@@ -285,6 +285,17 @@ func (d *GormDatabase) SetMessageAcknowledgement(userID, messageID uint, acknowl
 		DoUpdates: clause.AssignmentColumns([]string{"acknowledged_at"}),
 	}).Create(&model.MessageAcknowledgement{UserID:userID,MessageID:messageID,AcknowledgedAt:now}).Error
 }
+func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]model.MessageAcknowledgementView, error) {
+	var items []model.MessageAcknowledgementView
+	err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.user_id, users.name, users.display_name, ma.acknowledged_at").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id = ?", messageID).
+		Order("ma.acknowledged_at asc").
+		Scan(&items).Error
+	return items, err
+}
+
 func (d *GormDatabase) IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error) {
 	var count int64
 	err := d.DB.Model(&model.MessageAcknowledgement{}).Where("user_id = ? AND message_id = ?", userID, messageID).Count(&count).Error
