@@ -18,6 +18,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/gorilla/websocket"
@@ -82,7 +83,7 @@ type Engine struct {
 	integrationWG      sync.WaitGroup
 	reload             chan struct{}
 	instanceID         string
-	integrationLeader  bool
+	integrationLeader  atomic.Bool
 }
 
 func New(db Database, notifier Notifier) *Engine {
@@ -104,7 +105,7 @@ func New(db Database, notifier Notifier) *Engine {
 func (e *Engine) Close() {
 	e.cancel()
 	e.stopIntegrations()
-	if e.integrationLeader {
+	if e.integrationLeader.Load() {
 		if err := e.db.ReleaseAutomationLease("native-integrations", e.instanceID); err != nil {
 			log.Warn().Err(err).Msg("Could not release native integration lease")
 		}
@@ -543,7 +544,7 @@ func (e *Engine) integrationLoop() {
 		case <-e.ctx.Done():
 			return
 		case <-e.reload:
-			if e.integrationLeader {
+			if e.integrationLeader.Load() {
 				e.restartIntegrations()
 			}
 		case <-ticker.C:
@@ -562,21 +563,21 @@ func (e *Engine) refreshIntegrationLeadership(forceReload bool) {
 	)
 	if err != nil {
 		log.Error().Err(err).Msg("Could not renew native integration lease")
-		if e.integrationLeader {
-			e.integrationLeader = false
+		if e.integrationLeader.Load() {
+			e.integrationLeader.Store(false)
 			e.stopIntegrations()
 		}
 		return
 	}
 	if !acquired {
-		if e.integrationLeader {
-			e.integrationLeader = false
+		if e.integrationLeader.Load() {
+			e.integrationLeader.Store(false)
 			e.stopIntegrations()
 		}
 		return
 	}
-	wasLeader := e.integrationLeader
-	e.integrationLeader = true
+	wasLeader := e.integrationLeader.Load()
+	e.integrationLeader.Store(true)
 	if !wasLeader || forceReload {
 		e.restartIntegrations()
 	}
