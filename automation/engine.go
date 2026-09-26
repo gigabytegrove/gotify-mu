@@ -132,6 +132,28 @@ func (e *Engine) StoreAndDeliver(msg *model.Message) (*model.MessageExternal, er
 	return e.storeAndDeliver(msg, true)
 }
 
+// StoreAndDeliverToUsers stores one message and applies delivery policy only to
+// the supplied recipients. This keeps plugin-originated notifications on the
+// same Quiet Hours, Digest, and escalation path without changing plugin scope.
+func (e *Engine) StoreAndDeliverToUsers(msg *model.Message, userIDs []uint) (*model.MessageExternal, error) {
+	if msg.Date.IsZero() {
+		msg.Date = time.Now()
+	}
+	if err := e.db.CreateMessage(msg); err != nil {
+		return nil, err
+	}
+	external := externalMessage(msg)
+	for _, userID := range userIDs {
+		if err := e.deliver(userID, msg, external); err != nil {
+			return nil, err
+		}
+	}
+	if err := e.queueEscalations(msg); err != nil {
+		return nil, err
+	}
+	return external, nil
+}
+
 func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*model.MessageExternal, error) {
 	if msg.Date.IsZero() {
 		msg.Date = time.Now()
