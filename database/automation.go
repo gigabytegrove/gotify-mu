@@ -35,6 +35,9 @@ func (d *GormDatabase) decryptWebhook(item *model.WebhookRoute) error {
 	value, err := d.decryptValue(item.Secret)
 	if err != nil { return err }
 	item.Secret = value
+	signingSecret, err := d.decryptValue(item.SigningSecret)
+	if err != nil { return err }
+	item.SigningSecret = signingSecret
 	return nil
 }
 
@@ -60,9 +63,15 @@ func (d *GormDatabase) encryptLegacyAutomationSecrets() error {
 		if err != nil { return err }
 		encrypted, err := d.encryptValue(plain)
 		if err != nil { return err }
+		signingPlain, err := d.decryptValue(item.SigningSecret)
+		if err != nil { return err }
+		signingEncrypted, err := d.encryptValue(signingPlain)
+		if err != nil { return err }
 		hash := hashAutomationSecret(plain)
-		if item.Secret != encrypted || item.SecretHash != hash {
-			if err := d.DB.Model(item).Updates(map[string]any{"secret": encrypted, "secret_hash": hash}).Error; err != nil { return err }
+		if item.Secret != encrypted || item.SecretHash != hash || item.SigningSecret != signingEncrypted {
+			if err := d.DB.Model(item).Updates(map[string]any{
+				"secret": encrypted, "secret_hash": hash, "signing_secret": signingEncrypted,
+			}).Error; err != nil { return err }
 		}
 	}
 
@@ -129,6 +138,9 @@ func (d *GormDatabase) SaveWebhookRoute(item *model.WebhookRoute) error {
 	encrypted, err := d.encryptValue(copy.Secret)
 	if err != nil { return err }
 	copy.Secret = encrypted
+	signingEncrypted, err := d.encryptValue(copy.SigningSecret)
+	if err != nil { return err }
+	copy.SigningSecret = signingEncrypted
 	if err := d.DB.Save(&copy).Error; err != nil { return err }
 	item.ID, item.CreatedAt, item.UpdatedAt = copy.ID, copy.CreatedAt, copy.UpdatedAt
 	item.SecretHash = copy.SecretHash
