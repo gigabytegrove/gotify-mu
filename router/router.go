@@ -320,6 +320,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.POST("/integration/webhook", automationHandler.CreateWebhookRoute)
 		adminPlatform.PUT("/integration/webhook/:id", automationHandler.UpdateWebhookRoute)
 		adminPlatform.POST("/integration/webhook/:id/regenerate", automationHandler.RegenerateWebhookSecret)
+		adminPlatform.POST("/integration/webhook/:id/signing-secret/regenerate", automationHandler.RegenerateWebhookSigningSecret)
 		adminPlatform.DELETE("/integration/webhook/:id", automationHandler.DeleteWebhookRoute)
 
 		adminPlatform.GET("/integration/mqtt", automationHandler.GetMQTT)
