@@ -53,7 +53,7 @@ func TestLocalAuthDisabled(t *testing.T) {
 		{
 			name:   "without oidc",
 			env:    map[string]string{EnvLocalAuthEnabled: "false"},
-			fatals: []FutureLog{futureFatal("either local authentication or OIDC must be enabled")},
+			fatals: []FutureLog{futureFatal("at least one authentication provider must be enabled")},
 		},
 		{
 			name: "with registration",
