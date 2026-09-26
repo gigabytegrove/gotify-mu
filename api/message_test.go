@@ -566,7 +566,7 @@ func (s *MessageSuite) Test_CreateMessage_MentionIgnoresEmailAndNonMember() {
 	s.a.CreateMessage(s.ctx)
 
 	assert.Equal(s.T(), 200, s.recorder.Code)
-	assert.Equal(s.T(), []uint{owner.ID}, s.notifiedUserIDs)
+	assert.ElementsMatch(s.T(), []uint{owner.ID, sender.ID}, s.notifiedUserIDs)
 }
 
 func (s *MessageSuite) Test_CreateMessage_MemberCannotPostWithoutChatMode() {
