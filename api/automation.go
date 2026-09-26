@@ -157,8 +157,17 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 	if !successOrAbort(ctx, 500, err) { return }
 	if item == nil { ctx.AbortWithStatus(404); return }
 
-	body, err := io.ReadAll(io.LimitReader(ctx.Request.Body, 1024*1024))
-	if !successOrAbort(ctx, 400, err) { return }
+	const maxWebhookBody = int64(1024 * 1024)
+	ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, maxWebhookBody)
+	body, err := io.ReadAll(ctx.Request.Body)
+	if err != nil {
+		var maxErr *http.MaxBytesError
+		if errors.As(err, &maxErr) {
+			ctx.AbortWithError(http.StatusRequestEntityTooLarge, errors.New("webhook payload exceeds the 1 MiB limit"))
+			return
+		}
+		if !successOrAbort(ctx, 400, err) { return }
+	}
 
 	title := item.DefaultTitle
 	message := strings.TrimSpace(string(body))
