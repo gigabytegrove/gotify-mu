@@ -438,7 +438,7 @@ func (a *AutomationAPI) CreateHomeAssistant(ctx *gin.Context) {
 	var params homeAssistantParams
 	if err := ctx.ShouldBindJSON(&params); err != nil { return }
 	if !a.channelExists(ctx, params.ApplicationID) { return }
-	if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("Home Assistant URL must use http or https")); return }
+	if !validHTTPURL(params.BaseURL) { ctx.AbortWithError(400, errors.New("home Assistant URL must use http or https")); return }
 	if strings.TrimSpace(params.Token) == "" { ctx.AbortWithError(400, errors.New("access token is required")); return }
 	item := &model.HomeAssistantIntegration{
 		Name: params.Name, ApplicationID: params.ApplicationID, BaseURL: strings.TrimRight(params.BaseURL, "/"),
@@ -786,7 +786,7 @@ func (a *AutomationAPI) UnacknowledgeMessage(ctx *gin.Context) {
 func (a *AutomationAPI) channelExists(ctx *gin.Context, id uint) bool {
 	item, err := a.DB.GetApplicationByID(id)
 	if !successOrAbort(ctx, 500, err) { return false }
-	if item == nil { ctx.AbortWithError(400, errors.New("Channel not found")); return false }
+	if item == nil { ctx.AbortWithError(400, errors.New("channel not found")); return false }
 	return true
 }
 
@@ -1011,11 +1011,3 @@ func validHTTPURL(raw string) bool {
 	return strings.HasPrefix(lower,"http://") || strings.HasPrefix(lower,"https://")
 }
 
-func integrationID(raw string) (uint, error) {
-	value, err := strconv.ParseUint(raw, 10, 64)
-	return uint(value), err
-}
-
-func integrationError(name string, id uint) error {
-	return fmt.Errorf("%s %d not found", name, id)
-}
