@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 )
 
 func TestLookupPayloadNestedField(t *testing.T) {
@@ -92,5 +93,55 @@ func TestRenderPayloadTemplate(t *testing.T) {
 	}
 	if raw := renderPayloadTemplate("body={{raw}}", payload, "original"); raw != "body=original" {
 		t.Fatalf("unexpected raw template output %q", raw)
+	}
+}
+
+
+func TestNormalizeHomeAssistantMode(t *testing.T) {
+	cases := map[string]string{
+		"":            "token",
+		"token":       "token",
+		"LLT":         "token",
+		"integration": "integration",
+		"Native":      "integration",
+		"invalid":     "",
+	}
+	for input, expected := range cases {
+		if got := normalizeHomeAssistantMode(input); got != expected {
+			t.Fatalf("normalizeHomeAssistantMode(%q) = %q, want %q", input, got, expected)
+		}
+	}
+}
+
+func TestPrepareHomeAssistantPairingCreatesOneTimeState(t *testing.T) {
+	item := &model.HomeAssistantIntegration{
+		NativeWebhookURL: "https://old.example/api/webhook/old",
+		NativeSecret:     "old-secret",
+		Status:           "connected",
+	}
+	before := time.Now()
+
+	code, err := prepareHomeAssistantPairing(item)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if code == "" {
+		t.Fatal("pairing code is empty")
+	}
+	if item.PairingCodeHash != security.HashSecret(code) {
+		t.Fatal("pairing code hash does not match generated code")
+	}
+	if item.PairingExpiresAt == nil {
+		t.Fatal("pairing expiry was not set")
+	}
+	if item.PairingExpiresAt.Before(before.Add(14*time.Minute)) ||
+		item.PairingExpiresAt.After(before.Add(16*time.Minute)) {
+		t.Fatalf("unexpected pairing expiry: %s", item.PairingExpiresAt)
+	}
+	if item.NativeWebhookURL != "" || item.NativeSecret != "" {
+		t.Fatal("old native bridge credentials were not cleared")
+	}
+	if item.Status != "pairing" {
+		t.Fatalf("unexpected pairing status %q", item.Status)
 	}
 }
