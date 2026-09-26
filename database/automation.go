@@ -136,6 +136,10 @@ func (d *GormDatabase) GetHomeAssistantIntegrations() ([]*model.HomeAssistantInt
 		plain, err := d.Secrets.Decrypt(item.Token)
 		if err != nil { return nil, err }
 		item.Token = plain
+		item.NativeWebhookURL, err = d.Secrets.Decrypt(item.NativeWebhookURL)
+		if err != nil { return nil, err }
+		item.NativeSecret, err = d.Secrets.Decrypt(item.NativeSecret)
+		if err != nil { return nil, err }
 	}
 	return items, nil
 }
@@ -148,17 +152,32 @@ func (d *GormDatabase) GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssi
 	plain, err := d.Secrets.Decrypt(item.Token)
 	if err != nil { return nil, err }
 	item.Token = plain
+	item.NativeWebhookURL, err = d.Secrets.Decrypt(item.NativeWebhookURL)
+	if err != nil { return nil, err }
+	item.NativeSecret, err = d.Secrets.Decrypt(item.NativeSecret)
+	if err != nil { return nil, err }
 	return item, nil
 }
 func (d *GormDatabase) SaveHomeAssistantIntegration(item *model.HomeAssistantIntegration) error {
-	plain, err := d.Secrets.Decrypt(item.Token)
+	token, err := d.Secrets.Decrypt(item.Token)
 	if err != nil { return err }
-	encrypted, err := d.Secrets.Encrypt(plain)
+	webhookURL, err := d.Secrets.Decrypt(item.NativeWebhookURL)
 	if err != nil { return err }
-	item.Token = encrypted
-	err = d.DB.Save(item).Error
-	item.Token = plain
-	return err
+	nativeSecret, err := d.Secrets.Decrypt(item.NativeSecret)
+	if err != nil { return err }
+
+	item.Token, err = d.Secrets.Encrypt(token)
+	if err != nil { return err }
+	item.NativeWebhookURL, err = d.Secrets.Encrypt(webhookURL)
+	if err != nil { return err }
+	item.NativeSecret, err = d.Secrets.Encrypt(nativeSecret)
+	if err != nil { return err }
+
+	saveErr := d.DB.Save(item).Error
+	item.Token = token
+	item.NativeWebhookURL = webhookURL
+	item.NativeSecret = nativeSecret
+	return saveErr
 }
 func (d *GormDatabase) DeleteHomeAssistantIntegration(id uint) error { return d.DB.Delete(&model.HomeAssistantIntegration{}, id).Error }
 
