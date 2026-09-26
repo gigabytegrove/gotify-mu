@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
@@ -15,6 +16,7 @@ import (
 	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/automation"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 )
 
 type AutomationEngine interface {
@@ -64,8 +66,9 @@ type AutomationDatabase interface {
 }
 
 type AutomationAPI struct {
-	DB     AutomationDatabase
-	Engine AutomationEngine
+	DB             AutomationDatabase
+	Engine         AutomationEngine
+	WebhookLimiter *security.WindowLimiter
 }
 
 type webhookParams struct {
@@ -138,6 +141,18 @@ func (a *AutomationAPI) DeleteWebhookRoute(ctx *gin.Context) {
 
 func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 	secret := strings.TrimSpace(ctx.Param("secret"))
+	if a.WebhookLimiter != nil {
+		key := ctx.ClientIP() + "|" + secret
+		if allowed, retry := a.WebhookLimiter.Allow(key); !allowed {
+			seconds := int(retry.Seconds())
+			if seconds < 1 {
+				seconds = 1
+			}
+			ctx.Header("Retry-After", strconv.Itoa(seconds))
+			ctx.AbortWithError(http.StatusTooManyRequests, errors.New("too many webhook requests"))
+			return
+		}
+	}
 	item, err := a.DB.GetWebhookRouteBySecret(secret)
 	if !successOrAbort(ctx, 500, err) { return }
 	if item == nil { ctx.AbortWithStatus(404); return }
