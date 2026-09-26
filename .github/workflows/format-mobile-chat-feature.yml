@@ -1,0 +1,36 @@
+name: Format mobile chat feature
+
+on:
+  push:
+    branches:
+      - feature/mobile-chat-capabilities
+
+permissions:
+  contents: write
+
+jobs:
+  gofmt:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feature/mobile-chat-capabilities
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26.x'
+      - name: Format changed Go files
+        run: |
+          gofmt -w             api/application_membership.go             api/mu_capabilities.go             api/mu_presence.go             api/stream/stream.go             api/stream/mu_event_client.go             model/message.go
+      - name: Commit formatting
+        run: |
+          if git diff --quiet; then
+            echo "No formatting changes required."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add api/application_membership.go api/mu_capabilities.go api/mu_presence.go api/stream/stream.go api/stream/mu_event_client.go model/message.go
+          git commit -m "style: gofmt mobile chat changes"
+          git push origin HEAD:feature/mobile-chat-capabilities
