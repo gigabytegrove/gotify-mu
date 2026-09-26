@@ -1,6 +1,7 @@
 package database
 
 import (
+	"time"
 	"github.com/gotify/server/v3/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
