@@ -458,7 +458,7 @@ func (s *MessageSuite) Test_CreateMessage_MemberCanPostToChatChannel() {
 	assert.Equal(s.T(), member.Name, messages[0].Title)
 }
 
-func (s *MessageSuite) Test_CreateMessage_ChatDoesNotNotifySender() {
+func (s *MessageSuite) Test_CreateMessage_ChatNotifiesSender() {
 	owner := s.db.NewUser(1)
 	sender := s.db.NewUser(2)
 	app := &model.Application{
@@ -485,7 +485,7 @@ func (s *MessageSuite) Test_CreateMessage_ChatDoesNotNotifySender() {
 	s.a.CreateMessage(s.ctx)
 
 	assert.Equal(s.T(), 200, s.recorder.Code)
-	assert.Equal(s.T(), []uint{owner.ID}, s.notifiedUserIDs)
+	assert.ElementsMatch(s.T(), []uint{owner.ID, sender.ID}, s.notifiedUserIDs)
 }
 
 func (s *MessageSuite) Test_CreateMessage_MentionNotifiesMutedChatMember() {
@@ -525,9 +525,8 @@ func (s *MessageSuite) Test_CreateMessage_MentionNotifiesMutedChatMember() {
 	s.a.CreateMessage(s.ctx)
 
 	assert.Equal(s.T(), 200, s.recorder.Code)
-	assert.ElementsMatch(s.T(), []uint{owner.ID, mentioned.ID}, s.notifiedUserIDs)
-	assert.NotContains(s.T(), s.notifiedUserIDs, sender.ID)
-
+	assert.ElementsMatch(s.T(), []uint{owner.ID, sender.ID, mentioned.ID}, s.notifiedUserIDs)
+	
 	messages, err := s.db.GetMessagesByApplication(app.ID)
 	require.NoError(s.T(), err)
 	require.Len(s.T(), messages, 1)
@@ -567,7 +566,7 @@ func (s *MessageSuite) Test_CreateMessage_MentionIgnoresEmailAndNonMember() {
 	s.a.CreateMessage(s.ctx)
 
 	assert.Equal(s.T(), 200, s.recorder.Code)
-	assert.Equal(s.T(), []uint{owner.ID}, s.notifiedUserIDs)
+	assert.ElementsMatch(s.T(), []uint{owner.ID, sender.ID}, s.notifiedUserIDs)
 }
 
 func (s *MessageSuite) Test_CreateMessage_MemberCannotPostWithoutChatMode() {

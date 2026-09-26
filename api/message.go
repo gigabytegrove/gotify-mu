@@ -796,11 +796,11 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 			return
 		}
 		recipients = append(recipients, mentionUserIDs...)
+		if postingUser != nil && app.AllowMemberPost {
+			recipients = append(recipients, postingUser.ID)
+		}
 		notified := make(map[uint]struct{}, len(recipients))
 		for _, userID := range recipients {
-			if postingUser != nil && userID == postingUser.ID {
-				continue
-			}
 			if _, exists := notified[userID]; exists {
 				continue
 			}
