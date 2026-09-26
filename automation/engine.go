@@ -52,6 +52,7 @@ type Database interface {
 	GetScheduledNotifications() ([]*model.ScheduledNotification, error)
 	GetDueScheduledNotifications(now time.Time) ([]*model.ScheduledNotification, error)
 	SaveScheduledNotification(item *model.ScheduledNotification) error
+	SaveScheduleRun(item *model.ScheduleRun) error
 
 	GetEscalationRulesForMessage(applicationID uint, priority int) ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
@@ -369,25 +370,46 @@ func (e *Engine) runSchedules(now time.Time) {
 	for _, item := range items {
 		if item.NextRunAt == nil { continue }
 		dueAt := *item.NextRunAt
+		run := &model.ScheduleRun{
+			ScheduleID:item.ID, ScheduledFor:dueAt, Status:"running", StartedAt:time.Now().UTC(),
+		}
+		_ = e.db.SaveScheduleRun(run)
+
 		key := fmt.Sprintf("schedule:%d:%d", item.ID, dueAt.UnixNano())
-		if _, _, err := e.publishOnce(item.ApplicationID, item.Title, item.Message, item.Priority, key); err != nil {
-			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
+		msg, _, publishErr := e.publishOnce(item.ApplicationID, item.Title, item.Message, item.Priority, key)
+		finished := time.Now().UTC()
+		if publishErr != nil {
+			run.Status = "failed"
+			run.Error = publishErr.Error()
+			run.FinishedAt = &finished
+			_ = e.db.SaveScheduleRun(run)
+			log.Error().Err(publishErr).Uint("schedule_id", item.ID).Msg("Scheduled notification failed")
 			continue
 		}
+
+		run.Status = "completed"
+		run.MessageID = msg.ID
+		run.Error = ""
+		run.FinishedAt = &finished
+		_ = e.db.SaveScheduleRun(run)
+
 		runAt := now
 		item.LastRunAt = &runAt
-		if item.ScheduleType == "once" {
+		item.RunCount++
+		if item.ScheduleType == "once" || (item.MaxRuns > 0 && item.RunCount >= item.MaxRuns) {
 			item.Enabled = false
 			item.NextRunAt = nil
 		} else {
 			item.NextRunAt = NextScheduleRun(item, now.Add(time.Second))
+			if item.NextRunAt == nil {
+				item.Enabled = false
+			}
 		}
 		if err := e.db.SaveScheduledNotification(item); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not update schedule")
 		}
 	}
 }
-
 func NextScheduleRun(item *model.ScheduledNotification, now time.Time) *time.Time {
 	loc := time.UTC
 	if item.Timezone != "" {
@@ -396,42 +418,68 @@ func NextScheduleRun(item *model.ScheduledNotification, now time.Time) *time.Tim
 		}
 	}
 	localNow := now.In(loc)
+	excluded := map[string]struct{}{}
+	for _, value := range strings.Split(item.ExcludeDates, ",") {
+		if value = strings.TrimSpace(value); value != "" {
+			excluded[value] = struct{}{}
+		}
+	}
+	allowed := func(candidate time.Time) bool {
+		if _, skip := excluded[candidate.In(loc).Format("2006-01-02")]; skip { return false }
+		if item.EndAt != nil && candidate.UTC().After(item.EndAt.UTC()) { return false }
+		return true
+	}
+	returnValue := func(candidate time.Time) *time.Time {
+		value := candidate.UTC()
+		if !allowed(value) { return nil }
+		return &value
+	}
 
 	switch item.ScheduleType {
 	case "once":
-		if item.RunAt != nil && item.RunAt.After(now) {
+		if item.RunAt != nil && item.RunAt.After(now) && allowed(*item.RunAt) {
 			value := *item.RunAt
 			return &value
 		}
 		return nil
+	case "interval":
+		minutes := item.IntervalMinutes
+		if minutes < 1 { minutes = 1 }
+		candidate := now.Add(time.Duration(minutes) * time.Minute)
+		return returnValue(candidate)
 	case "hourly":
 		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), localNow.Hour(), clamp(item.Minute, 0, 59), 0, 0, loc)
-		if !candidate.After(localNow) {
+		if !candidate.After(localNow) { candidate = candidate.Add(time.Hour) }
+		for i := 0; i < 24*370; i++ {
+			if allowed(candidate) { value := candidate.UTC(); return &value }
 			candidate = candidate.Add(time.Hour)
+			if item.EndAt != nil && candidate.UTC().After(item.EndAt.UTC()) { return nil }
 		}
-		value := candidate.UTC()
-		return &value
+		return nil
 	case "daily":
 		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc)
-		if !candidate.After(localNow) {
+		if !candidate.After(localNow) { candidate = candidate.AddDate(0, 0, 1) }
+		for i := 0; i < 370; i++ {
+			if allowed(candidate) { value := candidate.UTC(); return &value }
 			candidate = candidate.AddDate(0, 0, 1)
+			if item.EndAt != nil && candidate.UTC().After(item.EndAt.UTC()) { return nil }
 		}
-		value := candidate.UTC()
-		return &value
+		return nil
 	case "weekly":
 		weekday := time.Weekday(clamp(item.Weekday, 0, 6))
 		days := (int(weekday) - int(localNow.Weekday()) + 7) % 7
 		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc).AddDate(0, 0, days)
-		if !candidate.After(localNow) {
+		if !candidate.After(localNow) { candidate = candidate.AddDate(0, 0, 7) }
+		for i := 0; i < 54; i++ {
+			if allowed(candidate) { value := candidate.UTC(); return &value }
 			candidate = candidate.AddDate(0, 0, 7)
+			if item.EndAt != nil && candidate.UTC().After(item.EndAt.UTC()) { return nil }
 		}
-		value := candidate.UTC()
-		return &value
+		return nil
 	default:
 		return nil
 	}
 }
-
 func (e *Engine) runDigests(now time.Time) {
 	policies, err := e.db.GetDueDigestPolicies(now)
 	if err != nil {
