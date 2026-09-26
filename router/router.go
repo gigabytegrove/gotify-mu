@@ -73,6 +73,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	)
 	go func() {
 		ticker := time.NewTicker(5 * time.Minute)
+		lastAuditCleanup := time.Time{}
 		for range ticker.C {
 			connectedTokens := streamHandler.CollectConnectedClientTokens()
 			now := time.Now()
@@ -85,6 +86,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 				}
 			} else {
 				log.Error().Err(err).Msg("Error cleaning up expired clients")
+			}
+			if lastAuditCleanup.IsZero() || now.Sub(lastAuditCleanup) >= 24*time.Hour {
+				before := now.AddDate(0, 0, -conf.AuditRetentionDays)
+				if err := db.DeleteAuditEventsBefore(before); err != nil {
+					log.Error().Err(err).Msg("Error applying Audit Log retention")
+				} else {
+					lastAuditCleanup = now
+				}
 			}
 		}
 	}()
@@ -314,6 +323,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	{
 		adminPlatform.Use(authentication.RequireAdmin)
 		adminPlatform.GET("/audit", auditHandler.GetAuditEvents)
+		adminPlatform.GET("/audit/export", auditHandler.ExportAuditEvents)
 		adminPlatform.GET("/group", groupHandler.GetGroups)
 		adminPlatform.POST("/group", groupHandler.CreateGroup)
 		adminPlatform.PUT("/group/:id", groupHandler.UpdateGroup)
