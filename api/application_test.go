@@ -65,6 +65,7 @@ func (s *ApplicationSuite) Test_CreateApplication_mapAllParameters() {
 		Name:        "custom_name",
 		Description: "description_text",
 		SortKey:     "a5",
+		ChannelType: "notification",
 		CreatedAt:   testdb.Now,
 	}
 	assert.Equal(s.T(), 200, s.recorder.Code)
@@ -87,7 +88,7 @@ func (s *ApplicationSuite) Test_ensureApplicationHasCorrectJsonRepresentation() 
 		SortKey:     "a1",
 		CreatedAt:   testdb.Now,
 	}
-	test.JSONEquals(s.T(), actual, `{"id":1,"token":"Aasdasfgeeg","ownerId":2,"name":"myapp","description":"mydesc", "internal":true, "autoAssign":false, "allowMemberPost":false, "image":"asd", "defaultPriority":0, "retentionDays":0, "createdAt":"2020-01-01T00:00:00Z", "lastUsed":null, "sortKey":"a1"}`)
+	test.JSONEquals(s.T(), actual, `{"id":1,"token":"Aasdasfgeeg","ownerId":2,"name":"myapp","description":"mydesc", "internal":true, "autoAssign":false, "allowMemberPost":false, "channelType":"", "image":"asd", "defaultPriority":0, "retentionDays":0, "createdAt":"2020-01-01T00:00:00Z", "lastUsed":null, "sortKey":"a1"}`)
 }
 
 func (s *ApplicationSuite) Test_CreateApplication_nonAdminCannotCreateChatChannel() {
@@ -140,6 +141,7 @@ func (s *ApplicationSuite) Test_CreateApplication_ignoresReadOnlyPropertiesInPar
 		Internal:    false,
 		Image:       "static/defaultapp.png",
 		SortKey:     "a5",
+		ChannelType: "notification",
 		CreatedAt:   testdb.Now,
 	}
 
@@ -239,7 +241,7 @@ func (s *ApplicationSuite) Test_CreateApplication_onlyRequiredParameters() {
 	s.withFormData("name=custom_name")
 	s.a.CreateApplication(s.ctx)
 
-	expected := &model.Application{ID: 1, UserID: 5, Name: "custom_name", SortKey: "a0", CreatedAt: testdb.Now, Image: "static/defaultapp.png"}
+	expected := &model.Application{ID: 1, UserID: 5, Name: "custom_name", SortKey: "a0", ChannelType: "notification", CreatedAt: testdb.Now, Image: "static/defaultapp.png"}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	bodyBytes, err := io.ReadAll(s.recorder.Body)
 	assert.Nil(s.T(), err)
@@ -268,6 +270,7 @@ func (s *ApplicationSuite) Test_CreateApplication_returnsApplicationWithID() {
 		Name:      "custom_name",
 		Image:     "static/defaultapp.png",
 		SortKey:   "a0",
+		ChannelType: "notification",
 		CreatedAt: testdb.Now,
 	}
 	assert.Equal(s.T(), 200, s.recorder.Code)
@@ -293,7 +296,7 @@ func (s *ApplicationSuite) Test_CreateApplication_withExistingToken() {
 
 	s.a.CreateApplication(s.ctx)
 
-	expected := &model.Application{ID: 2, Name: "custom_name", UserID: 5, SortKey: "a0", CreatedAt: testdb.Now}
+	expected := &model.Application{ID: 2, Name: "custom_name", UserID: 5, SortKey: "a0", ChannelType: "notification", CreatedAt: testdb.Now}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	if app, err := s.db.GetApplicationByID(2); assert.NoError(s.T(), err) {
 		expected.Token = app.Token
@@ -381,6 +384,8 @@ func (s *ApplicationSuite) Test_GetApplications() {
 	receiveNotifications := true
 	first.ReceiveNotifications = &receiveNotifications
 	second.ReceiveNotifications = &receiveNotifications
+	first.CurrentRole = model.ChannelRoleOwner
+	second.CurrentRole = model.ChannelRoleOwner
 	test.BodyEquals(s.T(), []*model.Application{first, second}, s.recorder)
 }
 
@@ -404,6 +409,8 @@ func (s *ApplicationSuite) Test_GetApplications_WithImage() {
 	receiveNotifications := true
 	first.ReceiveNotifications = &receiveNotifications
 	second.ReceiveNotifications = &receiveNotifications
+	first.CurrentRole = model.ChannelRoleOwner
+	second.CurrentRole = model.ChannelRoleOwner
 	test.BodyEquals(s.T(), []*model.Application{first, second}, s.recorder)
 }
 
