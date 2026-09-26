@@ -3,13 +3,21 @@ import axios from 'axios';
 import {
     Box,
     Button,
+    Checkbox,
     Chip,
+    Dialog,
+    DialogActions,
+    DialogContent,
+    DialogTitle,
+    FormControlLabel,
     Stack,
     Typography,
 } from '@mui/material';
 import Refresh from '@mui/icons-material/Refresh';
 import Download from '@mui/icons-material/Download';
 import Logout from '@mui/icons-material/Logout';
+import Add from '@mui/icons-material/Add';
+import ContentCopy from '@mui/icons-material/ContentCopy';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
 import ConfirmDialog from '../common/ConfirmDialog';
@@ -19,6 +27,8 @@ import {
     IAdminSession,
     IAutomationRun,
     IIntegrationStatus,
+    IServiceAccount,
+    IServiceAccountCreated,
     ISystemStats,
 } from '../types';
 
@@ -36,11 +46,14 @@ const formatBytes = (value?: number) => {
 };
 
 const Operations = () => {
-    const {snackManager} = useStores();
+    const {snackManager, appStore} = useStores();
     const [stats, setStats] = React.useState<ISystemStats>();
     const [sessions, setSessions] = React.useState<IAdminSession[]>([]);
     const [integrations, setIntegrations] = React.useState<IIntegrationStatus[]>([]);
     const [runs, setRuns] = React.useState<IAutomationRun[]>([]);
+    const [serviceAccounts, setServiceAccounts] = React.useState<IServiceAccount[]>([]);
+    const [serviceAccountOpen, setServiceAccountOpen] = React.useState(false);
+    const [serviceToken, setServiceToken] = React.useState<IServiceAccountCreated>();
     const [loading, setLoading] = React.useState(true);
     const [revoke, setRevoke] = React.useState<IAdminSession>();
     const [restoreResult, setRestoreResult] = React.useState<string>();
@@ -48,20 +61,24 @@ const Operations = () => {
     const refresh = React.useCallback(async () => {
         setLoading(true);
         try {
-            const [statsResult, sessionsResult, integrationResult, runsResult] = await Promise.all([
-                axios.get<ISystemStats>(api('operations/stats')),
-                axios.get<IAdminSession[]>(api('operations/sessions')),
-                axios.get<IIntegrationStatus[]>(api('integration/status')),
-                axios.get<IAutomationRun[]>(api('automation/run?limit=100')),
-            ]);
+            await appStore.refresh();
+            const [statsResult, sessionsResult, integrationResult, runsResult, serviceResult] =
+                await Promise.all([
+                    axios.get<ISystemStats>(api('operations/stats')),
+                    axios.get<IAdminSession[]>(api('operations/sessions')),
+                    axios.get<IIntegrationStatus[]>(api('integration/status')),
+                    axios.get<IAutomationRun[]>(api('automation/run?limit=100')),
+                    axios.get<IServiceAccount[]>(api('service-account')),
+                ]);
             setStats(statsResult.data);
             setSessions(sessionsResult.data);
             setIntegrations(integrationResult.data);
             setRuns(runsResult.data);
+            setServiceAccounts(serviceResult.data);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [appStore]);
 
     React.useEffect(() => {
         void refresh();
@@ -193,6 +210,59 @@ const Operations = () => {
                 )}
             </SurfaceCard>
 
+            <SurfaceCard
+                title="Service Accounts"
+                subtitle="Scoped non-interactive credentials for external systems and automation."
+                action={
+                    <Button
+                        variant="contained"
+                        startIcon={<Add />}
+                        onClick={() => setServiceAccountOpen(true)}>
+                        Add Service Account
+                    </Button>
+                }>
+                <Stack spacing={1}>
+                    {serviceAccounts.length === 0 && (
+                        <Typography color="text.secondary">No service accounts configured.</Typography>
+                    )}
+                    {serviceAccounts.map((account) => (
+                        <Stack
+                            key={account.id}
+                            direction={{xs: 'column', sm: 'row'}}
+                            spacing={1}
+                            sx={{
+                                p: 1.5,
+                                border: 1,
+                                borderColor: 'divider',
+                                borderRadius: 2,
+                                justifyContent: 'space-between',
+                                alignItems: {sm: 'center'},
+                            }}>
+                            <Box>
+                                <Typography sx={{fontWeight: 700}}>{account.name}</Typography>
+                                <Typography variant="body2" color="text.secondary">
+                                    {account.scopes} · Channels {account.channelIds}
+                                    {account.expiresAt
+                                        ? ' · Expires ' + new Date(account.expiresAt).toLocaleString()
+                                        : ' · No expiration'}
+                                </Typography>
+                            </Box>
+                            <Button
+                                size="small"
+                                color="error"
+                                onClick={() => {
+                                    void axios.delete(api('service-account/' + account.id)).then(async () => {
+                                        await refresh();
+                                        snackManager.snack('Service account revoked');
+                                    });
+                                }}>
+                                Revoke
+                            </Button>
+                        </Stack>
+                    ))}
+                </Stack>
+            </SurfaceCard>
+
             <SurfaceCard title="Active Sessions" subtitle="Signed-in clients that can currently access the server.">
                 <Stack spacing={1}>
                     {sessions.length === 0 && <Typography color="text.secondary">No active sessions.</Typography>}
@@ -290,6 +360,48 @@ const Operations = () => {
                 </Stack>
             </SurfaceCard>
 
+            {serviceAccountOpen && (
+                <ServiceAccountDialog
+                    channels={appStore.getItems()}
+                    onClose={() => setServiceAccountOpen(false)}
+                    onCreated={async (created) => {
+                        setServiceAccountOpen(false);
+                        setServiceToken(created);
+                        await refresh();
+                    }}
+                />
+            )}
+            {serviceToken && (
+                <Dialog open onClose={() => setServiceToken(undefined)} fullWidth maxWidth="sm">
+                    <DialogTitle>Save Service Account Token</DialogTitle>
+                    <DialogContent>
+                        <Stack spacing={2} sx={{pt: 1}}>
+                            <Typography color="warning.main">
+                                This token is shown once. Store it before closing this window.
+                            </Typography>
+                            <TextField
+                                label="Token"
+                                value={serviceToken.token}
+                                fullWidth
+                                slotProps={{input: {readOnly: true}}}
+                            />
+                            <Button
+                                startIcon={<ContentCopy />}
+                                onClick={() => {
+                                    void navigator.clipboard.writeText(serviceToken.token);
+                                    snackManager.snack('Service account token copied');
+                                }}>
+                                Copy Token
+                            </Button>
+                        </Stack>
+                    </DialogContent>
+                    <DialogActions>
+                        <Button variant="contained" onClick={() => setServiceToken(undefined)}>
+                            I Saved This Token
+                        </Button>
+                    </DialogActions>
+                </Dialog>
+            )}
             {revoke && (
                 <ConfirmDialog
                     title="Revoke session?"
@@ -306,6 +418,122 @@ const Operations = () => {
                 />
             )}
         </DefaultPage>
+    );
+};
+
+const ServiceAccountDialog = ({
+    channels,
+    onClose,
+    onCreated,
+}: {
+    channels: Array<{id: number; name: string}>;
+    onClose: VoidFunction;
+    onCreated: (created: IServiceAccountCreated) => Promise<void>;
+}) => {
+    const [name, setName] = React.useState('');
+    const [scopes, setScopes] = React.useState<string[]>(['message:write']);
+    const [channelIds, setChannelIds] = React.useState<number[]>([]);
+    const [expiresAt, setExpiresAt] = React.useState('');
+    const [saving, setSaving] = React.useState(false);
+
+    const toggleScope = (scope: string) =>
+        setScopes((current) =>
+            current.includes(scope)
+                ? current.filter((value) => value !== scope)
+                : [...current, scope]
+        );
+
+    const toggleChannel = (id: number) =>
+        setChannelIds((current) =>
+            current.includes(id) ? current.filter((value) => value !== id) : [...current, id]
+        );
+
+    const save = async () => {
+        setSaving(true);
+        try {
+            const response = await axios.post<IServiceAccountCreated>(api('service-account'), {
+                name,
+                scopes,
+                channelIds,
+                expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+            });
+            await onCreated(response.data);
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    return (
+        <Dialog open onClose={onClose} fullWidth maxWidth="sm">
+            <DialogTitle>Add Service Account</DialogTitle>
+            <DialogContent>
+                <Stack spacing={2} sx={{pt: 1}}>
+                    <TextField
+                        label="Name"
+                        value={name}
+                        onChange={(event) => setName(event.target.value)}
+                        required
+                    />
+                    <Box>
+                        <Typography sx={{fontWeight: 700, mb: 0.5}}>API access</Typography>
+                        {[
+                            ['channels:read', 'Read Channel information'],
+                            ['message:read', 'Read Channel messages'],
+                            ['message:write', 'Send Channel messages'],
+                        ].map(([scope, label]) => (
+                            <FormControlLabel
+                                key={scope}
+                                control={
+                                    <Checkbox
+                                        checked={scopes.includes(scope)}
+                                        onChange={() => toggleScope(scope)}
+                                    />
+                                }
+                                label={label}
+                            />
+                        ))}
+                    </Box>
+                    <Box>
+                        <Typography sx={{fontWeight: 700, mb: 0.5}}>Allowed Channels</Typography>
+                        <Stack>
+                            {channels.map((channel) => (
+                                <FormControlLabel
+                                    key={channel.id}
+                                    control={
+                                        <Checkbox
+                                            checked={channelIds.includes(channel.id)}
+                                            onChange={() => toggleChannel(channel.id)}
+                                        />
+                                    }
+                                    label={channel.name}
+                                />
+                            ))}
+                        </Stack>
+                    </Box>
+                    <TextField
+                        type="datetime-local"
+                        label="Expiration"
+                        value={expiresAt}
+                        onChange={(event) => setExpiresAt(event.target.value)}
+                        helperText="Optional. Leave blank for no expiration."
+                        slotProps={{inputLabel: {shrink: true}}}
+                    />
+                    <Typography variant="body2" color="text.secondary">
+                        Service account tokens use dedicated /service/v1 endpoints and cannot be
+                        used as interactive browser sessions.
+                    </Typography>
+                </Stack>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Cancel</Button>
+                <Button
+                    variant="contained"
+                    disabled={saving || !name.trim() || scopes.length === 0 || channelIds.length === 0}
+                    onClick={() => void save()}>
+                    Create
+                </Button>
+            </DialogActions>
+        </Dialog>
     );
 };
 
