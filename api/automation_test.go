@@ -303,7 +303,7 @@ func TestPairNativeHomeAssistantRejectsBadAndExpiredCodes(t *testing.T) {
 	future := time.Now().Add(10 * time.Minute)
 	past := time.Now().Add(-time.Minute)
 
-	for name, secret, expires, wantStatus := range []struct {
+	for _, tc := range []struct {
 		name       string
 		secret     string
 		expires    *time.Time
@@ -312,25 +312,25 @@ func TestPairNativeHomeAssistantRejectsBadAndExpiredCodes(t *testing.T) {
 		{name: "bad secret", secret: "wrong-secret", expires: &future, wantStatus: 401},
 		{name: "expired", secret: "pair-secret", expires: &past, wantStatus: 410},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			db := &homeAssistantEndpointTestDB{
 				item: &model.HomeAssistantIntegration{
 					ID:               7,
 					ConnectionMode:   "integration",
 					PairingCodeHash:  security.HashSecret("pair-secret"),
-					PairingExpiresAt: expires,
+					PairingExpiresAt: tc.expires,
 				},
 			}
 			api := &AutomationAPI{DB: db, Engine: &homeAssistantEndpointTestEngine{}}
 			ctx, recorder := nativePairingContext(t, map[string]any{
-				"pairingCode": "7." + secret,
+				"pairingCode": "7." + tc.secret,
 				"webhookUrl":  "https://ha.example/api/webhook/bridge",
 			})
 
 			api.PairNativeHomeAssistant(ctx)
 
-			if recorder.Code != wantStatus {
-				t.Fatalf("unexpected status %d, want %d", recorder.Code, wantStatus)
+			if recorder.Code != tc.wantStatus {
+				t.Fatalf("unexpected status %d, want %d", recorder.Code, tc.wantStatus)
 			}
 		})
 	}
@@ -349,7 +349,7 @@ func TestReceiveNativeHomeAssistantEventAuthorizationAndRouting(t *testing.T) {
 	engine := &homeAssistantEndpointTestEngine{routed: true}
 	api := &AutomationAPI{DB: db, Engine: engine}
 
-	for name, authHeader, wantStatus, wantReceived := range []struct {
+	for _, tc := range []struct {
 		name         string
 		authHeader   string
 		wantStatus   int
@@ -358,22 +358,22 @@ func TestReceiveNativeHomeAssistantEventAuthorizationAndRouting(t *testing.T) {
 		{name: "bad bearer", authHeader: "Bearer wrong-secret", wantStatus: 401, wantReceived: false},
 		{name: "valid bearer", authHeader: "Bearer shared-secret", wantStatus: 202, wantReceived: true},
 	} {
-		t.Run(name, func(t *testing.T) {
+		t.Run(tc.name, func(t *testing.T) {
 			engine.received = false
 			ctx, recorder := nativePairingContext(t, map[string]any{
 				"eventType": "state_changed",
 				"data":      map[string]any{"entity_id": "light.kitchen"},
 			})
 			ctx.Params = gin.Params{{Key: "id", Value: "7"}}
-			ctx.Request.Header.Set("Authorization", authHeader)
+			ctx.Request.Header.Set("Authorization", tc.authHeader)
 
 			api.ReceiveNativeHomeAssistantEvent(ctx)
 
-			if recorder.Code != wantStatus {
-				t.Fatalf("unexpected status %d, want %d: %s", recorder.Code, wantStatus, recorder.Body.String())
+			if recorder.Code != tc.wantStatus {
+				t.Fatalf("unexpected status %d, want %d: %s", recorder.Code, tc.wantStatus, recorder.Body.String())
 			}
-			if engine.received != wantReceived {
-				t.Fatalf("received=%v, want %v", engine.received, wantReceived)
+			if engine.received != tc.wantReceived {
+				t.Fatalf("received=%v, want %v", engine.received, tc.wantReceived)
 			}
 		})
 	}
