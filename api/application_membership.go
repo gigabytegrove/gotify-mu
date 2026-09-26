@@ -40,6 +40,12 @@ type ApplicationMemberExternal struct {
 	AutoAssigned         bool   `json:"autoAssigned"`
 }
 
+type MentionableUserExternal struct {
+	UserID      uint   `json:"userId"`
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
+}
+
 type ApplicationAutoAssignParams struct {
 	Enabled bool `json:"enabled"`
 }
@@ -92,6 +98,61 @@ func (a *ApplicationMembershipAPI) getAuthorizedApplication(
 		return nil, false
 	}
 	return app, true
+}
+
+func (a *ApplicationMembershipAPI) GetMentionableUsers(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if app == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist"))
+			return
+		}
+
+		currentUserID := auth.GetUserID(ctx)
+		currentMembership, err := a.DB.GetApplicationMembership(id, currentUserID)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if currentMembership == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist"))
+			return
+		}
+
+		isChat := app.ChannelType == model.ChannelTypeChat ||
+			(app.ChannelType == "" && app.AllowMemberPost)
+		if !isChat {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("mentions are only available for chat channels"))
+			return
+		}
+
+		memberships, err := a.DB.GetApplicationMemberships(id)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+
+		result := make([]MentionableUserExternal, 0, len(memberships))
+		for _, membership := range memberships {
+			if membership.UserID == currentUserID {
+				continue
+			}
+			user, err := a.DB.GetUserByID(membership.UserID)
+			if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+				return
+			}
+			if user == nil {
+				continue
+			}
+			result = append(result, MentionableUserExternal{
+				UserID:      user.ID,
+				Name:        user.Name,
+				DisplayName: user.DisplayName,
+			})
+		}
+		ctx.JSON(http.StatusOK, result)
+	})
 }
 
 func (a *ApplicationMembershipAPI) GetMembers(ctx *gin.Context) {
