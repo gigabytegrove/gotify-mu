@@ -218,6 +218,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		app := clientAuth.Group("/application")
 		{
 			app.GET("", applicationHandler.GetApplications)
+			app.GET("/:id/mentionable-users", applicationMembershipHandler.GetMentionableUsers)
 			app.POST("", applicationHandler.CreateApplication)
 			app.POST("/:id/image", applicationHandler.UploadApplicationImage)
 			app.DELETE("/:id/image", applicationHandler.RemoveApplicationImage)
