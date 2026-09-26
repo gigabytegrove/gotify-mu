@@ -518,7 +518,7 @@ func (a *AutomationAPI) CreateHomeAssistant(ctx *gin.Context) {
 	if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 	ctx.JSON(201, homeAssistantPairingResponse{
 		HomeAssistantIntegrationView: homeAssistantView(item),
-		PairingCode: pairingCode,
+		PairingCode: fmt.Sprintf("%d.%s", item.ID, pairingCode),
 	})
 }
 
@@ -593,56 +593,67 @@ func (a *AutomationAPI) RegenerateHomeAssistantPairing(ctx *gin.Context) {
 		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
 		ctx.JSON(200, homeAssistantPairingResponse{
 			HomeAssistantIntegrationView: homeAssistantView(item),
-			PairingCode: code,
+			PairingCode: fmt.Sprintf("%d.%s", item.ID, code),
 		})
 	})
 }
 
 func (a *AutomationAPI) PairNativeHomeAssistant(ctx *gin.Context) {
-	withID(ctx, "id", func(id uint) {
-		item, err := a.DB.GetHomeAssistantIntegrationByID(id)
-		if !successOrAbort(ctx, 500, err) { return }
-		if item == nil || normalizeHomeAssistantMode(item.ConnectionMode) != "integration" {
-			ctx.AbortWithError(404, errors.New("home assistant pairing request not found"))
-			return
-		}
-		var params homeAssistantNativePairParams
-		if err := ctx.ShouldBindJSON(&params); err != nil { return }
-		if item.PairingExpiresAt == nil || time.Now().After(*item.PairingExpiresAt) || item.PairingCodeHash == "" {
-			ctx.AbortWithError(410, errors.New("home assistant pairing code has expired"))
-			return
-		}
-		expected, decodeErr := hex.DecodeString(item.PairingCodeHash)
-		if decodeErr != nil {
-			ctx.AbortWithError(500, errors.New("home assistant pairing state is invalid"))
-			return
-		}
-		providedHash := sha256.Sum256([]byte(strings.TrimSpace(params.PairingCode)))
-		if !hmac.Equal(expected, providedHash[:]) {
-			ctx.AbortWithError(401, errors.New("invalid home assistant pairing code"))
-			return
-		}
-		if !validHTTPURL(params.WebhookURL) {
-			ctx.AbortWithError(400, errors.New("home assistant webhook URL must use http or https"))
-			return
-		}
-		secret, err := generateIntegrationSecret()
-		if !successOrAbort(ctx, 500, err) { return }
-		now := time.Now()
-		item.NativeWebhookURL = strings.TrimSpace(params.WebhookURL)
-		item.NativeSecret = secret
-		item.PairingCodeHash = ""
-		item.PairingExpiresAt = nil
-		item.Status = "connected"
-		item.LastConnectedAt = &now
-		item.LastError = ""
-		item.LastErrorAt = nil
-		if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
-		ctx.JSON(200, homeAssistantNativePairResponse{
-			IntegrationID: item.ID,
-			Secret: secret,
-			EventPath: fmt.Sprintf("/integrations/home-assistant/native/%d/event", item.ID),
-		})
+	var params homeAssistantNativePairParams
+	if err := ctx.ShouldBindJSON(&params); err != nil { return }
+
+	parts := strings.SplitN(strings.TrimSpace(params.PairingCode), ".", 2)
+	if len(parts) != 2 {
+		ctx.AbortWithError(400, errors.New("invalid home assistant pairing code"))
+		return
+	}
+	id64, err := strconv.ParseUint(parts[0], 10, 64)
+	if err != nil || id64 == 0 {
+		ctx.AbortWithError(400, errors.New("invalid home assistant pairing code"))
+		return
+	}
+	id := uint(id64)
+
+	item, err := a.DB.GetHomeAssistantIntegrationByID(id)
+	if !successOrAbort(ctx, 500, err) { return }
+	if item == nil || normalizeHomeAssistantMode(item.ConnectionMode) != "integration" {
+		ctx.AbortWithError(404, errors.New("home assistant pairing request not found"))
+		return
+	}
+	if item.PairingExpiresAt == nil || time.Now().After(*item.PairingExpiresAt) || item.PairingCodeHash == "" {
+		ctx.AbortWithError(410, errors.New("home assistant pairing code has expired"))
+		return
+	}
+	expected, decodeErr := hex.DecodeString(item.PairingCodeHash)
+	if decodeErr != nil {
+		ctx.AbortWithError(500, errors.New("home assistant pairing state is invalid"))
+		return
+	}
+	providedHash := sha256.Sum256([]byte(parts[1]))
+	if !hmac.Equal(expected, providedHash[:]) {
+		ctx.AbortWithError(401, errors.New("invalid home assistant pairing code"))
+		return
+	}
+	if !validHTTPURL(params.WebhookURL) {
+		ctx.AbortWithError(400, errors.New("home assistant webhook URL must use http or https"))
+		return
+	}
+	secret, err := generateIntegrationSecret()
+	if !successOrAbort(ctx, 500, err) { return }
+	now := time.Now()
+	item.NativeWebhookURL = strings.TrimSpace(params.WebhookURL)
+	item.NativeSecret = secret
+	item.PairingCodeHash = ""
+	item.PairingExpiresAt = nil
+	item.Status = "connected"
+	item.LastConnectedAt = &now
+	item.LastError = ""
+	item.LastErrorAt = nil
+	if !successOrAbort(ctx, 500, a.DB.SaveHomeAssistantIntegration(item)) { return }
+	ctx.JSON(200, homeAssistantNativePairResponse{
+		IntegrationID: item.ID,
+		Secret: secret,
+		EventPath: fmt.Sprintf("/integrations/home-assistant/native/%d/event", item.ID),
 	})
 }
 
