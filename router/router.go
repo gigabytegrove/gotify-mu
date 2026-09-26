@@ -112,6 +112,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
 	muCapabilitiesHandler := api.MUCapabilitiesAPI{Version: vInfo.Version}
+	muPresenceHandler := api.MUPresenceAPI{DB: db, Notifier: streamHandler}
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
@@ -251,6 +252,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		}
 
 		clientAuth.GET("/api/mu/v1/capabilities", muCapabilitiesHandler.Get)
+		clientAuth.GET("/api/mu/v1/events", streamHandler.HandleMUEvents)
+		clientAuth.POST("/application/:id/typing", muPresenceHandler.SetTyping)
 		clientAuth.GET("/stream", streamHandler.Handle)
 		clientAuth.GET("current/user", userHandler.GetCurrentUser)
 		clientAuth.POST("/auth/logout", sessionHandler.Logout)
