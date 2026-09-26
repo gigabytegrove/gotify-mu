@@ -114,11 +114,7 @@ func TestNormalizeHomeAssistantMode(t *testing.T) {
 }
 
 func TestPrepareHomeAssistantPairingCreatesOneTimeState(t *testing.T) {
-	item := &model.HomeAssistantIntegration{
-		NativeWebhookURL: "https://old.example/api/webhook/old",
-		NativeSecret:     "old-secret",
-		Status:           "connected",
-	}
+	item := &model.HomeAssistantIntegration{Status: "not_paired"}
 	before := time.Now()
 
 	code, err := prepareHomeAssistantPairing(item)
@@ -139,13 +135,15 @@ func TestPrepareHomeAssistantPairingCreatesOneTimeState(t *testing.T) {
 		t.Fatalf("unexpected pairing expiry: %s", item.PairingExpiresAt)
 	}
 	if item.NativeWebhookURL != "" || item.NativeSecret != "" {
-		t.Fatal("old native bridge credentials were not cleared")
+		t.Fatal("fresh pairing unexpectedly created bridge credentials")
 	}
 	if item.Status != "pairing" {
 		t.Fatalf("unexpected pairing status %q", item.Status)
 	}
 }
-\n\nfunc TestPrepareHomeAssistantPairingPreservesActiveNativeBridge(t *testing.T) {
+
+
+func TestPrepareHomeAssistantPairingPreservesActiveNativeBridge(t *testing.T) {
 	item := &model.HomeAssistantIntegration{
 		NativeWebhookURL: "https://ha.example/api/webhook/existing",
 		NativeSecret:     "existing-secret",
