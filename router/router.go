@@ -90,6 +90,20 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			}
 		}
 	}()
+	if conf.AuditRetentionDays > 0 {
+		go func() {
+			cleanup := func() {
+				before := time.Now().AddDate(0, 0, -conf.AuditRetentionDays)
+				if err := db.DeleteAuditEventsBefore(before); err != nil {
+					log.Error().Err(err).Msg("Error applying audit retention")
+				}
+			}
+			cleanup()
+			ticker := time.NewTicker(24 * time.Hour)
+			defer ticker.Stop()
+			for range ticker.C { cleanup() }
+		}()
+	}
 	authentication := auth.Auth{
 		DB:               db,
 		SecureCookie:     conf.Server.SecureCookie,
@@ -355,26 +369,27 @@ func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ctx.Next()
 
-		method := ctx.Request.Method
-		if method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions {
-			return
-		}
-		if ctx.Writer.Status() >= 400 {
-			return
-		}
-
 		path := ctx.FullPath()
-		if path == "" {
-			path = ctx.Request.URL.Path
-		}
-		if !shouldAuditMutation(path) {
+		if path == "" { path = ctx.Request.URL.Path }
+		securityEvent := strings.HasPrefix(path, "/auth/") || strings.Contains(path, "/elevate")
+		method := ctx.Request.Method
+		if !securityEvent && (method == http.MethodGet || method == http.MethodHead || method == http.MethodOptions) {
 			return
 		}
+		if !securityEvent && !shouldAuditMutation(path) { return }
 
+		action := strings.ToLower(method)
+		if strings.HasSuffix(path, "/login") { action = "login" }
+		if strings.Contains(path, "/elevate") { action = "elevate" }
+		if strings.Contains(path, "/oidc/") { action = "oidc" }
+
+		status := ctx.Writer.Status()
 		event := &model.AuditEvent{
-			Action:    strings.ToLower(method),
-			Target:    path,
+			Action: action,
+			Target: path,
 			IPAddress: ctx.ClientIP(),
+			StatusCode: status,
+			Success: status < 400,
 		}
 		if id := ctx.Param("id"); id != "" {
 			event.TargetID = id
@@ -385,6 +400,10 @@ func auditMutations(db *database.GormDatabase) gin.HandlerFunc {
 			event.UserID = *userID
 			if user, err := db.GetUserByID(*userID); err == nil && user != nil {
 				event.Username = user.Name
+			}
+		} else if securityEvent {
+			if name, _, ok := ctx.Request.BasicAuth(); ok {
+				event.Username = name
 			}
 		}
 		if err := db.CreateAuditEvent(event); err != nil {
