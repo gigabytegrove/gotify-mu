@@ -1,0 +1,48 @@
+name: Mobile chat current-server CI
+
+on:
+  push:
+    branches:
+      - feature/mobile-chat-current
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-chat-current-server
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+
+      - name: Verify Go formatting
+        run: |
+          set -euo pipefail
+          FILES="api/message.go api/message_test.go api/application_membership.go api/application_membership_test.go api/mu_capabilities.go api/mu_presence.go api/mu_presence_test.go api/stream/stream.go api/stream/mu_event_client.go automation/engine.go automation/engine_test.go router/router.go"
+          test -z "$(gofmt -l $FILES)"
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Test chat API behavior
+        run: go test ./api -run '^(TestMUPresence|TestApplicationMembershipMentionableUsers|TestMessageSuite)$' -count=1
+
+      - name: Test automation delivery behavior
+        run: go test ./automation -run '^TestMUDeliverySuppressesSenderAndIncludesMutedMention$' -count=1
+
+      - name: Test realtime stream
+        run: go test ./api/stream -count=1
+
+      - name: Compile router wiring
+        run: |
+          mkdir -p ui/build
+          printf '<html></html>\n' > ui/build/index.html
+          go test ./router -run TestDoesNotExist -count=1
