@@ -134,7 +134,13 @@ func (d *GormDatabase) SaveWebhookRoute(item *model.WebhookRoute) error {
 	item.SecretHash = copy.SecretHash
 	return nil
 }
-func (d *GormDatabase) DeleteWebhookRoute(id uint) error { return d.DB.Delete(&model.WebhookRoute{}, id).Error }
+func (d *GormDatabase) DeleteWebhookRoute(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("kind = ? AND integration_id = ?", "webhook", id).Delete(&model.IntegrationStatus{}).Error; err != nil { return err }
+		if err := tx.Where("kind = ? AND integration_id = ?", "webhook", id).Delete(&model.IntegrationEvent{}).Error; err != nil { return err }
+		return tx.Delete(&model.WebhookRoute{}, id).Error
+	})
+}
 
 func (d *GormDatabase) GetMQTTIntegrations() ([]*model.MQTTIntegration, error) {
 	var items []*model.MQTTIntegration
@@ -162,7 +168,13 @@ func (d *GormDatabase) SaveMQTTIntegration(item *model.MQTTIntegration) error {
 	item.ID, item.CreatedAt, item.UpdatedAt = copy.ID, copy.CreatedAt, copy.UpdatedAt
 	return nil
 }
-func (d *GormDatabase) DeleteMQTTIntegration(id uint) error { return d.DB.Delete(&model.MQTTIntegration{}, id).Error }
+func (d *GormDatabase) DeleteMQTTIntegration(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("kind = ? AND integration_id = ?", "mqtt", id).Delete(&model.IntegrationStatus{}).Error; err != nil { return err }
+		if err := tx.Where("kind = ? AND integration_id = ?", "mqtt", id).Delete(&model.IntegrationEvent{}).Error; err != nil { return err }
+		return tx.Delete(&model.MQTTIntegration{}, id).Error
+	})
+}
 
 func (d *GormDatabase) GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error) {
 	var items []*model.HomeAssistantIntegration
@@ -190,7 +202,13 @@ func (d *GormDatabase) SaveHomeAssistantIntegration(item *model.HomeAssistantInt
 	item.ID, item.CreatedAt, item.UpdatedAt = copy.ID, copy.CreatedAt, copy.UpdatedAt
 	return nil
 }
-func (d *GormDatabase) DeleteHomeAssistantIntegration(id uint) error { return d.DB.Delete(&model.HomeAssistantIntegration{}, id).Error }
+func (d *GormDatabase) DeleteHomeAssistantIntegration(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("kind = ? AND integration_id = ?", "home-assistant", id).Delete(&model.IntegrationStatus{}).Error; err != nil { return err }
+		if err := tx.Where("kind = ? AND integration_id = ?", "home-assistant", id).Delete(&model.IntegrationEvent{}).Error; err != nil { return err }
+		return tx.Delete(&model.HomeAssistantIntegration{}, id).Error
+	})
+}
 
 func (d *GormDatabase) GetScheduledNotifications() ([]*model.ScheduledNotification, error) {
 	var items []*model.ScheduledNotification
@@ -327,4 +345,49 @@ func (d *GormDatabase) AcquireAutomationLease(name, owner string, now time.Time,
 
 func (d *GormDatabase) ReleaseAutomationLease(name, owner string) error {
 	return d.DB.Where("name = ? AND owner = ?", name, owner).Delete(&model.AutomationLease{}).Error
+}
+
+
+func (d *GormDatabase) SaveIntegrationStatus(item *model.IntegrationStatus) error {
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"kind"},{Name:"integration_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"state","message","last_connected_at","last_event_at","last_error_at","updated_at",
+		}),
+	}).Create(item).Error
+}
+
+func (d *GormDatabase) GetIntegrationStatus(kind string, integrationID uint) (*model.IntegrationStatus, error) {
+	item := new(model.IntegrationStatus)
+	if err := d.DB.Where("kind = ? AND integration_id = ?", kind, integrationID).First(item).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	return item, nil
+}
+
+func (d *GormDatabase) RecordIntegrationEvent(item *model.IntegrationEvent) error {
+	if err := d.DB.Create(item).Error; err != nil { return err }
+	// Keep recent operational history bounded per integration.
+	var stale []uint
+	if err := d.DB.Model(&model.IntegrationEvent{}).
+		Where("kind = ? AND integration_id = ?", item.Kind, item.IntegrationID).
+		Order("id desc").Offset(200).Pluck("id", &stale).Error; err != nil {
+		return err
+	}
+	if len(stale) > 0 {
+		return d.DB.Where("id IN ?", stale).Delete(&model.IntegrationEvent{}).Error
+	}
+	return nil
+}
+
+func (d *GormDatabase) GetIntegrationEvents(kind string, integrationID uint, limit int) ([]*model.IntegrationEvent, error) {
+	if limit <= 0 || limit > 200 { limit = 50 }
+	var items []*model.IntegrationEvent
+	return items, d.DB.Where("kind = ? AND integration_id = ?", kind, integrationID).
+		Order("created_at desc, id desc").Limit(limit).Find(&items).Error
+}
+
+func (d *GormDatabase) DeleteIntegrationEventsBefore(before time.Time) error {
+	return d.DB.Where("created_at < ?", before).Delete(&model.IntegrationEvent{}).Error
 }
