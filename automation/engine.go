@@ -1193,7 +1193,7 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 		return err
 	}
 	if authResponse["type"] != "auth_ok" {
-		return errors.New("Home Assistant authentication failed")
+		return errors.New("home Assistant authentication failed")
 	}
 	connectedAt := time.Now()
 	_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "connected", &connectedAt, nil, "", nil, false)
