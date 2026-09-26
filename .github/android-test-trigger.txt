@@ -1,1 +1,1 @@
-Trigger Gotify MU Android v0.2.0 Tailwind admin phone-test build after Retrofit cleanup.\n
+Trigger Gotify MU Android v0.2.0 Tailwind admin phone-test build after final compile fixes.
