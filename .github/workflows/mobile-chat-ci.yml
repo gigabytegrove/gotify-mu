@@ -1,0 +1,42 @@
+name: Mobile chat feature CI
+
+on:
+  push:
+    branches:
+      - feature/mobile-chat-capabilities
+  pull_request:
+    branches:
+      - master
+    paths:
+      - "api/mu_presence.go"
+      - "api/mu_presence_test.go"
+      - "api/mu_capabilities.go"
+      - "api/stream/**"
+      - "router/router.go"
+      - ".github/workflows/mobile-chat-ci.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.26.x"
+
+      - name: Verify Go formatting
+        run: |
+          set -euo pipefail
+          FILES="api/mu_presence.go api/mu_presence_test.go api/mu_capabilities.go api/stream/stream.go api/stream/mu_event_client.go router/router.go"
+          test -z "$(gofmt -l $FILES)"
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Test MU API and stream
+        run: go test ./api ./api/stream ./router
