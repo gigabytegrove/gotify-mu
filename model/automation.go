@@ -209,3 +209,15 @@ type WebhookReplay struct {
 	ExpiresAt time.Time `gorm:"index" json:"-"`
 	CreatedAt time.Time `json:"-"`
 }
+
+
+// IntegrationRuntimeStatus describes live connectivity without exposing credentials.
+type IntegrationRuntimeStatus struct {
+	Type            string     `json:"type"`
+	ID              uint       `json:"id"`
+	State           string     `json:"state"`
+	Message         string     `json:"message,omitempty"`
+	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
+	LastEventAt     *time.Time `json:"lastEventAt,omitempty"`
+	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
+}
