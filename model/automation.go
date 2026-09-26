@@ -15,6 +15,9 @@ type WebhookRoute struct {
 	PriorityField   string    `gorm:"type:text" json:"priorityField"`
 	DefaultTitle    string    `gorm:"type:text" json:"defaultTitle"`
 	DefaultPriority int       `json:"defaultPriority"`
+	RequireSignature bool      `json:"requireSignature"`
+	SigningSecret    string    `gorm:"type:text" json:"-"`
+	AllowedCIDRs     string    `gorm:"type:text" json:"allowedCidrs"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
@@ -30,8 +33,11 @@ type WebhookRouteView struct {
 	MessageField    string    `json:"messageField"`
 	PriorityField   string    `json:"priorityField"`
 	DefaultTitle    string    `json:"defaultTitle"`
-	DefaultPriority int       `json:"defaultPriority"`
-	CreatedAt       time.Time `json:"createdAt"`
+	DefaultPriority      int       `json:"defaultPriority"`
+	RequireSignature     bool      `json:"requireSignature"`
+	SignatureConfigured  bool      `json:"signatureConfigured"`
+	AllowedCIDRs          string    `json:"allowedCidrs"`
+	CreatedAt             time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
@@ -194,4 +200,12 @@ type AutomationLease struct {
 	Owner     string    `gorm:"type:text;index" json:"owner"`
 	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
+}
+
+
+// WebhookReplay prevents signed Webhook requests from being replayed across server instances.
+type WebhookReplay struct {
+	Key       string    `gorm:"primaryKey;type:char(64)" json:"-"`
+	ExpiresAt time.Time `gorm:"index" json:"-"`
+	CreatedAt time.Time `json:"-"`
 }
