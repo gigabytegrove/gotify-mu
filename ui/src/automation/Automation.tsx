@@ -22,9 +22,10 @@ import Schedule from '@mui/icons-material/Schedule';
 import TrendingUp from '@mui/icons-material/TrendingUp';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
+import ConfirmDialog from '../common/ConfirmDialog';
 import * as config from '../config';
 import {useStores} from '../stores';
-import {IEscalationRule, IScheduledNotification} from '../types';
+import {IEscalationRule, IScheduleRun, IScheduledNotification} from '../types';
 
 const api = (path: string) => config.get('url') + path;
 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
@@ -43,6 +44,12 @@ const Automation = () => {
     const [escalationEdit, setEscalationEdit] =
         React.useState<IEscalationRule | null | undefined>();
     const [loading, setLoading] = React.useState(true);
+    const [scheduleHistory, setScheduleHistory] = React.useState<
+        {id: number; name: string} | undefined
+    >();
+    const [confirmAction, setConfirmAction] = React.useState<
+        {title: string; text: string; run: () => Promise<void>} | undefined
+    >();
 
     const refresh = React.useCallback(async () => {
         setLoading(true);
@@ -99,17 +106,36 @@ const Automation = () => {
                                 enabled={item.enabled}
                                 subtitle={scheduleSummary(item, channels)}
                                 detail={
-                                    item.nextRunAt
+                                    (item.nextRunAt
                                         ? 'Next: ' + new Date(item.nextRunAt).toLocaleString()
                                         : item.enabled
                                           ? 'Waiting for a future run time'
-                                          : 'Disabled'
+                                          : 'Disabled') +
+                                    ' · Runs: ' +
+                                    item.runCount +
+                                    (item.maxRuns > 0 ? '/' + item.maxRuns : '')
+                                }
+                                extraAction={
+                                    <Button
+                                        size="small"
+                                        onClick={() =>
+                                            setScheduleHistory({id: item.id, name: item.name})
+                                        }>
+                                        History
+                                    </Button>
                                 }
                                 onEdit={() => setScheduleEdit(item)}
-                                onDelete={async () => {
-                                    await axios.delete(api('automation/schedule/' + item.id));
-                                    await refresh();
-                                    snackManager.snack('Schedule deleted');
+                                onDelete={() => {
+                                    setConfirmAction({
+                                        title: 'Delete Schedule',
+                                        text: `Delete ${item.name} and its run history?`,
+                                        run: async () => {
+                                            await axios.delete(api('automation/schedule/' + item.id));
+                                            await refresh();
+                                            snackManager.snack('Schedule deleted');
+                                        },
+                                    });
+                                    return Promise.resolve();
                                 }}
                             />
                         ))}
@@ -153,10 +179,17 @@ const Automation = () => {
                                     ' or higher and the message is still unacknowledged.'
                                 }
                                 onEdit={() => setEscalationEdit(item)}
-                                onDelete={async () => {
-                                    await axios.delete(api('automation/escalation/' + item.id));
-                                    await refresh();
-                                    snackManager.snack('Escalation deleted');
+                                onDelete={() => {
+                                    setConfirmAction({
+                                        title: 'Delete Escalation',
+                                        text: `Delete ${item.name}? Pending escalations using this rule will be removed.`,
+                                        run: async () => {
+                                            await axios.delete(api('automation/escalation/' + item.id));
+                                            await refresh();
+                                            snackManager.snack('Escalation deleted');
+                                        },
+                                    });
+                                    return Promise.resolve();
                                 }}
                             />
                         ))}
@@ -186,6 +219,25 @@ const Automation = () => {
                     }}
                 />
             )}
+            {scheduleHistory && (
+                <ScheduleHistoryDialog
+                    id={scheduleHistory.id}
+                    name={scheduleHistory.name}
+                    onClose={() => setScheduleHistory(undefined)}
+                />
+            )}
+            {confirmAction && (
+                <ConfirmDialog
+                    title={confirmAction.title}
+                    text={confirmAction.text}
+                    fClose={() => setConfirmAction(undefined)}
+                    fOnSubmit={async () => {
+                        const action = confirmAction;
+                        setConfirmAction(undefined);
+                        await action.run();
+                    }}
+                />
+            )}
         </DefaultPage>
     );
 };
@@ -197,6 +249,7 @@ const AutomationRow = ({
     detail,
     enabled,
     onEdit,
+    extraAction,
     onDelete,
 }: {
     icon: React.ReactNode;
@@ -205,6 +258,7 @@ const AutomationRow = ({
     detail: string;
     enabled: boolean;
     onEdit: VoidFunction;
+    extraAction?: React.ReactNode;
     onDelete: () => Promise<void>;
 }) => (
     <Box sx={{p: 1.5, border: 1, borderColor: 'divider', borderRadius: 2}}>
@@ -236,6 +290,7 @@ const AutomationRow = ({
                 </Box>
             </Stack>
             <Stack direction="row" spacing={0.5}>
+                {extraAction}
                 <Button size="small" onClick={onEdit}>
                     Edit
                 </Button>
@@ -285,6 +340,9 @@ const scheduleSummary = (
     switch (item.scheduleType) {
         case 'once':
             return channel + ' · One time';
+        case 'interval':
+            return channel + ' · Every ' + item.intervalMinutes + ' minute' +
+                (item.intervalMinutes === 1 ? '' : 's');
         case 'hourly':
             return channel + ' · Hourly at minute ' + item.minute;
         case 'daily':
@@ -344,7 +402,11 @@ const ScheduleDialog = ({
     const [hour, setHour] = React.useState(item?.hour ?? 9);
     const [minute, setMinute] = React.useState(item?.minute ?? 0);
     const [weekday, setWeekday] = React.useState(item?.weekday ?? 1);
+    const [intervalMinutes, setIntervalMinutes] = React.useState(item?.intervalMinutes || 60);
     const [timezoneValue, setTimezoneValue] = React.useState(item?.timezone || timezone);
+    const [excludedDates, setExcludedDates] = React.useState((item?.excludedDates || []).join(', '));
+    const [endAt, setEndAt] = React.useState(item?.endAt ? localInputValue(item.endAt) : '');
+    const [maxRuns, setMaxRuns] = React.useState(item?.maxRuns || 0);
     const [enabled, setEnabled] = React.useState(item?.enabled ?? true);
     const [saving, setSaving] = React.useState(false);
 
@@ -362,7 +424,14 @@ const ScheduleDialog = ({
                 hour,
                 minute,
                 weekday,
+                intervalMinutes,
                 timezone: timezoneValue,
+                excludedDates: excludedDates
+                    .split(/[\n,]+/)
+                    .map((value) => value.trim())
+                    .filter(Boolean),
+                endAt: endAt ? new Date(endAt).toISOString() : null,
+                maxRuns,
                 enabled,
             };
             if (item) {
@@ -393,11 +462,15 @@ const ScheduleDialog = ({
                         required
                     />
                     <TextField
+                        select
                         label="Priority"
-                        type="number"
                         value={priority}
-                        onChange={(e) => setPriority(Number(e.target.value))}
-                    />
+                        onChange={(e) => setPriority(Number(e.target.value))}>
+                        <MenuItem value={0}>Normal (0)</MenuItem>
+                        <MenuItem value={4}>High (4)</MenuItem>
+                        <MenuItem value={8}>Critical (8)</MenuItem>
+                        <MenuItem value={10}>Emergency (10)</MenuItem>
+                    </TextField>
                     <TextField
                         select
                         label="Schedule"
@@ -406,6 +479,7 @@ const ScheduleDialog = ({
                             setScheduleType(e.target.value as IScheduledNotification['scheduleType'])
                         }>
                         <MenuItem value="once">One time</MenuItem>
+                        <MenuItem value="interval">Custom interval</MenuItem>
                         <MenuItem value="hourly">Hourly</MenuItem>
                         <MenuItem value="daily">Daily</MenuItem>
                         <MenuItem value="weekly">Weekly</MenuItem>
@@ -418,6 +492,16 @@ const ScheduleDialog = ({
                             value={runAt}
                             onChange={(e) => setRunAt(e.target.value)}
                             slotProps={{inputLabel: {shrink: true}}}
+                        />
+                    )}
+                    {scheduleType === 'interval' && (
+                        <TextField
+                            type="number"
+                            label="Every"
+                            value={intervalMinutes}
+                            onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+                            helperText="Minutes between notifications."
+                            slotProps={{htmlInput: {min: 1, max: 525600}}}
                         />
                     )}
                     {scheduleType === 'hourly' && (
@@ -470,6 +554,33 @@ const ScheduleDialog = ({
                             onChange={(e) => setTimezoneValue(e.target.value)}
                             helperText="Use an IANA timezone such as America/New_York."
                         />
+                    )}
+                    {scheduleType !== 'once' && (
+                        <>
+                            <TextField
+                                label="Skip dates"
+                                value={excludedDates}
+                                onChange={(e) => setExcludedDates(e.target.value)}
+                                placeholder="2026-12-25, 2027-01-01"
+                                helperText="Optional YYYY-MM-DD dates, separated by commas."
+                            />
+                            <TextField
+                                type="datetime-local"
+                                label="Stop after"
+                                value={endAt}
+                                onChange={(e) => setEndAt(e.target.value)}
+                                slotProps={{inputLabel: {shrink: true}}}
+                                helperText="Optional end date/time."
+                            />
+                            <TextField
+                                type="number"
+                                label="Maximum runs"
+                                value={maxRuns}
+                                onChange={(e) => setMaxRuns(Number(e.target.value))}
+                                helperText="0 means no run-count limit."
+                                slotProps={{htmlInput: {min: 0}}}
+                            />
+                        </>
                     )}
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
@@ -554,11 +665,15 @@ const EscalationDialog = ({
                         channels={channels.filter((channel) => channel.id !== sourceApplicationId)}
                     />
                     <TextField
-                        type="number"
+                        select
                         label="Minimum priority"
                         value={minPriority}
-                        onChange={(e) => setMinPriority(Number(e.target.value))}
-                    />
+                        onChange={(e) => setMinPriority(Number(e.target.value))}>
+                        <MenuItem value={0}>Normal and above (0)</MenuItem>
+                        <MenuItem value={4}>High and above (4)</MenuItem>
+                        <MenuItem value={8}>Critical and above (8)</MenuItem>
+                        <MenuItem value={10}>Emergency only (10)</MenuItem>
+                    </TextField>
                     <TextField
                         type="number"
                         label="Wait before escalating"
@@ -587,6 +702,60 @@ const EscalationDialog = ({
                     onClick={() => void save()}>
                     Save
                 </Button>
+            </DialogActions>
+        </Dialog>
+    );
+};
+
+const ScheduleHistoryDialog = ({
+    id,
+    name,
+    onClose,
+}: {
+    id: number;
+    name: string;
+    onClose: VoidFunction;
+}) => {
+    const [runs, setRuns] = React.useState<IScheduleRun[]>([]);
+    React.useEffect(() => {
+        void axios
+            .get<IScheduleRun[]>(api('automation/schedule/' + id + '/runs?limit=200'))
+            .then((response) => setRuns(response.data));
+    }, [id]);
+
+    return (
+        <Dialog open onClose={onClose} fullWidth maxWidth="md">
+            <DialogTitle>{name} Run History</DialogTitle>
+            <DialogContent>
+                {runs.length === 0 ? (
+                    <Typography color="text.secondary">This schedule has not run yet.</Typography>
+                ) : (
+                    <Stack spacing={1}>
+                        {runs.map((run) => (
+                            <Box key={run.id} sx={{p: 1.25, border: 1, borderColor: 'divider', borderRadius: 2}}>
+                                <Stack direction="row" spacing={1} sx={{justifyContent: 'space-between'}}>
+                                    <Typography sx={{fontWeight: 700}}>
+                                        {new Date(run.scheduledFor).toLocaleString()}
+                                    </Typography>
+                                    <Chip
+                                        size="small"
+                                        color={run.status === 'completed' ? 'success' : run.status === 'failed' ? 'error' : 'default'}
+                                        label={run.status}
+                                    />
+                                </Stack>
+                                {run.messageId ? (
+                                    <Typography variant="body2">Message #{run.messageId}</Typography>
+                                ) : null}
+                                {run.error ? (
+                                    <Typography variant="body2" color="error.main">{run.error}</Typography>
+                                ) : null}
+                            </Box>
+                        ))}
+                    </Stack>
+                )}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Close</Button>
             </DialogActions>
         </Dialog>
     );
