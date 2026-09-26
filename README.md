@@ -8,7 +8,7 @@
 
 Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
 
-> **Current release:** **v0.2.1** (pre-release). v0.2.1 adds managed in-app Docker updates on top of the v0.2.0 multi-user foundation. Pre-1.0 builds should still be validated in the target environment before production rollout.
+> **Current published baseline:** **v0.2.2** (pre-release). **v0.3.0 is currently a validated preview candidate** on PR #20 and has not replaced the published baseline yet. Pre-1.0 builds should still be validated in the target environment before production rollout.
 
 ## Why Gotify MU?
 
@@ -62,6 +62,10 @@ The Web UI uses **Channels** as the user-facing term and provides:
 - Responsive desktop and mobile-web navigation
 - Consistent dialogs, tables, cards, status indicators, and destructive-action language
 - Administrator update discovery with Dashboard notices, direct release downloads, and managed in-app installation from Settings
+- Native Integrations administration for Webhooks, MQTT, and Home Assistant
+- Native Automation administration for Scheduled Notifications and Escalations
+- Per-user Quiet Hours and Digest preferences
+- Per-user message acknowledgement in Message History
 
 The underlying `/application` API naming remains in place to avoid breaking existing clients and integrations.
 
@@ -117,16 +121,18 @@ The official Gotify Android app continues to receive Chat Channel messages as no
 
 ## Releases
 
-The current release baseline is **Gotify MU v0.2.1**.
+The current published release baseline is **Gotify MU v0.2.2**.
 
-Release history and compatibility notes are tracked in [CHANGELOG.md](CHANGELOG.md). Detailed v0.2.1 notes are available in [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md), with the original multi-user baseline documented in [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md).
+**v0.3.0 is a preview candidate** until PR #20 is accepted, merged, tagged, and published. Release history and compatibility notes are tracked in [CHANGELOG.md](CHANGELOG.md). Detailed notes are available for [v0.2.2](docs/releases/v0.2.2.md) and the [v0.3.0 preview](docs/releases/v0.3.0.md).
+
+Deployment, validation, updater, backup, and rollback procedures are maintained in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 For a release checkout:
 
 ```bash
 git clone https://github.com/gigabytegrove/gotify-mu.git
 cd gotify-mu
-git checkout v0.2.1
+git checkout v0.2.2
 ```
 
 Release builds inject the release version, commit, and build date into the server binary. Development builds continue to use `master-<commit>`, `master-local`, or `dev-<commit>` identities as appropriate.
@@ -170,6 +176,7 @@ GOTIFY_MU_COMMIT=local
 GOTIFY_MU_PORT=8080
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
+GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
 
 Then build and start Gotify MU:
@@ -242,17 +249,20 @@ Docker socket access is privileged host access. If managed self-updating is not 
 
 ### Updating a development installation
 
-After new changes are merged into `master`:
+Development and preview builds should be validated with the full Web UI build and Go test suite before replacing a running container. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the validated upgrade and rollback procedure.
+
+For ordinary Compose development after changes are merged into `master`:
 
 ```bash
 cd /opt/gotify-mu
-git pull origin master
-docker compose up -d --build
+git pull --ff-only origin master
+docker compose build --build-arg RUN_TESTS=1
+docker compose up -d
 ```
 
-Your `./data` directory remains in place.
+Your `./data` directory remains in place. Keep a verified pre-upgrade data backup whenever a build introduces database migrations.
 
-### Building the v0.2.1 release manually
+### Building the current published release manually
 
 After checking out the release tag, build with explicit release identity:
 
@@ -264,10 +274,10 @@ COMMIT="$(git rev-parse --short HEAD)"
 docker build --no-cache \
   --build-arg BUILD_JS=1 \
   --build-arg GO_VERSION=1.26.0 \
-  --build-arg GOTIFY_MU_VERSION="0.2.1" \
+  --build-arg GOTIFY_MU_VERSION="0.2.2" \
   --build-arg GOTIFY_MU_COMMIT="${COMMIT}" \
   -f docker/Dockerfile \
-  -t gotify-mu:0.2.1 \
+  -t gotify-mu:0.2.2 \
   .
 ```
 
@@ -320,7 +330,7 @@ go build -o gotify-mu .
 
 ### First-test checklist
 
-For the current development build, verify these behaviors before treating an installation as production-ready:
+For the current development or preview build, verify these behaviors before treating an installation as production-ready:
 
 1. The Gotify MU Web UI loads.
 2. The administrator can sign in.
@@ -338,6 +348,14 @@ For the current development build, verify these behaviors before treating an ins
 14. The official Gotify Android app receives notifications normally.
 15. Deleting a shared message for one user does not remove it for other members.
 16. Private channels retain normal Gotify delete behavior.
+17. Webhook routes can deliver JSON/plain-text payloads to the selected Channel.
+18. MQTT connections can subscribe and route messages to the selected Channel.
+19. Home Assistant can receive events and send a test event back successfully.
+20. Scheduled Notifications run at the expected local/timezone-aware time.
+21. Acknowledging a message prevents a pending Escalation from firing.
+22. Quiet Hours save correctly and suppress only lower-priority realtime delivery.
+23. Digest settings save correctly and collect lower-priority notifications.
+24. Settings remains stable and does not enter a refresh loop after updates.
 
 ### Future container namespace
 

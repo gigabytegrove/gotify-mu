@@ -48,8 +48,42 @@ export interface IMessage {
     date: string;
     senderUserId?: number;
     senderName?: string;
+    acknowledged?: boolean;
+    acknowledgedAny?: boolean;
+    acknowledgementCount?: number;
+    acknowledgedBy?: IMessageAcknowledgement[];
+    parentMessageId?: number;
+    escalationRuleId?: number;
     image?: string;
     extras?: IMessageExtras;
+}
+
+export interface IMessageAcknowledgement {
+    userId: number;
+    name: string;
+    displayName?: string;
+    acknowledgedAt: string;
+}
+
+export interface IIntegrationStatus {
+    kind: string;
+    integrationId: number;
+    state: string;
+    message?: string;
+    lastConnectedAt?: string;
+    lastEventAt?: string;
+    lastErrorAt?: string;
+    updatedAt: string;
+}
+
+export interface IIntegrationEvent {
+    id: number;
+    kind: string;
+    integrationId: number;
+    level: string;
+    event: string;
+    message: string;
+    createdAt: string;
 }
 
 export interface IMessageExtras {
@@ -121,4 +155,123 @@ export interface IApplicationMember {
     owner: boolean;
     receiveNotifications: boolean;
     autoAssigned: boolean;
+}
+
+
+export interface IWebhookRoute {
+    id: number;
+    name: string;
+    applicationId: number;
+    enabled: boolean;
+    path: string;
+    titleField: string;
+    messageField: string;
+    priorityField: string;
+    defaultTitle: string;
+    defaultPriority: number;
+    allowedCidrs?: string[];
+    requireSignature: boolean;
+    signatureConfigured: boolean;
+    replayWindowSeconds: number;
+    createdAt: string;
+    updatedAt: string;
+    status?: IIntegrationStatus;
+}
+
+export interface IMQTTIntegration {
+    id: number;
+    name: string;
+    applicationId: number;
+    brokerUrl: string;
+    clientId: string;
+    username: string;
+    passwordConfigured: boolean;
+    topic: string;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+    status?: IIntegrationStatus;
+}
+
+export interface IHomeAssistantIntegration {
+    id: number;
+    name: string;
+    applicationId: number;
+    baseUrl: string;
+    tokenConfigured: boolean;
+    eventType: string;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+    status?: IIntegrationStatus;
+}
+
+export interface IScheduledNotification {
+    id: number;
+    name: string;
+    applicationId: number;
+    title: string;
+    message: string;
+    priority: number;
+    scheduleType: 'once' | 'interval' | 'hourly' | 'daily' | 'weekly';
+    runAt?: string;
+    hour: number;
+    minute: number;
+    weekday: number;
+    intervalMinutes: number;
+    timezone: string;
+    excludedDates?: string[];
+    endAt?: string;
+    maxRuns: number;
+    runCount: number;
+    enabled: boolean;
+    lastRunAt?: string;
+    nextRunAt?: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
+export interface IQuietHoursPolicy {
+    id?: number;
+    userId: number;
+    enabled: boolean;
+    startMinute: number;
+    endMinute: number;
+    timezone: string;
+    allowPriority: number;
+    mode: 'suppress' | 'defer';
+}
+
+export interface IDigestPolicy {
+    id?: number;
+    userId: number;
+    enabled: boolean;
+    intervalMinutes: number;
+    immediatePriority: number;
+    lastSentAt?: string;
+    nextRunAt?: string;
+}
+
+export interface IEscalationRule {
+    id: number;
+    name: string;
+    sourceApplicationId: number;
+    targetApplicationId: number;
+    minPriority: number;
+    delayMinutes: number;
+    enabled: boolean;
+    createdAt: string;
+    updatedAt: string;
+}
+
+
+export interface IScheduleRun {
+    id: number;
+    scheduleId: number;
+    scheduledFor: string;
+    messageId?: number;
+    status: string;
+    error?: string;
+    startedAt: string;
+    finishedAt?: string;
 }

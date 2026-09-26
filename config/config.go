@@ -82,8 +82,11 @@ type Configuration struct {
 	Database          Database
 	DefaultUser       DefaultUser
 	PassStrength      int
+	PasswordMinLength int
+	AuditRetentionDays int
 	UploadedImagesDir string
 	PluginsDir        string
+	PluginTrustedSHA256 []string
 	Registration      bool
 	LocalAuthEnabled  bool
 	OIDC              OIDC
@@ -116,6 +119,8 @@ func Get() (*Configuration, []FutureLog) {
 			Pass: "admin",
 		},
 		PassStrength:      10,
+		PasswordMinLength: 12,
+		AuditRetentionDays: 90,
 		UploadedImagesDir: "data/images",
 		PluginsDir:        "data/plugins",
 		LocalAuthEnabled:  true,
@@ -174,8 +179,11 @@ func Get() (*Configuration, []FutureLog) {
 	add(parseString(&c.DefaultUser.Pass, EnvDefaultUserPass))
 
 	add(parseInt(&c.PassStrength, EnvPassStrength))
+	add(parseInt(&c.PasswordMinLength, EnvPasswordMinLength))
+	add(parseInt(&c.AuditRetentionDays, EnvAuditRetentionDays))
 	add(parseString(&c.UploadedImagesDir, EnvUploadedImagesDir))
 	add(parseString(&c.PluginsDir, EnvPluginsDir))
+	add(parseList(&c.PluginTrustedSHA256, EnvPluginTrustedSHA256))
 	add(parseBool(&c.Registration, EnvRegistration))
 	add(parseBool(&c.LocalAuthEnabled, EnvLocalAuthEnabled))
 
@@ -204,6 +212,12 @@ func Get() (*Configuration, []FutureLog) {
 	}
 	if c.Registration && !c.LocalAuthEnabled {
 		logs = append(logs, futureFatal("registration requires local authentication to be enabled"))
+	}
+	if c.PasswordMinLength < 8 || c.PasswordMinLength > 72 {
+		logs = append(logs, futureFatal("password minimum length must be between 8 and 72"))
+	}
+	if c.AuditRetentionDays < 1 {
+		logs = append(logs, futureFatal("audit retention days must be at least 1"))
 	}
 	return c, logs
 }

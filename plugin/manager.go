@@ -3,6 +3,8 @@ package plugin
 import (
 	"bufio"
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -44,6 +46,10 @@ type Notifier interface {
 	Notify(userID uint, message *model.MessageExternal)
 }
 
+type MessageDispatcher interface {
+	StoreAndDeliverToUsers(message *model.Message, userIDs []uint) (*model.MessageExternal, error)
+}
+
 // Manager is an encapsulating layer for plugins and manages all plugins and its instances.
 type Manager struct {
 	mutex     *sync.RWMutex
@@ -52,11 +58,13 @@ type Manager struct {
 	messages  chan MessageWithUserID
 	db        Database
 	mux       *gin.RouterGroup
-	directory string
+	directory  string
+	dispatcher MessageDispatcher
+	trustedInstallHashes map[string]struct{}
 }
 
 // NewManager created a Manager from configurations.
-func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier Notifier) (*Manager, error) {
+func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier Notifier, dispatchers ...MessageDispatcher) (*Manager, error) {
 	manager := &Manager{
 		mutex:     &sync.RWMutex{},
 		instances: map[uint]compat.PluginInstance{},
@@ -65,6 +73,10 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 		db:        db,
 		mux:       mux,
 		directory: directory,
+		trustedInstallHashes: map[string]struct{}{},
+	}
+	if len(dispatchers) > 0 {
+		manager.dispatcher = dispatchers[0]
 	}
 
 	go func() {
@@ -80,7 +92,19 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 			if message.Message.Extras != nil {
 				internalMsg.Extras, _ = json.Marshal(message.Message.Extras)
 			}
-			db.CreateMessage(internalMsg)
+			if manager.dispatcher != nil {
+				external, err := manager.dispatcher.StoreAndDeliverToUsers(internalMsg, []uint{message.UserID})
+				if err != nil {
+					log.Error().Err(err).Uint("user_id", message.UserID).Msg("Plugin message delivery failed")
+					continue
+				}
+				message.Message.ID = external.ID
+				continue
+			}
+			if err := db.CreateMessage(internalMsg); err != nil {
+				log.Error().Err(err).Uint("user_id", message.UserID).Msg("Plugin message storage failed")
+				continue
+			}
 			message.Message.ID = internalMsg.ID
 			notifier.Notify(message.UserID, &message.Message)
 		}
@@ -101,6 +125,28 @@ func NewManager(db Database, directory string, mux *gin.RouterGroup, notifier No
 	}
 
 	return manager, nil
+}
+
+// SetTrustedInstallHashes configures the exact SHA256 values allowed for Web UI plugin installation.
+// Local filesystem plugins remain an explicit server-operator trust decision.
+func (m *Manager) SetTrustedInstallHashes(values []string) {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	m.trustedInstallHashes = map[string]struct{}{}
+	for _, value := range values {
+		value = strings.ToLower(strings.TrimSpace(value))
+		if len(value) == 64 {
+			if _, err := hex.DecodeString(value); err == nil {
+				m.trustedInstallHashes[value] = struct{}{}
+			}
+	}
+	}
+}
+
+func (m *Manager) IsRuntimeInstallEnabled() bool {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+	return len(m.trustedInstallHashes) > 0
 }
 
 // MaxPluginUploadBytes is the maximum size accepted for a plugin uploaded through the API.
@@ -150,7 +196,8 @@ func (m *Manager) InstallPlugin(filename string, source io.Reader) (compat.Info,
 		}
 	}()
 
-	written, copyErr := io.Copy(tmp, io.LimitReader(source, MaxPluginUploadBytes+1))
+	hasher := sha256.New()
+	written, copyErr := io.Copy(io.MultiWriter(tmp, hasher), io.LimitReader(source, MaxPluginUploadBytes+1))
 	closeErr := tmp.Close()
 	if copyErr != nil {
 		return empty, nil, fmt.Errorf("write plugin: %w", copyErr)
@@ -160,6 +207,17 @@ func (m *Manager) InstallPlugin(filename string, source io.Reader) (compat.Info,
 	}
 	if written > MaxPluginUploadBytes {
 		return empty, nil, fmt.Errorf("plugin exceeds the %d MiB upload limit", MaxPluginUploadBytes>>20)
+	}
+	digest := hex.EncodeToString(hasher.Sum(nil))
+	m.mutex.RLock()
+	_, trusted := m.trustedInstallHashes[digest]
+	trustedCount := len(m.trustedInstallHashes)
+	m.mutex.RUnlock()
+	if trustedCount == 0 {
+		return empty, nil, errors.New("runtime plugin installation is disabled until trusted SHA256 hashes are configured")
+	}
+	if !trusted {
+		return empty, nil, fmt.Errorf("plugin SHA256 %s is not trusted by this server", digest)
 	}
 	if err := os.Chmod(tmpPath, 0o644); err != nil {
 		return empty, nil, fmt.Errorf("set plugin permissions: %w", err)

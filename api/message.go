@@ -48,9 +48,14 @@ type Notifier interface {
 }
 
 // The MessageAPI provides handlers for managing messages.
+type MessageDispatcher interface {
+	StoreAndDeliver(message *model.Message) (*model.MessageExternal, error)
+}
+
 type MessageAPI struct {
-	DB       MessageDatabase
-	Notifier Notifier
+	DB         MessageDatabase
+	Notifier   Notifier
+	Dispatcher MessageDispatcher
 }
 
 type pagingParams struct {
@@ -694,13 +699,15 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 			}
 		}
 
-		postingUser, err = a.DB.GetUserByID(userID)
-		if success := successOrAbort(ctx, 500, err); !success {
-			return
-		}
-		if postingUser == nil {
-			ctx.AbortWithError(400, errors.New("user not found"))
-			return
+		if fetchedApp.AllowMemberPost {
+			postingUser, err = a.DB.GetUserByID(userID)
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
+			if postingUser == nil {
+				ctx.AbortWithError(400, errors.New("user not found"))
+				return
+			}
 		}
 		app = fetchedApp
 	}
@@ -718,22 +725,30 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		message.Priority = &app.DefaultPriority
 	}
 
-	recipients, err := a.DB.GetApplicationRecipientUserIDs(app.ID)
-	if success := successOrAbort(ctx, 500, err); !success {
-		return
-	}
-
 	msgInternal := toInternalMessage(&message)
 	if postingUser != nil {
 		msgInternal.SenderUserID = postingUser.ID
 		msgInternal.SenderName = postingUser.Name
 	}
-	if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
-		return
-	}
-	external := toExternalMessage(msgInternal)
-	for _, userID := range recipients {
-		a.Notifier.Notify(userID, external)
+	var external *model.MessageExternal
+	if a.Dispatcher != nil {
+		dispatched, dispatchErr := a.Dispatcher.StoreAndDeliver(msgInternal)
+		if success := successOrAbort(ctx, 500, dispatchErr); !success {
+			return
+		}
+		external = dispatched
+	} else {
+		if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
+			return
+		}
+		external = toExternalMessage(msgInternal)
+		recipients, recipientErr := a.DB.GetApplicationRecipientUserIDs(app.ID)
+		if success := successOrAbort(ctx, 500, recipientErr); !success {
+			return
+		}
+		for _, userID := range recipients {
+			a.Notifier.Notify(userID, external)
+		}
 	}
 	ctx.JSON(200, external)
 }
@@ -765,6 +780,12 @@ func toExternalMessage(msg *model.Message) *model.MessageExternal {
 		Date:          msg.Date,
 		SenderUserID:  msg.SenderUserID,
 		SenderName:    msg.SenderName,
+		Acknowledged:          msg.Acknowledged,
+		AcknowledgedAny:       msg.AcknowledgedAny,
+		AcknowledgementCount:  msg.AcknowledgementCount,
+		AcknowledgedBy:        msg.AcknowledgedBy,
+		ParentMessageID:       msg.ParentMessageID,
+		EscalationRuleID:      msg.EscalationRuleID,
 	}
 	if len(msg.Extras) != 0 {
 		res.Extras = make(map[string]any)

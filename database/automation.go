@@ -1,0 +1,486 @@
+package database
+
+import (
+	"crypto/sha256"
+	"crypto/subtle"
+	"encoding/hex"
+	"time"
+
+	"github.com/gotify/server/v3/model"
+	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
+)
+
+
+func hashAutomationSecret(value string) string {
+	sum := sha256.Sum256([]byte(value))
+	return hex.EncodeToString(sum[:])
+}
+
+func (d *GormDatabase) encryptValue(value string) (string, error) {
+	if d.Secrets == nil {
+		return value, nil
+	}
+	return d.Secrets.Encrypt(value)
+}
+
+func (d *GormDatabase) decryptValue(value string) (string, error) {
+	if d.Secrets == nil {
+		return value, nil
+	}
+	return d.Secrets.Decrypt(value)
+}
+
+func (d *GormDatabase) decryptWebhook(item *model.WebhookRoute) error {
+	value, err := d.decryptValue(item.Secret)
+	if err != nil { return err }
+	item.Secret = value
+	signingSecret, err := d.decryptValue(item.SigningSecret)
+	if err != nil { return err }
+	item.SigningSecret = signingSecret
+	return nil
+}
+
+func (d *GormDatabase) decryptMQTT(item *model.MQTTIntegration) error {
+	value, err := d.decryptValue(item.Password)
+	if err != nil { return err }
+	item.Password = value
+	return nil
+}
+
+func (d *GormDatabase) decryptHomeAssistant(item *model.HomeAssistantIntegration) error {
+	value, err := d.decryptValue(item.Token)
+	if err != nil { return err }
+	item.Token = value
+	return nil
+}
+
+func (d *GormDatabase) encryptLegacyAutomationSecrets() error {
+	var webhooks []*model.WebhookRoute
+	if err := d.DB.Find(&webhooks).Error; err != nil { return err }
+	for _, item := range webhooks {
+		plain, err := d.decryptValue(item.Secret)
+		if err != nil { return err }
+		encrypted, err := d.encryptValue(plain)
+		if err != nil { return err }
+		signingPlain, err := d.decryptValue(item.SigningSecret)
+		if err != nil { return err }
+		signingEncrypted, err := d.encryptValue(signingPlain)
+		if err != nil { return err }
+		hash := hashAutomationSecret(plain)
+		if item.Secret != encrypted || item.SecretHash != hash || item.SigningSecret != signingEncrypted {
+			if err := d.DB.Model(item).Updates(map[string]any{
+				"secret": encrypted, "secret_hash": hash, "signing_secret": signingEncrypted,
+			}).Error; err != nil { return err }
+		}
+	}
+
+	var mqtt []*model.MQTTIntegration
+	if err := d.DB.Find(&mqtt).Error; err != nil { return err }
+	for _, item := range mqtt {
+		plain, err := d.decryptValue(item.Password)
+		if err != nil { return err }
+		encrypted, err := d.encryptValue(plain)
+		if err != nil { return err }
+		if item.Password != encrypted {
+			if err := d.DB.Model(item).Update("password", encrypted).Error; err != nil { return err }
+		}
+	}
+
+	var homeAssistant []*model.HomeAssistantIntegration
+	if err := d.DB.Find(&homeAssistant).Error; err != nil { return err }
+	for _, item := range homeAssistant {
+		plain, err := d.decryptValue(item.Token)
+		if err != nil { return err }
+		encrypted, err := d.encryptValue(plain)
+		if err != nil { return err }
+		if item.Token != encrypted {
+			if err := d.DB.Model(item).Update("token", encrypted).Error; err != nil { return err }
+		}
+	}
+	return nil
+}
+
+func (d *GormDatabase) GetWebhookRoutes() ([]*model.WebhookRoute, error) {
+	var items []*model.WebhookRoute
+	if err := d.DB.Order("name asc, id asc").Find(&items).Error; err != nil { return items, err }
+	for _, item := range items {
+		if err := d.decryptWebhook(item); err != nil { return nil, err }
+	}
+	return items, nil
+}
+
+func (d *GormDatabase) GetWebhookRouteByID(id uint) (*model.WebhookRoute, error) {
+	item := new(model.WebhookRoute)
+	if err := d.DB.First(item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	if err := d.decryptWebhook(item); err != nil { return nil, err }
+	return item, nil
+}
+
+func (d *GormDatabase) GetWebhookRouteBySecret(secret string) (*model.WebhookRoute, error) {
+	item := new(model.WebhookRoute)
+	hash := hashAutomationSecret(secret)
+	if err := d.DB.Where("secret_hash = ? AND enabled = ?", hash, true).First(item).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	if err := d.decryptWebhook(item); err != nil { return nil, err }
+	if subtle.ConstantTimeCompare([]byte(item.Secret), []byte(secret)) != 1 { return nil, nil }
+	return item, nil
+}
+
+func (d *GormDatabase) SaveWebhookRoute(item *model.WebhookRoute) error {
+	copy := *item
+	copy.SecretHash = hashAutomationSecret(copy.Secret)
+	encrypted, err := d.encryptValue(copy.Secret)
+	if err != nil { return err }
+	copy.Secret = encrypted
+	signingEncrypted, err := d.encryptValue(copy.SigningSecret)
+	if err != nil { return err }
+	copy.SigningSecret = signingEncrypted
+	if err := d.DB.Save(&copy).Error; err != nil { return err }
+	item.ID, item.CreatedAt, item.UpdatedAt = copy.ID, copy.CreatedAt, copy.UpdatedAt
+	item.SecretHash = copy.SecretHash
+	return nil
+}
+func (d *GormDatabase) DeleteWebhookRoute(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("kind = ? AND integration_id = ?", "webhook", id).Delete(&model.IntegrationStatus{}).Error; err != nil { return err }
+		if err := tx.Where("kind = ? AND integration_id = ?", "webhook", id).Delete(&model.IntegrationEvent{}).Error; err != nil { return err }
+		return tx.Delete(&model.WebhookRoute{}, id).Error
+	})
+}
+
+func (d *GormDatabase) GetMQTTIntegrations() ([]*model.MQTTIntegration, error) {
+	var items []*model.MQTTIntegration
+	if err := d.DB.Order("name asc, id asc").Find(&items).Error; err != nil { return items, err }
+	for _, item := range items {
+		if err := d.decryptMQTT(item); err != nil { return nil, err }
+	}
+	return items, nil
+}
+func (d *GormDatabase) GetMQTTIntegrationByID(id uint) (*model.MQTTIntegration, error) {
+	item := new(model.MQTTIntegration)
+	if err := d.DB.First(item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	if err := d.decryptMQTT(item); err != nil { return nil, err }
+	return item, nil
+}
+func (d *GormDatabase) SaveMQTTIntegration(item *model.MQTTIntegration) error {
+	copy := *item
+	encrypted, err := d.encryptValue(copy.Password)
+	if err != nil { return err }
+	copy.Password = encrypted
+	if err := d.DB.Save(&copy).Error; err != nil { return err }
+	item.ID, item.CreatedAt, item.UpdatedAt = copy.ID, copy.CreatedAt, copy.UpdatedAt
+	return nil
+}
+func (d *GormDatabase) DeleteMQTTIntegration(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("kind = ? AND integration_id = ?", "mqtt", id).Delete(&model.IntegrationStatus{}).Error; err != nil { return err }
+		if err := tx.Where("kind = ? AND integration_id = ?", "mqtt", id).Delete(&model.IntegrationEvent{}).Error; err != nil { return err }
+		return tx.Delete(&model.MQTTIntegration{}, id).Error
+	})
+}
+
+func (d *GormDatabase) GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error) {
+	var items []*model.HomeAssistantIntegration
+	if err := d.DB.Order("name asc, id asc").Find(&items).Error; err != nil { return items, err }
+	for _, item := range items {
+		if err := d.decryptHomeAssistant(item); err != nil { return nil, err }
+	}
+	return items, nil
+}
+func (d *GormDatabase) GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error) {
+	item := new(model.HomeAssistantIntegration)
+	if err := d.DB.First(item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	if err := d.decryptHomeAssistant(item); err != nil { return nil, err }
+	return item, nil
+}
+func (d *GormDatabase) SaveHomeAssistantIntegration(item *model.HomeAssistantIntegration) error {
+	copy := *item
+	encrypted, err := d.encryptValue(copy.Token)
+	if err != nil { return err }
+	copy.Token = encrypted
+	if err := d.DB.Save(&copy).Error; err != nil { return err }
+	item.ID, item.CreatedAt, item.UpdatedAt = copy.ID, copy.CreatedAt, copy.UpdatedAt
+	return nil
+}
+func (d *GormDatabase) DeleteHomeAssistantIntegration(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("kind = ? AND integration_id = ?", "home-assistant", id).Delete(&model.IntegrationStatus{}).Error; err != nil { return err }
+		if err := tx.Where("kind = ? AND integration_id = ?", "home-assistant", id).Delete(&model.IntegrationEvent{}).Error; err != nil { return err }
+		return tx.Delete(&model.HomeAssistantIntegration{}, id).Error
+	})
+}
+
+func (d *GormDatabase) GetScheduledNotifications() ([]*model.ScheduledNotification, error) {
+	var items []*model.ScheduledNotification
+	return items, d.DB.Order("name asc, id asc").Find(&items).Error
+}
+func (d *GormDatabase) GetScheduledNotificationByID(id uint) (*model.ScheduledNotification, error) {
+	item := new(model.ScheduledNotification)
+	if err := d.DB.First(item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	return item, nil
+}
+func (d *GormDatabase) SaveScheduledNotification(item *model.ScheduledNotification) error { return d.DB.Save(item).Error }
+func (d *GormDatabase) DeleteScheduledNotification(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("schedule_id = ?", id).Delete(&model.ScheduleRun{}).Error; err != nil { return err }
+		return tx.Delete(&model.ScheduledNotification{}, id).Error
+	})
+}
+func (d *GormDatabase) GetDueScheduledNotifications(now time.Time) ([]*model.ScheduledNotification, error) {
+	var items []*model.ScheduledNotification
+	return items, d.DB.Where("enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ?", true, now).Find(&items).Error
+}
+
+func (d *GormDatabase) GetQuietHoursPolicy(userID uint) (*model.QuietHoursPolicy, error) {
+	item := new(model.QuietHoursPolicy)
+	if err := d.DB.Where("user_id = ?", userID).First(item).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	return item, nil
+}
+func (d *GormDatabase) SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error {
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"enabled","start_minute","end_minute","timezone","allow_priority","mode","updated_at"}),
+	}).Create(item).Error
+}
+
+func (d *GormDatabase) GetDigestPolicy(userID uint) (*model.DigestPolicy, error) {
+	item := new(model.DigestPolicy)
+	if err := d.DB.Where("user_id = ?", userID).First(item).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	return item, nil
+}
+func (d *GormDatabase) SaveDigestPolicy(item *model.DigestPolicy) error {
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"enabled","interval_minutes","immediate_priority","last_sent_at","next_run_at","updated_at"}),
+	}).Create(item).Error
+}
+func (d *GormDatabase) QueueDigestItem(item *model.DigestItem) error {
+	return d.DB.Clauses(clause.OnConflict{DoNothing:true}).Create(item).Error
+}
+func (d *GormDatabase) GetDigestItems(userID uint) ([]*model.DigestItem, error) {
+	var items []*model.DigestItem
+	return items, d.DB.Where("user_id = ?", userID).Order("created_at asc").Find(&items).Error
+}
+func (d *GormDatabase) DeleteDigestItems(userID uint) error { return d.DB.Where("user_id = ?", userID).Delete(&model.DigestItem{}).Error }
+func (d *GormDatabase) GetDueDigestPolicies(now time.Time) ([]*model.DigestPolicy, error) {
+	var items []*model.DigestPolicy
+	return items, d.DB.Where("enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ?", true, now).Find(&items).Error
+}
+
+func (d *GormDatabase) GetEscalationRules() ([]*model.EscalationRule, error) {
+	var items []*model.EscalationRule
+	return items, d.DB.Order("name asc, id asc").Find(&items).Error
+}
+func (d *GormDatabase) GetEscalationRuleByID(id uint) (*model.EscalationRule, error) {
+	item := new(model.EscalationRule)
+	if err := d.DB.First(item, id).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	return item, nil
+}
+func (d *GormDatabase) SaveEscalationRule(item *model.EscalationRule) error { return d.DB.Save(item).Error }
+func (d *GormDatabase) DeleteEscalationRule(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("rule_id = ?", id).Delete(&model.EscalationState{}).Error; err != nil { return err }
+		return tx.Delete(&model.EscalationRule{}, id).Error
+	})
+}
+func (d *GormDatabase) GetEscalationRulesForMessage(applicationID uint, priority int) ([]*model.EscalationRule, error) {
+	var items []*model.EscalationRule
+	return items, d.DB.Where("enabled = ? AND source_application_id = ? AND min_priority <= ?", true, applicationID, priority).Find(&items).Error
+}
+func (d *GormDatabase) QueueEscalation(item *model.EscalationState) error {
+	return d.DB.Clauses(clause.OnConflict{DoNothing:true}).Create(item).Error
+}
+func (d *GormDatabase) GetDueEscalations(now time.Time) ([]*model.EscalationState, error) {
+	var items []*model.EscalationState
+	return items, d.DB.Where("completed = ? AND due_at <= ?", false, now).Find(&items).Error
+}
+func (d *GormDatabase) SaveEscalationState(item *model.EscalationState) error { return d.DB.Save(item).Error }
+
+func (d *GormDatabase) SetMessageAcknowledgement(userID, messageID uint, acknowledged bool, now time.Time) error {
+	if !acknowledged {
+		return d.DB.Where("user_id = ? AND message_id = ?", userID, messageID).Delete(&model.MessageAcknowledgement{}).Error
+	}
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"user_id"},{Name:"message_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"acknowledged_at"}),
+	}).Create(&model.MessageAcknowledgement{UserID:userID,MessageID:messageID,AcknowledgedAt:now}).Error
+}
+func (d *GormDatabase) IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error) {
+	var count int64
+	err := d.DB.Model(&model.MessageAcknowledgement{}).Where("user_id = ? AND message_id = ?", userID, messageID).Count(&count).Error
+	return count > 0, err
+}
+func (d *GormDatabase) IsMessageAcknowledged(messageID uint) (bool, error) {
+	var count int64
+	err := d.DB.Model(&model.MessageAcknowledgement{}).Where("message_id = ?", messageID).Count(&count).Error
+	return count > 0, err
+}
+func (d *GormDatabase) DeleteMessageAcknowledgements(messageID uint) error {
+	return d.DB.Where("message_id = ?", messageID).Delete(&model.MessageAcknowledgement{}).Error
+}
+
+
+func (d *GormDatabase) AcquireAutomationLease(name, owner string, now time.Time, ttl time.Duration) (bool, error) {
+	expires := now.Add(ttl)
+	result := d.DB.Model(&model.AutomationLease{}).
+		Where("name = ? AND (expires_at <= ? OR owner = ?)", name, now, owner).
+		Updates(map[string]any{"owner": owner, "expires_at": expires, "updated_at": now})
+	if result.Error != nil { return false, result.Error }
+	if result.RowsAffected == 1 { return true, nil }
+
+	item := &model.AutomationLease{Name:name, Owner:owner, ExpiresAt:expires, UpdatedAt:now}
+	if err := d.DB.Create(item).Error; err != nil {
+		if err == gorm.ErrDuplicatedKey { return false, nil }
+		return false, err
+	}
+	return true, nil
+}
+
+func (d *GormDatabase) ReleaseAutomationLease(name, owner string) error {
+	return d.DB.Where("name = ? AND owner = ?", name, owner).Delete(&model.AutomationLease{}).Error
+}
+
+
+func (d *GormDatabase) SaveIntegrationStatus(item *model.IntegrationStatus) error {
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"kind"},{Name:"integration_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{
+			"state","message","last_connected_at","last_event_at","last_error_at","updated_at",
+		}),
+	}).Create(item).Error
+}
+
+func (d *GormDatabase) GetIntegrationStatus(kind string, integrationID uint) (*model.IntegrationStatus, error) {
+	item := new(model.IntegrationStatus)
+	if err := d.DB.Where("kind = ? AND integration_id = ?", kind, integrationID).First(item).Error; err != nil {
+		if err == gorm.ErrRecordNotFound { return nil, nil }
+		return nil, err
+	}
+	return item, nil
+}
+
+func (d *GormDatabase) RecordIntegrationEvent(item *model.IntegrationEvent) error {
+	if err := d.DB.Create(item).Error; err != nil { return err }
+	// Keep recent operational history bounded per integration.
+	var stale []uint
+	if err := d.DB.Model(&model.IntegrationEvent{}).
+		Where("kind = ? AND integration_id = ?", item.Kind, item.IntegrationID).
+		Order("id desc").Offset(200).Pluck("id", &stale).Error; err != nil {
+		return err
+	}
+	if len(stale) > 0 {
+		return d.DB.Where("id IN ?", stale).Delete(&model.IntegrationEvent{}).Error
+	}
+	return nil
+}
+
+func (d *GormDatabase) GetIntegrationEvents(kind string, integrationID uint, limit int) ([]*model.IntegrationEvent, error) {
+	if limit <= 0 || limit > 200 { limit = 50 }
+	var items []*model.IntegrationEvent
+	return items, d.DB.Where("kind = ? AND integration_id = ?", kind, integrationID).
+		Order("created_at desc, id desc").Limit(limit).Find(&items).Error
+}
+
+func (d *GormDatabase) DeleteIntegrationEventsBefore(before time.Time) error {
+	return d.DB.Where("created_at < ?", before).Delete(&model.IntegrationEvent{}).Error
+}
+
+
+func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]model.MessageAcknowledgementView, error) {
+	var rows []model.MessageAcknowledgementView
+	err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.user_id, users.name, users.display_name, ma.acknowledged_at").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id = ?", messageID).
+		Order("ma.acknowledged_at ASC").
+		Scan(&rows).Error
+	return rows, err
+}
+
+
+func (d *GormDatabase) EnsureAutomationRecipientDispatches(key string, messageID uint, userIDs []uint, now time.Time) error {
+	if len(userIDs) == 0 { return nil }
+	items := make([]*model.AutomationRecipientDispatch, 0, len(userIDs))
+	for _, userID := range userIDs {
+		items = append(items, &model.AutomationRecipientDispatch{
+			AutomationKey:key, UserID:userID, MessageID:messageID, UpdatedAt:now,
+		})
+	}
+	return d.DB.Clauses(clause.OnConflict{DoNothing:true}).Create(&items).Error
+}
+
+func (d *GormDatabase) GetAutomationRecipientDispatches(key string) ([]*model.AutomationRecipientDispatch, error) {
+	var items []*model.AutomationRecipientDispatch
+	return items, d.DB.Where("automation_key = ?", key).Order("user_id asc").Find(&items).Error
+}
+
+func (d *GormDatabase) SaveAutomationRecipientDispatch(item *model.AutomationRecipientDispatch) error {
+	return d.DB.Save(item).Error
+}
+
+func (d *GormDatabase) DeleteAutomationRecipientDispatchesForMessage(messageID uint) error {
+	return d.DB.Where("message_id = ?", messageID).Delete(&model.AutomationRecipientDispatch{}).Error
+}
+
+
+func (d *GormDatabase) QueueDeferredNotification(item *model.DeferredNotification) error {
+	return d.DB.Clauses(clause.OnConflict{DoNothing:true}).Create(item).Error
+}
+
+func (d *GormDatabase) GetDeferredNotifications(limit int) ([]*model.DeferredNotification, error) {
+	if limit <= 0 || limit > 1000 { limit = 500 }
+	var items []*model.DeferredNotification
+	return items, d.DB.Order("created_at asc").Limit(limit).Find(&items).Error
+}
+
+func (d *GormDatabase) DeleteDeferredNotification(userID, messageID uint) error {
+	return d.DB.Where("user_id = ? AND message_id = ?", userID, messageID).
+		Delete(&model.DeferredNotification{}).Error
+}
+
+func (d *GormDatabase) DeleteDeferredNotifications(userID uint) error {
+	return d.DB.Where("user_id = ?", userID).Delete(&model.DeferredNotification{}).Error
+}
+
+
+func (d *GormDatabase) SaveScheduleRun(item *model.ScheduleRun) error {
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"schedule_id"},{Name:"scheduled_for"}},
+		DoUpdates: clause.AssignmentColumns([]string{"message_id","status","error","started_at","finished_at"}),
+	}).Create(item).Error
+}
+
+func (d *GormDatabase) GetScheduleRuns(scheduleID uint, limit int) ([]*model.ScheduleRun, error) {
+	if limit <= 0 || limit > 500 { limit = 100 }
+	var items []*model.ScheduleRun
+	return items, d.DB.Where("schedule_id = ?", scheduleID).
+		Order("scheduled_for desc").Limit(limit).Find(&items).Error
+}
+
+func (d *GormDatabase) DeleteScheduleRunsBefore(before time.Time) error {
+	return d.DB.Where("scheduled_for < ?", before).Delete(&model.ScheduleRun{}).Error
+}

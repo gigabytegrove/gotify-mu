@@ -32,6 +32,7 @@ type ApplicationDatabase interface {
 type ApplicationAPI struct {
 	DB       ApplicationDatabase
 	ImageDir string
+	OnDelete func(uint)
 }
 
 // Application Params Model
@@ -246,6 +247,9 @@ func (a *ApplicationAPI) DeleteApplication(ctx *gin.Context) {
 			}
 			if success := successOrAbort(ctx, 500, a.DB.DeleteApplicationByID(id)); !success {
 				return
+			}
+			if a.OnDelete != nil {
+				a.OnDelete(id)
 			}
 			if app.Image != "" {
 				os.Remove(a.ImageDir + app.Image)

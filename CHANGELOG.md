@@ -2,6 +2,46 @@
 
 All notable Gotify MU changes are documented here.
 
+## [0.3.0] - 2026-09-25
+
+Native integrations and notification automation release.
+
+### Added
+
+- Native **Integrations** administration area.
+- Inbound Webhook routes with generated URLs, JSON field mapping, default title/priority, URL regeneration, and Channel routing.
+- Native MQTT broker connections with topic subscriptions, TLS support, optional credentials, automatic reconnect, and JSON message/title/priority extraction.
+- Native Home Assistant event subscriptions using long-lived access tokens.
+- Home Assistant event filtering and Channel routing.
+- Outbound Home Assistant events, including a Web UI connection test.
+- Native **Automation** administration area.
+- One-time, hourly, daily, and weekly Scheduled Notifications with timezone-aware scheduling.
+- Escalation rules that forward qualifying messages to another Channel when they remain unacknowledged.
+- Per-user message acknowledgement and acknowledgement removal in Message History.
+- Per-user Quiet Hours with timezone-aware overnight windows and priority exceptions.
+- Per-user Digest delivery with configurable intervals and immediate-delivery priority.
+- Additive database storage for integrations, schedules, policies, digest queues, escalation state, and acknowledgements.
+
+### Changed
+
+- Existing Gotify-compatible `/message` publishing now passes through the same native delivery-policy engine as Webhooks, MQTT, Home Assistant, and Scheduled Notifications.
+- Quiet Hours suppress realtime delivery without removing the stored message.
+- Digest mode keeps underlying messages in normal history while delaying lower-priority realtime alerts into summaries.
+- Escalations stop when any Channel member acknowledges the original message.
+- Integration credentials are masked after saving and are not echoed back into the Web UI.
+- Native integration and automation changes are included in the administrative Audit Log.
+
+### Compatibility
+
+- Existing Gotify application tokens, client tokens, Android notification reception, REST routes, WebSocket delivery, Channels, users, messages, archives, and plugins remain compatible.
+- Database migration is additive.
+
+### Validation
+
+- The v0.3.0 preview application commit `05bcd71fd8501161d6d35e41bae2dc17214f968a` passed the complete Web UI build, full `go test -v ./...` suite, complete Docker/server build, database migration startup, and green application/database health checks.
+- v0.2.2 remains the published rollback baseline until v0.3.0 is accepted and formally released.
+- A maintained deployment/rollback procedure is available in `docs/DEPLOYMENT.md`.
+
 ## [0.2.2] - 2026-09-25
 
 Updater reliability and interface polish release.

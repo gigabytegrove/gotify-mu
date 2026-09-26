@@ -15,6 +15,13 @@ type Message struct {
 	Date          time.Time
 	SenderUserID  uint `gorm:"index"`
 	SenderName    string `gorm:"type:text"`
+	Acknowledged        bool                      `gorm:"-" json:"-"`
+	AcknowledgedAny     bool                      `gorm:"-" json:"-"`
+	AcknowledgementCount int                      `gorm:"-" json:"-"`
+	AcknowledgedBy      []MessageAcknowledgementView `gorm:"-" json:"-"`
+	ParentMessageID     uint                      `gorm:"index" json:"-"`
+	EscalationRuleID    uint                      `gorm:"index" json:"-"`
+	AutomationKey       *string                   `gorm:"type:varchar(180);uniqueIndex" json:"-"`
 }
 
 // MessageExternal Model
@@ -73,6 +80,18 @@ type MessageExternal struct {
 	//
 	// read only: true
 	SenderName string `json:"senderName,omitempty"`
+	// Whether the current requesting user has acknowledged this message.
+	Acknowledged bool `json:"acknowledged,omitempty"`
+	// Whether anyone has acknowledged this message.
+	AcknowledgedAny bool `json:"acknowledgedAny,omitempty"`
+	// Number of users who acknowledged this message.
+	AcknowledgementCount int `json:"acknowledgementCount,omitempty"`
+	// Users who acknowledged this message.
+	AcknowledgedBy []MessageAcknowledgementView `json:"acknowledgedBy,omitempty"`
+	// Original message id when this message was created by an escalation.
+	ParentMessageID uint `json:"parentMessageId,omitempty"`
+	// Escalation rule that created this message.
+	EscalationRuleID uint `json:"escalationRuleId,omitempty"`
 }
 
 // CreateMessage Model
@@ -109,4 +128,13 @@ type CreateMessage struct {
 	//
 	// example: {"home::appliances::thermostat::change_temperature":{"temperature":23},"home::appliances::lighting::on":{"brightness":15}}
 	Extras map[string]any `form:"-" query:"-" json:"extras,omitempty"`
+}
+
+
+// MessageAcknowledgementView is user-facing acknowledgement history.
+type MessageAcknowledgementView struct {
+	UserID         uint      `json:"userId"`
+	Name           string    `json:"name"`
+	DisplayName    string    `json:"displayName,omitempty"`
+	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }

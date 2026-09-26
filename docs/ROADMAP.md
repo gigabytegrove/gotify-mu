@@ -20,6 +20,14 @@ Implemented or in active development:
 - User display names
 - User Groups foundation
 - Administrative/security audit log foundation
+- Native Webhook routing
+- Native MQTT broker/topic subscriptions
+- Native Home Assistant event integration
+- Scheduled Notifications
+- Per-user Quiet Hours
+- Per-user Digest delivery
+- Acknowledgement-aware Escalations
+- Per-user message acknowledgement
 - Existing Gotify local auth, OIDC, client tokens, application tokens, REST and WebSocket compatibility
 
 ## Identity, authorization, and security
@@ -133,32 +141,39 @@ The goal is **alerts + collaboration**, not a general-purpose Slack replacement.
 
 These are native Gotify MU capabilities, not plugins, because they directly affect message delivery behavior.
 
-Planned:
+Implemented in the v0.3.0 preview:
 
-- user quiet hours
-- per-Channel quiet hours
-- priority-based quiet-hour exceptions
-- hold, suppress, or defer behavior
-- timezone-aware quiet-hour schedules
+- per-user Quiet Hours
+- priority-based Quiet Hours exceptions
+- timezone-aware overnight Quiet Hours
+- one-time Scheduled Notifications
+- hourly Scheduled Notifications
+- daily Scheduled Notifications
+- weekly Scheduled Notifications
+- timezone-aware schedules
+- schedule enable/disable
+- per-user Digest mode
+- configurable Digest intervals
+- immediate-delivery priority exceptions
+- Channel-to-Channel Escalation rules
+- acknowledgement-based Escalation cancellation
+- per-user message acknowledgement
+
+Planned enhancements:
+
+- per-Channel Quiet Hours
+- hold/defer queues in addition to realtime suppression
 - per-Channel priority thresholds
 - per-device notification preferences
 - snooze
-- one-time scheduled notifications
-- recurring scheduled notifications
-- per-Channel schedules
-- schedule enable/disable and history
-- digest mode
-- hourly, daily, and custom digest schedules
-- per-user and per-Channel digest rules
-- immediate-delivery exceptions for higher-priority messages
-- escalation rules
-- multi-stage escalation paths
-- acknowledgement/resolution-based escalation
+- richer schedule history
+- custom/cron-style schedules
+- per-Channel Digest rules
+- multi-stage Escalation paths
 - acknowledgement deadlines
-- fallback/escalation targets
-- user, Group, and Channel escalation targets
+- user and Group escalation targets
 - repeat-until-acknowledged
-- stop escalation after acknowledgement or resolution
+- resolve/reopen-aware escalation
 - notification templates
 
 ## Rich messages
@@ -180,40 +195,69 @@ Planned:
 
 ### Native integration framework
 
-The following integrations are planned as built-in Gotify MU functionality rather than plugins because they are foundational notification transports or are expected to participate deeply in routing and delivery behavior.
+The following integrations are built into Gotify MU because they are foundational notification transports or participate directly in routing and delivery behavior. The initial implementation is present in the v0.3.0 preview, with additional routing and diagnostics planned.
 
 #### Webhook Router
 
-- named inbound webhook endpoints
+Implemented in the v0.3.0 preview:
+
+- named inbound Webhook endpoints
+- generated secret URLs
+- route incoming requests to a Channel
+- JSON field mapping for title, message, and priority
+- default title/priority
+- enable/disable
+- URL regeneration
+- request-size limit
+
+Planned enhancements:
+
 - generic outbound Webhooks
-- route incoming requests to one or more Channels
-- routing rules
-- transformation rules
-- conditional rules
-- reusable endpoints
-- templates
+- richer routing rules
+- transformation/conditional rules
+- reusable templates
 - retry policy
-- delivery history and errors
-- webhook signing/secrets
+- delivery history/errors
+- optional request signing
 
 #### MQTT
 
-- connect to one or more MQTT brokers
-- subscribe to configured topics
-- route topic events into Channels
-- topic filters
-- payload templates
-- optional publishing from Gotify MU where appropriate
-- per-connection health/status
+Implemented in the v0.3.0 preview:
+
+- multiple MQTT broker connections
+- mqtt/mqtts/tcp/tls connection schemes
+- optional credentials and client IDs
+- broker topic subscriptions
+- reconnect behavior
+- route received topic messages into Channels
+- JSON title/message/priority extraction
+
+Planned enhancements:
+
+- richer topic/payload filters
+- reusable payload templates
+- publishing from Gotify MU where appropriate
+- per-connection health/status in the Web UI
 
 #### Home Assistant
 
+Implemented in the v0.3.0 preview:
+
 - direct Home Assistant integration
-- receive selected Home Assistant events and notifications
-- route selected events into Gotify MU Channels
-- send supported Gotify MU actions/events back to Home Assistant
-- configurable entity and event filters
+- long-lived access-token authentication
+- WebSocket event subscription
+- subscribe to all events or one selected event type
+- route received events into a Channel
+- send events back to Home Assistant
+- Web UI test-event action
+- automatic reconnect
+
+Planned enhancements:
+
+- entity-level filters
+- richer event filters
 - connection/status visibility in the Web UI
+- reusable outbound actions
 
 The native integration framework should share consistent configuration, health/status, secrets handling, routing, retry, and audit behavior.
 

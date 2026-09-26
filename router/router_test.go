@@ -22,12 +22,36 @@ var (
 	forbiddenJSON = `{"error":"Forbidden", "errorCode":403, "errorDescription":"you are not allowed to access this api"}`
 )
 
+func TestSanitizeLoggedRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(
+		http.MethodGet,
+		"/integrations/webhook/THIS-MUST-NOT-LOG?code=oidc-code&state=oidc-state&token=client-token&view=compact",
+		nil,
+	)
+	got := sanitizeLoggedRequest(ctx)
+	assert.NotContains(t, got, "THIS-MUST-NOT-LOG")
+	assert.NotContains(t, got, "oidc-code")
+	assert.NotContains(t, got, "oidc-state")
+	assert.NotContains(t, got, "client-token")
+	assert.Contains(t, got, "/integrations/webhook/[masked]")
+	assert.Contains(t, got, "view=compact")
+	assert.Contains(t, got, "%5Bmasked%5D")
+}
+
 func TestShouldAuditMutation(t *testing.T) {
 	assert.True(t, shouldAuditMutation("/user/:id"))
 	assert.True(t, shouldAuditMutation("/group/:id/members"))
 	assert.True(t, shouldAuditMutation("/plugin/install"))
 	assert.True(t, shouldAuditMutation("/application/:id/security"))
 	assert.True(t, shouldAuditMutation("/update/install"))
+	assert.True(t, shouldAuditMutation("/integration/webhook"))
+	assert.True(t, shouldAuditMutation("/integration/mqtt/1"))
+	assert.True(t, shouldAuditMutation("/integration/home-assistant/1"))
+	assert.True(t, shouldAuditMutation("/automation/schedule"))
+	assert.True(t, shouldAuditMutation("/automation/escalation/1"))
+	assert.True(t, shouldAuditMutation("/message/1/acknowledgement"))
 	assert.False(t, shouldAuditMutation("/message"))
 	assert.False(t, shouldAuditMutation("/application/:id/message/archive"))
 	assert.False(t, shouldAuditMutation("/plugin/:id/custom/:token/webhook"))
