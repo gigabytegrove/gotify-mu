@@ -60,6 +60,7 @@ type Database interface {
 	CompleteEscalationWithMessage(state *model.EscalationState, message *model.Message, now time.Time) (bool, error)
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
+	GetMQTTIntegrationByID(id uint) (*model.MQTTIntegration, error)
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
 	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
 
@@ -68,6 +69,14 @@ type Database interface {
 }
 
 // Engine runs scheduled work and persistent native integrations.
+type IntegrationStatus struct {
+	State           string     `json:"state"`
+	Message         string     `json:"message,omitempty"`
+	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
+	LastMessageAt   *time.Time `json:"lastMessageAt,omitempty"`
+	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
+}
+
 type Engine struct {
 	db       Database
 	notifier Notifier
@@ -82,6 +91,8 @@ type Engine struct {
 	reload             chan struct{}
 	leader             atomic.Bool
 	leaseOwner         string
+	statusMu           sync.RWMutex
+	statuses           map[string]IntegrationStatus
 }
 
 func New(db Database, notifier Notifier) *Engine {
@@ -93,6 +104,7 @@ func New(db Database, notifier Notifier) *Engine {
 		cancel: cancel,
 		reload: make(chan struct{}, 1),
 		leaseOwner: newLeaseOwner(),
+		statuses: make(map[string]IntegrationStatus),
 	}
 	e.wg.Add(3)
 	go e.schedulerLoop()
@@ -110,6 +122,42 @@ func (e *Engine) Close() {
 			log.Warn().Err(err).Msg("Could not release automation leadership")
 		}
 	}
+}
+
+func integrationStatusKey(kind string, id uint) string {
+	return fmt.Sprintf("%s:%d", kind, id)
+}
+
+func (e *Engine) setIntegrationStatus(kind string, id uint, update func(*IntegrationStatus)) {
+	key := integrationStatusKey(kind, id)
+	e.statusMu.Lock()
+	defer e.statusMu.Unlock()
+	status := e.statuses[key]
+	update(&status)
+	e.statuses[key] = status
+}
+
+func (e *Engine) GetIntegrationStatus(kind string, id uint) IntegrationStatus {
+	e.statusMu.RLock()
+	defer e.statusMu.RUnlock()
+	return e.statuses[integrationStatusKey(kind, id)]
+}
+
+func (e *Engine) TestMQTT(id uint) error {
+	item, err := e.db.GetMQTTIntegrationByID(id)
+	if err != nil { return err }
+	if item == nil { return errors.New("MQTT connection not found") }
+	ctx, cancel := context.WithTimeout(e.ctx, 15*time.Second)
+	defer cancel()
+	conn, err := dialMQTT(ctx, item.BrokerURL)
+	if err != nil { return err }
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+	clientID := item.ClientID
+	if clientID == "" { clientID = "gotify-mu-test-" + strconv.FormatUint(uint64(item.ID), 10) }
+	if err := mqttConnect(conn, reader, clientID, item.Username, item.Password); err != nil { return err }
+	if err := mqttSubscribe(conn, reader, item.Topic); err != nil { return err }
+	return nil
 }
 
 func (e *Engine) ReloadIntegrations() {
@@ -584,7 +632,17 @@ func (e *Engine) runMQTTLoop(ctx context.Context, integration *model.MQTTIntegra
 		if ctx.Err() != nil {
 			return
 		}
+		e.setIntegrationStatus("mqtt", integration.ID, func(status *IntegrationStatus) {
+			status.State = "connecting"
+			status.Message = "Connecting"
+		})
 		if err := e.runMQTT(ctx, integration); err != nil && ctx.Err() == nil {
+			now := time.Now().UTC()
+			e.setIntegrationStatus("mqtt", integration.ID, func(status *IntegrationStatus) {
+				status.State = "reconnecting"
+				status.Message = "Connection interrupted"
+				status.LastErrorAt = &now
+			})
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("MQTT connection interrupted")
 		}
 		select {
@@ -622,6 +680,12 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 	if err := mqttSubscribe(conn, reader, integration.Topic); err != nil {
 		return err
 	}
+	connectedAt := time.Now().UTC()
+	e.setIntegrationStatus("mqtt", integration.ID, func(status *IntegrationStatus) {
+		status.State = "connected"
+		status.Message = "Connected"
+		status.LastConnectedAt = &connectedAt
+	})
 
 	for {
 		if ctx.Err() != nil {
@@ -664,6 +728,13 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 		}
 		if _, err := e.Publish(integration.ApplicationID, title, message, priority); err != nil {
 			log.Error().Err(err).Uint("integration_id", integration.ID).Msg("MQTT message could not be published")
+		} else {
+			now := time.Now().UTC()
+			e.setIntegrationStatus("mqtt", integration.ID, func(status *IntegrationStatus) {
+				status.State = "connected"
+				status.Message = "Connected"
+				status.LastMessageAt = &now
+			})
 		}
 		if qos == 1 && packetID != 0 {
 			ack := []byte{0x40, 0x02, byte(packetID >> 8), byte(packetID)}
@@ -756,6 +827,8 @@ func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string) error {
 	return nil
 }
 
+const maxMQTTPacketBytes = 1 << 20
+
 func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 	header, err := reader.ReadByte()
 	if err != nil {
@@ -769,6 +842,9 @@ func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 		}
 		remaining += int(value&127) * multiplier
 		if value&128 == 0 {
+			if remaining > maxMQTTPacketBytes {
+				return 0, nil, fmt.Errorf("MQTT packet exceeds %d bytes", maxMQTTPacketBytes)
+			}
 			body := make([]byte, remaining)
 			_, err = io.ReadFull(reader, body)
 			return header, body, err
@@ -860,10 +936,18 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 
 func (e *Engine) runHomeAssistantLoop(ctx context.Context, integration *model.HomeAssistantIntegration) {
 	for {
-		if ctx.Err() != nil {
-			return
-		}
+		if ctx.Err() != nil { return }
+		e.setIntegrationStatus("home-assistant", integration.ID, func(status *IntegrationStatus) {
+			status.State = "connecting"
+			status.Message = "Connecting"
+		})
 		if err := e.runHomeAssistant(ctx, integration); err != nil && ctx.Err() == nil {
+			now := time.Now().UTC()
+			e.setIntegrationStatus("home-assistant", integration.ID, func(status *IntegrationStatus) {
+				status.State = "reconnecting"
+				status.Message = "Connection interrupted"
+				status.LastErrorAt = &now
+			})
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("Home Assistant connection interrupted")
 		}
 		select {
@@ -929,6 +1013,12 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 	if err := conn.WriteJSON(subscribe); err != nil {
 		return err
 	}
+	connectedAt := time.Now().UTC()
+	e.setIntegrationStatus("home-assistant", integration.ID, func(status *IntegrationStatus) {
+		status.State = "connected"
+		status.Message = "Connected"
+		status.LastConnectedAt = &connectedAt
+	})
 
 	for {
 		if ctx.Err() != nil {
@@ -958,6 +1048,13 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 		}
 		if _, err := e.Publish(integration.ApplicationID, title, string(encoded), 0); err != nil {
 			log.Error().Err(err).Uint("integration_id", integration.ID).Msg("Home Assistant event could not be published")
+		} else {
+			now := time.Now().UTC()
+			e.setIntegrationStatus("home-assistant", integration.ID, func(status *IntegrationStatus) {
+				status.State = "connected"
+				status.Message = "Connected"
+				status.LastMessageAt = &now
+			})
 		}
 	}
 }
