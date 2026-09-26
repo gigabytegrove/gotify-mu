@@ -9,6 +9,7 @@ type User struct {
 	DisplayName  string `gorm:"type:text"`
 	Pass         []byte
 	Admin        bool
+	DirectoryManaged bool `gorm:"default:false"`
 	CreatedAt    time.Time
 	Applications []Application
 	Clients      []Client
@@ -41,6 +42,7 @@ type UserExternal struct {
 	// required: true
 	// example: true
 	Admin bool `json:"admin" form:"admin" query:"admin"`
+	DirectoryManaged bool `json:"directoryManaged,omitempty"`
 	// The date the user was created.
 	//
 	// read only: true
