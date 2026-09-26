@@ -53,7 +53,7 @@ func (l *FailureLimiter) Allow(key string) (bool, time.Duration) {
 	}
 	entry.lastSeen = now
 	if entry.blockedUntil.After(now) {
-		return false, time.Until(entry.blockedUntil)
+		return false, entry.blockedUntil.Sub(now)
 	}
 	if now.Sub(entry.windowStarted) >= l.window {
 		delete(l.entries, key)
