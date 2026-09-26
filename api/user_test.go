@@ -210,7 +210,7 @@ func (s *UserSuite) Test_CreateUser() {
 func (s *UserSuite) Test_CreateUser_Anonymous() {
 	s.noLogin()
 
-	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "1", "admin": false}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "secret-password-123", "admin": false}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.CreateUser(s.ctx)
@@ -223,7 +223,7 @@ func (s *UserSuite) Test_CreateUser_Register_Anonymous() {
 	s.a.Registration = true
 	s.noLogin()
 
-	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "1", "admin": false}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "secret-password-123", "admin": false}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.CreateUser(s.ctx)
@@ -238,7 +238,7 @@ func (s *UserSuite) Test_CreateUser_Register_Admin_Anonymous() {
 	s.a.Registration = true
 	s.noLogin()
 
-	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "1", "admin": true}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "secret-password-123", "admin": true}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.CreateUser(s.ctx)
