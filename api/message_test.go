@@ -480,7 +480,7 @@ func (s *MessageSuite) Test_CreateMessage_MemberCannotPostWithoutChatMode() {
 
 	s.a.CreateMessage(s.ctx)
 
-	assert.Equal(s.T(), 400, s.recorder.Code)
+	assert.Equal(s.T(), 403, s.recorder.Code)
 	messages, err := s.db.GetMessagesByApplication(app.ID)
 	require.NoError(s.T(), err)
 	assert.Empty(s.T(), messages)
