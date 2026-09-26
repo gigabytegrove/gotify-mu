@@ -129,3 +129,44 @@ func TestApplicationMembershipSetMemberPostingAdminOnly(t *testing.T) {
 	assert.True(t, updated.AllowMemberPost)
 }
 
+
+func TestApplicationMembershipMentionableUsers(t *testing.T) {
+	db := testdb.NewDB(t)
+	defer db.Close()
+
+	owner := db.NewUser(1)
+	member := db.NewUser(2)
+	jennifer := db.NewUser(3)
+	jennifer.Name = "jennifer"
+	jennifer.DisplayName = "Jennifer"
+	require.NoError(t, db.UpdateUser(jennifer))
+
+	app := &model.Application{
+		UserID:          owner.ID,
+		Token:           "MUAPI000MENT",
+		Name:            "Family Chat",
+		AllowMemberPost: true,
+	}
+	require.NoError(t, db.CreateApplication(app))
+	for _, user := range []*model.User{member, jennifer} {
+		require.NoError(t, db.UpsertApplicationMembership(&model.ApplicationMembership{
+			ApplicationID:        app.ID,
+			UserID:               user.ID,
+			ReceiveNotifications: true,
+		}))
+	}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	test.WithUser(ctx, member.ID)
+	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	ctx.Request = httptest.NewRequest("GET", "/application/1/mentionable-users", nil)
+
+	handler := &ApplicationMembershipAPI{DB: db}
+	handler.GetMentionableUsers(ctx)
+
+	assert.Equal(t, 200, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"name":"jennifer"`)
+	assert.Contains(t, recorder.Body.String(), `"displayName":"Jennifer"`)
+	assert.NotContains(t, recorder.Body.String(), `"userId":2`)
+}
