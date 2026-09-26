@@ -86,6 +86,23 @@ func (d *GormDatabase) CreateMessage(message *model.Message) error {
 	return d.DB.Create(message).Error
 }
 
+// CreateMessageOnce creates one automation message for a stable idempotency key.
+// If the key already exists, the existing message id is returned on message and created is false.
+func (d *GormDatabase) CreateMessageOnce(message *model.Message, key string) (created bool, err error) {
+	message.AutomationKey = &key
+	err = d.DB.Create(message).Error
+	if err == nil { return true, nil }
+	if err != gorm.ErrDuplicatedKey { return false, err }
+	existing := new(model.Message)
+	if loadErr := d.DB.Where("automation_key = ?", key).First(existing).Error; loadErr != nil {
+		return false, loadErr
+	}
+	message.ID = existing.ID
+	message.Date = existing.Date
+	message.AutomationKey = existing.AutomationKey
+	return false, nil
+}
+
 // GetMessagesByUser returns all messages from a user.
 func (d *GormDatabase) GetMessagesByUser(userID uint) ([]*model.Message, error) {
 	var messages []*model.Message
