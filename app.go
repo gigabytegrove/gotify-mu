@@ -16,6 +16,7 @@ import (
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/router"
 	"github.com/gotify/server/v3/runner"
+	"github.com/gotify/server/v3/security"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
@@ -163,7 +164,13 @@ func serve(vInfo *model.VersionInfo) int {
 		return 1
 	}
 
-	db, err := database.New(conf.Database.Dialect, conf.Database.Connection, conf.DefaultUser.Name, conf.DefaultUser.Pass, conf.PassStrength, conf.LocalAuthEnabled, time.Now)
+	secretStore, err := security.NewSecretStore(conf.SecretKeyFile)
+	if err != nil {
+		log.Error().Err(err).Str("path", conf.SecretKeyFile).Msg("Cannot initialize encrypted secret storage")
+		return 1
+	}
+
+	db, err := database.NewWithSecretStore(conf.Database.Dialect, conf.Database.Connection, conf.DefaultUser.Name, conf.DefaultUser.Pass, conf.PassStrength, conf.LocalAuthEnabled, time.Now, secretStore)
 	if err != nil {
 		log.Error().Err(err).Msg("Cannot initialize database")
 		return 1
