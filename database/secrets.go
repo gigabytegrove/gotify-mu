@@ -32,9 +32,12 @@ func (d *GormDatabase) encryptExistingIntegrationSecrets() error {
 			if err != nil {
 				return fmt.Errorf("decrypt webhook %d secret: %w", item.ID, err)
 			}
-			encrypted, err := d.SecretBox.EncryptString(plain)
-			if err != nil {
-				return err
+			encrypted := item.Secret
+			if !security.IsEncryptedSecret(encrypted) {
+				encrypted, err = d.SecretBox.EncryptString(plain)
+				if err != nil {
+					return err
+				}
 			}
 			if err := tx.Model(&model.WebhookRoute{}).Where("id = ?", item.ID).
 				Updates(map[string]any{
@@ -57,9 +60,12 @@ func (d *GormDatabase) encryptExistingIntegrationSecrets() error {
 			if err != nil {
 				return fmt.Errorf("decrypt MQTT integration %d password: %w", item.ID, err)
 			}
-			encrypted, err := d.SecretBox.EncryptString(plain)
-			if err != nil {
-				return err
+			encrypted := item.Password
+			if !security.IsEncryptedSecret(encrypted) {
+				encrypted, err = d.SecretBox.EncryptString(plain)
+				if err != nil {
+					return err
+				}
 			}
 			if err := tx.Model(&model.MQTTIntegration{}).Where("id = ?", item.ID).
 				Update("password", encrypted).Error; err != nil {
@@ -79,9 +85,12 @@ func (d *GormDatabase) encryptExistingIntegrationSecrets() error {
 			if err != nil {
 				return fmt.Errorf("decrypt Home Assistant integration %d token: %w", item.ID, err)
 			}
-			encrypted, err := d.SecretBox.EncryptString(plain)
-			if err != nil {
-				return err
+			encrypted := item.Token
+			if !security.IsEncryptedSecret(encrypted) {
+				encrypted, err = d.SecretBox.EncryptString(plain)
+				if err != nil {
+					return err
+				}
 			}
 			if err := tx.Model(&model.HomeAssistantIntegration{}).Where("id = ?", item.ID).
 				Update("token", encrypted).Error; err != nil {
