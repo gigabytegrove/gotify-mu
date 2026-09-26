@@ -106,7 +106,8 @@ export class AppStore extends BaseStore<IApplication> {
         description: string,
         defaultPriority: number,
         autoAssign = false,
-        allowMemberPost = false
+        allowMemberPost = false,
+        channelType: 'notification' | 'chat' = allowMemberPost ? 'chat' : 'notification'
     ): Promise<string> => {
         const response = await axios.post(`${config.get('url')}application`, {
             name,
@@ -114,6 +115,7 @@ export class AppStore extends BaseStore<IApplication> {
             defaultPriority,
             autoAssign,
             allowMemberPost,
+            channelType,
         });
         await this.refresh();
         this.snack('Channel created');
