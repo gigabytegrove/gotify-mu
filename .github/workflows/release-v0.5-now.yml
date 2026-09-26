@@ -1,0 +1,52 @@
+name: release-v0.5-now
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/release-v0.5-now.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+
+      - name: Verify version
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(tr -d '[:space:]' < VERSION)" = "0.5.0"
+
+      - name: Build updater release package
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p build
+          git archive --format=zip --prefix="gotify-mu-v0.5.0/" --output="build/gotify-mu-v0.5.0-source.zip" HEAD
+          (cd build && sha256sum gotify-mu-v0.5.0-source.zip > SHA256SUMS)
+
+      - name: Publish v0.5.0 prerelease
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if ! git ls-remote --exit-code --tags origin refs/tags/v0.5.0 >/dev/null 2>&1; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a v0.5.0 -m "Gotify MU v0.5.0"
+            git push origin v0.5.0
+          fi
+
+          if gh release view v0.5.0 >/dev/null 2>&1; then
+            gh release upload v0.5.0 build/gotify-mu-v0.5.0-source.zip build/SHA256SUMS --clobber
+          else
+            gh release create v0.5.0               build/gotify-mu-v0.5.0-source.zip               build/SHA256SUMS               --title "Gotify MU v0.5.0"               --notes "Gotify MU v0.5.0 pre-release for upgrade and acceptance testing. See CHANGELOG.md and docs/releases/v0.5.0.md."               --prerelease
+          fi
