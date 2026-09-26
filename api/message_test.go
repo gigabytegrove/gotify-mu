@@ -29,6 +29,7 @@ type MessageSuite struct {
 	ctx             *gin.Context
 	recorder        *httptest.ResponseRecorder
 	notifiedMessage *model.MessageExternal
+	notifiedUserIDs []uint
 }
 
 func (s *MessageSuite) BeforeTest(suiteName, testName string) {
@@ -38,6 +39,7 @@ func (s *MessageSuite) BeforeTest(suiteName, testName string) {
 	s.ctx.Request = httptest.NewRequest("GET", "/irrelevant", nil)
 	s.db = testdb.NewDB(s.T())
 	s.notifiedMessage = nil
+	s.notifiedUserIDs = nil
 	s.a = &MessageAPI{DB: s.db, Notifier: s}
 }
 
@@ -47,6 +49,7 @@ func (s *MessageSuite) AfterTest(string, string) {
 
 func (s *MessageSuite) Notify(userID uint, msg *model.MessageExternal) {
 	s.notifiedMessage = msg
+	s.notifiedUserIDs = append(s.notifiedUserIDs, userID)
 }
 
 func (s *MessageSuite) Test_ensureCorrectJsonRepresentation() {
@@ -453,6 +456,118 @@ func (s *MessageSuite) Test_CreateMessage_MemberCanPostToChatChannel() {
 	assert.Equal(s.T(), member.ID, messages[0].SenderUserID)
 	assert.Equal(s.T(), member.Name, messages[0].SenderName)
 	assert.Equal(s.T(), member.Name, messages[0].Title)
+}
+
+func (s *MessageSuite) Test_CreateMessage_ChatDoesNotNotifySender() {
+	owner := s.db.NewUser(1)
+	sender := s.db.NewUser(2)
+	app := &model.Application{
+		UserID:          owner.ID,
+		Token:           "MUCHATSELF001",
+		Name:            "Family Chat",
+		AllowMemberPost: true,
+	}
+	require.NoError(s.T(), s.db.CreateApplication(app))
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               sender.ID,
+		ReceiveNotifications: true,
+	}))
+
+	test.WithUser(s.ctx, sender.ID)
+	s.ctx.Request = httptest.NewRequest(
+		"POST",
+		"/message",
+		strings.NewReader(`{"appid":1,"message":"hello"}`),
+	)
+	s.ctx.Request.Header.Set("Content-Type", "application/json")
+
+	s.a.CreateMessage(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	assert.Equal(s.T(), []uint{owner.ID}, s.notifiedUserIDs)
+}
+
+func (s *MessageSuite) Test_CreateMessage_MentionNotifiesMutedChatMember() {
+	owner := s.db.NewUser(1)
+	sender := s.db.NewUser(2)
+	mentioned := s.db.NewUser(3)
+	mentioned.Name = "jennifer"
+	mentioned.DisplayName = "Jennifer"
+	require.NoError(s.T(), s.db.UpdateUser(mentioned))
+
+	app := &model.Application{
+		UserID:          owner.ID,
+		Token:           "MUCHATMENT01",
+		Name:            "Family Chat",
+		AllowMemberPost: true,
+	}
+	require.NoError(s.T(), s.db.CreateApplication(app))
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               sender.ID,
+		ReceiveNotifications: true,
+	}))
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               mentioned.ID,
+		ReceiveNotifications: false,
+	}))
+
+	test.WithUser(s.ctx, sender.ID)
+	s.ctx.Request = httptest.NewRequest(
+		"POST",
+		"/message",
+		strings.NewReader(`{"appid":1,"message":"hey, @jennifer can you check this?"}`),
+	)
+	s.ctx.Request.Header.Set("Content-Type", "application/json")
+
+	s.a.CreateMessage(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	assert.ElementsMatch(s.T(), []uint{owner.ID, mentioned.ID}, s.notifiedUserIDs)
+	assert.NotContains(s.T(), s.notifiedUserIDs, sender.ID)
+
+	messages, err := s.db.GetMessagesByApplication(app.ID)
+	require.NoError(s.T(), err)
+	require.Len(s.T(), messages, 1)
+	external := toExternalMessage(messages[0])
+	require.NotNil(s.T(), external.Extras)
+	assert.Equal(s.T(), []any{"jennifer"}, external.Extras["gotify::mu::mentions"])
+}
+
+func (s *MessageSuite) Test_CreateMessage_MentionIgnoresEmailAndNonMember() {
+	owner := s.db.NewUser(1)
+	sender := s.db.NewUser(2)
+	outside := s.db.NewUser(3)
+	outside.Name = "jennifer"
+	require.NoError(s.T(), s.db.UpdateUser(outside))
+
+	app := &model.Application{
+		UserID:          owner.ID,
+		Token:           "MUCHATMENT02",
+		Name:            "Family Chat",
+		AllowMemberPost: true,
+	}
+	require.NoError(s.T(), s.db.CreateApplication(app))
+	require.NoError(s.T(), s.db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               sender.ID,
+		ReceiveNotifications: true,
+	}))
+
+	test.WithUser(s.ctx, sender.ID)
+	s.ctx.Request = httptest.NewRequest(
+		"POST",
+		"/message",
+		strings.NewReader(`{"appid":1,"message":"email test@jennifer then ping @jennifer"}`),
+	)
+	s.ctx.Request.Header.Set("Content-Type", "application/json")
+
+	s.a.CreateMessage(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	assert.Equal(s.T(), []uint{owner.ID}, s.notifiedUserIDs)
 }
 
 func (s *MessageSuite) Test_CreateMessage_MemberCannotPostWithoutChatMode() {
