@@ -1121,7 +1121,8 @@ func externalMessage(msg *model.Message) *model.MessageExternal {
 		Date: msg.Date,
 		SenderUserID: msg.SenderUserID,
 		SenderName: msg.SenderName,
-		Acknowledged: msg.Acknowledged,
+		Acknowledged:         msg.Acknowledged,
+		AcknowledgementCount: msg.AcknowledgementCount,
 	}
 }
 
