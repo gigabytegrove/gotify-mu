@@ -709,7 +709,7 @@ func (e *Engine) restartIntegrations() {
 		}(*item)
 	}
 	for _, item := range haItems {
-		if !item.Enabled {
+		if !item.Enabled || strings.EqualFold(strings.TrimSpace(item.ConnectionMode), "integration") {
 			continue
 		}
 		ctx, cancel := context.WithCancel(e.ctx)
@@ -1099,18 +1099,47 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 		return err
 	}
 	if integration == nil {
-		return errors.New("home Assistant connection not found")
+		return errors.New("home assistant connection not found")
 	}
 	eventType = strings.TrimSpace(eventType)
 	if eventType == "" {
 		return errors.New("event type is required")
 	}
-	base := strings.TrimRight(integration.BaseURL, "/")
-	endpoint := base + "/api/events/" + url.PathEscape(eventType)
+
 	payload, err := json.Marshal(data)
 	if err != nil {
 		return err
 	}
+
+	mode := strings.ToLower(strings.TrimSpace(integration.ConnectionMode))
+	if mode == "integration" {
+		if strings.TrimSpace(integration.NativeWebhookURL) == "" || strings.TrimSpace(integration.NativeSecret) == "" {
+			return errors.New("home assistant integration is not paired")
+		}
+		envelope, err := json.Marshal(map[string]any{"eventType": eventType, "data": data})
+		if err != nil {
+			return err
+		}
+		request, err := http.NewRequestWithContext(e.ctx, http.MethodPost, integration.NativeWebhookURL, bytes.NewReader(envelope))
+		if err != nil {
+			return err
+		}
+		request.Header.Set("Authorization", "Bearer "+integration.NativeSecret)
+		request.Header.Set("Content-Type", "application/json")
+		client := &http.Client{Timeout: 15 * time.Second}
+		response, err := client.Do(request)
+		if err != nil {
+			return err
+		}
+		defer response.Body.Close()
+		if response.StatusCode < 200 || response.StatusCode >= 300 {
+			return fmt.Errorf("home assistant integration returned HTTP %d", response.StatusCode)
+		}
+		return nil
+	}
+
+	base := strings.TrimRight(integration.BaseURL, "/")
+	endpoint := base + "/api/events/" + url.PathEscape(eventType)
 	request, err := http.NewRequestWithContext(e.ctx, http.MethodPost, endpoint, bytes.NewReader(payload))
 	if err != nil {
 		return err
@@ -1124,9 +1153,43 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 	}
 	defer response.Body.Close()
 	if response.StatusCode < 200 || response.StatusCode >= 300 {
-		return fmt.Errorf("home Assistant returned HTTP %d", response.StatusCode)
+		return fmt.Errorf("home assistant returned HTTP %d", response.StatusCode)
 	}
 	return nil
+}
+
+func (e *Engine) ReceiveHomeAssistantEvent(id uint, eventType string, data map[string]any) (bool, error) {
+	integration, err := e.db.GetHomeAssistantIntegrationByID(id)
+	if err != nil {
+		return false, err
+	}
+	if integration == nil {
+		return false, errors.New("home assistant connection not found")
+	}
+	if !integration.Enabled || !strings.EqualFold(strings.TrimSpace(integration.ConnectionMode), "integration") {
+		return false, nil
+	}
+	eventType = strings.TrimSpace(eventType)
+	if configured := strings.TrimSpace(integration.EventType); configured != "" && configured != eventType {
+		return false, nil
+	}
+	if !homeAssistantEventMatches(integration, data) {
+		return false, nil
+	}
+	encoded, _ := json.MarshalIndent(data, "", "  ")
+	title := integration.Name
+	if title == "" {
+		title = "Home Assistant"
+	}
+	if eventType != "" {
+		title += ": " + eventType
+	}
+	if _, err := e.Publish(integration.ApplicationID, title, string(encoded), 0); err != nil {
+		return false, err
+	}
+	eventAt := time.Now()
+	_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "connected", nil, &eventAt, "", nil, false)
+	return true, nil
 }
 
 func (e *Engine) runHomeAssistantLoop(ctx context.Context, integration *model.HomeAssistantIntegration) {
