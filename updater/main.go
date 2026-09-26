@@ -2,6 +2,8 @@ package main
 
 import (
 	"archive/zip"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -244,17 +246,26 @@ func (m *manager) performInstall(version string, started time.Time) {
 	defer os.RemoveAll(tempDir)
 
 	m.updateProgress("preparing", "Checking release", "Checking release", 5)
-	commit, err := m.resolveCommit(version)
+	release, err := m.resolveRelease(version)
 	if err != nil {
 		m.fail(version, started, "The release could not be verified.", err)
 		return
 	}
 
-	archivePath := filepath.Join(tempDir, "source.zip")
-	sourceURL := fmt.Sprintf("https://github.com/%s/archive/refs/tags/v%s.zip", m.repository, version)
+	archivePath := filepath.Join(tempDir, release.SourceName)
+	checksumPath := filepath.Join(tempDir, "SHA256SUMS")
 	m.updateProgress("downloading", "Downloading update", "Downloading update", 10)
-	if err := m.downloadFile(sourceURL, archivePath, 10, 24); err != nil {
+	if err := m.downloadFile(release.SourceURL, archivePath, 10, 23); err != nil {
 		m.fail(version, started, "The update could not be downloaded.", err)
+		return
+	}
+	if err := m.downloadFile(release.ChecksumURL, checksumPath, 23, 25); err != nil {
+		m.fail(version, started, "The release checksum could not be downloaded.", err)
+		return
+	}
+	m.updateProgress("preparing", "Verifying update", "Verifying update", 26)
+	if err := verifyReleaseChecksum(archivePath, checksumPath, release.SourceName); err != nil {
+		m.fail(version, started, "The update failed integrity verification.", err)
 		return
 	}
 
@@ -273,7 +284,7 @@ func (m *manager) performInstall(version string, started time.Time) {
 	m.updateProgress("building", "Installing update", "Installing update", 30)
 	image := "gotify-mu:release-" + version
 	buildDate := time.Now().UTC().Format(time.RFC3339)
-	if err := m.buildRelease(root, image, version, commit, buildDate); err != nil {
+	if err := m.buildRelease(root, image, version, release.Commit, buildDate); err != nil {
 		m.fail(version, started, "The update could not be installed.", err)
 		return
 	}
@@ -285,6 +296,103 @@ func (m *manager) performInstall(version string, started time.Time) {
 
 	finished := time.Now().UTC()
 	m.finishUpdate("completed", "Update complete", "Update installed successfully", 100, finished)
+}
+
+type releaseAsset struct {
+	Name               string `json:"name"`
+	BrowserDownloadURL string `json:"browser_download_url"`
+}
+
+type releaseMetadata struct {
+	TagName  string         `json:"tag_name"`
+	Assets   []releaseAsset `json:"assets"`
+	Commit   string         `json:"-"`
+	SourceURL string        `json:"-"`
+	ChecksumURL string      `json:"-"`
+	SourceName string       `json:"-"`
+}
+
+func (m *manager) resolveRelease(version string) (*releaseMetadata, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/tags/v%s", m.repository, version)
+	request, err := http.NewRequest(http.MethodGet, url, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("Accept", "application/vnd.github+json")
+	request.Header.Set("User-Agent", "gotify-mu-updater")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		return nil, fmt.Errorf("could not load release metadata: %w", err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("could not load release metadata: GitHub returned HTTP %d", response.StatusCode)
+	}
+
+	var release releaseMetadata
+	if err := json.NewDecoder(io.LimitReader(response.Body, 1<<20)).Decode(&release); err != nil {
+		return nil, fmt.Errorf("could not decode release metadata: %w", err)
+	}
+	if release.TagName != "v"+version {
+		return nil, errors.New("release tag did not match requested version")
+	}
+	release.SourceName = "gotify-mu-v" + version + "-source.zip"
+	for _, asset := range release.Assets {
+		switch asset.Name {
+		case release.SourceName:
+			release.SourceURL = asset.BrowserDownloadURL
+		case "SHA256SUMS":
+			release.ChecksumURL = asset.BrowserDownloadURL
+		}
+	}
+	if release.SourceURL == "" || release.ChecksumURL == "" {
+		return nil, errors.New("release is missing the required source or checksum asset")
+	}
+	commit, err := m.resolveCommit(version)
+	if err != nil {
+		return nil, err
+	}
+	release.Commit = commit
+	return &release, nil
+}
+
+func verifyReleaseChecksum(archivePath, checksumPath, sourceName string) error {
+	data, err := os.ReadFile(checksumPath)
+	if err != nil {
+		return fmt.Errorf("read release checksum: %w", err)
+	}
+	var expected string
+	for _, line := range strings.Split(string(data), "\n") {
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 2 {
+			continue
+		}
+		name := strings.TrimPrefix(fields[len(fields)-1], "*")
+		if filepath.Base(name) == sourceName {
+			expected = strings.ToLower(fields[0])
+			break
+		}
+	}
+	if expected == "" {
+		return errors.New("release checksum file does not contain the source archive")
+	}
+	if _, err := hex.DecodeString(expected); err != nil || len(expected) != sha256.Size*2 {
+		return errors.New("release checksum is not a valid SHA-256 value")
+	}
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+	hash := sha256.New()
+	if _, err := io.Copy(hash, file); err != nil {
+		return err
+	}
+	actual := hex.EncodeToString(hash.Sum(nil))
+	if actual != expected {
+		return fmt.Errorf("release checksum mismatch: expected %s, got %s", expected, actual)
+	}
+	return nil
 }
 
 func (m *manager) resolveCommit(version string) (string, error) {
@@ -513,6 +621,30 @@ func (m *manager) waitForHealthy(name string, timeout time.Duration) error {
 	return errors.New("replacement service did not become healthy before timeout")
 }
 
+func formatDockerArgs(args []string) string {
+	safe := append([]string(nil), args...)
+	for i := 0; i < len(safe); i++ {
+		if (safe[i] == "--env" || safe[i] == "-e") && i+1 < len(safe) {
+			if key, _, ok := strings.Cut(safe[i+1], "="); ok {
+				safe[i+1] = key + "=[masked]"
+			} else {
+				safe[i+1] = "[masked]"
+			}
+			i++
+			continue
+		}
+		if strings.HasPrefix(safe[i], "--env=") {
+			raw := strings.TrimPrefix(safe[i], "--env=")
+			if key, _, ok := strings.Cut(raw, "="); ok {
+				safe[i] = "--env=" + key + "=[masked]"
+			} else {
+				safe[i] = "--env=[masked]"
+			}
+		}
+	}
+	return strings.Join(safe, " ")
+}
+
 func runDocker(args ...string) (string, error) {
 	command := exec.Command("docker", args...)
 	output, err := command.CombinedOutput()
@@ -669,6 +801,7 @@ func (m *manager) buildRelease(root, image, version, commit, buildDate string) e
 		"--progress=plain",
 		"--pull",
 		"--build-arg", "BUILD_JS=1",
+		"--build-arg", "RUN_TESTS=1",
 		"--build-arg", "GO_VERSION=1.26.0",
 		"--build-arg", "GOTIFY_MU_VERSION="+version,
 		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
