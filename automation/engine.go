@@ -45,6 +45,9 @@ type Database interface {
 	DeleteDigestItems(userID uint) error
 	GetDueDigestPolicies(now time.Time) ([]*model.DigestPolicy, error)
 	SaveDigestPolicy(item *model.DigestPolicy) error
+	QueueDeferredNotification(item *model.DeferredNotification) error
+	GetDeferredNotifications(limit int) ([]*model.DeferredNotification, error)
+	DeleteDeferredNotification(userID, messageID uint) error
 
 	GetScheduledNotifications() ([]*model.ScheduledNotification, error)
 	GetDueScheduledNotifications(now time.Time) ([]*model.ScheduledNotification, error)
@@ -276,6 +279,12 @@ func (e *Engine) deliver(userID uint, msg *model.Message, external *model.Messag
 		return err
 	}
 	if quiet != nil && quiet.Enabled && msg.Priority < quiet.AllowPriority && quietNow(quiet, time.Now()) {
+		if quiet.Mode == "defer" {
+			return e.db.QueueDeferredNotification(&model.DeferredNotification{
+				UserID:userID, MessageID:msg.ID, ApplicationID:msg.ApplicationID,
+				Title:msg.Title, Message:msg.Message, Priority:msg.Priority, CreatedAt:time.Now().UTC(),
+			})
+		}
 		return nil
 	}
 
@@ -347,6 +356,7 @@ func (e *Engine) schedulerLoop() {
 func (e *Engine) runDue(now time.Time) {
 	e.runSchedules(now)
 	e.runDigests(now)
+	e.runDeferred(now)
 	e.runEscalations(now)
 }
 
@@ -473,6 +483,32 @@ func (e *Engine) runDigests(now time.Time) {
 		policy.NextRunAt = &next
 		if err := e.db.SaveDigestPolicy(policy); err != nil {
 			log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not update digest policy")
+		}
+	}
+}
+
+func (e *Engine) runDeferred(now time.Time) {
+	items, err := e.db.GetDeferredNotifications(500)
+	if err != nil {
+		log.Error().Err(err).Msg("Could not load deferred notifications")
+		return
+	}
+	for _, item := range items {
+		policy, err := e.db.GetQuietHoursPolicy(item.UserID)
+		if err != nil {
+			log.Error().Err(err).Uint("user_id", item.UserID).Msg("Could not load Quiet Hours for deferred notification")
+			continue
+		}
+		if policy != nil && policy.Enabled && quietNow(policy, now) {
+			continue
+		}
+		priority := item.Priority
+		e.notifier.Notify(item.UserID, &model.MessageExternal{
+			ID:item.MessageID, ApplicationID:item.ApplicationID, Title:item.Title,
+			Message:item.Message, Priority:&priority, Date:item.CreatedAt,
+		})
+		if err := e.db.DeleteDeferredNotification(item.UserID, item.MessageID); err != nil {
+			log.Error().Err(err).Uint("user_id", item.UserID).Uint("message_id", item.MessageID).Msg("Could not clear deferred notification")
 		}
 	}
 }
