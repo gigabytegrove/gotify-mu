@@ -381,6 +381,8 @@ func (s *ApplicationSuite) Test_GetApplications() {
 	receiveNotifications := true
 	first.ReceiveNotifications = &receiveNotifications
 	second.ReceiveNotifications = &receiveNotifications
+	first.CurrentRole = model.ChannelRoleOwner
+	second.CurrentRole = model.ChannelRoleOwner
 	test.BodyEquals(s.T(), []*model.Application{first, second}, s.recorder)
 }
 
@@ -404,6 +406,8 @@ func (s *ApplicationSuite) Test_GetApplications_WithImage() {
 	receiveNotifications := true
 	first.ReceiveNotifications = &receiveNotifications
 	second.ReceiveNotifications = &receiveNotifications
+	first.CurrentRole = model.ChannelRoleOwner
+	second.CurrentRole = model.ChannelRoleOwner
 	test.BodyEquals(s.T(), []*model.Application{first, second}, s.recorder)
 }
 
