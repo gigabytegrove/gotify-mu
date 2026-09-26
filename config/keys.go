@@ -29,6 +29,8 @@ const (
 	EnvDefaultUserName                  = "GOTIFY_DEFAULTUSER_NAME"
 	EnvDefaultUserPass                  = "GOTIFY_DEFAULTUSER_PASS"
 	EnvPassStrength                     = "GOTIFY_PASSSTRENGTH"
+	EnvPasswordMinLength                = "GOTIFY_SECURITY_PASSWORD_MIN_LENGTH"
+	EnvAuditRetentionDays               = "GOTIFY_AUDIT_RETENTION_DAYS"
 	EnvUploadedImagesDir                = "GOTIFY_UPLOADEDIMAGESDIR"
 	EnvPluginsDir                       = "GOTIFY_PLUGINSDIR"
 	EnvPluginTrustedSHA256              = "GOTIFY_PLUGINS_TRUSTEDSHA256"
