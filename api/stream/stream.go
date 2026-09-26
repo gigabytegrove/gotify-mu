@@ -18,6 +18,7 @@ import (
 // The API provides a handler for a WebSocket stream API.
 type API struct {
 	clients     map[uint][]*client
+	muClients   map[uint][]*muEventClient
 	lock        sync.RWMutex
 	pingPeriod  time.Duration
 	pongTimeout time.Duration
@@ -31,6 +32,7 @@ type API struct {
 func New(pingPeriod, pongTimeout time.Duration, allowedWebSocketOrigins []string) *API {
 	return &API{
 		clients:     make(map[uint][]*client),
+		muClients:   make(map[uint][]*muEventClient),
 		pingPeriod:  pingPeriod,
 		pongTimeout: pingPeriod + pongTimeout,
 		upgrader:    newUpgrader(allowedWebSocketOrigins),
@@ -47,6 +49,11 @@ func (a *API) CollectConnectedClientTokens() []string {
 			clients = append(clients, c.token)
 		}
 	}
+	for _, cs := range a.muClients {
+		for _, c := range cs {
+			clients = append(clients, c.token)
+		}
+	}
 	return uniq(clients)
 }
 
@@ -56,6 +63,9 @@ func (a *API) ConnectedClientCount() int {
 	defer a.lock.RUnlock()
 	count := 0
 	for _, clients := range a.clients {
+		count += len(clients)
+	}
+	for _, clients := range a.muClients {
 		count += len(clients)
 	}
 	return count
@@ -70,6 +80,12 @@ func (a *API) NotifyDeletedUser(userID uint) error {
 			client.Close()
 		}
 		delete(a.clients, userID)
+	}
+	if clients, ok := a.muClients[userID]; ok {
+		for _, client := range clients {
+			client.Close()
+		}
+		delete(a.muClients, userID)
 	}
 	return nil
 }
@@ -88,6 +104,16 @@ func (a *API) NotifyDeletedClient(userID uint, token string) {
 		}
 		a.clients[userID] = clients
 	}
+	if clients, ok := a.muClients[userID]; ok {
+		for i := len(clients) - 1; i >= 0; i-- {
+			client := clients[i]
+			if client.token == token {
+				client.Close()
+				clients = append(clients[:i], clients[i+1:]...)
+			}
+		}
+		a.muClients[userID] = clients
+	}
 }
 
 // Notify notifies the clients with the given userID that a new messages was created.
@@ -102,6 +128,41 @@ func (a *API) Notify(userID uint, msg *model.MessageExternal) {
 			}
 		}
 	}
+}
+
+func (a *API) NotifyMUEvent(userID uint, event any) {
+	a.lock.RLock()
+	defer a.lock.RUnlock()
+	if clients, ok := a.muClients[userID]; ok {
+		for _, c := range clients {
+			select {
+			case c.write <- event:
+			case <-c.closed:
+			default:
+				// Presence is ephemeral. Drop stale state rather than block
+				// the normal message-delivery stream.
+			}
+		}
+	}
+}
+
+func (a *API) removeMU(remove *muEventClient) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	if userIDClients, ok := a.muClients[remove.userID]; ok {
+		for i, client := range userIDClients {
+			if client == remove {
+				a.muClients[remove.userID] = append(userIDClients[:i], userIDClients[i+1:]...)
+				break
+			}
+		}
+	}
+}
+
+func (a *API) registerMU(client *muEventClient) {
+	a.lock.Lock()
+	defer a.lock.Unlock()
+	a.muClients[client.userID] = append(a.muClients[client.userID], client)
 }
 
 func (a *API) remove(remove *client) {
@@ -154,6 +215,23 @@ func (a *API) register(client *client) {
 //	    description: Server Error
 //	    schema:
 //	        $ref: "#/definitions/Error"
+func (a *API) HandleMUEvents(ctx *gin.Context) {
+	conn, err := a.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
+	if err != nil {
+		ctx.Error(err)
+		return
+	}
+
+	var token string
+	if c := auth.GetClient(ctx); c != nil {
+		token = c.Token
+	}
+	client := newMUEventClient(conn, auth.GetUserID(ctx), token, a.removeMU)
+	a.registerMU(client)
+	go client.startReading(a.pongTimeout)
+	go client.startWriteHandler(a.pingPeriod)
+}
+
 func (a *API) Handle(ctx *gin.Context) {
 	conn, err := a.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
@@ -181,8 +259,16 @@ func (a *API) Close() {
 			client.Close()
 		}
 	}
+	for _, clients := range a.muClients {
+		for _, client := range clients {
+			client.Close()
+		}
+	}
 	for k := range a.clients {
 		delete(a.clients, k)
+	}
+	for k := range a.muClients {
+		delete(a.muClients, k)
 	}
 }
 
