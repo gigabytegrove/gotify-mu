@@ -8,7 +8,7 @@
 
 Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
 
-> **Current published baseline:** **v0.2.2** (pre-release). **v0.5.0 is the current hardening/completion preview candidate** on PR #22. It remains unreleased until the full CI, migration, health, compatibility, and live-feature validation gates pass.
+> **Current release:** **v0.5.0** (pre-release). It is the current Gotify MU security, reliability, integration, collaboration, plugin, and operations release.
 
 ## Why Gotify MU?
 
@@ -134,9 +134,7 @@ The official Gotify Android app continues to receive Chat Channel messages as no
 
 ## Releases
 
-The current published release baseline is **Gotify MU v0.2.2**.
-
-**v0.5.0 is the current preview candidate** on PR #22. It is not considered released until the complete validation gate has passed and the branch is accepted, merged, tagged, and published. Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed preview notes in [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md).
+The current published release is **Gotify MU v0.5.0** (pre-release). Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed notes in [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md).
 
 Deployment, validation, updater, backup, and rollback procedures are maintained in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
@@ -145,7 +143,7 @@ For a release checkout:
 ```bash
 git clone https://github.com/gigabytegrove/gotify-mu.git
 cd gotify-mu
-git checkout v0.2.2
+git checkout v0.5.0
 ```
 
 Release builds inject the release version, commit, and build date into the server binary. Development builds continue to use `master-<commit>`, `master-local`, or `dev-<commit>` identities as appropriate.
@@ -287,10 +285,10 @@ COMMIT="$(git rev-parse --short HEAD)"
 docker build --no-cache \
   --build-arg BUILD_JS=1 \
   --build-arg GO_VERSION=1.26.0 \
-  --build-arg GOTIFY_MU_VERSION="0.2.2" \
+  --build-arg GOTIFY_MU_VERSION="0.5.0" \
   --build-arg GOTIFY_MU_COMMIT="${COMMIT}" \
   -f docker/Dockerfile \
-  -t gotify-mu:0.2.2 \
+  -t gotify-mu:0.5.0 \
   .
 ```
 
