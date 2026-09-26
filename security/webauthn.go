@@ -9,7 +9,6 @@ import (
 	"encoding/binary"
 	"encoding/json"
 	"errors"
-	"math/big"
 )
 
 func NewWebAuthnChallenge() (string,error) {
@@ -132,13 +131,17 @@ func VerifyWebAuthnAssertion(authenticatorData, clientDataJSON, signature, x, y 
 	if err:=VerifyWebAuthnRPID(authenticatorData[:32],rpID);err!=nil{return 0,err}
 	if authenticatorData[32]&0x01==0{return 0,errors.New("user presence was not verified")}
 	signCount:=binary.BigEndian.Uint32(authenticatorData[33:37])
-	xInt:=new(big.Int).SetBytes(x);yInt:=new(big.Int).SetBytes(y)
-	if !elliptic.P256().IsOnCurve(xInt,yInt){return 0,errors.New("stored passkey public key is invalid")}
+	if len(x)>32||len(y)>32{return 0,errors.New("stored passkey public key is invalid")}
+	encoded:=make([]byte,65)
+	encoded[0]=4
+	copy(encoded[1+32-len(x):33],x)
+	copy(encoded[33+32-len(y):],y)
+	pub,err:=ecdsa.ParseUncompressedPublicKey(elliptic.P256(),encoded)
+	if err!=nil{return 0,errors.New("stored passkey public key is invalid")}
 	clientHash:=sha256.Sum256(clientDataJSON)
 	signed:=append(append([]byte(nil),authenticatorData...),clientHash[:]...)
 	digest:=sha256.Sum256(signed)
-	pub:=ecdsa.PublicKey{Curve:elliptic.P256(),X:xInt,Y:yInt}
-	if !ecdsa.VerifyASN1(&pub,digest[:],signature){return 0,errors.New("passkey signature verification failed")}
+	if !ecdsa.VerifyASN1(pub,digest[:],signature){return 0,errors.New("passkey signature verification failed")}
 	if previousSignCount>0&&signCount>0&&signCount<=previousSignCount{return 0,errors.New("passkey signature counter did not advance")}
 	return signCount,nil
 }
