@@ -50,6 +50,12 @@ type ApplicationMemberExternal struct {
 	Role                 string `json:"role"`
 }
 
+type MentionableUserExternal struct {
+	UserID      uint   `json:"userId"`
+	Name        string `json:"name"`
+	DisplayName string `json:"displayName,omitempty"`
+}
+
 type ApplicationAutoAssignParams struct {
 	Enabled bool `json:"enabled"`
 }
@@ -99,6 +105,54 @@ func (a *ApplicationMembershipAPI) getAuthorizedApplication(
 		return nil, false
 	}
 	return app, true
+}
+
+func (a *ApplicationMembershipAPI) GetMentionableUsers(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, err := a.DB.GetApplicationByID(id)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if app == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("application does not exist"))
+			return
+		}
+
+		currentUserID := auth.GetUserID(ctx)
+		membership, err := a.DB.GetApplicationMembership(id, currentUserID)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		if membership == nil || !app.AllowMemberPost {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("chat channel does not exist"))
+			return
+		}
+
+		memberships, err := a.DB.GetApplicationMemberships(id)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+
+		result := make([]MentionableUserExternal, 0, len(memberships))
+		for _, item := range memberships {
+			if item.UserID == currentUserID {
+				continue
+			}
+			user, err := a.DB.GetUserByID(item.UserID)
+			if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+				return
+			}
+			if user == nil {
+				continue
+			}
+			result = append(result, MentionableUserExternal{
+				UserID:      user.ID,
+				Name:        user.Name,
+				DisplayName: user.DisplayName,
+			})
+		}
+		ctx.JSON(http.StatusOK, result)
+	})
 }
 
 func (a *ApplicationMembershipAPI) GetMembers(ctx *gin.Context) {
