@@ -12,25 +12,49 @@ func (d *GormDatabase) markAcknowledged(userID uint, messages []*model.Message) 
 		return nil
 	}
 	ids := make([]uint, 0, len(messages))
+	byID := make(map[uint]*model.Message, len(messages))
 	for _, message := range messages {
 		ids = append(ids, message.ID)
+		byID[message.ID] = message
+		message.Acknowledged = false
+		message.AcknowledgedAny = false
+		message.AcknowledgementCount = 0
+		message.AcknowledgedBy = nil
 	}
-	var acknowledged []uint
-	if err := d.DB.Model(&model.MessageAcknowledgement{}).
-		Where("user_id = ? AND message_id IN ?", userID, ids).
-		Pluck("message_id", &acknowledged).Error; err != nil {
+
+	var rows []struct {
+		MessageID      uint
+		UserID         uint
+		Name           string
+		DisplayName    string
+		AcknowledgedAt time.Time
+	}
+	if err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.message_id, ma.user_id, users.name, users.display_name, ma.acknowledged_at").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id IN ?", ids).
+		Order("ma.acknowledged_at ASC").
+		Scan(&rows).Error; err != nil {
 		return err
 	}
-	set := make(map[uint]struct{}, len(acknowledged))
-	for _, id := range acknowledged {
-		set[id] = struct{}{}
-	}
-	for _, message := range messages {
-		_, message.Acknowledged = set[message.ID]
+
+	for _, row := range rows {
+		message := byID[row.MessageID]
+		if message == nil { continue }
+		message.AcknowledgedAny = true
+		message.AcknowledgementCount++
+		message.AcknowledgedBy = append(message.AcknowledgedBy, model.MessageAcknowledgementView{
+			UserID: row.UserID,
+			Name: row.Name,
+			DisplayName: row.DisplayName,
+			AcknowledgedAt: row.AcknowledgedAt,
+		})
+		if row.UserID == userID {
+			message.Acknowledged = true
+		}
 	}
 	return nil
 }
-
 func visibleMessages(db *gorm.DB, userID uint) *gorm.DB {
 	return db.Joins("JOIN application_memberships AS am ON am.application_id = messages.application_id AND am.user_id = ?", userID).
 		Joins("LEFT JOIN message_dismissals AS md ON md.message_id = messages.id AND md.user_id = ?", userID).
