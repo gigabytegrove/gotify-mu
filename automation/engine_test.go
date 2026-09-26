@@ -174,7 +174,7 @@ func (n *captureNotifier) Notify(userID uint, _ *model.MessageExternal) {
 	n.userIDs = append(n.userIDs, userID)
 }
 
-func TestMUDeliverySuppressesSenderAndIncludesMutedMention(t *testing.T) {
+func TestMUDeliveryNotifiesSenderAndIncludesMutedMention(t *testing.T) {
 	db := testdb.NewDB(t)
 	defer db.Close()
 
@@ -232,8 +232,8 @@ func TestMUDeliverySuppressesSenderAndIncludesMutedMention(t *testing.T) {
 	for _, userID := range notifier.userIDs {
 		seen[userID]++
 	}
-	if seen[sender.ID] != 0 {
-		t.Fatalf("sender received its own notification: %v", notifier.userIDs)
+	if seen[sender.ID] != 1 {
+		t.Fatalf("sender should receive one notification for their own Chat Channel message: %v", notifier.userIDs)
 	}
 	if seen[owner.ID] != 1 {
 		t.Fatalf("owner should receive one notification: %v", notifier.userIDs)
