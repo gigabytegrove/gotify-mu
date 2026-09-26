@@ -22,6 +22,24 @@ var (
 	forbiddenJSON = `{"error":"Forbidden", "errorCode":403, "errorDescription":"you are not allowed to access this api"}`
 )
 
+func TestSanitizeLoggedRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+	ctx.Request = httptest.NewRequest(
+		http.MethodGet,
+		"/integrations/webhook/THIS-MUST-NOT-LOG?code=oidc-code&state=oidc-state&token=client-token&view=compact",
+		nil,
+	)
+	got := sanitizeLoggedRequest(ctx)
+	assert.NotContains(t, got, "THIS-MUST-NOT-LOG")
+	assert.NotContains(t, got, "oidc-code")
+	assert.NotContains(t, got, "oidc-state")
+	assert.NotContains(t, got, "client-token")
+	assert.Contains(t, got, "/integrations/webhook/[masked]")
+	assert.Contains(t, got, "view=compact")
+	assert.Contains(t, got, "%5Bmasked%5D")
+}
+
 func TestShouldAuditMutation(t *testing.T) {
 	assert.True(t, shouldAuditMutation("/user/:id"))
 	assert.True(t, shouldAuditMutation("/group/:id/members"))
