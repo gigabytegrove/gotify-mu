@@ -70,12 +70,31 @@ type endpointInfo struct {
 	Aliases []string `json:"Aliases"`
 }
 
+type deviceMapping struct {
+	PathOnHost        string `json:"PathOnHost"`
+	PathInContainer   string `json:"PathInContainer"`
+	CgroupPermissions string `json:"CgroupPermissions"`
+}
+
+type ulimitInfo struct {
+	Name string `json:"Name"`
+	Hard int64  `json:"Hard"`
+	Soft int64  `json:"Soft"`
+}
+
+type logConfig struct {
+	Type   string            `json:"Type"`
+	Config map[string]string `json:"Config"`
+}
+
 type inspectedContainer struct {
 	Config struct {
 		Env        []string          `json:"Env"`
 		User       string            `json:"User"`
 		WorkingDir string            `json:"WorkingDir"`
 		Labels     map[string]string `json:"Labels"`
+		Hostname   string            `json:"Hostname"`
+		StopSignal string            `json:"StopSignal"`
 	} `json:"Config"`
 	HostConfig struct {
 		Binds         []string                 `json:"Binds"`
@@ -85,6 +104,19 @@ type inspectedContainer struct {
 		ExtraHosts    []string                 `json:"ExtraHosts"`
 		DNS           []string                 `json:"Dns"`
 		DNSSearch     []string                 `json:"DnsSearch"`
+		Privileged    bool                     `json:"Privileged"`
+		ReadonlyRootfs bool                    `json:"ReadonlyRootfs"`
+		CapAdd        []string                 `json:"CapAdd"`
+		CapDrop       []string                 `json:"CapDrop"`
+		SecurityOpt   []string                 `json:"SecurityOpt"`
+		Memory        int64                    `json:"Memory"`
+		NanoCPUs      int64                    `json:"NanoCpus"`
+		CPUShares     int64                    `json:"CpuShares"`
+		PidsLimit     *int64                   `json:"PidsLimit"`
+		Tmpfs         map[string]string        `json:"Tmpfs"`
+		LogConfig     logConfig                `json:"LogConfig"`
+		Devices       []deviceMapping          `json:"Devices"`
+		Ulimits       []ulimitInfo             `json:"Ulimits"`
 	} `json:"HostConfig"`
 	Mounts []mountInfo `json:"Mounts"`
 	NetworkSettings struct {
@@ -481,11 +513,21 @@ func (m *manager) replaceContainer(image, version string, started time.Time) err
 		return restore(fmt.Errorf("could not create replacement service: %w", err))
 	}
 
-	for network := range inspection.NetworkSettings.Networks {
+	for network, endpoint := range inspection.NetworkSettings.Networks {
 		if network == inspection.HostConfig.NetworkMode || network == "bridge" || network == "default" {
 			continue
 		}
-		_, _ = runDocker("network", "connect", network, m.target)
+		args := []string{"network", "connect"}
+		seen := map[string]struct{}{}
+		for _, alias := range endpoint.Aliases {
+			alias = strings.TrimSpace(alias)
+			if alias == "" || alias == m.target { continue }
+			if _, exists := seen[alias]; exists { continue }
+			seen[alias] = struct{}{}
+			args = append(args, "--alias", alias)
+		}
+		args = append(args, network, m.target)
+		_, _ = runDocker(args...)
 	}
 
 	m.updateProgress("replacing", "Starting updated version", "Starting updated version", 94)
@@ -577,6 +619,62 @@ func createArgs(name, image string, inspected *inspectedContainer) []string {
 	}
 	if inspected.Config.WorkingDir != "" {
 		args = append(args, "--workdir", inspected.Config.WorkingDir)
+	}
+	if inspected.Config.Hostname != "" {
+		args = append(args, "--hostname", inspected.Config.Hostname)
+	}
+	if inspected.Config.StopSignal != "" {
+		args = append(args, "--stop-signal", inspected.Config.StopSignal)
+	}
+	for key, value := range inspected.Config.Labels {
+		args = append(args, "--label", key+"="+value)
+	}
+	if inspected.HostConfig.Privileged {
+		args = append(args, "--privileged")
+	}
+	if inspected.HostConfig.ReadonlyRootfs {
+		args = append(args, "--read-only")
+	}
+	for _, value := range inspected.HostConfig.CapAdd {
+		args = append(args, "--cap-add", value)
+	}
+	for _, value := range inspected.HostConfig.CapDrop {
+		args = append(args, "--cap-drop", value)
+	}
+	for _, value := range inspected.HostConfig.SecurityOpt {
+		args = append(args, "--security-opt", value)
+	}
+	if inspected.HostConfig.Memory > 0 {
+		args = append(args, "--memory", strconv.FormatInt(inspected.HostConfig.Memory, 10))
+	}
+	if inspected.HostConfig.NanoCPUs > 0 {
+		cpus := strconv.FormatFloat(float64(inspected.HostConfig.NanoCPUs)/1e9, 'f', -1, 64)
+		args = append(args, "--cpus", cpus)
+	}
+	if inspected.HostConfig.CPUShares > 0 {
+		args = append(args, "--cpu-shares", strconv.FormatInt(inspected.HostConfig.CPUShares, 10))
+	}
+	if inspected.HostConfig.PidsLimit != nil && *inspected.HostConfig.PidsLimit > 0 {
+		args = append(args, "--pids-limit", strconv.FormatInt(*inspected.HostConfig.PidsLimit, 10))
+	}
+	for destination, options := range inspected.HostConfig.Tmpfs {
+		value := destination
+		if strings.TrimSpace(options) != "" { value += ":" + options }
+		args = append(args, "--tmpfs", value)
+	}
+	if inspected.HostConfig.LogConfig.Type != "" && inspected.HostConfig.LogConfig.Type != "json-file" {
+		args = append(args, "--log-driver", inspected.HostConfig.LogConfig.Type)
+	}
+	for key, value := range inspected.HostConfig.LogConfig.Config {
+		args = append(args, "--log-opt", key+"="+value)
+	}
+	for _, device := range inspected.HostConfig.Devices {
+		value := device.PathOnHost + ":" + device.PathInContainer
+		if device.CgroupPermissions != "" { value += ":" + device.CgroupPermissions }
+		args = append(args, "--device", value)
+	}
+	for _, limit := range inspected.HostConfig.Ulimits {
+		args = append(args, "--ulimit", fmt.Sprintf("%s=%d:%d", limit.Name, limit.Soft, limit.Hard))
 	}
 
 	args = append(args, image)
