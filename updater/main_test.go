@@ -1,6 +1,10 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -20,6 +24,19 @@ func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 	inspected.HostConfig.ExtraHosts = []string{"example.local:192.0.2.10"}
 	inspected.HostConfig.DNS = []string{"1.1.1.1"}
 	inspected.HostConfig.DNSSearch = []string{"example.local"}
+	inspected.HostConfig.Memory = 536870912
+	inspected.HostConfig.NanoCpus = 1500000000
+	inspected.HostConfig.CPUShares = 512
+	inspected.HostConfig.CPUSetCPUs = "0-1"
+	inspected.HostConfig.CapAdd = []string{"NET_ADMIN"}
+	inspected.HostConfig.CapDrop = []string{"MKNOD"}
+	inspected.HostConfig.SecurityOpt = []string{"no-new-privileges:true"}
+	inspected.HostConfig.ReadonlyRootfs = true
+	inspected.HostConfig.Tmpfs = map[string]string{"/tmp": "rw,noexec"}
+	inspected.HostConfig.LogConfig = logConfig{Type: "local", Config: map[string]string{"max-size": "10m"}}
+	inspected.HostConfig.Devices = []deviceMapping{{PathOnHost:"/dev/null",PathInContainer:"/dev/test",CgroupPermissions:"r"}}
+	inspected.HostConfig.PidsLimit = func() *int64 { value := int64(256); return &value }()
+	inspected.HostConfig.ShmSize = 67108864
 
 	args := createArgs("gotify-mu", "gotify-mu:release-0.2.2", inspected)
 
@@ -36,6 +53,19 @@ func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 		{"--dns-search", "example.local"},
 		{"--user", "1000:1000"},
 		{"--workdir", "/app"},
+		{"--memory", "536870912"},
+		{"--cpus", "1.500"},
+		{"--cpu-shares", "512"},
+		{"--cpuset-cpus", "0-1"},
+		{"--cap-add", "NET_ADMIN"},
+		{"--cap-drop", "MKNOD"},
+		{"--security-opt", "no-new-privileges:true"},
+		{"--tmpfs", "/tmp:rw,noexec"},
+		{"--log-driver", "local"},
+		{"--log-opt", "max-size=10m"},
+		{"--device", "/dev/null:/dev/test:r"},
+		{"--pids-limit", "256"},
+		{"--shm-size", "67108864"},
 	}
 
 	for _, pair := range expected {
@@ -123,4 +153,53 @@ func containsAdjacent(values []string, first string, rest ...string) bool {
 		}
 	}
 	return false
+}
+
+
+func TestRedactDockerArgsMasksEnvironmentValues(t *testing.T) {
+	args := []string{"create", "--env", "TOKEN=secret-value", "-e", "PASSWORD=hunter2", "--name", "gotify-mu"}
+	got := redactDockerArgs(args)
+	if got[2] != "TOKEN=[masked]" || got[4] != "PASSWORD=[masked]" {
+		t.Fatalf("environment values were not redacted: %v", got)
+	}
+	if args[2] != "TOKEN=secret-value" {
+		t.Fatal("redaction mutated original arguments")
+	}
+}
+
+func TestVerifyChecksum(t *testing.T) {
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "source.zip")
+	if err := os.WriteFile(archive, []byte("release bytes"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	sum := sha256.Sum256([]byte("release bytes"))
+	checksums := filepath.Join(dir, "SHA256SUMS")
+	content := hex.EncodeToString(sum[:]) + "  source.zip\n"
+	if err := os.WriteFile(checksums, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyChecksum(archive, checksums); err != nil {
+		t.Fatalf("valid checksum rejected: %v", err)
+	}
+	if err := os.WriteFile(archive, []byte("tampered"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := verifyChecksum(archive, checksums); err == nil {
+		t.Fatal("tampered archive should fail checksum verification")
+	}
+}
+
+func TestVerifyChecksumSupportsHistoricalSingleEntry(t *testing.T) {
+	dir := t.TempDir()
+	archive := filepath.Join(dir, "source.zip")
+	payload := []byte("release bytes")
+	if err := os.WriteFile(archive, payload, 0o600); err != nil { t.Fatal(err) }
+	sum := sha256.Sum256(payload)
+	checksums := filepath.Join(dir, "SHA256SUMS")
+	content := hex.EncodeToString(sum[:]) + "  /tmp/build/gotify-mu-v0.5.0-source.zip\n"
+	if err := os.WriteFile(checksums, []byte(content), 0o600); err != nil { t.Fatal(err) }
+	if err := verifyChecksum(archive, checksums); err != nil {
+		t.Fatalf("historical single-entry checksum rejected: %v", err)
+	}
 }
