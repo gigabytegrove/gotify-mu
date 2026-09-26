@@ -53,6 +53,7 @@ type AutomationDatabase interface {
 	SaveQuietHoursPolicy(item *model.QuietHoursPolicy) error
 	GetDigestPolicy(userID uint) (*model.DigestPolicy, error)
 	SaveDigestPolicy(item *model.DigestPolicy) error
+	DeleteDigestItems(userID uint) error
 
 	GetEscalationRules() ([]*model.EscalationRule, error)
 	GetEscalationRuleByID(id uint) (*model.EscalationRule, error)
@@ -416,6 +417,9 @@ func (a *AutomationAPI) SaveDigest(ctx *gin.Context) {
 		item.NextRunAt = &next
 	}
 	if !successOrAbort(ctx, 500, a.DB.SaveDigestPolicy(item)) { return }
+	if !params.Enabled {
+		if !successOrAbort(ctx, 500, a.DB.DeleteDigestItems(userID)) { return }
+	}
 	ctx.JSON(200, item)
 }
 
