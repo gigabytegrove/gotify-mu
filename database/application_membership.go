@@ -183,14 +183,14 @@ func (d *GormDatabase) TransferApplicationOwnership(applicationID, newOwnerID ui
 			applicationID,
 			newOwnerID,
 		).First(&membership).Error
-		switch {
-		case err == nil:
+		switch err {
+		case nil:
 			if err := tx.Model(&model.ApplicationMembership{}).
 				Where("application_id = ? AND user_id = ?", applicationID, newOwnerID).
 				Update("auto_assigned", false).Error; err != nil {
 				return err
 			}
-		case err == gorm.ErrRecordNotFound:
+		case gorm.ErrRecordNotFound:
 			membership = model.ApplicationMembership{
 				ApplicationID:        applicationID,
 				UserID:               newOwnerID,
