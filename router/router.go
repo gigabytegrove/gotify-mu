@@ -3,8 +3,9 @@ package router
 import (
 	"fmt"
 	"net/http"
+	"net/url"
 	"path/filepath"
-	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -21,6 +22,7 @@ import (
 	gerror "github.com/gotify/server/v3/error"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/plugin"
+	"github.com/gotify/server/v3/ratelimit"
 	"github.com/gotify/server/v3/ui"
 	"github.com/rs/zerolog/log"
 )
@@ -115,6 +117,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
+	loginLimiter := ratelimit.New(8, time.Minute)
+	webhookIPLimiter := ratelimit.New(120, time.Minute)
+	webhookRouteLimiter := ratelimit.New(600, time.Minute)
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
@@ -143,7 +148,11 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}
 
 	g.Match([]string{"GET", "HEAD"}, "/health", healthHandler.Health)
-	g.POST("/integrations/webhook/:secret", automationHandler.ReceiveWebhook)
+	g.POST("/integrations/webhook/:secret",
+		rateLimitRequest(webhookIPLimiter, func(ctx *gin.Context) string { return "ip:" + ctx.ClientIP() }),
+		rateLimitRequest(webhookRouteLimiter, func(ctx *gin.Context) string { return "route:" + ctx.Param("secret") }),
+		automationHandler.ReceiveWebhook,
+	)
 	g.GET("/swagger", docs.Serve)
 	g.StaticFS("/image", &onlyImageFS{inner: gin.Dir(conf.UploadedImagesDir, false)})
 
@@ -172,7 +181,14 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	g.Group("/user").Use(authentication.OptionalAdmin).POST("", userHandler.CreateUser)
 
-	g.POST("/auth/local/login", sessionHandler.Login)
+	g.POST("/auth/local/login",
+		rateLimitRequest(loginLimiter, func(ctx *gin.Context) string {
+			username, _, _ := ctx.Request.BasicAuth()
+			return "login:" + ctx.ClientIP() + ":" + strings.ToLower(strings.TrimSpace(username))
+		}),
+		auditLoginAttempt(db),
+		sessionHandler.Login,
+	)
 
 	g.OPTIONS("/*any")
 
@@ -413,26 +429,19 @@ func shouldAuditMutation(path string) bool {
 	}
 }
 
-var tokenRegexp = regexp.MustCompile("token=[^&]+")
-
 func accessLogger() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		start := time.Now()
-
-		rawQuery := c.Request.URL.RawQuery
-		path := c.Request.URL.Path
+		originalPath := c.Request.URL.Path
 
 		c.Next()
 
 		clientIP := c.ClientIP()
-		if (clientIP == "127.0.0.1" || clientIP == "::1") && path == "/health" {
+		if (clientIP == "127.0.0.1" || clientIP == "::1") && originalPath == "/health" {
 			return
 		}
 
-		if rawQuery != "" {
-			path = path + "?" + rawQuery
-		}
-		path = tokenRegexp.ReplaceAllString(path, "token=[masked]")
+		path := sanitizeLoggedRequest(c)
 
 		latency := time.Since(start)
 		if latency > time.Minute {
@@ -460,6 +469,69 @@ func accessLogger() gin.HandlerFunc {
 		}
 
 		evt.Msg("HTTP")
+	}
+}
+
+
+var sensitiveQueryKeys = map[string]struct{}{
+	"token": {}, "code": {}, "state": {}, "secret": {}, "key": {}, "api_key": {},
+	"apikey": {}, "password": {}, "pass": {}, "signature": {}, "sig": {},
+	"access_token": {}, "refresh_token": {}, "client_secret": {},
+}
+
+func sanitizeLoggedRequest(ctx *gin.Context) string {
+	path := ctx.Request.URL.Path
+	if strings.HasPrefix(path, "/integrations/webhook/") {
+		path = "/integrations/webhook/[masked]"
+	}
+	query, err := url.ParseQuery(ctx.Request.URL.RawQuery)
+	if err != nil || len(query) == 0 {
+		return path
+	}
+	for key := range query {
+		if _, sensitive := sensitiveQueryKeys[strings.ToLower(key)]; sensitive {
+			query.Set(key, "[masked]")
+		}
+	}
+	return path + "?" + query.Encode()
+}
+
+func rateLimitRequest(limiter *ratelimit.Limiter, key func(*gin.Context) string) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		allowed, resetAt := limiter.Allow(key(ctx))
+		if allowed {
+			ctx.Next()
+			return
+		}
+		retry := time.Until(resetAt)
+		if retry < time.Second {
+			retry = time.Second
+		}
+		ctx.Header("Retry-After", strconv.Itoa(int(retry.Seconds())+1))
+		ctx.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+			"error": "Too many requests. Try again shortly.",
+		})
+	}
+}
+
+func auditLoginAttempt(db *database.GormDatabase) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		username, _, _ := ctx.Request.BasicAuth()
+		ctx.Next()
+		status := ctx.Writer.Status()
+		action := "login_success"
+		if status >= 400 {
+			action = "login_failed"
+		}
+		event := &model.AuditEvent{
+			Username: strings.TrimSpace(username),
+			Action: action,
+			Target: "/auth/local/login",
+			IPAddress: ctx.ClientIP(),
+		}
+		if err := db.CreateAuditEvent(event); err != nil {
+			log.Error().Err(err).Msg("Could not persist authentication audit event")
+		}
 	}
 }
 
