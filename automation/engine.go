@@ -66,6 +66,10 @@ type Database interface {
 	ReleaseAutomationLease(name, owner string) error
 	SaveIntegrationStatus(item *model.IntegrationStatus) error
 	RecordIntegrationEvent(item *model.IntegrationEvent) error
+
+	EnsureAutomationRecipientDispatches(key string, messageID uint, userIDs []uint, now time.Time) error
+	GetAutomationRecipientDispatches(key string) ([]*model.AutomationRecipientDispatch, error)
+	SaveAutomationRecipientDispatch(item *model.AutomationRecipientDispatch) error
 }
 
 // Engine runs scheduled work and persistent native integrations.
@@ -176,24 +180,45 @@ func (e *Engine) storeAndDeliverOnce(msg *model.Message, key string, allowEscala
 	if msg.Date.IsZero() { msg.Date = time.Now() }
 	created, err := e.db.CreateMessageOnce(msg, key)
 	if err != nil { return nil, false, err }
-	external := externalMessage(msg)
-	if !created {
-		return external, false, nil
-	}
+
 	recipients, err := e.db.GetApplicationRecipientUserIDs(msg.ApplicationID)
-	if err != nil { return nil, false, err }
-	for _, userID := range recipients {
-		if err := e.deliver(userID, msg, external); err != nil {
-			log.Error().Err(err).Uint("user_id", userID).Uint("message_id", msg.ID).Msg("Could not apply delivery policy")
-			e.notifier.Notify(userID, external)
+	if err != nil { return nil, created, err }
+	if err := e.db.EnsureAutomationRecipientDispatches(key, msg.ID, recipients, time.Now().UTC()); err != nil {
+		return nil, created, err
+	}
+	dispatches, err := e.db.GetAutomationRecipientDispatches(key)
+	if err != nil { return nil, created, err }
+
+	external := externalMessage(msg)
+	var firstErr error
+	for _, dispatch := range dispatches {
+		if dispatch.Completed { continue }
+		dispatch.Attempts++
+		dispatch.UpdatedAt = time.Now().UTC()
+		if err := e.deliver(dispatch.UserID, msg, external); err != nil {
+			dispatch.LastError = err.Error()
+			if saveErr := e.db.SaveAutomationRecipientDispatch(dispatch); saveErr != nil && firstErr == nil {
+				firstErr = saveErr
+			}
+			if firstErr == nil { firstErr = err }
+			continue
+		}
+		done := time.Now().UTC()
+		dispatch.Completed = true
+		dispatch.CompletedAt = &done
+		dispatch.LastError = ""
+		dispatch.UpdatedAt = done
+		if err := e.db.SaveAutomationRecipientDispatch(dispatch); err != nil && firstErr == nil {
+			firstErr = err
 		}
 	}
-	if allowEscalation {
-		if err := e.queueEscalations(msg); err != nil { return nil, true, err }
-	}
-	return external, true, nil
-}
+	if firstErr != nil { return external, created, firstErr }
 
+	if allowEscalation {
+		if err := e.queueEscalations(msg); err != nil { return external, created, err }
+	}
+	return external, created, nil
+}
 func (e *Engine) publishOnce(applicationID uint, title, message string, priority int, key string) (*model.Message, bool, error) {
 	app, err := e.db.GetApplicationByID(applicationID)
 	if err != nil { return nil, false, err }
