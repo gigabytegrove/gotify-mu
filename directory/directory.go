@@ -19,6 +19,11 @@ import (
 	"github.com/gotify/server/v3/security"
 )
 
+var (
+	ErrInvalidCredentials = errors.New("directory credentials are invalid")
+	ErrUserNotFound = errors.New("directory user was not found")
+)
+
 type Database interface {
 	GetDirectoryConfig() (*model.DirectoryConfig, error)
 	GetUserByName(name string) (*model.User, error)
@@ -53,7 +58,12 @@ func (s *Service) Authenticate(username, plainPassword string) (*model.User, err
 		return nil, errors.New("directory username and password are required")
 	}
 	identity, err := authenticate(config, username, plainPassword)
-	if err != nil { return nil, err }
+	if err != nil {
+		if errors.Is(err, ErrInvalidCredentials) || errors.Is(err, ErrUserNotFound) {
+			return nil, nil
+		}
+		return nil, err
+	}
 
 	user, err := s.DB.GetUserByName(identity.Username)
 	if err != nil { return nil, err }
@@ -112,14 +122,14 @@ func authenticate(config *model.DirectoryConfig, username, plainPassword string)
 	if displayAttribute == "" { displayAttribute = "displayName" }
 	entry, err := client.searchUser(config.UserBaseDN, attribute, username, []string{attribute, displayAttribute, "memberOf"})
 	if err != nil { return nil, err }
-	if entry == nil { return nil, errors.New("directory user was not found") }
+	if entry == nil { return nil, ErrUserNotFound }
 
 	userConn, err := dial(config)
 	if err != nil { return nil, err }
 	defer userConn.Close()
 	userClient := &ldapClient{conn:userConn, reader:bufio.NewReader(userConn), nextID:1}
 	if err := userClient.bind(entry.DN, plainPassword); err != nil {
-		return nil, errors.New("directory credentials are invalid")
+		return nil, ErrInvalidCredentials
 	}
 
 	resolvedUsername := first(entry.Attributes[attribute])
