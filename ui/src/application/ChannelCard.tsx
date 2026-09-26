@@ -68,6 +68,9 @@ const ChannelCard = ({
     fDelete,
 }: IProps) => {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+    const isChat =
+        app.channelType === 'chat' ||
+        (app.channelType == null && Boolean(app.allowMemberPost));
     const {attributes, listeners, setNodeRef, transform, transition, isDragging} = useSortable({
         id: app.id,
         disabled: !canManage,
@@ -145,7 +148,7 @@ const ChannelCard = ({
                         {app.autoAssign && (
                             <Chip size="small" icon={<Public fontSize="small" />} label="Global" />
                         )}
-                        {app.allowMemberPost && (
+                        {isChat && (
                             <Chip
                                 size="small"
                                 variant="outlined"
