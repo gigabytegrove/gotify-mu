@@ -43,6 +43,7 @@ type Database interface {
 	QueueDigestItem(item *model.DigestItem) error
 	GetDigestItems(userID uint) ([]*model.DigestItem, error)
 	DeleteDigestItems(userID uint) error
+	DeleteDigestItemsByIDs(userID uint, ids []uint) error
 	GetDueDigestPolicies(now time.Time) ([]*model.DigestPolicy, error)
 	SaveDigestPolicy(item *model.DigestPolicy) error
 	ClaimDigestPolicy(id uint, owner string, now, until time.Time) (bool, error)
@@ -443,7 +444,11 @@ func (e *Engine) runDigests(now time.Time) {
 		// cannot cause the same digest batch to be sent twice. The underlying
 		// notifications remain in normal message history even if delivery is
 		// interrupted after this point.
-		if err := e.db.DeleteDigestItems(policy.UserID); err != nil {
+		digestIDs := make([]uint, 0, len(items))
+		for _, item := range items {
+			digestIDs = append(digestIDs, item.ID)
+		}
+		if err := e.db.DeleteDigestItemsByIDs(policy.UserID, digestIDs); err != nil {
 			log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not clear digest")
 			continue
 		}
