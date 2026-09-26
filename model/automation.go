@@ -180,3 +180,11 @@ type MessageAcknowledgement struct {
 	MessageID      uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
 	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }
+
+
+type AutomationLease struct {
+	Name       string    `gorm:"primaryKey;size:64" json:"name"`
+	Owner      string    `gorm:"type:varchar(128);index" json:"owner"`
+	LeaseUntil time.Time `gorm:"index" json:"leaseUntil"`
+	UpdatedAt  time.Time `json:"updatedAt"`
+}
