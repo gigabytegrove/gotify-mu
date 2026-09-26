@@ -139,6 +139,10 @@ export interface IWebhookRoute {
     priorityField: string;
     defaultTitle: string;
     defaultPriority: number;
+    requireSignature: boolean;
+    signingSecretConfigured: boolean;
+    allowedCidrs: string;
+    replayWindowSeconds: number;
     createdAt: string;
     updatedAt: string;
 }
@@ -153,6 +157,11 @@ export interface IMQTTIntegration {
     passwordConfigured: boolean;
     topic: string;
     enabled: boolean;
+    state?: string;
+    statusMessage?: string;
+    lastConnectedAt?: string;
+    lastMessageAt?: string;
+    lastErrorAt?: string;
     createdAt: string;
     updatedAt: string;
 }
@@ -165,6 +174,11 @@ export interface IHomeAssistantIntegration {
     tokenConfigured: boolean;
     eventType: string;
     enabled: boolean;
+    state?: string;
+    statusMessage?: string;
+    lastConnectedAt?: string;
+    lastMessageAt?: string;
+    lastErrorAt?: string;
     createdAt: string;
     updatedAt: string;
 }
