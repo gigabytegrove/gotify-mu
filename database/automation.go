@@ -1,6 +1,7 @@
 package database
 
 import (
+	"crypto/subtle"
 	"time"
 
 	"github.com/gotify/server/v3/model"
@@ -10,7 +11,17 @@ import (
 
 func (d *GormDatabase) GetWebhookRoutes() ([]*model.WebhookRoute, error) {
 	var items []*model.WebhookRoute
-	return items, d.DB.Order("name asc, id asc").Find(&items).Error
+	if err := d.DB.Order("name asc, id asc").Find(&items).Error; err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		plain, err := d.decryptCredential(item.Secret)
+		if err != nil {
+			return nil, err
+		}
+		item.Secret = plain
+	}
+	return items, nil
 }
 
 func (d *GormDatabase) GetWebhookRouteByID(id uint) (*model.WebhookRoute, error) {
@@ -19,24 +30,60 @@ func (d *GormDatabase) GetWebhookRouteByID(id uint) (*model.WebhookRoute, error)
 		if err == gorm.ErrRecordNotFound { return nil, nil }
 		return nil, err
 	}
+	plain, err := d.decryptCredential(item.Secret)
+	if err != nil {
+		return nil, err
+	}
+	item.Secret = plain
 	return item, nil
 }
 
 func (d *GormDatabase) GetWebhookRouteBySecret(secret string) (*model.WebhookRoute, error) {
 	item := new(model.WebhookRoute)
-	if err := d.DB.Where("secret = ? AND enabled = ?", secret, true).First(item).Error; err != nil {
+	if err := d.DB.Where("secret_hash = ? AND enabled = ?", hashWebhookSecret(secret), true).First(item).Error; err != nil {
 		if err == gorm.ErrRecordNotFound { return nil, nil }
 		return nil, err
 	}
+	plain, err := d.decryptCredential(item.Secret)
+	if err != nil {
+		return nil, err
+	}
+	if subtle.ConstantTimeCompare([]byte(plain), []byte(secret)) != 1 {
+		return nil, nil
+	}
+	item.Secret = plain
 	return item, nil
 }
 
-func (d *GormDatabase) SaveWebhookRoute(item *model.WebhookRoute) error { return d.DB.Save(item).Error }
+func (d *GormDatabase) SaveWebhookRoute(item *model.WebhookRoute) error {
+	copyItem := *item
+	copyItem.SecretHash = hashWebhookSecret(item.Secret)
+	encrypted, err := d.encryptCredential(item.Secret)
+	if err != nil {
+		return err
+	}
+	copyItem.Secret = encrypted
+	if err := d.DB.Save(&copyItem).Error; err != nil {
+		return err
+	}
+	item.ID, item.CreatedAt, item.UpdatedAt, item.SecretHash = copyItem.ID, copyItem.CreatedAt, copyItem.UpdatedAt, copyItem.SecretHash
+	return nil
+}
 func (d *GormDatabase) DeleteWebhookRoute(id uint) error { return d.DB.Delete(&model.WebhookRoute{}, id).Error }
 
 func (d *GormDatabase) GetMQTTIntegrations() ([]*model.MQTTIntegration, error) {
 	var items []*model.MQTTIntegration
-	return items, d.DB.Order("name asc, id asc").Find(&items).Error
+	if err := d.DB.Order("name asc, id asc").Find(&items).Error; err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		plain, err := d.decryptCredential(item.Password)
+		if err != nil {
+			return nil, err
+		}
+		item.Password = plain
+	}
+	return items, nil
 }
 func (d *GormDatabase) GetMQTTIntegrationByID(id uint) (*model.MQTTIntegration, error) {
 	item := new(model.MQTTIntegration)
@@ -44,14 +91,41 @@ func (d *GormDatabase) GetMQTTIntegrationByID(id uint) (*model.MQTTIntegration, 
 		if err == gorm.ErrRecordNotFound { return nil, nil }
 		return nil, err
 	}
+	plain, err := d.decryptCredential(item.Password)
+	if err != nil {
+		return nil, err
+	}
+	item.Password = plain
 	return item, nil
 }
-func (d *GormDatabase) SaveMQTTIntegration(item *model.MQTTIntegration) error { return d.DB.Save(item).Error }
+func (d *GormDatabase) SaveMQTTIntegration(item *model.MQTTIntegration) error {
+	copyItem := *item
+	encrypted, err := d.encryptCredential(item.Password)
+	if err != nil {
+		return err
+	}
+	copyItem.Password = encrypted
+	if err := d.DB.Save(&copyItem).Error; err != nil {
+		return err
+	}
+	item.ID, item.CreatedAt, item.UpdatedAt = copyItem.ID, copyItem.CreatedAt, copyItem.UpdatedAt
+	return nil
+}
 func (d *GormDatabase) DeleteMQTTIntegration(id uint) error { return d.DB.Delete(&model.MQTTIntegration{}, id).Error }
 
 func (d *GormDatabase) GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error) {
 	var items []*model.HomeAssistantIntegration
-	return items, d.DB.Order("name asc, id asc").Find(&items).Error
+	if err := d.DB.Order("name asc, id asc").Find(&items).Error; err != nil {
+		return nil, err
+	}
+	for _, item := range items {
+		plain, err := d.decryptCredential(item.Token)
+		if err != nil {
+			return nil, err
+		}
+		item.Token = plain
+	}
+	return items, nil
 }
 func (d *GormDatabase) GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error) {
 	item := new(model.HomeAssistantIntegration)
@@ -59,9 +133,26 @@ func (d *GormDatabase) GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssi
 		if err == gorm.ErrRecordNotFound { return nil, nil }
 		return nil, err
 	}
+	plain, err := d.decryptCredential(item.Token)
+	if err != nil {
+		return nil, err
+	}
+	item.Token = plain
 	return item, nil
 }
-func (d *GormDatabase) SaveHomeAssistantIntegration(item *model.HomeAssistantIntegration) error { return d.DB.Save(item).Error }
+func (d *GormDatabase) SaveHomeAssistantIntegration(item *model.HomeAssistantIntegration) error {
+	copyItem := *item
+	encrypted, err := d.encryptCredential(item.Token)
+	if err != nil {
+		return err
+	}
+	copyItem.Token = encrypted
+	if err := d.DB.Save(&copyItem).Error; err != nil {
+		return err
+	}
+	item.ID, item.CreatedAt, item.UpdatedAt = copyItem.ID, copyItem.CreatedAt, copyItem.UpdatedAt
+	return nil
+}
 func (d *GormDatabase) DeleteHomeAssistantIntegration(id uint) error { return d.DB.Delete(&model.HomeAssistantIntegration{}, id).Error }
 
 func (d *GormDatabase) GetScheduledNotifications() ([]*model.ScheduledNotification, error) {
