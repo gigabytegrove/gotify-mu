@@ -319,6 +319,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		})
 	})
 
+	g.GET("/application/current", authentication.RequireApplicationToken, applicationHandler.GetCurrentApplication)
+
 	g.Group("/").Use(authentication.RequireApplicationOrClient).POST("/message", messageHandler.CreateMessage)
 
 	clientAuth := g.Group("")
