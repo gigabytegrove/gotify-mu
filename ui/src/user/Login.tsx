@@ -170,8 +170,11 @@ const Login = observer(() => {
                             variant="outlined"
                             label={`@${config.get('version').version}`}
                         />
-                        {passwordSignInEnabled && (
-                            <Chip size="small" variant="outlined" label="Local auth" />
+                        {localAuthEnabled && (
+                            <Chip size="small" variant="outlined" label="Local account" />
+                        )}
+                        {directoryEnabled && (
+                            <Chip size="small" variant="outlined" label="Directory" />
                         )}
                         {oidcEnabled && (
                             <Chip size="small" variant="outlined" label={oidcIdpName} />
