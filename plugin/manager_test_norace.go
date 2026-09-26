@@ -2,4 +2,6 @@
 
 package plugin
 
-//nolint:unused // Used by manager_test.go when tests are compiled.\nvar extraGoBuildFlags = []string{}
+var extraGoBuildFlags = []string{}
+
+var _ = extraGoBuildFlags
