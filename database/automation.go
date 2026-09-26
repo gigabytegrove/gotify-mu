@@ -235,7 +235,12 @@ func (d *GormDatabase) GetScheduledNotificationByID(id uint) (*model.ScheduledNo
 	return item, nil
 }
 func (d *GormDatabase) SaveScheduledNotification(item *model.ScheduledNotification) error { return d.DB.Save(item).Error }
-func (d *GormDatabase) DeleteScheduledNotification(id uint) error { return d.DB.Delete(&model.ScheduledNotification{}, id).Error }
+func (d *GormDatabase) DeleteScheduledNotification(id uint) error {
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("schedule_id = ?", id).Delete(&model.ScheduleRun{}).Error; err != nil { return err }
+		return tx.Delete(&model.ScheduledNotification{}, id).Error
+	})
+}
 func (d *GormDatabase) GetDueScheduledNotifications(now time.Time) ([]*model.ScheduledNotification, error) {
 	var items []*model.ScheduledNotification
 	return items, d.DB.Where("enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ?", true, now).Find(&items).Error
@@ -459,4 +464,23 @@ func (d *GormDatabase) DeleteDeferredNotification(userID, messageID uint) error 
 
 func (d *GormDatabase) DeleteDeferredNotifications(userID uint) error {
 	return d.DB.Where("user_id = ?", userID).Delete(&model.DeferredNotification{}).Error
+}
+
+
+func (d *GormDatabase) SaveScheduleRun(item *model.ScheduleRun) error {
+	return d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"schedule_id"},{Name:"scheduled_for"}},
+		DoUpdates: clause.AssignmentColumns([]string{"message_id","status","error","started_at","finished_at"}),
+	}).Create(item).Error
+}
+
+func (d *GormDatabase) GetScheduleRuns(scheduleID uint, limit int) ([]*model.ScheduleRun, error) {
+	if limit <= 0 || limit > 500 { limit = 100 }
+	var items []*model.ScheduleRun
+	return items, d.DB.Where("schedule_id = ?", scheduleID).
+		Order("scheduled_for desc").Limit(limit).Find(&items).Error
+}
+
+func (d *GormDatabase) DeleteScheduleRunsBefore(before time.Time) error {
+	return d.DB.Where("scheduled_for < ?", before).Delete(&model.ScheduleRun{}).Error
 }
