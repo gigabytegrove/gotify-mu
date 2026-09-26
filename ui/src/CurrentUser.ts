@@ -58,7 +58,7 @@ export class CurrentUser {
         axios
             .create()
             .request({
-                url: config.get('url') + 'auth/local/login',
+                url: config.get('url') + 'auth/login',
                 method: 'POST',
                 data: {name},
                 headers: {
