@@ -280,8 +280,30 @@ const Integrations = () => {
                                 lastActivityLabel="Last event"
                                 lastError={item.lastError}
                                 reconnectCount={item.reconnectCount}>
+                                {item.connectionMode === 'integration' && (
+                                    <Chip
+                                        size="small"
+                                        variant="outlined"
+                                        label={item.nativePaired ? 'Native integration paired' : 'Waiting for Home Assistant pairing'}
+                                    />
+                                )}
+                                {item.connectionMode === 'integration' && !item.nativePaired && (
+                                    <Button
+                                        size="small"
+                                        onClick={async () => {
+                                            const response = await axios.post<IHomeAssistantIntegration & {pairingCode: string}>(
+                                                api(`integration/home-assistant/${item.id}/pairing`)
+                                            );
+                                            await navigator.clipboard.writeText(response.data.pairingCode);
+                                            snackManager.snack('Home Assistant pairing code copied');
+                                            await refresh();
+                                        }}>
+                                        Copy Pairing Code
+                                    </Button>
+                                )}
                                 <Button
                                     size="small"
+                                    disabled={item.connectionMode === 'integration' && !item.nativePaired}
                                     onClick={async () => {
                                         await axios.post(
                                             api('integration/home-assistant/' + item.id + '/event'),
@@ -864,8 +886,12 @@ const HomeAssistantDialog = ({
     onClose: VoidFunction;
     onSaved: () => Promise<void>;
 }) => {
+    const {snackManager} = useStores();
     const [name, setName] = React.useState(item?.name || 'Home Assistant');
     const [applicationId, setApplicationId] = React.useState(item?.applicationId || 0);
+    const [connectionMode, setConnectionMode] = React.useState<'token' | 'integration'>(
+        item?.connectionMode || 'token'
+    );
     const [baseUrl, setBaseUrl] = React.useState(item?.baseUrl || 'http://');
     const [token, setToken] = React.useState('');
     const [eventType, setEventType] = React.useState(item?.eventType || '');
@@ -878,11 +904,29 @@ const HomeAssistantDialog = ({
     const save = async () => {
         setSaving(true);
         try {
-            const payload = {name, applicationId, baseUrl, token, eventType, entityIds, dataField, dataValue, enabled};
+            const payload = {
+                name,
+                applicationId,
+                connectionMode,
+                baseUrl: connectionMode === 'token' ? baseUrl : '',
+                token: connectionMode === 'token' ? token : '',
+                eventType,
+                entityIds,
+                dataField,
+                dataValue,
+                enabled,
+            };
             if (item) {
                 await axios.put(api(`integration/home-assistant/${item.id}`), payload);
             } else {
-                await axios.post(api('integration/home-assistant'), payload);
+                const response = await axios.post<IHomeAssistantIntegration & {pairingCode?: string}>(
+                    api('integration/home-assistant'),
+                    payload
+                );
+                if (connectionMode === 'integration' && response.data.pairingCode) {
+                    await navigator.clipboard.writeText(response.data.pairingCode);
+                    snackManager.snack('Home Assistant pairing code copied');
+                }
             }
             await onSaved();
         } finally {
@@ -898,19 +942,39 @@ const HomeAssistantDialog = ({
                     <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
                     <ChannelSelect value={applicationId} onChange={setApplicationId} channels={channels} />
                     <TextField
-                        label="Home Assistant URL"
-                        value={baseUrl}
-                        onChange={(e) => setBaseUrl(e.target.value)}
-                        placeholder="http://homeassistant.local:8123"
-                        required
-                    />
-                    <TextField
-                        label={item?.tokenConfigured ? 'New access token' : 'Long-lived access token'}
-                        type="password"
-                        value={token}
-                        onChange={(e) => setToken(e.target.value)}
-                        helperText={item?.tokenConfigured ? 'Leave blank to keep the current token.' : ''}
-                    />
+                        select
+                        label="Connection method"
+                        value={connectionMode}
+                        onChange={(e) => setConnectionMode(e.target.value as 'token' | 'integration')}>
+                        <MenuItem value="integration">Gotify MU Home Assistant Integration</MenuItem>
+                        <MenuItem value="token">Long-Lived Access Token</MenuItem>
+                    </TextField>
+
+                    {connectionMode === 'integration' ? (
+                        <Alert severity="info">
+                            Use the Gotify MU custom integration in Home Assistant. Saving copies a one-time
+                            pairing code. Paste that code into the Gotify MU integration in Home Assistant.
+                            No Home Assistant Long-Lived Access Token is required.
+                        </Alert>
+                    ) : (
+                        <>
+                            <TextField
+                                label="Home Assistant URL"
+                                value={baseUrl}
+                                onChange={(e) => setBaseUrl(e.target.value)}
+                                placeholder="http://homeassistant.local:8123"
+                                required
+                            />
+                            <TextField
+                                label={item?.tokenConfigured ? 'New access token' : 'Long-Lived Access Token'}
+                                type="password"
+                                value={token}
+                                onChange={(e) => setToken(e.target.value)}
+                                helperText={item?.tokenConfigured ? 'Leave blank to keep the current token.' : ''}
+                            />
+                        </>
+                    )}
+
                     <TextField
                         label="Event type"
                         value={eventType}
@@ -952,8 +1016,8 @@ const HomeAssistantDialog = ({
                         saving ||
                         !name ||
                         !applicationId ||
-                        !baseUrl ||
-                        (!item?.tokenConfigured && !token)
+                        (connectionMode === 'token' &&
+                            (!baseUrl || (!item?.tokenConfigured && !token)))
                     }
                     onClick={() => void save()}>
                     Save
