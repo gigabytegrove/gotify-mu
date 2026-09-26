@@ -171,7 +171,7 @@ func (d *GormDatabase) SaveScheduledNotification(item *model.ScheduledNotificati
 func (d *GormDatabase) DeleteScheduledNotification(id uint) error { return d.DB.Delete(&model.ScheduledNotification{}, id).Error }
 func (d *GormDatabase) GetDueScheduledNotifications(now time.Time) ([]*model.ScheduledNotification, error) {
 	var items []*model.ScheduledNotification
-	return items, d.DB.Where("enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ?", true, now).Find(&items).Error
+	return items, d.DB.Where("enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ? AND (claim_until IS NULL OR claim_until <= ?)", true, now, now).Find(&items).Error
 }
 
 func (d *GormDatabase) GetQuietHoursPolicy(userID uint) (*model.QuietHoursPolicy, error) {
@@ -213,7 +213,7 @@ func (d *GormDatabase) GetDigestItems(userID uint) ([]*model.DigestItem, error) 
 func (d *GormDatabase) DeleteDigestItems(userID uint) error { return d.DB.Where("user_id = ?", userID).Delete(&model.DigestItem{}).Error }
 func (d *GormDatabase) GetDueDigestPolicies(now time.Time) ([]*model.DigestPolicy, error) {
 	var items []*model.DigestPolicy
-	return items, d.DB.Where("enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ?", true, now).Find(&items).Error
+	return items, d.DB.Where("enabled = ? AND next_run_at IS NOT NULL AND next_run_at <= ? AND (claim_until IS NULL OR claim_until <= ?)", true, now, now).Find(&items).Error
 }
 
 func (d *GormDatabase) GetEscalationRules() ([]*model.EscalationRule, error) {
@@ -244,7 +244,7 @@ func (d *GormDatabase) QueueEscalation(item *model.EscalationState) error {
 }
 func (d *GormDatabase) GetDueEscalations(now time.Time) ([]*model.EscalationState, error) {
 	var items []*model.EscalationState
-	return items, d.DB.Where("completed = ? AND due_at <= ?", false, now).Find(&items).Error
+	return items, d.DB.Where("completed = ? AND due_at <= ? AND (claim_until IS NULL OR claim_until <= ?)", false, now, now).Find(&items).Error
 }
 func (d *GormDatabase) SaveEscalationState(item *model.EscalationState) error { return d.DB.Save(item).Error }
 
@@ -269,4 +269,49 @@ func (d *GormDatabase) IsMessageAcknowledged(messageID uint) (bool, error) {
 }
 func (d *GormDatabase) DeleteMessageAcknowledgements(messageID uint) error {
 	return d.DB.Where("message_id = ?", messageID).Delete(&model.MessageAcknowledgement{}).Error
+}
+
+
+func (d *GormDatabase) ClaimScheduledNotification(id uint, owner string, now, until time.Time) (bool, error) {
+	result := d.DB.Model(&model.ScheduledNotification{}).
+		Where("id = ? AND (claim_until IS NULL OR claim_until <= ? OR claim_owner = ?)", id, now, owner).
+		Updates(map[string]any{"claim_owner": owner, "claim_until": until})
+	return result.RowsAffected == 1, result.Error
+}
+
+func (d *GormDatabase) ClaimDigestPolicy(id uint, owner string, now, until time.Time) (bool, error) {
+	result := d.DB.Model(&model.DigestPolicy{}).
+		Where("id = ? AND (claim_until IS NULL OR claim_until <= ? OR claim_owner = ?)", id, now, owner).
+		Updates(map[string]any{"claim_owner": owner, "claim_until": until})
+	return result.RowsAffected == 1, result.Error
+}
+
+func (d *GormDatabase) ClaimEscalation(id uint, owner string, now, until time.Time) (bool, error) {
+	result := d.DB.Model(&model.EscalationState{}).
+		Where("id = ? AND completed = ? AND (claim_until IS NULL OR claim_until <= ? OR claim_owner = ?)", id, false, now, owner).
+		Updates(map[string]any{"claim_owner": owner, "claim_until": until})
+	return result.RowsAffected == 1, result.Error
+}
+
+func (d *GormDatabase) AcquireAutomationLease(name, owner string, now, until time.Time) (bool, error) {
+	result := d.DB.Model(&model.AutomationLease{}).
+		Where("name = ? AND (expires_at <= ? OR owner = ?)", name, now, owner).
+		Updates(map[string]any{"owner": owner, "expires_at": until, "updated_at": now})
+	if result.Error != nil {
+		return false, result.Error
+	}
+	if result.RowsAffected == 1 {
+		return true, nil
+	}
+
+	lease := &model.AutomationLease{Name: name, Owner: owner, ExpiresAt: until, UpdatedAt: now}
+	result = d.DB.Clauses(clause.OnConflict{DoNothing: true}).Create(lease)
+	if result.Error != nil {
+		return false, result.Error
+	}
+	return result.RowsAffected == 1, nil
+}
+
+func (d *GormDatabase) ReleaseAutomationLease(name, owner string) error {
+	return d.DB.Where("name = ? AND owner = ?", name, owner).Delete(&model.AutomationLease{}).Error
 }
