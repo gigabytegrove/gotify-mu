@@ -58,10 +58,13 @@ Edit `.env` and set at minimum:
 
 ```env
 GOTIFY_MU_PORT=8080
+GOTIFY_MU_DATA_DIR=./data
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
 GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
+
+For an existing installation, set `GOTIFY_MU_DATA_DIR` to the exact host directory already mounted at `/app/data`. Do not change that path during an upgrade. Compose also loads `.env` into the application container so existing `GOTIFY_*` runtime settings can be preserved instead of silently reverting to defaults.
 
 Build with the full server test suite enabled:
 
