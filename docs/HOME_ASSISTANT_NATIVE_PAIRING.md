@@ -134,7 +134,9 @@ The HA webhook handler must compare the Bearer credential to the stored shared s
 - Do not execute arbitrary Home Assistant services from bridge payloads.
 - Native inbound bridge payloads may fire Home Assistant events only.
 - Preserve LLT mode in Gotify MU as a fully supported fallback.
-\n\n## Native unpair / revoke
+
+
+## Native unpair / revoke
 
 Home Assistant removes native pairing by revoking the shared bridge credential on Gotify MU before deleting its local copy:
 
@@ -154,4 +156,4 @@ Regenerating a pairing code for an already paired connection does not tear down 
 - HTTP 400, 401, or 404 from the pairing endpoint indicates an invalid or no-longer-valid pairing code; HTTP 410 indicates expiration.
 - A paired client should expose bridge health separately from simple credential presence.
 - HTTP 401/403 from the native event endpoint means the shared credential is no longer valid and should surface as repair required.
-- Transient event-delivery failures should use bounded retry/backoff rather than silently dropping the first failed event.\n
+- Transient event-delivery failures should use bounded retry/backoff rather than silently dropping the first failed event.
