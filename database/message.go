@@ -8,25 +8,46 @@ import (
 
 
 func (d *GormDatabase) markAcknowledged(userID uint, messages []*model.Message) error {
-	if len(messages) == 0 {
-		return nil
-	}
+	if len(messages) == 0 { return nil }
 	ids := make([]uint, 0, len(messages))
-	for _, message := range messages {
-		ids = append(ids, message.ID)
-	}
-	var acknowledged []uint
+	for _, message := range messages { ids = append(ids, message.ID) }
+
+	var mine []uint
 	if err := d.DB.Model(&model.MessageAcknowledgement{}).
 		Where("user_id = ? AND message_id IN ?", userID, ids).
-		Pluck("message_id", &acknowledged).Error; err != nil {
+		Pluck("message_id", &mine).Error; err != nil {
 		return err
 	}
-	set := make(map[uint]struct{}, len(acknowledged))
-	for _, id := range acknowledged {
-		set[id] = struct{}{}
+	mineSet := make(map[uint]struct{}, len(mine))
+	for _, id := range mine { mineSet[id] = struct{}{} }
+
+	type ackRow struct {
+		MessageID   uint
+		Name        string
+		DisplayName string
+	}
+	var rows []ackRow
+	if err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.message_id, users.name, users.display_name").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id IN ?", ids).
+		Order("ma.acknowledged_at asc").
+		Scan(&rows).Error; err != nil {
+		return err
+	}
+	firstName := make(map[uint]string)
+	counts := make(map[uint]int)
+	for _, row := range rows {
+		counts[row.MessageID]++
+		if _, exists := firstName[row.MessageID]; !exists {
+			if row.DisplayName != "" { firstName[row.MessageID] = row.DisplayName } else { firstName[row.MessageID] = row.Name }
+		}
 	}
 	for _, message := range messages {
-		_, message.Acknowledged = set[message.ID]
+		_, message.Acknowledged = mineSet[message.ID]
+		message.AcknowledgedCount = counts[message.ID]
+		message.AcknowledgedByAnyone = counts[message.ID] > 0
+		message.AcknowledgedByName = firstName[message.ID]
 	}
 	return nil
 }
