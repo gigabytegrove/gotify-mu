@@ -180,3 +180,12 @@ type MessageAcknowledgement struct {
 	MessageID      uint      `gorm:"primaryKey;autoIncrement:false;index" json:"messageId"`
 	AcknowledgedAt time.Time `json:"acknowledgedAt"`
 }
+
+
+// AutomationLease coordinates scheduled/integration work across multiple Gotify MU instances.
+type AutomationLease struct {
+	Name      string    `gorm:"primaryKey;type:varchar(80)" json:"name"`
+	Owner     string    `gorm:"type:varchar(80);index" json:"owner"`
+	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
+	UpdatedAt time.Time `json:"updatedAt"`
+}
