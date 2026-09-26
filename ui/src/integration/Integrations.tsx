@@ -25,6 +25,7 @@ import Sensors from '@mui/icons-material/Sensors';
 import Home from '@mui/icons-material/Home';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
+import ConfirmDialog from '../common/ConfirmDialog';
 import * as config from '../config';
 import {useStores} from '../stores';
 import {
@@ -47,6 +48,11 @@ const Integrations = () => {
     const [homeAssistant, setHomeAssistant] = React.useState<IHomeAssistantIntegration[]>([]);
     const [loading, setLoading] = React.useState(true);
     const [webhookSigningSecret, setWebhookSigningSecret] = React.useState<string>();
+    const [confirm, setConfirm] = React.useState<{
+        title: string;
+        text: string;
+        action: () => void;
+    }>();
     const [webhookEdit, setWebhookEdit] = React.useState<IWebhookRoute | null | undefined>();
     const [mqttEdit, setMqttEdit] = React.useState<IMQTTIntegration | null | undefined>();
     const [homeAssistantEdit, setHomeAssistantEdit] =
@@ -154,30 +160,46 @@ const Integrations = () => {
                                     <Button
                                         size="small"
                                         startIcon={<Refresh />}
-                                        onClick={async () => {
-                                            await axios.post(
-                                                api(`integration/webhook/${item.id}/regenerate`)
-                                            );
-                                            await refresh();
-                                            snackManager.snack('Webhook URL regenerated');
-                                        }}>
+                                        onClick={() =>
+                                            setConfirm({
+                                                title: 'Regenerate Webhook URL?',
+                                                text: 'The current webhook URL will stop working immediately.',
+                                                action: () => {
+                                                    void (async () => {
+                                                        await axios.post(
+                                                            api(`integration/webhook/${item.id}/regenerate`)
+                                                        );
+                                                        await refresh();
+                                                        snackManager.snack('Webhook URL regenerated');
+                                                    })();
+                                                },
+                                            })
+                                        }>
                                         Regenerate URL
                                     </Button>
                                     {item.requireSignature && (
                                         <Button
                                             size="small"
-                                            onClick={async () => {
-                                                const response = await axios.post<{
-                                                    webhook: IWebhookRoute;
-                                                    signingSecret: string;
-                                                }>(
-                                                    api(
-                                                        `integration/webhook/${item.id}/signing-secret/regenerate`
-                                                    )
-                                                );
-                                                setWebhookSigningSecret(response.data.signingSecret);
-                                                await refresh();
-                                            }}>
+                                            onClick={() =>
+                                                setConfirm({
+                                                    title: 'Rotate Signing Secret?',
+                                                    text: 'Requests signed with the current secret will stop working immediately.',
+                                                    action: () => {
+                                                        void (async () => {
+                                                            const response = await axios.post<{
+                                                                webhook: IWebhookRoute;
+                                                                signingSecret: string;
+                                                            }>(
+                                                                api(
+                                                                    `integration/webhook/${item.id}/signing-secret/regenerate`
+                                                                )
+                                                            );
+                                                            setWebhookSigningSecret(response.data.signingSecret);
+                                                            await refresh();
+                                                        })();
+                                                    },
+                                                })
+                                            }>
                                             Rotate Signing Secret
                                         </Button>
                                     )}
@@ -185,11 +207,18 @@ const Integrations = () => {
                             </Stack>
                         ),
                         onEdit: () => setWebhookEdit(item),
-                        onDelete: async () => {
-                            await axios.delete(api(`integration/webhook/${item.id}`));
-                            await refresh();
-                            snackManager.snack('Webhook deleted');
-                        },
+                        onDelete: async () =>
+                            setConfirm({
+                                title: 'Delete Webhook?',
+                                text: 'This webhook URL will stop accepting requests immediately.',
+                                action: () => {
+                                    void (async () => {
+                                        await axios.delete(api(`integration/webhook/${item.id}`));
+                                        await refresh();
+                                        snackManager.snack('Webhook deleted');
+                                    })();
+                                },
+                            }),
                     }))}
                 />
             </SurfaceCard>
@@ -241,11 +270,18 @@ const Integrations = () => {
                             </Stack>
                         ),
                         onEdit: () => setMqttEdit(item),
-                        onDelete: async () => {
-                            await axios.delete(api(`integration/mqtt/${item.id}`));
-                            await refresh();
-                            snackManager.snack('MQTT connection deleted');
-                        },
+                        onDelete: async () =>
+                            setConfirm({
+                                title: 'Delete MQTT Connection?',
+                                text: 'Gotify MU will stop receiving messages from this MQTT subscription.',
+                                action: () => {
+                                    void (async () => {
+                                        await axios.delete(api(`integration/mqtt/${item.id}`));
+                                        await refresh();
+                                        snackManager.snack('MQTT connection deleted');
+                                    })();
+                                },
+                            }),
                     }))}
                 />
             </SurfaceCard>
@@ -302,14 +338,30 @@ const Integrations = () => {
                             </Stack>
                         ),
                         onEdit: () => setHomeAssistantEdit(item),
-                        onDelete: async () => {
-                            await axios.delete(api(`integration/home-assistant/${item.id}`));
-                            await refresh();
-                            snackManager.snack('Home Assistant connection deleted');
-                        },
+                        onDelete: async () =>
+                            setConfirm({
+                                title: 'Delete Home Assistant Connection?',
+                                text: 'Gotify MU will stop receiving and sending events through this connection.',
+                                action: () => {
+                                    void (async () => {
+                                        await axios.delete(api(`integration/home-assistant/${item.id}`));
+                                        await refresh();
+                                        snackManager.snack('Home Assistant connection deleted');
+                                    })();
+                                },
+                            }),
                     }))}
                 />
             </SurfaceCard>
+
+            {confirm && (
+                <ConfirmDialog
+                    title={confirm.title}
+                    text={confirm.text}
+                    fClose={() => setConfirm(undefined)}
+                    fOnSubmit={confirm.action}
+                />
+            )}
 
             {webhookEdit !== undefined && (
                 <WebhookDialog
@@ -357,7 +409,7 @@ interface ListItem {
     enabled: boolean;
     details?: React.ReactNode;
     onEdit: VoidFunction;
-    onDelete: () => Promise<void>;
+    onDelete: VoidFunction;
 }
 
 const IntegrationList = ({items, empty}: {items: ListItem[]; empty: string}) => {
@@ -409,7 +461,7 @@ const IntegrationList = ({items, empty}: {items: ListItem[]; empty: string}) => 
                                 size="small"
                                 color="error"
                                 startIcon={<Delete />}
-                                onClick={() => void item.onDelete()}>
+                                onClick={item.onDelete}>
                                 Delete
                             </Button>
                         </Stack>
