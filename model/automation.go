@@ -189,3 +189,27 @@ type AutomationLease struct {
 	ExpiresAt time.Time `gorm:"index" json:"expiresAt"`
 	UpdatedAt time.Time `json:"updatedAt"`
 }
+
+
+// IntegrationStatus stores shared runtime health for one native integration.
+type IntegrationStatus struct {
+	Kind            string     `gorm:"primaryKey;type:varchar(32)" json:"kind"`
+	IntegrationID   uint       `gorm:"primaryKey;autoIncrement:false" json:"integrationId"`
+	State           string     `gorm:"type:varchar(32);index" json:"state"`
+	Message         string     `gorm:"type:text" json:"message,omitempty"`
+	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
+	LastEventAt     *time.Time `json:"lastEventAt,omitempty"`
+	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
+	UpdatedAt       time.Time  `gorm:"index" json:"updatedAt"`
+}
+
+// IntegrationEvent is bounded operational history for native integrations.
+type IntegrationEvent struct {
+	ID            uint      `gorm:"primaryKey;autoIncrement" json:"id"`
+	Kind          string    `gorm:"type:varchar(32);index" json:"kind"`
+	IntegrationID uint      `gorm:"index" json:"integrationId"`
+	Level         string    `gorm:"type:varchar(16);index" json:"level"`
+	Event         string    `gorm:"type:varchar(64);index" json:"event"`
+	Message       string    `gorm:"type:text" json:"message"`
+	CreatedAt     time.Time `gorm:"index" json:"createdAt"`
+}
