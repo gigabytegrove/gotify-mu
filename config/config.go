@@ -84,6 +84,7 @@ type Configuration struct {
 	PassStrength      int
 	UploadedImagesDir string
 	PluginsDir        string
+	PluginTrustedSHA256 []string
 	Registration      bool
 	LocalAuthEnabled  bool
 	OIDC              OIDC
@@ -176,6 +177,7 @@ func Get() (*Configuration, []FutureLog) {
 	add(parseInt(&c.PassStrength, EnvPassStrength))
 	add(parseString(&c.UploadedImagesDir, EnvUploadedImagesDir))
 	add(parseString(&c.PluginsDir, EnvPluginsDir))
+	add(parseList(&c.PluginTrustedSHA256, EnvPluginTrustedSHA256))
 	add(parseBool(&c.Registration, EnvRegistration))
 	add(parseBool(&c.LocalAuthEnabled, EnvLocalAuthEnabled))
 
