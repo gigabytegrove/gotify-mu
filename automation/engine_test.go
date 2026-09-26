@@ -3,10 +3,12 @@ package automation
 import (
 	"bufio"
 	"bytes"
+	"encoding/json"
 	"testing"
 	"time"
 
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/test/testdb"
 )
 
 func TestQuietHoursCrossMidnight(t *testing.T) {
@@ -161,5 +163,82 @@ func TestHomeAssistantEventFilters(t *testing.T) {
 	data["new_state"] = map[string]any{"state": "off"}
 	if homeAssistantEventMatches(integration, data) {
 		t.Fatal("unexpected field value should be rejected")
+	}
+}
+
+type captureNotifier struct {
+	userIDs []uint
+}
+
+func (n *captureNotifier) Notify(userID uint, _ *model.MessageExternal) {
+	n.userIDs = append(n.userIDs, userID)
+}
+
+func TestMUDeliverySuppressesSenderAndIncludesMutedMention(t *testing.T) {
+	db := testdb.NewDB(t)
+	defer db.Close()
+
+	owner := db.NewUser(1)
+	sender := db.NewUser(2)
+	mentioned := db.NewUser(3)
+
+	app := &model.Application{
+		UserID:          owner.ID,
+		Token:           "MUAUTOMENT001",
+		Name:            "Family Chat",
+		AllowMemberPost: true,
+	}
+	if err := db.CreateApplication(app); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               sender.ID,
+		ReceiveNotifications: true,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               mentioned.ID,
+		ReceiveNotifications: false,
+	}); err != nil {
+		t.Fatal(err)
+	}
+
+	extras, err := json.Marshal(map[string]any{
+		"gotify::mu::mentions":      []string{"user3"},
+		"gotify::mu::mentionUserIds": []uint{mentioned.ID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	notifier := &captureNotifier{}
+	engine := &Engine{db: db, notifier: notifier}
+	_, err = engine.storeAndDeliver(&model.Message{
+		ApplicationID: app.ID,
+		Message:       "@user3 check this",
+		Title:         sender.Name,
+		SenderUserID:  sender.ID,
+		SenderName:    sender.Name,
+		Extras:        extras,
+	}, false)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	seen := map[uint]int{}
+	for _, userID := range notifier.userIDs {
+		seen[userID]++
+	}
+	if seen[sender.ID] != 0 {
+		t.Fatalf("sender received its own notification: %v", notifier.userIDs)
+	}
+	if seen[owner.ID] != 1 {
+		t.Fatalf("owner should receive one notification: %v", notifier.userIDs)
+	}
+	if seen[mentioned.ID] != 1 {
+		t.Fatalf("muted mentioned member should receive one notification: %v", notifier.userIDs)
 	}
 }
