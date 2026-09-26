@@ -8,7 +8,7 @@
 
 Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
 
-> **Current release:** **v0.5.0** (pre-release). It is the current Gotify MU security, reliability, integration, collaboration, plugin, and operations release.
+> **Current release:** **v1.0.0**. It is the first stable Gotify MU release.
 
 ## Why Gotify MU?
 
@@ -134,7 +134,7 @@ The official Gotify Android app continues to receive Chat Channel messages as no
 
 ## Releases
 
-The current published release is **Gotify MU v0.5.0** (pre-release). Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed notes in [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md).
+The current published release is **Gotify MU v1.0.0**. Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed notes in [docs/releases/v1.0.0.md](docs/releases/v1.0.0.md).
 
 Deployment, validation, updater, backup, and rollback procedures are maintained in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
@@ -143,7 +143,7 @@ For a release checkout:
 ```bash
 git clone https://github.com/gigabytegrove/gotify-mu.git
 cd gotify-mu
-git checkout v0.5.0
+git checkout v1.0.0
 ```
 
 Release builds inject the release version, commit, and build date into the server binary. Development builds continue to use `master-<commit>`, `master-local`, or `dev-<commit>` identities as appropriate.
@@ -285,10 +285,10 @@ COMMIT="$(git rev-parse --short HEAD)"
 docker build --no-cache \
   --build-arg BUILD_JS=1 \
   --build-arg GO_VERSION=1.26.0 \
-  --build-arg GOTIFY_MU_VERSION="0.5.0" \
+  --build-arg GOTIFY_MU_VERSION="1.0.0" \
   --build-arg GOTIFY_MU_COMMIT="${COMMIT}" \
   -f docker/Dockerfile \
-  -t gotify-mu:0.5.0 \
+  -t gotify-mu:1.0.0 \
   .
 ```
 
@@ -386,7 +386,7 @@ The MU database migration is additive. Existing users, applications, tokens and 
 
 ## Security
 
-The v0.5 preview includes MFA/TOTP, recovery codes, passkeys, LDAP/Active Directory, service accounts, login throttling, encrypted stored secrets, session policy, audit/security administration, hardened Webhooks, plugin signature verification, and a hardened managed updater.
+The 1.0 release includes MFA/TOTP, recovery codes, passkeys, LDAP/Active Directory, service accounts, login throttling, encrypted stored secrets, session policy, audit/security administration, hardened Webhooks, plugin signature verification, and a hardened managed updater.
 
 See `docs/SECURITY_ROADMAP.md` for implementation status and trust-boundary details.
 
