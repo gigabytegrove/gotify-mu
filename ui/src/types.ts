@@ -49,6 +49,7 @@ export interface IMessage {
     senderUserId?: number;
     senderName?: string;
     acknowledged?: boolean;
+    acknowledgementCount?: number;
     image?: string;
     extras?: IMessageExtras;
 }
@@ -230,4 +231,19 @@ export interface IIntegrationRuntimeStatus {
     lastConnectedAt?: string;
     lastEventAt?: string;
     lastErrorAt?: string;
+}
+
+
+export interface IMessageAcknowledgement {
+    userId: number;
+    name: string;
+    displayName?: string;
+    acknowledgedAt: string;
+}
+
+export interface IMessageAcknowledgementStatus {
+    acknowledged: boolean;
+    acknowledgedByAnyone: boolean;
+    count: number;
+    history: IMessageAcknowledgement[];
 }
