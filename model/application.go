@@ -2,6 +2,11 @@ package model
 
 import "time"
 
+const (
+	ChannelTypeNotification = "notification"
+	ChannelTypeChat         = "chat"
+)
+
 // Application Model
 //
 // The Application holds information about an app which can send notifications.
@@ -48,6 +53,9 @@ type Application struct {
 	//
 	// read only: true
 	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
+	// ChannelType controls how MU-aware clients present this Channel. Legacy
+	// member-posting Channels remain compatible when this value is empty.
+	ChannelType string `gorm:"type:varchar(32)" form:"channelType" query:"channelType" json:"channelType"`
 	// Whether the current requesting user receives realtime notifications from this Gotify MU channel.
 	//
 	// read only: true
