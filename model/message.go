@@ -21,6 +21,7 @@ type Message struct {
 	AcknowledgedBy      []MessageAcknowledgementView `gorm:"-" json:"-"`
 	ParentMessageID     uint                      `gorm:"index" json:"-"`
 	EscalationRuleID    uint                      `gorm:"index" json:"-"`
+	AutomationKey       *string                   `gorm:"type:varchar(180);uniqueIndex" json:"-"`
 }
 
 // MessageExternal Model
