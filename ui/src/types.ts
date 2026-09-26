@@ -49,6 +49,9 @@ export interface IMessage {
     senderUserId?: number;
     senderName?: string;
     acknowledged?: boolean;
+    acknowledgedByAnyone?: boolean;
+    acknowledgedByName?: string;
+    acknowledgedCount?: number;
     image?: string;
     extras?: IMessageExtras;
 }
