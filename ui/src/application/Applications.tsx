@@ -254,19 +254,26 @@ const Applications = observer(() => {
             {toUpdateApp && (
                 <UpdateApplicationDialog
                     fClose={() => setToUpdateApp(undefined)}
-                    fOnSubmit={(name, description, defaultPriority, retentionDays) =>
+                    fOnSubmit={(name, description, defaultPriority, retentionDays, channelType) =>
                         appStore.update({
                             ...toUpdateApp,
                             name,
                             description,
                             defaultPriority,
                             retentionDays,
+                            channelType,
                         })
                     }
                     initialDescription={toUpdateApp.description}
                     initialName={toUpdateApp.name}
                     initialDefaultPriority={toUpdateApp.defaultPriority}
                     initialRetentionDays={toUpdateApp.retentionDays || 0}
+                    initialChannelType={
+                        toUpdateApp.channelType === 'chat' ||
+                        (toUpdateApp.channelType == null && toUpdateApp.allowMemberPost)
+                            ? 'chat'
+                            : 'notification'
+                    }
                 />
             )}
 
