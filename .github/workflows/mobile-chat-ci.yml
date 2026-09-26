@@ -38,8 +38,18 @@ jobs:
       - name: Download dependencies
         run: go mod download
 
-      - name: Test MU typing API
-        run: go test ./api -run '^TestMUPresence' -count=1
+      - name: Test MU chat APIs
+        run: go test ./api -run '^(TestMUPresence|TestApplicationMembershipMentionableUsers|TestMessageSuite)
+
+      - name: Test realtime stream
+        run: go test ./api/stream -count=1
+
+      - name: Compile router wiring
+        run: |
+          mkdir -p ui/build
+          printf '<html></html>\n' > ui/build/index.html
+          go test ./router -run TestDoesNotExist -count=1
+ -count=1
 
       - name: Test realtime stream
         run: go test ./api/stream -count=1
