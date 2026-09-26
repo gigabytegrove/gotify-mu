@@ -44,7 +44,7 @@ const Messages = observer(() => {
     const [isLoadingMore, setLoadingMore] = React.useState(false);
     const [query, setQuery] = React.useState('');
 
-    const {messagesStore, appStore, currentUser} = useStores();
+    const {messagesStore, appStore, currentUser, wsStore} = useStores();
     const messages = archivedView ? messagesStore.getArchived(appId) : messagesStore.get(appId);
     const normalizedQuery = query.trim().toLowerCase();
     const filteredMessages = normalizedQuery
@@ -58,7 +58,13 @@ const Messages = observer(() => {
         : messages;
     const hasMore = messagesStore.canLoadMore(appId, archivedView);
     const app = appId === -1 ? undefined : appStore.getByIDOrUndefined(appId);
+    const isChat =
+        app?.channelType === 'chat' ||
+        (app?.channelType == null && Boolean(app?.allowMemberPost));
     const name = appStore.getName(appId);
+    const [typingUsers, setTypingUsers] = React.useState<
+        Record<number, {name: string; expiresAt: number}>
+    >({});
     const expandedState = React.useRef<Record<number, boolean>>({});
 
     const canPost =
@@ -81,6 +87,64 @@ const Messages = observer(() => {
             void messagesStore.loadMore(appId, archivedView);
         }
     }, [appId, archivedView, messagesStore]);
+
+    React.useEffect(() => {
+        if (!isChat || appId < 0 || archivedView) {
+            setTypingUsers({});
+            return;
+        }
+
+        const unsubscribe = wsStore.listenMU((event) => {
+            if (
+                event.type !== 'typing' ||
+                event.applicationId !== appId ||
+                event.userId === currentUser.user.id
+            ) {
+                return;
+            }
+
+            const expiresAt = new Date(event.expiresAt).getTime();
+            setTypingUsers((current) => {
+                const next = {...current};
+                if (event.typing && expiresAt > Date.now()) {
+                    next[event.userId] = {name: event.userName, expiresAt};
+                } else {
+                    delete next[event.userId];
+                }
+                return next;
+            });
+
+            if (event.typing) {
+                window.setTimeout(() => {
+                    setTypingUsers((current) => {
+                        const existing = current[event.userId];
+                        if (!existing || existing.expiresAt > Date.now()) return current;
+                        const next = {...current};
+                        delete next[event.userId];
+                        return next;
+                    });
+                }, Math.max(250, expiresAt - Date.now() + 100));
+            }
+        });
+
+        return () => {
+            unsubscribe();
+            setTypingUsers({});
+        };
+    }, [appId, archivedView, currentUser.user.id, isChat, wsStore]);
+
+    const activeTypingNames = Object.values(typingUsers)
+        .filter((entry) => entry.expiresAt > Date.now())
+        .map((entry) => entry.name);
+
+    const typingLabel =
+        activeTypingNames.length === 1
+            ? `${activeTypingNames[0]} is typing…`
+            : activeTypingNames.length === 2
+              ? `${activeTypingNames[0]} and ${activeTypingNames[1]} are typing…`
+              : activeTypingNames.length > 2
+                ? `${activeTypingNames.length} people are typing…`
+                : '';
 
     const deleteMessage = (message: IMessage) => {
         const key = enqueueSnackbar({
@@ -151,9 +215,7 @@ const Messages = observer(() => {
             rightControl={
                 <Stack direction="row" spacing={1} sx={{flexWrap: 'wrap'}} useFlexGap>
                     {app?.autoAssign && <Chip size="small" icon={<Public />} label="Global" />}
-                    {app?.allowMemberPost && (
-                        <Chip size="small" icon={<Forum />} label="Chat · Experimental" />
-                    )}
+                    {isChat && <Chip size="small" icon={<Forum />} label="Chat" />}
                     {app?.receiveNotifications === false && (
                         <Chip size="small" icon={<NotificationsOff />} label="Muted" />
                     )}
@@ -164,16 +226,28 @@ const Messages = observer(() => {
                     />
                 </Stack>
             }>
-            {app?.allowMemberPost && !archivedView && canPost && (
+            {isChat && !archivedView && canPost && app && (
                 <SurfaceCard
                     title="Conversation"
-                    subtitle="Experimental Web-only posting. Standard Gotify mobile clients remain receive-only.">
+                    subtitle="Two-way Gotify MU Chat Channel">
                     <ChatComposer
                         channelName={app.name}
                         fOnSubmit={(message) =>
                             messagesStore.sendMessage(app.id, message, '', app.defaultPriority)
                         }
+                        fOnTyping={(typing) => wsStore.setTyping(app.id, typing)}
                     />
+                    <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{
+                            display: 'block',
+                            minHeight: 20,
+                            px: 1,
+                            fontStyle: typingLabel ? 'italic' : 'normal',
+                        }}>
+                        {typingLabel}
+                    </Typography>
                 </SurfaceCard>
             )}
 
@@ -186,7 +260,7 @@ const Messages = observer(() => {
                 }
                 action={
                     <Stack direction="row" spacing={1} sx={{flexWrap: 'wrap'}} useFlexGap>
-                        {!archivedView && canPost && app && !app.allowMemberPost && (
+                        {!archivedView && canPost && app && !isChat && (
                             <Button
                                 id="push-message"
                                 variant="contained"
