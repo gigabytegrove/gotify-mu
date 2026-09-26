@@ -1,12 +1,14 @@
 package database
 
 import (
+	"crypto/ed25519"
+	"crypto/rand"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"strings"
 	"time"
 
-	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/security"
 	"gorm.io/gorm"
@@ -366,13 +368,22 @@ func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]*model.Mess
 	return rows, err
 }
 
+func generateInternalApplicationToken() (string, error) {
+	publicKey, _, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", fmt.Errorf("generate internal application token: %w", err)
+	}
+	return "gtfya." + base64.RawURLEncoding.EncodeToString(publicKey), nil
+}
+
 func (d *GormDatabase) GetOrCreateDigestApplication(userID uint) (*model.Application, error) {
 	app := new(model.Application)
 	err := d.DB.Where("user_id = ? AND internal = ? AND name = ?", userID, true, "Notification Digest").First(app).Error
 	if err == nil { return app, nil }
 	if !errors.Is(err, gorm.ErrRecordNotFound) { return nil, err }
 
-	publicToken, _ := auth.GenerateApplicationToken()
+	publicToken, tokenErr := generateInternalApplicationToken()
+	if tokenErr != nil { return nil, tokenErr }
 	app = &model.Application{
 		UserID:userID,
 		Name:"Notification Digest",
@@ -485,7 +496,8 @@ func (d *GormDatabase) ResolveEscalationTargetApplication(rule *model.Escalation
 			description = "Escalated notifications for Group " + group.Name
 		}
 
-		publicToken, _ := auth.GenerateApplicationToken()
+		publicToken, tokenErr := generateInternalApplicationToken()
+		if tokenErr != nil { return nil, tokenErr }
 		app = &model.Application{
 			UserID:ownerID,
 			Name:name,
