@@ -406,7 +406,7 @@ func (s *UserSuite) Test_UpdateUserByID_UpdatePassword() {
 
 	s.ctx.Params = gin.Params{{Key: "id", Value: "2"}}
 
-	s.ctx.Request = httptest.NewRequest("POST", "/user/2", strings.NewReader(`{"name": "tom", "pass": "new", "admin": true}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user/2", strings.NewReader(`{"name": "tom", "pass": "new-password-123", "admin": true}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.UpdateUserByID(s.ctx)
@@ -415,7 +415,7 @@ func (s *UserSuite) Test_UpdateUserByID_UpdatePassword() {
 	user, err := s.db.GetUserByID(2)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), user)
-	assert.True(s.T(), password.ComparePassword(user.Pass, []byte("new")))
+	assert.True(s.T(), password.ComparePassword(user.Pass, []byte("new-password-123")))
 }
 
 func (s *UserSuite) Test_UpdateUserByID_PreservesOIDCID() {
@@ -444,7 +444,7 @@ func (s *UserSuite) Test_UpdatePassword() {
 	s.db.CreateUser(&model.User{ID: 1, Name: "jmattheis", Pass: pw})
 
 	test.WithUser(s.ctx, 1)
-	s.ctx.Request = httptest.NewRequest("POST", "/user/current/password", strings.NewReader(`{"pass": "new"}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user/current/password", strings.NewReader(`{"pass": "new-password-123"}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.ChangePassword(s.ctx)
@@ -453,7 +453,7 @@ func (s *UserSuite) Test_UpdatePassword() {
 	user, err := s.db.GetUserByID(1)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), user)
-	assert.True(s.T(), password.ComparePassword(user.Pass, []byte("new")))
+	assert.True(s.T(), password.ComparePassword(user.Pass, []byte("new-password-123")))
 }
 
 func (s *UserSuite) Test_UpdatePassword_EmptyPassword() {
