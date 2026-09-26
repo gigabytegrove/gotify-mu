@@ -78,6 +78,7 @@ const Audit = observer(() => {
                             <TableCell>User</TableCell>
                             <TableCell>Action</TableCell>
                             <TableCell>Target</TableCell>
+                            <TableCell>Result</TableCell>
                             <TableCell>IP Address</TableCell>
                         </TableRow>
                     </TableHead>
@@ -99,6 +100,20 @@ const Audit = observer(() => {
                                     <Typography variant="body2" sx={{fontFamily: 'monospace'}}>
                                         {event.target}
                                     </Typography>
+                                </TableCell>
+                                <TableCell>
+                                    <Chip
+                                        size="small"
+                                        color={event.success === false ? 'error' : 'success'}
+                                        variant="outlined"
+                                        label={
+                                            event.statusCode
+                                                ? `${event.success === false ? 'Failed' : 'Success'} · ${event.statusCode}`
+                                                : event.success === false
+                                                  ? 'Failed'
+                                                  : 'Success'
+                                        }
+                                    />
                                 </TableCell>
                                 <TableCell>{event.ipAddress || '—'}</TableCell>
                             </TableRow>
