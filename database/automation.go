@@ -478,8 +478,7 @@ func (d *GormDatabase) ResolveEscalationTargetApplication(rule *model.Escalation
 	}
 
 	if app == nil {
-		name := "Escalations"
-		description := "Escalated notifications"
+		var name, description string
 		ownerID := uint(0)
 		if targetType == "user" {
 			user, userErr := d.GetUserByID(rule.TargetID)
@@ -491,7 +490,7 @@ func (d *GormDatabase) ResolveEscalationTargetApplication(rule *model.Escalation
 		} else {
 			group, groupErr := d.GetUserGroupByID(rule.TargetID)
 			if groupErr != nil { return nil, groupErr }
-			if group == nil { return nil, errors.New("escalation Group not found") }
+			if group == nil { return nil, errors.New("escalation group not found") }
 			name = "Escalations · " + group.Name
 			description = "Escalated notifications for Group " + group.Name
 		}
