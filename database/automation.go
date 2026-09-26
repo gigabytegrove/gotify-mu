@@ -375,3 +375,15 @@ func (d *GormDatabase) CompleteEscalationWithMessage(state *model.EscalationStat
 	})
 	return created, err
 }
+
+
+func (d *GormDatabase) GetMessageAcknowledgements(messageID uint) ([]*model.MessageAcknowledgementView, error) {
+	var items []*model.MessageAcknowledgementView
+	err := d.DB.Table("message_acknowledgements AS ma").
+		Select("ma.user_id, users.name, users.display_name, ma.acknowledged_at").
+		Joins("JOIN users ON users.id = ma.user_id").
+		Where("ma.message_id = ?", messageID).
+		Order("ma.acknowledged_at asc").
+		Scan(&items).Error
+	return items, err
+}
