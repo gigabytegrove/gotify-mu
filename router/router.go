@@ -21,6 +21,7 @@ import (
 	"github.com/gotify/server/v3/automation"
 	"github.com/gotify/server/v3/config"
 	"github.com/gotify/server/v3/database"
+	"github.com/gotify/server/v3/directory"
 	"github.com/gotify/server/v3/docs"
 	gerror "github.com/gotify/server/v3/error"
 	"github.com/gotify/server/v3/model"
@@ -93,6 +94,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}()
 	loginLimiter := security.NewLimiter(12, 5)
 	webhookLimiter := security.NewLimiter(240, 30)
+	directoryService := &directory.Service{DB: db, Strength: conf.PassStrength}
 	policyProvider := func() *model.SecurityPolicy {
 		policy, err := db.GetSecurityPolicy()
 		if err != nil {
@@ -105,6 +107,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		DB:               db,
 		SecureCookie:     conf.Server.SecureCookie,
 		LocalAuthEnabled: conf.LocalAuthEnabled,
+		Directory:        directoryService,
 		CrossOrigin:      http.NewCrossOriginProtection(),
 		LoginLimiter:     loginLimiter,
 	}
@@ -125,7 +128,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	applicationMembershipHandler := api.ApplicationMembershipAPI{
 		DB: db,
 	}
-	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled, Policy: policyProvider, LoginLimiter: loginLimiter}
+	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled, Directory: directoryService, Policy: policyProvider, LoginLimiter: loginLimiter}
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration, Policy: policyProvider}
 	auditHandler := api.AuditAPI{DB: db}
@@ -134,6 +137,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
 	serviceAccountHandler := api.ServiceAccountAPI{DB: db, Dispatcher: automationEngine}
 	securityPolicyHandler := api.SecurityPolicyAPI{DB: db}
+	directoryHandler := api.DirectoryAPI{DB: db, Service: directoryService}
 	mfaHandler := api.MFAAPI{DB: db}
 	operationsHandler := api.OperationsAPI{
 		DB: db,
@@ -186,7 +190,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	userChangeNotifier.OnUserDeleted(pluginManager.RemoveUser)
 	userChangeNotifier.OnUserAdded(pluginManager.InitializeForUserID)
 
-	ui.Register(g, *vInfo, conf.Registration, conf.LocalAuthEnabled, conf.OIDC.Enabled, conf.OIDC.IDPName, conf.OIDC.AutoRedirect)
+	ui.Register(g, *vInfo, conf.Registration, conf.LocalAuthEnabled, directoryService.Enabled(), conf.OIDC.Enabled, conf.OIDC.IDPName, conf.OIDC.AutoRedirect)
 
 	if conf.OIDC.Enabled {
 		oidcHandler := api.NewOIDC(conf, db, userChangeNotifier)
@@ -242,6 +246,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	g.Group("/user").Use(authentication.OptionalAdmin).POST("", userHandler.CreateUser)
 
+	g.POST("/auth/login", sessionHandler.Login)
 	g.POST("/auth/local/login", sessionHandler.Login)
 
 	g.OPTIONS("/*any")
@@ -278,6 +283,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			Oidc:             conf.OIDC.Enabled,
 			Register:         conf.Registration,
 			LocalAuth:        conf.LocalAuthEnabled,
+			Directory:        directoryService.Enabled(),
 			OIDCIDPName:      conf.OIDC.IDPName,
 			OIDCAutoRedirect: conf.OIDC.AutoRedirect,
 		})
@@ -383,6 +389,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/service-account", serviceAccountHandler.List)
 		adminPlatform.POST("/service-account", serviceAccountHandler.Create)
 		adminPlatform.DELETE("/service-account/:id", serviceAccountHandler.Delete)
+
+		adminPlatform.GET("/directory", directoryHandler.Get)
+		adminPlatform.PUT("/directory", directoryHandler.Save)
+		adminPlatform.POST("/directory/test", directoryHandler.Test)
 
 		adminPlatform.GET("/security/policy", securityPolicyHandler.Get)
 		adminPlatform.PUT("/security/policy", securityPolicyHandler.Save)
@@ -585,6 +595,10 @@ func shouldAuditMutation(path string) bool {
 	case strings.HasPrefix(path, "/automation"):
 		return true
 	case strings.HasPrefix(path, "/service-account"):
+		return true
+	case strings.HasPrefix(path, "/directory"):
+		return true
+	case strings.HasPrefix(path, "/operations"):
 		return true
 	case strings.Contains(path, "/acknowledgement"):
 		return true
