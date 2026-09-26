@@ -29,6 +29,8 @@ type MUCapabilityFlags struct {
 	OwnershipTransfer     bool `json:"ownershipTransfer"`
 	UserGroups            bool `json:"userGroups"`
 	AuditLog              bool `json:"auditLog"`
+	TypingPresence        bool `json:"typingPresence"`
+	ChatNotifications     bool `json:"chatNotifications"`
 }
 
 func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
@@ -49,6 +51,8 @@ func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
 			OwnershipTransfer:     true,
 			UserGroups:            true,
 			AuditLog:              true,
+			TypingPresence:        true,
+			ChatNotifications:     true,
 		},
 	})
 }
