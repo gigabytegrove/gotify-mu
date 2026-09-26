@@ -57,6 +57,7 @@ type Database interface {
 	IsMessageAcknowledged(messageID uint) (bool, error)
 
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
+	GetMQTTIntegrationByID(id uint) (*model.MQTTIntegration, error)
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
 	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
 
@@ -758,6 +759,8 @@ func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string) error {
 	return nil
 }
 
+const maxMQTTPacketBytes = 4 << 20
+
 func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 	header, err := reader.ReadByte()
 	if err != nil {
@@ -770,6 +773,9 @@ func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 			return 0, nil, err
 		}
 		remaining += int(value&127) * multiplier
+		if remaining > maxMQTTPacketBytes {
+			return 0, nil, fmt.Errorf("MQTT packet exceeds %d bytes", maxMQTTPacketBytes)
+		}
 		if value&128 == 0 {
 			body := make([]byte, remaining)
 			_, err = io.ReadFull(reader, body)
@@ -821,6 +827,26 @@ func encodeRemainingLength(length int) []byte {
 			return result
 		}
 	}
+}
+
+// TestMQTTConnection verifies broker authentication and topic subscription without persisting a message.
+func (e *Engine) TestMQTTConnection(id uint) error {
+	integration, err := e.db.GetMQTTIntegrationByID(id)
+	if err != nil { return err }
+	if integration == nil { return errors.New("MQTT connection not found") }
+	ctx, cancel := context.WithTimeout(e.ctx, 15*time.Second)
+	defer cancel()
+	conn, err := dialMQTT(ctx, integration.BrokerURL)
+	if err != nil { return err }
+	defer conn.Close()
+	reader := bufio.NewReader(conn)
+	clientID := integration.ClientID
+	if clientID == "" { clientID = "gotify-mu-test-" + strconv.FormatUint(uint64(integration.ID), 10) }
+	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password); err != nil { return err }
+	if err := mqttSubscribe(conn, reader, integration.Topic); err != nil { return err }
+	e.integrationStatus("mqtt", integration.ID, "connected", "Connection test successful", true, false, false)
+	e.integrationEvent("mqtt", integration.ID, "info", "connection_test", "Connection test successful")
+	return nil
 }
 
 // SendHomeAssistantEvent sends an event through a configured Home Assistant connection.
