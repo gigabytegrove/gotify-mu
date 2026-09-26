@@ -185,6 +185,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
+	muCapabilitiesHandler := api.MUCapabilitiesAPI{Version: vInfo.Version}
+	muPresenceHandler := api.MUPresenceAPI{DB: db, Notifier: streamHandler}
 	automationHandler := api.AutomationAPI{
 		DB: db,
 		Engine: automationEngine,
@@ -376,6 +378,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		message.DELETE("/:id/attachment/:attachmentId", collaborationHandler.DeleteAttachment)
 		}
 
+		clientAuth.GET("/api/mu/v1/capabilities", muCapabilitiesHandler.Get)
+		clientAuth.GET("/api/mu/v1/events", streamHandler.HandleMUEvents)
+		clientAuth.POST("/application/:id/typing", muPresenceHandler.SetTyping)
 		clientAuth.GET("/stream", streamHandler.Handle)
 		clientAuth.GET("current/user", userHandler.GetCurrentUser)
 		clientAuth.GET("/current/user/mfa/status", mfaHandler.Status)
