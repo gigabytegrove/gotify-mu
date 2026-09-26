@@ -45,7 +45,7 @@ The `gotify-mu-ha` integration already knows the Gotify MU server URL from its c
 It should expose an options/config flow named **Pair with Gotify MU server** that asks for:
 
 - pairing code
-- Home Assistant URL reachable by Gotify MU, when it cannot be determined automatically
+- Home Assistant URL reachable by Gotify MU when it cannot be determined automatically, with an optional manual override when the automatically selected URL is not reachable from the Gotify MU server
 
 The HA integration should register a private webhook handler with a random webhook ID and then call:
 
@@ -134,3 +134,24 @@ The HA webhook handler must compare the Bearer credential to the stored shared s
 - Do not execute arbitrary Home Assistant services from bridge payloads.
 - Native inbound bridge payloads may fire Home Assistant events only.
 - Preserve LLT mode in Gotify MU as a fully supported fallback.
+\n\n## Native unpair / revoke
+
+Home Assistant removes native pairing by revoking the shared bridge credential on Gotify MU before deleting its local copy:
+
+```text
+DELETE <gotify-mu-server>/integrations/home-assistant/native/<integration-id>
+Authorization: Bearer <shared-native-bridge-secret>
+```
+
+A successful revoke returns HTTP 204. Gotify MU clears the stored native webhook URL, shared secret, and any outstanding pairing state while preserving the normal Home Assistant connection record and its filters.
+
+Home Assistant must not silently discard local credentials when the revoke request fails. A force-local-remove escape hatch may be offered for recovery when the Gotify MU server is unavailable or the remote connection has already been replaced.
+
+Regenerating a pairing code for an already paired connection does not tear down the working native bridge. The existing webhook and shared secret remain valid until a replacement pairing succeeds. The Gotify MU admin UI exposes **Generate Repair Code** for an already paired native connection.
+
+## Health and delivery expectations
+
+- HTTP 400, 401, or 404 from the pairing endpoint indicates an invalid or no-longer-valid pairing code; HTTP 410 indicates expiration.
+- A paired client should expose bridge health separately from simple credential presence.
+- HTTP 401/403 from the native event endpoint means the shared credential is no longer valid and should surface as repair required.
+- Transient event-delivery failures should use bounded retry/backoff rather than silently dropping the first failed event.\n
