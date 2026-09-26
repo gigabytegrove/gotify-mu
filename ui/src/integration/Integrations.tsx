@@ -420,7 +420,7 @@ const IntegrationList = ({items, empty}: {items: ListItem[]; empty: string}) => 
                                             : ''}
                                     </Typography>
                                 )}
-                                {item.details && <Box sx={{mt: 1}}>{item.details}</Box>
+                                {item.details && <Box sx={{mt: 1}}>{item.details}</Box>}
                             </Box>
                         </Stack>
                         <Stack direction="row" spacing={0.5}>
