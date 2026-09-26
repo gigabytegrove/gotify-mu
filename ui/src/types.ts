@@ -4,6 +4,7 @@ export interface IApplication {
     ownerId?: number;
     autoAssign?: boolean;
     allowMemberPost?: boolean;
+    channelType?: "notification" | "chat";
     receiveNotifications?: boolean;
     name: string;
     sortKey: string;
@@ -533,3 +534,15 @@ export interface INotificationField {
     label: string;
     value: string;
 }
+
+
+export interface IMUTypingEvent {
+    type: 'typing';
+    applicationId: number;
+    userId: number;
+    userName: string;
+    typing: boolean;
+    expiresAt: string;
+}
+
+export type IMURealtimeEvent = IMUTypingEvent;

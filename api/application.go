@@ -62,6 +62,8 @@ type ApplicationParams struct {
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
 	// Whether assigned users may publish messages to this Gotify MU channel.
 	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
+	// Presentation mode for MU-aware clients. Empty remains accepted for older clients.
+	ChannelType string `form:"channelType" query:"channelType" json:"channelType" binding:"omitempty,oneof=notification chat"`
 	// Number of days to retain message history. Zero keeps messages indefinitely.
 	RetentionDays int `form:"retentionDays" query:"retentionDays" json:"retentionDays" binding:"min=0,max=36500"`
 }
@@ -115,6 +117,15 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 				return
 			}
 		}
+		channelType := applicationParams.ChannelType
+		if channelType == "" {
+			if applicationParams.AllowMemberPost {
+				channelType = model.ChannelTypeChat
+			} else {
+				channelType = model.ChannelTypeNotification
+			}
+		}
+
 		tokenPublic, tokenPrivate := generateApplicationToken()
 		app := model.Application{
 			Name:            applicationParams.Name,
@@ -126,7 +137,8 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			Internal:        false,
 			AutoAssign:      applicationParams.AutoAssign,
 			AllowMemberPost: applicationParams.AllowMemberPost,
-			RetentionDays: applicationParams.RetentionDays,
+			ChannelType:     channelType,
+			RetentionDays:   applicationParams.RetentionDays,
 		}
 
 		if err := a.DB.CreateApplication(&app); err != nil {
@@ -342,6 +354,9 @@ func (a *ApplicationAPI) UpdateApplication(ctx *gin.Context) {
 				app.Name = applicationParams.Name
 				app.DefaultPriority = applicationParams.DefaultPriority
 				app.RetentionDays = applicationParams.RetentionDays
+				if applicationParams.ChannelType != "" {
+					app.ChannelType = applicationParams.ChannelType
+				}
 				if applicationParams.SortKey != "" {
 					app.SortKey = applicationParams.SortKey
 				}
@@ -657,13 +672,23 @@ func handleApplicationError(ctx *gin.Context, err error) {
 }
 
 func (a *ApplicationAPI) canManageApplication(userID uint, app *model.Application) (bool, error) {
-	if app == nil { return false, nil }
-	if app.UserID == userID { return true, nil }
+	if app == nil {
+		return false, nil
+	}
+	if app.UserID == userID {
+		return true, nil
+	}
 	user, err := a.DB.GetUserByID(userID)
-	if err != nil { return false, err }
-	if user != nil && user.Admin { return true, nil }
+	if err != nil {
+		return false, err
+	}
+	if user != nil && user.Admin {
+		return true, nil
+	}
 	membership, err := a.DB.GetApplicationMembership(app.ID, userID)
-	if err != nil { return false, err }
+	if err != nil {
+		return false, err
+	}
 	return membership != nil && membership.EffectiveRole == model.ChannelRoleManager, nil
 }
 
