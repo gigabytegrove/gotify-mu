@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"bytes"
 	"context"
+	"crypto/rand"
 	"crypto/tls"
 	"encoding/binary"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -57,6 +59,9 @@ type Database interface {
 	GetMQTTIntegrations() ([]*model.MQTTIntegration, error)
 	GetHomeAssistantIntegrations() ([]*model.HomeAssistantIntegration, error)
 	GetHomeAssistantIntegrationByID(id uint) (*model.HomeAssistantIntegration, error)
+
+	AcquireAutomationLease(name, owner string, now time.Time, ttl time.Duration) (bool, error)
+	ReleaseAutomationLease(name, owner string) error
 }
 
 // Engine runs scheduled work and persistent native integrations.
@@ -72,16 +77,22 @@ type Engine struct {
 	integrationCancels []context.CancelFunc
 	integrationWG      sync.WaitGroup
 	reload             chan struct{}
+	leaseOwner         string
 }
 
 func New(db Database, notifier Notifier) *Engine {
 	ctx, cancel := context.WithCancel(context.Background())
+	ownerBytes := make([]byte, 16)
+	if _, err := rand.Read(ownerBytes); err != nil {
+		panic(fmt.Errorf("generate automation instance id: %w", err))
+	}
 	e := &Engine{
 		db: db,
 		notifier: notifier,
 		ctx: ctx,
 		cancel: cancel,
 		reload: make(chan struct{}, 1),
+		leaseOwner: hex.EncodeToString(ownerBytes),
 	}
 	e.wg.Add(2)
 	go e.schedulerLoop()
@@ -93,6 +104,9 @@ func (e *Engine) Close() {
 	e.cancel()
 	e.stopIntegrations()
 	e.wg.Wait()
+	if err := e.db.ReleaseAutomationLease("automation", e.leaseOwner); err != nil {
+		log.Warn().Err(err).Msg("Could not release automation ownership")
+	}
 }
 
 func (e *Engine) ReloadIntegrations() {
@@ -253,13 +267,18 @@ func (e *Engine) schedulerLoop() {
 	defer e.wg.Done()
 	ticker := time.NewTicker(10 * time.Second)
 	defer ticker.Stop()
-	e.runDue(time.Now())
 	for {
+		now := time.Now()
+		leader, err := e.db.AcquireAutomationLease("automation", e.leaseOwner, now, 30*time.Second)
+		if err != nil {
+			log.Error().Err(err).Msg("Could not acquire automation ownership")
+		} else if leader {
+			e.runDue(now)
+		}
 		select {
 		case <-e.ctx.Done():
 			return
-		case now := <-ticker.C:
-			e.runDue(now)
+		case <-ticker.C:
 		}
 	}
 }
@@ -443,13 +462,36 @@ func (e *Engine) runEscalations(now time.Time) {
 
 func (e *Engine) integrationLoop() {
 	defer e.wg.Done()
-	e.restartIntegrations()
+	ticker := time.NewTicker(5 * time.Second)
+	defer ticker.Stop()
+	active := false
+
+	checkOwnership := func() {
+		leader, err := e.db.AcquireAutomationLease("automation", e.leaseOwner, time.Now(), 30*time.Second)
+		if err != nil {
+			log.Error().Err(err).Msg("Could not renew automation ownership")
+			return
+		}
+		if leader && !active {
+			e.restartIntegrations()
+			active = true
+		}
+		if !leader && active {
+			e.stopIntegrations()
+			active = false
+		}
+	}
+
+	checkOwnership()
 	for {
 		select {
 		case <-e.ctx.Done():
+			if active { e.stopIntegrations() }
 			return
 		case <-e.reload:
-			e.restartIntegrations()
+			if active { e.restartIntegrations() }
+		case <-ticker.C:
+			checkOwnership()
 		}
 	}
 }
