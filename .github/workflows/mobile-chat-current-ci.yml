@@ -27,7 +27,12 @@ jobs:
         run: |
           set -euo pipefail
           FILES="api/message.go api/message_test.go api/application_membership.go api/application_membership_test.go api/mu_capabilities.go api/mu_presence.go api/mu_presence_test.go api/stream/stream.go api/stream/mu_event_client.go automation/engine.go automation/engine_test.go router/router.go"
-          test -z "$(gofmt -l $FILES)"
+          UNFORMATTED="$(gofmt -l $FILES)"
+          if [ -n "$UNFORMATTED" ]; then
+            echo "Unformatted files:"
+            echo "$UNFORMATTED"
+            exit 1
+          fi
 
       - name: Download dependencies
         run: go mod download
