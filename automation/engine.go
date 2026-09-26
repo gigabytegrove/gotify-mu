@@ -62,6 +62,8 @@ type Database interface {
 
 	AcquireAutomationLease(name, owner string, now time.Time, ttl time.Duration) (bool, error)
 	ReleaseAutomationLease(name, owner string) error
+	SaveIntegrationStatus(item *model.IntegrationStatus) error
+	RecordIntegrationEvent(item *model.IntegrationEvent) error
 }
 
 // Engine runs scheduled work and persistent native integrations.
@@ -546,12 +548,38 @@ func (e *Engine) restartIntegrations() {
 	}
 }
 
+
+func (e *Engine) integrationStatus(kind string, id uint, state, message string, connected, event, failed bool) {
+	now := time.Now().UTC()
+	current := &model.IntegrationStatus{
+		Kind: kind, IntegrationID: id, State: state, Message: message, UpdatedAt: now,
+	}
+	if connected { current.LastConnectedAt = &now }
+	if event { current.LastEventAt = &now }
+	if failed { current.LastErrorAt = &now }
+	if err := e.db.SaveIntegrationStatus(current); err != nil {
+		log.Error().Err(err).Str("integration", kind).Uint("integration_id", id).Msg("Could not save integration status")
+	}
+}
+
+func (e *Engine) integrationEvent(kind string, id uint, level, event, message string) {
+	item := &model.IntegrationEvent{
+		Kind: kind, IntegrationID: id, Level: level, Event: event, Message: message, CreatedAt: time.Now().UTC(),
+	}
+	if err := e.db.RecordIntegrationEvent(item); err != nil {
+		log.Error().Err(err).Str("integration", kind).Uint("integration_id", id).Msg("Could not save integration event")
+	}
+}
+
 func (e *Engine) runMQTTLoop(ctx context.Context, integration *model.MQTTIntegration) {
+	e.integrationStatus("mqtt", integration.ID, "connecting", "Connecting to broker", false, false, false)
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 		if err := e.runMQTT(ctx, integration); err != nil && ctx.Err() == nil {
+			e.integrationStatus("mqtt", integration.ID, "reconnecting", err.Error(), false, false, true)
+			e.integrationEvent("mqtt", integration.ID, "error", "connection_error", err.Error())
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("MQTT connection interrupted")
 		}
 		select {
@@ -589,6 +617,8 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 	if err := mqttSubscribe(conn, reader, integration.Topic); err != nil {
 		return err
 	}
+	e.integrationStatus("mqtt", integration.ID, "connected", "Connected", true, false, false)
+	e.integrationEvent("mqtt", integration.ID, "info", "connected", "Connected to broker")
 
 	for {
 		if ctx.Err() != nil {
@@ -630,7 +660,12 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 			title = topic
 		}
 		if _, err := e.Publish(integration.ApplicationID, title, message, priority); err != nil {
+			e.integrationStatus("mqtt", integration.ID, "connected", err.Error(), false, false, true)
+			e.integrationEvent("mqtt", integration.ID, "error", "message_error", err.Error())
 			log.Error().Err(err).Uint("integration_id", integration.ID).Msg("MQTT message could not be published")
+		} else {
+			e.integrationStatus("mqtt", integration.ID, "connected", "Message received", false, true, false)
+			e.integrationEvent("mqtt", integration.ID, "info", "message_received", topic)
 		}
 		if qos == 1 && packetID != 0 {
 			ack := []byte{0x40, 0x02, byte(packetID >> 8), byte(packetID)}
@@ -826,11 +861,14 @@ func (e *Engine) SendHomeAssistantEvent(id uint, eventType string, data map[stri
 }
 
 func (e *Engine) runHomeAssistantLoop(ctx context.Context, integration *model.HomeAssistantIntegration) {
+	e.integrationStatus("home-assistant", integration.ID, "connecting", "Connecting to Home Assistant", false, false, false)
 	for {
 		if ctx.Err() != nil {
 			return
 		}
 		if err := e.runHomeAssistant(ctx, integration); err != nil && ctx.Err() == nil {
+			e.integrationStatus("home-assistant", integration.ID, "reconnecting", err.Error(), false, false, true)
+			e.integrationEvent("home-assistant", integration.ID, "error", "connection_error", err.Error())
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("Home Assistant connection interrupted")
 		}
 		select {
@@ -888,6 +926,8 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 	if authResponse["type"] != "auth_ok" {
 		return errors.New("Home Assistant authentication failed")
 	}
+	e.integrationStatus("home-assistant", integration.ID, "connected", "Connected", true, false, false)
+	e.integrationEvent("home-assistant", integration.ID, "info", "connected", "Connected to Home Assistant")
 
 	subscribe := map[string]any{"id":1,"type":"subscribe_events"}
 	if strings.TrimSpace(integration.EventType) != "" {
@@ -924,7 +964,12 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 			title += ": " + eventType
 		}
 		if _, err := e.Publish(integration.ApplicationID, title, string(encoded), 0); err != nil {
+			e.integrationStatus("home-assistant", integration.ID, "connected", err.Error(), false, false, true)
+			e.integrationEvent("home-assistant", integration.ID, "error", "event_error", err.Error())
 			log.Error().Err(err).Uint("integration_id", integration.ID).Msg("Home Assistant event could not be published")
+		} else {
+			e.integrationStatus("home-assistant", integration.ID, "connected", "Event received", false, true, false)
+			e.integrationEvent("home-assistant", integration.ID, "info", "event_received", eventType)
 		}
 	}
 }
