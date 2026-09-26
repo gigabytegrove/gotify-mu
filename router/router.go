@@ -164,6 +164,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	applicationMembershipHandler := api.ApplicationMembershipAPI{
 		DB: db,
 	}
+	muCapabilitiesHandler := api.MUCapabilitiesAPI{Version: vInfo.Version}
+	muPresenceHandler := api.MUPresenceAPI{DB: db, Notifier: streamHandler}
 	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled}
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
@@ -329,6 +331,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		app := clientAuth.Group("/application")
 		{
 			app.GET("", applicationHandler.GetApplications)
+			app.GET("/:id/mentionable-users", applicationMembershipHandler.GetMentionableUsers)
 			app.POST("", applicationHandler.CreateApplication)
 			app.POST("/:id/image", applicationHandler.UploadApplicationImage)
 			app.DELETE("/:id/image", applicationHandler.RemoveApplicationImage)
@@ -376,6 +379,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		message.DELETE("/:id/attachment/:attachmentId", collaborationHandler.DeleteAttachment)
 		}
 
+		clientAuth.GET("/api/mu/v1/capabilities", muCapabilitiesHandler.Get)
+		clientAuth.GET("/api/mu/v1/events", streamHandler.HandleMUEvents)
+		clientAuth.POST("/application/:id/typing", muPresenceHandler.SetTyping)
 		clientAuth.GET("/stream", streamHandler.Handle)
 		clientAuth.GET("current/user", userHandler.GetCurrentUser)
 		clientAuth.GET("/current/user/mfa/status", mfaHandler.Status)
