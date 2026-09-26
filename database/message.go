@@ -43,6 +43,17 @@ func archivedMessages(db *gorm.DB, userID uint) *gorm.DB {
 		Where("md.archived = ?", true)
 }
 
+func (d *GormDatabase) GetMessageByAutomationKey(key string) (*model.Message, error) {
+	message := new(model.Message)
+	if err := d.DB.Where("automation_key = ?", key).First(message).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return message, nil
+}
+
 // GetMessageByID returns the messages for the given id or nil.
 func (d *GormDatabase) GetMessageByID(id uint) (*model.Message, error) {
 	msg := new(model.Message)
