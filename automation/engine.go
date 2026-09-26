@@ -387,12 +387,18 @@ func (e *Engine) runDigests(now time.Time) {
 			}
 			last := items[len(items)-1]
 			e.notifier.Notify(policy.UserID, &model.MessageExternal{
-				ID: last.MessageID,
+				ID: 0,
 				ApplicationID: last.ApplicationID,
 				Title: fmt.Sprintf("%d notification digest", len(items)),
 				Message: strings.Join(lines, "\n"),
 				Priority: &highest,
 				Date: now,
+				Extras: map[string]any{
+					"gotify.mu.digest": map[string]any{
+						"count": len(items),
+						"synthetic": true,
+					},
+				},
 			})
 			if err := e.db.DeleteDigestItems(policy.UserID); err != nil {
 				log.Error().Err(err).Uint("user_id", policy.UserID).Msg("Could not clear digest")
