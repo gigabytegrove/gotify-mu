@@ -21,6 +21,7 @@ import (
 	gerror "github.com/gotify/server/v3/error"
 	"github.com/gotify/server/v3/model"
 	"github.com/gotify/server/v3/plugin"
+	"github.com/gotify/server/v3/security"
 	"github.com/gotify/server/v3/ui"
 	"github.com/rs/zerolog/log"
 )
@@ -86,11 +87,21 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			}
 		}
 	}()
+	loginLimiter := security.NewFailureLimiter(
+		conf.Security.LoginMaxAttempts,
+		time.Duration(conf.Security.LoginWindowSeconds)*time.Second,
+		time.Duration(conf.Security.LoginBlockSeconds)*time.Second,
+	)
+	webhookLimiter := security.NewWindowLimiter(
+		conf.Security.WebhookRequestsPerMinute,
+		time.Minute,
+	)
 	authentication := auth.Auth{
 		DB:               db,
 		SecureCookie:     conf.Server.SecureCookie,
 		LocalAuthEnabled: conf.LocalAuthEnabled,
 		CrossOrigin:      http.NewCrossOriginProtection(),
+		LoginLimiter:     loginLimiter,
 	}
 	automationEngine := automation.New(db, streamHandler)
 	messageHandler := api.MessageAPI{Notifier: streamHandler, DB: db, Dispatcher: automationEngine}
@@ -108,13 +119,19 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	applicationMembershipHandler := api.ApplicationMembershipAPI{
 		DB: db,
 	}
-	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled}
+	sessionHandler := api.SessionAPI{
+		DB:               db,
+		NotifyDeleted:    streamHandler.NotifyDeletedClient,
+		SecureCookie:     conf.Server.SecureCookie,
+		LocalAuthEnabled: conf.LocalAuthEnabled,
+		LoginLimiter:     loginLimiter,
+	}
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
 	auditHandler := api.AuditAPI{DB: db}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
-	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine}
+	automationHandler := api.AutomationAPI{DB: db, Engine: automationEngine, WebhookLimiter: webhookLimiter}
 
 	pluginManager, err := plugin.NewManager(db, conf.PluginsDir, g.Group("/plugin/:id/custom/"), streamHandler)
 	if err != nil {
