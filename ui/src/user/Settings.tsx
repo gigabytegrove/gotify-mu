@@ -129,6 +129,7 @@ const NotificationPreferences = () => {
                         timezone: response.data.id
                             ? response.data.timezone
                             : browserTimezone,
+                        mode: response.data.mode || 'suppress',
                     })
                 ),
             axios
@@ -226,14 +227,31 @@ const NotificationPreferences = () => {
                         helperText="Your browser timezone is shown by default."
                     />
                     <TextField
-                        label="Allow priority"
-                        type="number"
+                        select
+                        label="During Quiet Hours"
+                        value={quiet.mode || 'suppress'}
+                        onChange={(event) =>
+                            setQuiet({
+                                ...quiet,
+                                mode: event.target.value as 'suppress' | 'defer',
+                            })
+                        }>
+                        <MenuItem value="suppress">Silence realtime alert</MenuItem>
+                        <MenuItem value="defer">Deliver when Quiet Hours ends</MenuItem>
+                    </TextField>
+                    <TextField
+                        select
+                        label="Deliver immediately at"
                         value={quiet.allowPriority}
                         onChange={(event) =>
                             setQuiet({...quiet, allowPriority: Number(event.target.value)})
                         }
-                        helperText="Messages at this priority or higher are delivered immediately during quiet hours."
-                    />
+                        helperText="Messages at this priority or higher bypass Quiet Hours.">
+                        <MenuItem value={0}>Normal and above (0)</MenuItem>
+                        <MenuItem value={4}>High and above (4)</MenuItem>
+                        <MenuItem value={8}>Critical only (8)</MenuItem>
+                        <MenuItem value={10}>Emergency only (10)</MenuItem>
+                    </TextField>
                     <Button
                         variant="contained"
                         disabled={savingQuiet}
@@ -277,14 +295,18 @@ const NotificationPreferences = () => {
                         <MenuItem value={1440}>24 hours</MenuItem>
                     </TextField>
                     <TextField
-                        label="Send immediately at priority"
-                        type="number"
+                        select
+                        label="Send immediately at"
                         value={digest.immediatePriority}
                         onChange={(event) =>
                             setDigest({...digest, immediatePriority: Number(event.target.value)})
                         }
-                        helperText="Messages at this priority or higher skip the digest and notify you immediately."
-                    />
+                        helperText="Messages at this priority or higher skip the Digest.">
+                        <MenuItem value={0}>Normal and above (0)</MenuItem>
+                        <MenuItem value={4}>High and above (4)</MenuItem>
+                        <MenuItem value={8}>Critical only (8)</MenuItem>
+                        <MenuItem value={10}>Emergency only (10)</MenuItem>
+                    </TextField>
                     <Button
                         variant="contained"
                         disabled={savingDigest}
