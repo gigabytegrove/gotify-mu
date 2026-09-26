@@ -65,7 +65,7 @@ func (s *ManagerSuite) SetupSuite() {
 	s.makeDanglingPluginConf(1)
 
 	e := gin.New()
-	manager, err := NewManager(s.db.GormDatabase, s.tmpDir.Path(), e.Group("/plugin/:id/custom/"), s)
+	manager, err := NewManager(s.db.GormDatabase, s.tmpDir.Path(), e.Group("/plugin/:id/custom/"), s, nil)
 	s.e = e
 	assert.Nil(s.T(), err)
 
@@ -357,12 +357,12 @@ func TestManagerSuite(t *testing.T) {
 }
 
 func TestNewManager_CannotLoadDirectory_expectError(t *testing.T) {
-	_, err := NewManager(nil, "<>", nil, nil)
+	_, err := NewManager(nil, "<>", nil, nil, nil)
 	assert.Error(t, err)
 }
 
 func TestNewManager_NonPluginFile_expectError(t *testing.T) {
-	_, err := NewManager(nil, path.Join(test.GetProjectDir(), "test/assets/"), nil, nil)
+	_, err := NewManager(nil, path.Join(test.GetProjectDir(), "test/assets/"), nil, nil, nil)
 	assert.Error(t, err)
 }
 
@@ -381,7 +381,7 @@ func TestNewManager_InternalApplicationManagement(t *testing.T) {
 		if app, err := db.GetApplicationByToken("Ainternal_obsolete"); assert.NoError(t, err) {
 			assert.True(t, app.Internal)
 		}
-		_, err := NewManager(db, "", nil, nil)
+		_, err := NewManager(db, "", nil, nil, nil)
 		assert.Nil(t, err)
 		if app, err := db.GetApplicationByToken("Ainternal_obsolete"); assert.NoError(t, err) {
 			assert.False(t, app.Internal)
@@ -407,7 +407,7 @@ func TestNewManager_InternalApplicationManagement(t *testing.T) {
 		if app, err := db.GetApplicationByToken("Ainternal_not_loaded"); assert.NoError(t, err) {
 			assert.True(t, app.Internal)
 		}
-		_, err := NewManager(db, "", nil, nil)
+		_, err := NewManager(db, "", nil, nil, nil)
 		assert.Nil(t, err)
 		if app, err := db.GetApplicationByToken("Ainternal_not_loaded"); assert.NoError(t, err) {
 			assert.False(t, app.Internal)
@@ -434,7 +434,7 @@ func TestNewManager_InternalApplicationManagement(t *testing.T) {
 		if app, err := db.GetApplicationByToken("Ainternal_loaded"); assert.NoError(t, err) {
 			assert.False(t, app.Internal)
 		}
-		manager, err := NewManager(db, "", nil, nil)
+		manager, err := NewManager(db, "", nil, nil, nil)
 		assert.Nil(t, err)
 		assert.Nil(t, manager.LoadPlugin(new(mock.Plugin)))
 		assert.Nil(t, manager.InitializeForUserID(1))
@@ -457,7 +457,7 @@ func TestNewManager_MessengerAddedAfterInit_createsApplication(t *testing.T) {
 		Token:      auth.GeneratePluginToken(),
 	}))
 
-	manager, err := NewManager(db, "", nil, nil)
+	manager, err := NewManager(db, "", nil, nil, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, manager.LoadPlugin(new(mock.Plugin)))
 	// The mock plugin supports Messenger, so re-initializing must back-fill the
@@ -518,7 +518,7 @@ func TestNewManager_MessengerAddedAfterInit_createApplicationError(t *testing.T)
 	}
 	seedMessengerConfWithoutApplication(t, db)
 
-	manager, err := NewManager(db, "", nil, nil)
+	manager, err := NewManager(db, "", nil, nil, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, manager.LoadPlugin(new(mock.Plugin)))
 
@@ -534,7 +534,7 @@ func TestNewManager_MessengerAddedAfterInit_updatePluginConfError(t *testing.T) 
 	}
 	seedMessengerConfWithoutApplication(t, db)
 
-	manager, err := NewManager(db, "", nil, nil)
+	manager, err := NewManager(db, "", nil, nil, nil)
 	assert.Nil(t, err)
 	assert.Nil(t, manager.LoadPlugin(new(mock.Plugin)))
 
@@ -545,7 +545,7 @@ func TestNewManager_MessengerAddedAfterInit_updatePluginConfError(t *testing.T) 
 
 func TestInstallPlugin_NoDirectory_expectError(t *testing.T) {
 	db := testdb.NewDBWithDefaultUser(t)
-	manager, err := NewManager(db, "", nil, nil)
+	manager, err := NewManager(db, "", nil, nil, nil)
 	assert.NoError(t, err)
 
 	_, _, err = manager.InstallPlugin("example.so", strings.NewReader("not a plugin"))
