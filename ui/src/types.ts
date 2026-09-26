@@ -388,3 +388,19 @@ export interface ISystemStats {
     databaseBytes?: number;
     dataBytes?: number;
 }
+
+
+export interface IServiceAccount {
+    id: number;
+    name: string;
+    userId: number;
+    scopes: string;
+    channelIds: string;
+    lastUsed?: string;
+    expiresAt?: string;
+    createdAt: string;
+}
+
+export interface IServiceAccountCreated extends IServiceAccount {
+    token: string;
+}
