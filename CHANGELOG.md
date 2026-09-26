@@ -2,11 +2,30 @@
 
 All notable Gotify MU changes are documented here.
 
-## Unreleased
+## [1.0.0] - 2026-09-26
 
-- Home Assistant connections can use either a Long-Lived Access Token or the native `gotify-mu-ha` integration.
-- Adds one-time native Home Assistant pairing codes, encrypted bridge credentials, inbound event routing, and outbound event delivery without a Home Assistant LLT.
-- Native pairing codes expire after 15 minutes and are invalidated after successful pairing.
+First stable Gotify MU release, promoting the completed multi-user platform and the final 1.0 interoperability work.
+
+### Home Assistant
+
+- Adds two supported Home Assistant connection methods: Long-Lived Access Token and native `gotify-mu-ha` pairing.
+- Adds one-time 15-minute pairing codes stored only as hashes and invalidated after successful pairing.
+- Encrypts native bridge secrets and Home Assistant webhook URLs at rest.
+- Adds authenticated bidirectional Home Assistant event delivery without requiring a Home Assistant Long-Lived Access Token for native pairing.
+
+### Chat Channels and MU-aware clients
+
+- Adds explicit `notification` and `chat` Channel types while preserving legacy member-posting Chat Channels.
+- Adds authenticated `/api/mu/v1/capabilities` discovery so MU-aware clients can distinguish Gotify MU from stock Gotify.
+- Adds a separate `/api/mu/v1/events` realtime WebSocket for ephemeral MU events without changing the stock Gotify `/stream` contract.
+- Adds permission-checked typing presence for Chat Channels and desktop typing indicators.
+- Preserves stock Gotify notification delivery and compatibility routes.
+
+### Release quality
+
+- Adds focused regression coverage for MU capability discovery, typing permissions/delivery, the MU realtime event queue, and native Home Assistant pairing state.
+- Publishes stable semantic versions such as `1.0.0` as normal GitHub releases while keeping `-rc` builds marked prerelease.
+- Retains the v0.5 security, automation, collaboration, connector, plugin, operations, updater, SBOM, checksum, provenance, and vulnerability-gate work as the 1.0 platform baseline.
 
 ## [0.5.0] - 2026-09-26
 
