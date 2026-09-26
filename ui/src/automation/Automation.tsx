@@ -22,6 +22,7 @@ import Schedule from '@mui/icons-material/Schedule';
 import TrendingUp from '@mui/icons-material/TrendingUp';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
+import ConfirmDialog from '../common/ConfirmDialog';
 import * as config from '../config';
 import {useStores} from '../stores';
 import {IEscalationRule, IScheduledNotification} from '../types';
@@ -43,6 +44,11 @@ const Automation = () => {
     const [escalationEdit, setEscalationEdit] =
         React.useState<IEscalationRule | null | undefined>();
     const [loading, setLoading] = React.useState(true);
+    const [confirm, setConfirm] = React.useState<{
+        title: string;
+        text: string;
+        action: () => void;
+    }>();
 
     const refresh = React.useCallback(async () => {
         setLoading(true);
@@ -106,11 +112,19 @@ const Automation = () => {
                                           : 'Disabled'
                                 }
                                 onEdit={() => setScheduleEdit(item)}
-                                onDelete={async () => {
-                                    await axios.delete(api('automation/schedule/' + item.id));
-                                    await refresh();
-                                    snackManager.snack('Schedule deleted');
-                                }}
+                                onDelete={() =>
+                                    setConfirm({
+                                        title: 'Delete Schedule?',
+                                        text: 'This scheduled notification will no longer run.',
+                                        action: () => {
+                                            void (async () => {
+                                                await axios.delete(api('automation/schedule/' + item.id));
+                                                await refresh();
+                                                snackManager.snack('Schedule deleted');
+                                            })();
+                                        },
+                                    })
+                                }
                             />
                         ))}
                     </Stack>
@@ -153,16 +167,33 @@ const Automation = () => {
                                     ' or higher and the message is still unacknowledged.'
                                 }
                                 onEdit={() => setEscalationEdit(item)}
-                                onDelete={async () => {
-                                    await axios.delete(api('automation/escalation/' + item.id));
-                                    await refresh();
-                                    snackManager.snack('Escalation deleted');
-                                }}
+                                onDelete={() =>
+                                    setConfirm({
+                                        title: 'Delete Escalation?',
+                                        text: 'Pending and future escalation behavior for this rule will stop.',
+                                        action: () => {
+                                            void (async () => {
+                                                await axios.delete(api('automation/escalation/' + item.id));
+                                                await refresh();
+                                                snackManager.snack('Escalation deleted');
+                                            })();
+                                        },
+                                    })
+                                }
                             />
                         ))}
                     </Stack>
                 )}
             </SurfaceCard>
+
+            {confirm && (
+                <ConfirmDialog
+                    title={confirm.title}
+                    text={confirm.text}
+                    fClose={() => setConfirm(undefined)}
+                    fOnSubmit={confirm.action}
+                />
+            )}
 
             {scheduleEdit !== undefined && (
                 <ScheduleDialog
@@ -205,7 +236,7 @@ const AutomationRow = ({
     detail: string;
     enabled: boolean;
     onEdit: VoidFunction;
-    onDelete: () => Promise<void>;
+    onDelete: VoidFunction;
 }) => (
     <Box sx={{p: 1.5, border: 1, borderColor: 'divider', borderRadius: 2}}>
         <Stack
@@ -243,7 +274,7 @@ const AutomationRow = ({
                     size="small"
                     color="error"
                     startIcon={<Delete />}
-                    onClick={() => void onDelete()}>
+                    onClick={onDelete}>
                     Delete
                 </Button>
             </Stack>
