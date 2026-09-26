@@ -61,6 +61,11 @@ type AutomationDatabase interface {
 
 	SetMessageAcknowledgement(userID, messageID uint, acknowledged bool, now time.Time) error
 	IsMessageAcknowledgedByUser(userID, messageID uint) (bool, error)
+
+	GetIntegrationStatus(kind string, integrationID uint) (*model.IntegrationStatus, error)
+	GetIntegrationEvents(kind string, integrationID uint, limit int) ([]*model.IntegrationEvent, error)
+	RecordIntegrationEvent(item *model.IntegrationEvent) error
+	SaveIntegrationStatus(item *model.IntegrationStatus) error
 }
 
 type AutomationAPI struct {
@@ -83,7 +88,11 @@ func (a *AutomationAPI) GetWebhookRoutes(ctx *gin.Context) {
 	items, err := a.DB.GetWebhookRoutes()
 	if !successOrAbort(ctx, 500, err) { return }
 	out := make([]model.WebhookRouteView, 0, len(items))
-	for _, item := range items { out = append(out, webhookView(item)) }
+	for _, item := range items {
+		view := webhookView(item)
+		view.Status, _ = a.DB.GetIntegrationStatus("webhook", item.ID)
+		out = append(out, view)
+	}
 	ctx.JSON(200, out)
 }
 
@@ -167,7 +176,16 @@ func (a *AutomationAPI) ReceiveWebhook(ctx *gin.Context) {
 		return
 	}
 	msg, err := a.Engine.Publish(item.ApplicationID, title, message, priority)
-	if !successOrAbort(ctx, 500, err) { return }
+	if err != nil {
+		now := time.Now().UTC()
+		_ = a.DB.SaveIntegrationStatus(&model.IntegrationStatus{Kind:"webhook", IntegrationID:item.ID, State:"error", Message:err.Error(), LastErrorAt:&now, UpdatedAt:now})
+		_ = a.DB.RecordIntegrationEvent(&model.IntegrationEvent{Kind:"webhook",IntegrationID:item.ID,Level:"error",Event:"delivery_error",Message:err.Error(),CreatedAt:now})
+		ctx.AbortWithError(500, err)
+		return
+	}
+	now := time.Now().UTC()
+	_ = a.DB.SaveIntegrationStatus(&model.IntegrationStatus{Kind:"webhook", IntegrationID:item.ID, State:"ready", Message:"Request accepted", LastEventAt:&now, UpdatedAt:now})
+	_ = a.DB.RecordIntegrationEvent(&model.IntegrationEvent{Kind:"webhook",IntegrationID:item.ID,Level:"info",Event:"request_accepted",Message:"Webhook request accepted",CreatedAt:now})
 	ctx.JSON(202, gin.H{"accepted": true, "messageId": msg.ID})
 }
 
@@ -186,7 +204,11 @@ func (a *AutomationAPI) GetMQTT(ctx *gin.Context) {
 	items, err := a.DB.GetMQTTIntegrations()
 	if !successOrAbort(ctx, 500, err) { return }
 	out := make([]model.MQTTIntegrationView, 0, len(items))
-	for _, item := range items { out = append(out, mqttView(item)) }
+	for _, item := range items {
+		view := mqttView(item)
+		view.Status, _ = a.DB.GetIntegrationStatus("mqtt", item.ID)
+		out = append(out, view)
+	}
 	ctx.JSON(200, out)
 }
 
@@ -241,7 +263,11 @@ func (a *AutomationAPI) GetHomeAssistant(ctx *gin.Context) {
 	items, err := a.DB.GetHomeAssistantIntegrations()
 	if !successOrAbort(ctx, 500, err) { return }
 	out := make([]model.HomeAssistantIntegrationView, 0, len(items))
-	for _, item := range items { out = append(out, homeAssistantView(item)) }
+	for _, item := range items {
+		view := homeAssistantView(item)
+		view.Status, _ = a.DB.GetIntegrationStatus("home-assistant", item.ID)
+		out = append(out, view)
+	}
 	ctx.JSON(200, out)
 }
 
@@ -486,6 +512,23 @@ func (a *AutomationAPI) UnacknowledgeMessage(ctx *gin.Context) {
 		if !a.canAccessMessage(ctx, id) { return }
 		if !successOrAbort(ctx, 500, a.DB.SetMessageAcknowledgement(auth.GetUserID(ctx), id, false, time.Now())) { return }
 		ctx.JSON(200, gin.H{"acknowledged":false})
+	})
+}
+
+func (a *AutomationAPI) GetIntegrationEvents(ctx *gin.Context) {
+	kind := strings.TrimSpace(ctx.Param("kind"))
+	if kind != "webhook" && kind != "mqtt" && kind != "home-assistant" {
+		ctx.AbortWithError(400, errors.New("unknown integration type"))
+		return
+	}
+	withID(ctx, "id", func(id uint) {
+		limit := 50
+		if raw := ctx.Query("limit"); raw != "" {
+			if parsed, err := strconv.Atoi(raw); err == nil { limit = parsed }
+		}
+		items, err := a.DB.GetIntegrationEvents(kind, id, limit)
+		if !successOrAbort(ctx, 500, err) { return }
+		ctx.JSON(200, items)
 	})
 }
 
