@@ -39,6 +39,7 @@ type Database interface {
 	GetMessageByID(id uint) (*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
+	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 
 	GetQuietHoursPolicy(userID uint) (*model.QuietHoursPolicy, error)
 	GetDigestPolicy(userID uint) (*model.DigestPolicy, error)
@@ -185,7 +186,30 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 	if err != nil {
 		return nil, err
 	}
+	if msg.SenderUserID != 0 {
+		for _, userID := range mentionRecipientUserIDs(msg) {
+			if userID == msg.SenderUserID {
+				continue
+			}
+			membership, membershipErr := e.db.GetApplicationMembership(msg.ApplicationID, userID)
+			if membershipErr != nil {
+				return nil, membershipErr
+			}
+			if membership != nil {
+				recipients = append(recipients, userID)
+			}
+		}
+	}
+
+	delivered := make(map[uint]struct{}, len(recipients))
 	for _, userID := range recipients {
+		if msg.SenderUserID != 0 && userID == msg.SenderUserID {
+			continue
+		}
+		if _, exists := delivered[userID]; exists {
+			continue
+		}
+		delivered[userID] = struct{}{}
 		if err := e.deliver(userID, msg, external); err != nil {
 			log.Error().Err(err).Uint("user_id", userID).Uint("message_id", msg.ID).Msg("Could not apply delivery policy")
 			e.notifier.Notify(userID, external)
@@ -198,6 +222,25 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 	}
 	e.runPostStoreHooks(msg)
 	return external, nil
+}
+
+func mentionRecipientUserIDs(msg *model.Message) []uint {
+	if msg == nil || len(msg.Extras) == 0 {
+		return nil
+	}
+	var extras map[string]json.RawMessage
+	if err := json.Unmarshal(msg.Extras, &extras); err != nil {
+		return nil
+	}
+	raw, ok := extras["gotify::mu::mentionUserIds"]
+	if !ok {
+		return nil
+	}
+	var ids []uint
+	if err := json.Unmarshal(raw, &ids); err != nil {
+		return nil
+	}
+	return ids
 }
 
 func (e *Engine) deliver(userID uint, msg *model.Message, external *model.MessageExternal) error {
