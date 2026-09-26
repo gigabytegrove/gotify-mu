@@ -48,5 +48,10 @@ const (
 	EnvOIDCIDPName                      = "GOTIFY_OIDC_IDP_NAME"
 	EnvOIDCAutoRedirect                 = "GOTIFY_OIDC_AUTO_REDIRECT"
 	EnvOIDCPrompt                       = "GOTIFY_OIDC_PROMPT"
-	EnvNoColor                          = "NOCOLOR"
+	EnvSecuritySecretKey                 = "GOTIFY_SECURITY_SECRETKEY"
+	EnvSecurityLoginMaxAttempts          = "GOTIFY_SECURITY_LOGIN_MAXATTEMPTS"
+	EnvSecurityLoginWindowSeconds        = "GOTIFY_SECURITY_LOGIN_WINDOWSECONDS"
+	EnvSecurityLoginBlockSeconds         = "GOTIFY_SECURITY_LOGIN_BLOCKSECONDS"
+	EnvSecurityWebhookRequestsPerMinute  = "GOTIFY_SECURITY_WEBHOOK_REQUESTSPERMINUTE"
+	EnvNoColor                           = "NOCOLOR"
 )
