@@ -5,11 +5,10 @@ This document is the maintained deployment, validation, update, backup, and roll
 ## Release state
 
 - **Current published baseline:** v0.2.2
-- **Current preview candidate:** v0.3.0 on PR #20
-- **Last validated v0.3.0 application commit:** `05bcd71fd8501161d6d35e41bae2dc17214f968a`
-- v0.3.0 is not the published baseline until the preview is accepted, merged, tagged, and released.
+- **Current preview candidate:** v0.5.0 on PR #22
+- v0.5.0 is not the published baseline until the complete validation gate passes and the preview is accepted, merged, tagged, and released.
 
-Documentation-only commits may be newer than the validated application commit without changing the tested server/UI binaries.
+The release candidate must be validated at the exact commit that is merged. Documentation-only changes are part of the release candidate and must pass the same repository gate.
 
 ## Supported deployment models
 
@@ -247,60 +246,97 @@ Preview branches are deployed manually and must pass the full validation gate.
 
 The in-app updater is intended for **published numbered releases**. A preview branch should not be presented as a normal downloadable release until it has been accepted, merged, tagged, and published.
 
-For v0.3.0 specifically:
+## v0.5.0 live validation checklist
 
-- v0.2.2 remains the published rollback baseline while PR #20 is under validation.
-- the v0.3.0 preview has passed the complete Web UI build and full Go test suite in the validated Docker deployment.
-- the preview must complete live integration/automation checks before release publication.
-
-## v0.3.0 live validation checklist
-
-Before v0.3.0 is locked as a release:
+Before v0.5.0 is locked as a release:
 
 ### Core compatibility
 
 - existing administrator login works
-- existing users and Channels are intact
+- existing users, Groups, Channels, messages, archives, and tokens are intact
 - existing application tokens continue to publish
 - existing client-token access works
 - official Gotify Android receive/display behavior remains normal
-- shared Channel delivery remains correct
+- shared and Global Channel delivery remains correct
+- per-user mute, archive/restore, and destructive-action protections remain correct
 
-### Integrations
+### Identity and security
 
-- create an inbound Webhook
-- send JSON through the Webhook and confirm Channel delivery
-- regenerate the Webhook URL and confirm the old URL no longer works
-- create/edit/delete an MQTT connection
-- verify an MQTT topic message reaches the selected Channel
-- create/edit a Home Assistant connection
-- verify Home Assistant event intake
-- use **Send Test Event** and verify Home Assistant receives the outbound event
+- local authentication works
+- configured OIDC authentication remains functional
+- LDAP / Active Directory authentication works when enabled
+- TOTP MFA enrollment, verification, recovery codes, and policy enforcement work
+- WebAuthn/passkey registration and authentication work
+- active-session listing and revocation work
+- service-account/API credentials enforce their configured scopes
+- protected integration and connector secrets are not returned in plaintext
+- login throttling and security-event auditing work
+
+### Channels, permissions, and collaboration
+
+- Channel roles enforce Owner, Manager, Publisher, Member, and Read Only permissions
+- Group-to-Channel assignment grants the intended inherited access
+- replies/threads, reactions, mentions, assignment, resolve/reopen, and read state work
+- attachments can be created, retrieved, and removed under the correct permissions
+- message templates and saved searches persist and execute correctly
+- acknowledgement history is visible and accurate
+
+### Native integrations
+
+- Webhook Router accepts valid requests and rejects invalid signature, replay, CIDR, rate-limit, and oversized-payload cases
+- MQTT connects using configured protocol/TLS settings and routes QoS 0/1/2 messages
+- Home Assistant receives filtered events and can send an outbound test event
+- integration health, last-event/message, reconnect, and error state are accurate
+
+### First-party connectors
+
+- Email Delivery sends qualifying notifications through SMTP
+- SMTP Receiver accepts permitted mail and routes it to the intended Channel
+- RSS / Atom polling applies duplicate, title, and category filters
+- Syslog Receiver applies source/facility/severity filters and duplicate suppression
+- Calendar / iCal polling generates reminders once per intended event/window
 
 ### Automation
 
-- create a one-time Scheduled Notification and verify delivery
-- create recurring schedule types and verify the calculated next run
-- create an Escalation rule
-- verify an unacknowledged qualifying message escalates
-- acknowledge a message before its deadline and verify escalation stops
-- undo acknowledgement successfully
+- one-time, hourly, daily, weekly, and cron Scheduled Notifications run correctly
+- excluded dates, end dates, maximum runs, and misfire behavior are honored
+- schedule execution history records outcomes
+- Quiet Hours suppression and deferred delivery work
+- Digest queues and stored summaries work
+- Escalations honor acknowledgement cancellation, repeat rules, targets, and depth protection
+- multi-instance leases prevent duplicate scheduler/integration execution
 
-### Personal notification preferences
+### Plugins
 
-- enable and save Quiet Hours
-- verify lower-priority realtime delivery is suppressed during the window
-- verify high-priority bypass works
-- enable Digest
-- verify lower-priority messages are summarized at the configured interval
-- verify immediate-priority messages bypass Digest
+- verified plugin upload/install works
+- checksum/signature/trusted-key policy is enforced
+- Plugin Catalog install/update works
+- plugin update and uninstall work
+- plugin-created notifications pass through Gotify MU delivery policy
 
-### Administration
+### Operations and updater
 
-- Integration and Automation changes appear in the Audit Log
-- Settings remains stable and does not repeatedly reload
-- Software Update remains functional
-- server and database health remain green
+- Operations counters and diagnostics load
+- backup creation/download works
+- restore staging validates an accepted backup without modifying live data until explicitly applied
+- configuration and Audit Log export work
+- retention cleanup runs without removing protected/live records
+- Settings remains stable and does not enter a refresh loop
+- managed update status exposes meaningful progress
+- checksum verification, full-test build, health verification, and automatic container rollback behave correctly
+
+### Final deployment gate
+
+- complete Web UI build passes
+- Go lint passes
+- complete Go test suite passes
+- repository consistency checks pass
+- production Docker build with `RUN_TESTS=1` passes
+- filesystem/dependency and built-container vulnerability gates pass
+- SPDX SBOM is generated
+- database migrations succeed against a verified copy of the existing deployment data
+- application and database health are green after upgrade
+- rollback container and verified pre-upgrade backup are retained until live acceptance is complete
 
 ## Release publication
 
