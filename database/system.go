@@ -135,7 +135,7 @@ func (d *GormDatabase) GetOperationsSummary(dialect string) (model.OperationsSum
 
 
 func (d *GormDatabase) CreateBackupSnapshot(destination string) error {
-	if d.DB.Dialector.Name() != "sqlite" {
+	if d.DB.Name() != "sqlite" {
 		return errors.New("online backup bundles currently require SQLite")
 	}
 	if err := os.MkdirAll(filepath.Dir(destination), 0o700); err != nil {
