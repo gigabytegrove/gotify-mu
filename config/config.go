@@ -58,6 +58,14 @@ type DefaultUser struct {
 	Pass string
 }
 
+type Security struct {
+	SecretKey                string
+	LoginMaxAttempts         int
+	LoginWindowSeconds       int
+	LoginBlockSeconds        int
+	WebhookRequestsPerMinute int
+}
+
 type OIDC struct {
 	Enabled        bool
 	Issuer         string
@@ -86,6 +94,7 @@ type Configuration struct {
 	PluginsDir        string
 	Registration      bool
 	LocalAuthEnabled  bool
+	Security          Security
 	OIDC              OIDC
 	NoColor           string
 }
@@ -119,6 +128,12 @@ func Get() (*Configuration, []FutureLog) {
 		UploadedImagesDir: "data/images",
 		PluginsDir:        "data/plugins",
 		LocalAuthEnabled:  true,
+		Security: Security{
+			LoginMaxAttempts:         10,
+			LoginWindowSeconds:       300,
+			LoginBlockSeconds:        900,
+			WebhookRequestsPerMinute: 120,
+		},
 		OIDC: OIDC{
 			UsernameClaim: "preferred_username",
 			AutoRegister:  true,
@@ -178,6 +193,11 @@ func Get() (*Configuration, []FutureLog) {
 	add(parseString(&c.PluginsDir, EnvPluginsDir))
 	add(parseBool(&c.Registration, EnvRegistration))
 	add(parseBool(&c.LocalAuthEnabled, EnvLocalAuthEnabled))
+	add(parseString(&c.Security.SecretKey, EnvSecuritySecretKey))
+	add(parseInt(&c.Security.LoginMaxAttempts, EnvSecurityLoginMaxAttempts))
+	add(parseInt(&c.Security.LoginWindowSeconds, EnvSecurityLoginWindowSeconds))
+	add(parseInt(&c.Security.LoginBlockSeconds, EnvSecurityLoginBlockSeconds))
+	add(parseInt(&c.Security.WebhookRequestsPerMinute, EnvSecurityWebhookRequestsPerMinute))
 
 	add(parseBool(&c.OIDC.Enabled, EnvOIDCEnabled))
 	add(parseString(&c.OIDC.Issuer, EnvOIDCIssuer))
@@ -204,6 +224,15 @@ func Get() (*Configuration, []FutureLog) {
 	}
 	if c.Registration && !c.LocalAuthEnabled {
 		logs = append(logs, futureFatal("registration requires local authentication to be enabled"))
+	}
+	if strings.TrimSpace(c.Security.SecretKey) == "" {
+		logs = append(logs, futureFatal("GOTIFY_SECURITY_SECRETKEY is required; generate a random 32-byte key and provide it as 64 hex characters or base64"))
+	}
+	if c.Security.LoginMaxAttempts < 1 || c.Security.LoginWindowSeconds < 1 || c.Security.LoginBlockSeconds < 1 {
+		logs = append(logs, futureFatal("login rate-limit settings must be positive"))
+	}
+	if c.Security.WebhookRequestsPerMinute < 1 {
+		logs = append(logs, futureFatal("GOTIFY_SECURITY_WEBHOOK_REQUESTSPERMINUTE must be positive"))
 	}
 	return c, logs
 }
