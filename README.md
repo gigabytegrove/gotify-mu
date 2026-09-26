@@ -8,7 +8,7 @@
 
 Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
 
-> **Current release:** **v0.2.1** (pre-release). v0.2.1 adds managed in-app Docker updates on top of the v0.2.0 multi-user foundation. Pre-1.0 builds should still be validated in the target environment before production rollout.
+> **Current release:** **v0.5.0** (pre-release). It is the current Gotify MU security, reliability, integration, collaboration, plugin, and operations release.
 
 ## Why Gotify MU?
 
@@ -62,6 +62,23 @@ The Web UI uses **Channels** as the user-facing term and provides:
 - Responsive desktop and mobile-web navigation
 - Consistent dialogs, tables, cards, status indicators, and destructive-action language
 - Administrator update discovery with Dashboard notices, direct release downloads, and managed in-app installation from Settings
+- Native Integrations administration for Webhooks, MQTT, and Home Assistant
+- Native Automation administration for Scheduled Notifications and Escalations
+- Per-user Quiet Hours and Digest preferences
+- Per-user message acknowledgement in Message History
+- TOTP MFA, recovery codes, and WebAuthn/passkeys
+- LDAP / Active Directory authentication
+- Scoped service accounts/API credentials
+- Owner / Manager / Publisher / Member / Read Only Channel roles
+- Group-to-Channel assignment
+- Replies/threads, reactions, mentions, assignment, resolve/reopen, attachments, templates, and saved searches
+- Cron/custom scheduling, schedule history, deferred Quiet Hours, stored Digests, and richer Escalations
+- Hardened Webhooks with signing, replay defense, CIDR rules, rate limiting, templates, conditions, and history
+- MQTT 5 / 3.1.1 with QoS 0/1/2, custom CA and mutual TLS
+- Home Assistant event/entity/data filtering with connection diagnostics
+- First-party Email Delivery, SMTP Receiver, RSS/Atom, Syslog, and Calendar/iCal connectors
+- Signed/checksummed Plugin Catalog installs, updates, and uninstall
+- Operations, backup/restore, diagnostics, active-session administration, audit export/retention, and hardened updates
 
 The underlying `/application` API naming remains in place to avoid breaking existing clients and integrations.
 
@@ -69,7 +86,7 @@ The official Gotify Android app is not modified by the Web UI rewrite.
 
 Administrators can install compatible Linux Go plugin binaries from **Plugins → Install Plugin**. Uploaded plugins are stored under the configured `GOTIFY_PLUGINSDIR` (the default Docker data volume resolves to `/app/data/plugins`) and are loaded immediately. Plugin binaries execute native code inside the Gotify MU process, so only trusted plugins built for the matching Gotify MU/Go ABI and server architecture should be installed.
 
-Authentication/security work such as MFA/2FA, passkeys, and LDAP/Active Directory is tracked separately in [docs/ROADMAP.md](docs/ROADMAP.md). Those features are planned and are not implied to be active by the redesigned UI.
+Authentication and security controls including MFA, passkeys, LDAP/Active Directory, session policy, service accounts, encrypted stored secrets, and audit/security administration are implemented in the v0.5 preview. See [docs/SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md) for the current security status and trust boundaries.
 
 ### Gotify MU channel-management API
 
@@ -117,16 +134,16 @@ The official Gotify Android app continues to receive Chat Channel messages as no
 
 ## Releases
 
-The current release baseline is **Gotify MU v0.2.1**.
+The current published release is **Gotify MU v0.5.0** (pre-release). Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed notes in [docs/releases/v0.5.0.md](docs/releases/v0.5.0.md).
 
-Release history and compatibility notes are tracked in [CHANGELOG.md](CHANGELOG.md). Detailed v0.2.1 notes are available in [docs/releases/v0.2.1.md](docs/releases/v0.2.1.md), with the original multi-user baseline documented in [docs/releases/v0.2.0.md](docs/releases/v0.2.0.md).
+Deployment, validation, updater, backup, and rollback procedures are maintained in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 For a release checkout:
 
 ```bash
 git clone https://github.com/gigabytegrove/gotify-mu.git
 cd gotify-mu
-git checkout v0.2.1
+git checkout v0.5.0
 ```
 
 Release builds inject the release version, commit, and build date into the server binary. Development builds continue to use `master-<commit>`, `master-local`, or `dev-<commit>` identities as appropriate.
@@ -170,6 +187,7 @@ GOTIFY_MU_COMMIT=local
 GOTIFY_MU_PORT=8080
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
+GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
 
 Then build and start Gotify MU:
@@ -178,7 +196,7 @@ Then build and start Gotify MU:
 docker compose up -d --build
 ```
 
-The default deployment publishes Gotify MU on port `8080`.
+The default deployment publishes the Web UI/API on port `8080`. Native SMTP and Syslog receivers are mapped to ports `2525/tcp` and `5514/udp` but bind to `127.0.0.1` by default. Set `GOTIFY_MU_RECEIVER_BIND` to a trusted LAN/host address only when remote devices must reach those listeners.
 
 Open:
 
@@ -242,17 +260,20 @@ Docker socket access is privileged host access. If managed self-updating is not 
 
 ### Updating a development installation
 
-After new changes are merged into `master`:
+Development and preview builds should be validated with the full Web UI build and Go test suite before replacing a running container. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for the validated upgrade and rollback procedure.
+
+For ordinary Compose development after changes are merged into `master`:
 
 ```bash
 cd /opt/gotify-mu
-git pull origin master
-docker compose up -d --build
+git pull --ff-only origin master
+docker compose build --build-arg RUN_TESTS=1
+docker compose up -d
 ```
 
-Your `./data` directory remains in place.
+Your `./data` directory remains in place. Keep a verified pre-upgrade data backup whenever a build introduces database migrations.
 
-### Building the v0.2.1 release manually
+### Building the current published release manually
 
 After checking out the release tag, build with explicit release identity:
 
@@ -264,10 +285,10 @@ COMMIT="$(git rev-parse --short HEAD)"
 docker build --no-cache \
   --build-arg BUILD_JS=1 \
   --build-arg GO_VERSION=1.26.0 \
-  --build-arg GOTIFY_MU_VERSION="0.2.1" \
+  --build-arg GOTIFY_MU_VERSION="0.5.0" \
   --build-arg GOTIFY_MU_COMMIT="${COMMIT}" \
   -f docker/Dockerfile \
-  -t gotify-mu:0.2.1 \
+  -t gotify-mu:0.5.0 \
   .
 ```
 
@@ -320,7 +341,7 @@ go build -o gotify-mu .
 
 ### First-test checklist
 
-For the current development build, verify these behaviors before treating an installation as production-ready:
+For the current development or preview build, verify these behaviors before treating an installation as production-ready:
 
 1. The Gotify MU Web UI loads.
 2. The administrator can sign in.
@@ -338,6 +359,14 @@ For the current development build, verify these behaviors before treating an ins
 14. The official Gotify Android app receives notifications normally.
 15. Deleting a shared message for one user does not remove it for other members.
 16. Private channels retain normal Gotify delete behavior.
+17. Webhook routes can deliver JSON/plain-text payloads to the selected Channel.
+18. MQTT connections can subscribe and route messages to the selected Channel.
+19. Home Assistant can receive events and send a test event back successfully.
+20. Scheduled Notifications run at the expected local/timezone-aware time.
+21. Acknowledging a message prevents a pending Escalation from firing.
+22. Quiet Hours save correctly and suppress only lower-priority realtime delivery.
+23. Digest settings save correctly and collect lower-priority notifications.
+24. Settings remains stable and does not enter a refresh loop after updates.
 
 ### Future container namespace
 
@@ -355,11 +384,11 @@ The MU database migration is additive. Existing users, applications, tokens and 
 
 **Back up your database before testing an upgrade.** This project is still in active development.
 
-## Security roadmap
+## Security
 
-MFA/2FA, LDAP/Active Directory authentication, stronger session policy, and security auditing are tracked separately from the UI rewrite so authentication changes can be implemented and tested without destabilizing client compatibility.
+The v0.5 preview includes MFA/TOTP, recovery codes, passkeys, LDAP/Active Directory, service accounts, login throttling, encrypted stored secrets, session policy, audit/security administration, hardened Webhooks, plugin signature verification, and a hardened managed updater.
 
-See `docs/SECURITY_ROADMAP.md`.
+See `docs/SECURITY_ROADMAP.md` for implementation status and trust-boundary details.
 
 ## Development
 

@@ -77,10 +77,47 @@ func (d *GormDatabase) DeleteApplicationByID(id uint) error {
 	if err := d.DeleteMessagesByApplication(id); err != nil {
 		return err
 	}
-	if err := d.DB.Where("application_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil {
-		return err
-	}
-	return d.DB.Where("id = ?", id).Delete(&model.Application{}).Error
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		var escalationRuleIDs []uint
+		if err := tx.Model(&model.EscalationRule{}).
+			Where("source_application_id = ? OR target_application_id = ?", id, id).
+			Pluck("id", &escalationRuleIDs).Error; err != nil {
+			return err
+		}
+		if len(escalationRuleIDs) > 0 {
+			if err := tx.Where("rule_id IN ?", escalationRuleIDs).Delete(&model.EscalationState{}).Error; err != nil {
+				return err
+			}
+			if err := tx.Where("id IN ?", escalationRuleIDs).Delete(&model.EscalationRule{}).Error; err != nil {
+				return err
+			}
+		}
+		if err := tx.Where("application_id = ?", id).Delete(&model.WebhookRoute{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.MQTTIntegration{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.HomeAssistantIntegration{}).Error; err != nil { return err }
+		var scheduleIDs []uint
+		if err := tx.Model(&model.ScheduledNotification{}).Where("application_id = ?", id).Pluck("id", &scheduleIDs).Error; err != nil { return err }
+		if len(scheduleIDs) > 0 {
+			if err := tx.Where("schedule_id IN ?", scheduleIDs).Delete(&model.ScheduledNotificationRun{}).Error; err != nil { return err }
+		}
+		if err := tx.Where("application_id = ?", id).Delete(&model.ScheduledNotification{}).Error; err != nil { return err }
+		if err := tx.Where("source_application_id = ?", id).Delete(&model.EmailGateway{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.SMTPRoute{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.RSSMonitor{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.SyslogRoute{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.CalendarMonitor{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationGroupAssignment{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil { return err }
+		if err := tx.Where("application_id = ?", id).Delete(&model.ApplicationMembership{}).Error; err != nil { return err }
+		return tx.Where("id = ?", id).Delete(&model.Application{}).Error
+	})
+}
+
+// GetApplications returns all non-internal Channels.
+func (d *GormDatabase) GetApplications() ([]*model.Application, error) {
+	var applications []*model.Application
+	err := d.DB.Where("internal = ?", false).Order("name asc, id asc").Find(&applications).Error
+	return applications, err
 }
 
 // GetApplicationsByUser returns all applications from a user.

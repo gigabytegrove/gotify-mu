@@ -5,6 +5,7 @@ services:
       dockerfile: docker/Dockerfile
       args:
         BUILD_JS: "1"
+        RUN_TESTS: "1"
         GO_VERSION: "1.26.0"
         GOTIFY_MU_VERSION: "${GOTIFY_MU_VERSION:-master-local}"
         GOTIFY_MU_COMMIT: "${GOTIFY_MU_COMMIT:-local}"
@@ -13,6 +14,8 @@ services:
     restart: unless-stopped
     ports:
       - "${GOTIFY_MU_PORT:-8080}:80"
+      - "${GOTIFY_MU_RECEIVER_BIND:-127.0.0.1}:${GOTIFY_MU_SMTP_PORT:-2525}:2525"
+      - "${GOTIFY_MU_RECEIVER_BIND:-127.0.0.1}:${GOTIFY_MU_SYSLOG_PORT:-5514}:5514/udp"
     environment:
       GOTIFY_DEFAULTUSER_NAME: "${GOTIFY_DEFAULTUSER_NAME:-admin}"
       GOTIFY_DEFAULTUSER_PASS: "${GOTIFY_DEFAULTUSER_PASS:?Set GOTIFY_DEFAULTUSER_PASS in .env}"

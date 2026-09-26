@@ -48,9 +48,14 @@ type Notifier interface {
 }
 
 // The MessageAPI provides handlers for managing messages.
+type MessageDispatcher interface {
+	StoreAndDeliver(message *model.Message) (*model.MessageExternal, error)
+}
+
 type MessageAPI struct {
-	DB       MessageDatabase
-	Notifier Notifier
+	DB         MessageDatabase
+	Notifier   Notifier
+	Dispatcher MessageDispatcher
 }
 
 type pagingParams struct {
@@ -597,6 +602,14 @@ func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
 		isAdmin := user != nil && user.Admin
 
 		allowed := app.UserID == userID || isAdmin
+		if !allowed {
+			membership, membershipErr := a.DB.GetApplicationMembership(id, userID)
+			if membershipErr != nil {
+				ctx.AbortWithError(500, membershipErr)
+				return
+			}
+			allowed = membership != nil && membership.EffectiveRole == model.ChannelRoleManager
+		}
 		if app.AutoAssign {
 			allowed = isAdmin
 		}
@@ -680,27 +693,29 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		}
 
 		if fetchedApp.UserID != userID {
-			if !fetchedApp.AllowMemberPost {
-				ctx.AbortWithError(400, errors.New("appid not found"))
-				return
-			}
 			membership, err := a.DB.GetApplicationMembership(fetchedApp.ID, userID)
-			if success := successOrAbort(ctx, 500, err); !success {
-				return
-			}
+			if success := successOrAbort(ctx, 500, err); !success { return }
 			if membership == nil {
 				ctx.AbortWithError(400, errors.New("appid not found"))
 				return
 			}
-		}
-
-		postingUser, err = a.DB.GetUserByID(userID)
-		if success := successOrAbort(ctx, 500, err); !success {
-			return
-		}
-		if postingUser == nil {
-			ctx.AbortWithError(400, errors.New("user not found"))
-			return
+			role := membership.EffectiveRole
+			canPost := role == model.ChannelRoleManager ||
+				role == model.ChannelRolePublisher ||
+				(role == model.ChannelRoleMember && fetchedApp.AllowMemberPost)
+			if !canPost {
+				ctx.AbortWithError(403, errors.New("your Channel role does not allow posting"))
+				return
+			}
+			postingUser, err = a.DB.GetUserByID(userID)
+			if success := successOrAbort(ctx, 500, err); !success { return }
+			if postingUser == nil {
+				ctx.AbortWithError(400, errors.New("user not found"))
+				return
+			}
+		} else if fetchedApp.AllowMemberPost {
+			postingUser, err = a.DB.GetUserByID(userID)
+			if success := successOrAbort(ctx, 500, err); !success { return }
 		}
 		app = fetchedApp
 	}
@@ -718,22 +733,30 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 		message.Priority = &app.DefaultPriority
 	}
 
-	recipients, err := a.DB.GetApplicationRecipientUserIDs(app.ID)
-	if success := successOrAbort(ctx, 500, err); !success {
-		return
-	}
-
 	msgInternal := toInternalMessage(&message)
 	if postingUser != nil {
 		msgInternal.SenderUserID = postingUser.ID
 		msgInternal.SenderName = postingUser.Name
 	}
-	if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
-		return
-	}
-	external := toExternalMessage(msgInternal)
-	for _, userID := range recipients {
-		a.Notifier.Notify(userID, external)
+	var external *model.MessageExternal
+	if a.Dispatcher != nil {
+		dispatched, dispatchErr := a.Dispatcher.StoreAndDeliver(msgInternal)
+		if success := successOrAbort(ctx, 500, dispatchErr); !success {
+			return
+		}
+		external = dispatched
+	} else {
+		if success := successOrAbort(ctx, 500, a.DB.CreateMessage(msgInternal)); !success {
+			return
+		}
+		external = toExternalMessage(msgInternal)
+		recipients, recipientErr := a.DB.GetApplicationRecipientUserIDs(app.ID)
+		if success := successOrAbort(ctx, 500, recipientErr); !success {
+			return
+		}
+		for _, userID := range recipients {
+			a.Notifier.Notify(userID, external)
+		}
 	}
 	ctx.JSON(200, external)
 }
@@ -764,7 +787,19 @@ func toExternalMessage(msg *model.Message) *model.MessageExternal {
 		Priority:      &msg.Priority,
 		Date:          msg.Date,
 		SenderUserID:  msg.SenderUserID,
-		SenderName:    msg.SenderName,
+		SenderName:             msg.SenderName,
+		ParentMessageID:        msg.ParentMessageID,
+		RootMessageID:          msg.RootMessageID,
+		EscalationRuleID:       msg.EscalationRuleID,
+		EscalationDepth:        msg.EscalationDepth,
+		ReplyToMessageID:       msg.ReplyToMessageID,
+		ThreadRootMessageID:    msg.ThreadRootMessageID,
+		Collaboration:          msg.Collaboration,
+		Acknowledged:           msg.Acknowledged,
+		AcknowledgedByAnyone:   msg.AcknowledgedByAnyone,
+		AcknowledgementCount:   msg.AcknowledgementCount,
+		LastAcknowledgedBy:     msg.LastAcknowledgedBy,
+		LastAcknowledgedAt:     msg.LastAcknowledgedAt,
 	}
 	if len(msg.Extras) != 0 {
 		res.Extras = make(map[string]any)

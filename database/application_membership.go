@@ -88,26 +88,33 @@ func backfillApplicationMemberships(tx *gorm.DB) error {
 func (d *GormDatabase) GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error) {
 	membership := new(model.ApplicationMembership)
 	err := d.DB.Where("application_id = ? AND user_id = ?", applicationID, userID).Find(membership).Error
-	if err == gorm.ErrRecordNotFound {
-		err = nil
-	}
-	if membership.ApplicationID == applicationID && membership.UserID == userID {
-		return membership, err
-	}
-	return nil, err
+	if err == gorm.ErrRecordNotFound { err = nil }
+	if membership.ApplicationID != applicationID || membership.UserID != userID { return nil, err }
+	app, appErr := d.GetApplicationByID(applicationID)
+	if appErr != nil { return nil, appErr }
+	membership.EffectiveRole = model.EffectiveChannelRole(app != nil && app.UserID == userID, membership)
+	return membership, err
 }
 
 func (d *GormDatabase) GetApplicationMemberships(applicationID uint) ([]*model.ApplicationMembership, error) {
 	var memberships []*model.ApplicationMembership
 	err := d.DB.Where("application_id = ?", applicationID).Order("user_id ASC").Find(&memberships).Error
-	return memberships, err
+	if err != nil { return nil, err }
+	app, appErr := d.GetApplicationByID(applicationID)
+	if appErr != nil { return nil, appErr }
+	for _, membership := range memberships {
+		membership.EffectiveRole = model.EffectiveChannelRole(app != nil && app.UserID == membership.UserID, membership)
+	}
+	return memberships, nil
 }
 
 func (d *GormDatabase) UpsertApplicationMembership(membership *model.ApplicationMembership) error {
 	membership.AutoAssigned = false
+	if membership.Role == "" { membership.Role = model.ChannelRoleMember }
+	membership.Role = model.NormalizeChannelRole(membership.Role)
 	return d.DB.Clauses(clause.OnConflict{
-		Columns:   []clause.Column{{Name: "application_id"}, {Name: "user_id"}},
-		DoUpdates: clause.AssignmentColumns([]string{"receive_notifications", "auto_assigned", "updated_at"}),
+		Columns: []clause.Column{{Name:"application_id"},{Name:"user_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"receive_notifications","role","auto_assigned","updated_at"}),
 	}).Create(membership).Error
 }
 
@@ -137,7 +144,7 @@ func (d *GormDatabase) SetApplicationMembershipNotifications(
 ) error {
 	result := d.DB.Model(&model.ApplicationMembership{}).
 		Where("application_id = ? AND user_id = ?", applicationID, userID).
-		Update("receive_notifications", enabled)
+		Updates(map[string]any{"receive_notifications":enabled, "notification_override":enabled})
 	if result.Error != nil {
 		return result.Error
 	}
@@ -243,5 +250,121 @@ func (d *GormDatabase) SetApplicationAutoAssign(applicationID uint, enabled bool
 		}
 		return tx.Where("application_id = ? AND auto_assigned = ?", applicationID, true).
 			Delete(&model.ApplicationMembership{}).Error
+	})
+}
+
+
+type groupAccess struct {
+	role    string
+	receive bool
+}
+
+func (d *GormDatabase) GetApplicationGroupAssignments(applicationID uint) ([]*model.ApplicationGroupAssignment, error) {
+	var items []*model.ApplicationGroupAssignment
+	err := d.DB.Where("application_id = ?", applicationID).Order("group_id asc").Find(&items).Error
+	return items, err
+}
+
+func (d *GormDatabase) UpsertApplicationGroupAssignment(item *model.ApplicationGroupAssignment) error {
+	item.Role = model.NormalizeChannelRole(item.Role)
+	if err := d.DB.Clauses(clause.OnConflict{
+		Columns: []clause.Column{{Name:"application_id"},{Name:"group_id"}},
+		DoUpdates: clause.AssignmentColumns([]string{"role","receive_notifications","updated_at"}),
+	}).Create(item).Error; err != nil {
+		return err
+	}
+	return d.SyncApplicationGroupAssignments(item.ApplicationID)
+}
+
+func (d *GormDatabase) DeleteApplicationGroupAssignment(applicationID, groupID uint) error {
+	if err := d.DB.Where("application_id = ? AND group_id = ?", applicationID, groupID).
+		Delete(&model.ApplicationGroupAssignment{}).Error; err != nil {
+		return err
+	}
+	return d.SyncApplicationGroupAssignments(applicationID)
+}
+
+func (d *GormDatabase) SyncGroupAssignmentsForGroup(groupID uint) error {
+	var appIDs []uint
+	if err := d.DB.Model(&model.ApplicationGroupAssignment{}).
+		Where("group_id = ?", groupID).
+		Distinct("application_id").
+		Pluck("application_id", &appIDs).Error; err != nil {
+		return err
+	}
+	for _, applicationID := range appIDs {
+		if err := d.SyncApplicationGroupAssignments(applicationID); err != nil { return err }
+	}
+	return nil
+}
+
+func (d *GormDatabase) SyncApplicationGroupAssignments(applicationID uint) error {
+	app, err := d.GetApplicationByID(applicationID)
+	if err != nil { return err }
+	if app == nil { return nil }
+
+	assignments, err := d.GetApplicationGroupAssignments(applicationID)
+	if err != nil { return err }
+	desired := make(map[uint]groupAccess)
+	for _, assignment := range assignments {
+		members, memberErr := d.GetUserGroupMembers(assignment.GroupID)
+		if memberErr != nil { return memberErr }
+		for _, user := range members {
+			current := desired[user.ID]
+			if model.ChannelRoleRank(assignment.Role) > model.ChannelRoleRank(current.role) {
+				current.role = model.NormalizeChannelRole(assignment.Role)
+			}
+			current.receive = current.receive || assignment.ReceiveNotifications
+			desired[user.ID] = current
+		}
+	}
+
+	var memberships []*model.ApplicationMembership
+	if err := d.DB.Where("application_id = ?", applicationID).Find(&memberships).Error; err != nil { return err }
+	existing := make(map[uint]*model.ApplicationMembership, len(memberships))
+	for _, membership := range memberships { existing[membership.UserID] = membership }
+
+	return d.DB.Transaction(func(tx *gorm.DB) error {
+		for userID, membership := range existing {
+			access, assigned := desired[userID]
+			if assigned {
+				membership.GroupAssigned = true
+				membership.GroupRole = access.role
+				membership.GroupReceiveNotifications = access.receive
+				if membership.NotificationOverride != nil {
+					membership.ReceiveNotifications = *membership.NotificationOverride
+				} else if membership.Role == "" && !membership.AutoAssigned && userID != app.UserID {
+					membership.ReceiveNotifications = access.receive
+				}
+				if err := tx.Save(membership).Error; err != nil { return err }
+				delete(desired, userID)
+				continue
+			}
+			if !membership.GroupAssigned { continue }
+			membership.GroupAssigned = false
+			membership.GroupRole = ""
+			membership.GroupReceiveNotifications = false
+			if membership.Role == "" && !membership.AutoAssigned && userID != app.UserID {
+				if err := tx.Delete(&model.ApplicationMembership{}, "application_id = ? AND user_id = ?", applicationID, userID).Error; err != nil { return err }
+			} else {
+				if membership.NotificationOverride != nil {
+					membership.ReceiveNotifications = *membership.NotificationOverride
+				}
+				if err := tx.Save(membership).Error; err != nil { return err }
+			}
+		}
+		for userID, access := range desired {
+			receive := access.receive
+			membership := &model.ApplicationMembership{
+				ApplicationID:applicationID,
+				UserID:userID,
+				ReceiveNotifications:receive,
+				GroupAssigned:true,
+				GroupRole:access.role,
+				GroupReceiveNotifications:access.receive,
+			}
+			if err := tx.Create(membership).Error; err != nil { return err }
+		}
+		return nil
 	})
 }

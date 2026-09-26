@@ -1,9 +1,16 @@
 package api
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
+	"net/url"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/location"
@@ -52,7 +59,15 @@ func (c *PluginAPI) InstallPlugin(ctx *gin.Context) {
 	}
 	defer file.Close()
 
-	info, warnings, err := c.Manager.InstallPlugin(header.Filename, file)
+	info, warnings, checksum, err := c.Manager.InstallVerifiedPlugin(
+		header.Filename,
+		file,
+		plugin.InstallVerification{
+			ExpectedSHA256: ctx.PostForm("sha256"),
+			Signature: ctx.PostForm("signature"),
+			PublicKey: ctx.PostForm("publicKey"),
+		},
+	)
 	if err != nil {
 		ctx.AbortWithError(400, err)
 		return
@@ -61,7 +76,136 @@ func (c *PluginAPI) InstallPlugin(ctx *gin.Context) {
 	ctx.JSON(201, gin.H{
 		"name":       info.String(),
 		"modulePath": info.ModulePath,
+		"sha256":     checksum,
 		"warnings":   warnings,
+	})
+}
+
+type pluginCatalogEntry struct {
+	Name        string `json:"name"`
+	ModulePath  string `json:"modulePath"`
+	Version     string `json:"version"`
+	Description string `json:"description"`
+	Website     string `json:"website,omitempty"`
+	DownloadURL string `json:"downloadUrl"`
+	SHA256      string `json:"sha256"`
+	Signature   string `json:"signature"`
+	PublicKey   string `json:"publicKey"`
+}
+
+func loadPluginCatalog(ctx *gin.Context) ([]pluginCatalogEntry, error) {
+	rawURL := strings.TrimSpace(os.Getenv("GOTIFY_MU_PLUGIN_CATALOG_URL"))
+	if rawURL == "" {
+		return []pluginCatalogEntry{}, nil
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil || parsed.Scheme != "https" || parsed.Host == "" {
+		return nil, errors.New("plugin catalog URL must use https")
+	}
+	request, err := http.NewRequestWithContext(ctx.Request.Context(), http.MethodGet, rawURL, nil)
+	if err != nil { return nil, err }
+	request.Header.Set("User-Agent", "Gotify-MU/0.5")
+	client := &http.Client{Timeout:15*time.Second}
+	response, err := client.Do(request)
+	if err != nil { return nil, err }
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("plugin catalog returned HTTP %d", response.StatusCode)
+	}
+	var entries []pluginCatalogEntry
+	decoder := json.NewDecoder(io.LimitReader(response.Body, 2<<20))
+	if err := decoder.Decode(&entries); err != nil { return nil, err }
+	for _, entry := range entries {
+		if strings.TrimSpace(entry.ModulePath)=="" || strings.TrimSpace(entry.DownloadURL)=="" ||
+			strings.TrimSpace(entry.SHA256)=="" || strings.TrimSpace(entry.Signature)=="" ||
+			strings.TrimSpace(entry.PublicKey)=="" {
+			return nil, errors.New("plugin catalog contains an incomplete entry")
+		}
+	}
+	return entries, nil
+}
+
+func (c *PluginAPI) GetCatalog(ctx *gin.Context) {
+	entries, err := loadPluginCatalog(ctx)
+	if !successOrAbort(ctx, http.StatusBadGateway, err) { return }
+	type catalogView struct {
+		pluginCatalogEntry
+		Installed bool `json:"installed"`
+	}
+	out := make([]catalogView,0,len(entries))
+	for _, entry := range entries {
+		out = append(out,catalogView{pluginCatalogEntry:entry,Installed:c.Manager.HasPlugin(entry.ModulePath)})
+	}
+	ctx.JSON(http.StatusOK,out)
+}
+
+type catalogInstallParams struct {
+	ModulePath string `json:"modulePath" binding:"required"`
+	Version    string `json:"version"`
+}
+
+func (c *PluginAPI) InstallCatalogPlugin(ctx *gin.Context) {
+	var params catalogInstallParams
+	if err := ctx.ShouldBindJSON(&params); err != nil { return }
+	entries, err := loadPluginCatalog(ctx)
+	if !successOrAbort(ctx, http.StatusBadGateway, err) { return }
+	var selected *pluginCatalogEntry
+	for i := range entries {
+		if entries[i].ModulePath == params.ModulePath && (params.Version=="" || entries[i].Version==params.Version) {
+			selected=&entries[i];break
+		}
+	}
+	if selected==nil { ctx.AbortWithError(http.StatusNotFound,errors.New("plugin not found in configured catalog"));return }
+	parsed, err := url.Parse(selected.DownloadURL)
+	if err != nil || parsed.Scheme!="https" || parsed.Host=="" {
+		ctx.AbortWithError(http.StatusBadRequest,errors.New("plugin download URL must use https"));return
+	}
+	request, err := http.NewRequestWithContext(ctx.Request.Context(),http.MethodGet,selected.DownloadURL,nil)
+	if !successOrAbort(ctx,500,err){return}
+	request.Header.Set("User-Agent","Gotify-MU/0.5")
+	response, err := (&http.Client{Timeout:2*time.Minute}).Do(request)
+	if !successOrAbort(ctx,http.StatusBadGateway,err){return}
+	defer response.Body.Close()
+	if response.StatusCode!=http.StatusOK{ctx.AbortWithError(http.StatusBadGateway,fmt.Errorf("plugin download returned HTTP %d",response.StatusCode));return}
+	verification:=plugin.InstallVerification{ExpectedSHA256:selected.SHA256,Signature:selected.Signature,PublicKey:selected.PublicKey}
+	filename:=filepath.Base(parsed.Path)
+	if filename==""||filename=="."||!strings.HasSuffix(strings.ToLower(filename),".so"){filename="plugin.so"}
+	if c.Manager.HasPlugin(selected.ModulePath) {
+		checksum, stageErr:=c.Manager.StagePluginUpdate(selected.ModulePath,filename,response.Body,verification)
+		if !successOrAbort(ctx,400,stageErr){return}
+		ctx.JSON(202,gin.H{"modulePath":selected.ModulePath,"sha256":checksum,"restartRequired":true})
+		return
+	}
+	info,warnings,checksum,installErr:=c.Manager.InstallVerifiedPlugin(filename,response.Body,verification)
+	if !successOrAbort(ctx,400,installErr){return}
+	ctx.JSON(201,gin.H{"name":info.String(),"modulePath":info.ModulePath,"sha256":checksum,"warnings":warnings})
+}
+
+func (c *PluginAPI) UninstallPlugin(ctx *gin.Context) {
+	withID(ctx,"id",func(id uint){
+		conf,err:=c.DB.GetPluginConfByID(id)
+		if !successOrAbort(ctx,500,err){return}
+		if conf==nil{ctx.AbortWithStatus(404);return}
+		if !successOrAbort(ctx,500,c.Manager.UninstallPlugin(conf.ModulePath)){return}
+		ctx.Status(http.StatusNoContent)
+	})
+}
+
+func (c *PluginAPI) StagePluginUpdate(ctx *gin.Context) {
+	withID(ctx,"id",func(id uint){
+		conf,err:=c.DB.GetPluginConfByID(id)
+		if !successOrAbort(ctx,500,err){return}
+		if conf==nil{ctx.AbortWithStatus(404);return}
+		header,err:=ctx.FormFile("plugin")
+		if err!=nil{ctx.AbortWithError(400,errors.New("plugin file is required"));return}
+		file,err:=header.Open()
+		if !successOrAbort(ctx,500,err){return}
+		defer file.Close()
+		checksum,err:=c.Manager.StagePluginUpdate(conf.ModulePath,header.Filename,file,plugin.InstallVerification{
+			ExpectedSHA256:ctx.PostForm("sha256"),Signature:ctx.PostForm("signature"),PublicKey:ctx.PostForm("publicKey"),
+		})
+		if !successOrAbort(ctx,400,err){return}
+		ctx.JSON(202,gin.H{"sha256":checksum,"restartRequired":true})
 	})
 }
 

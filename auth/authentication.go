@@ -9,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,6 +21,7 @@ const (
 	authStateNotElevated
 	authStateOk
 	authStateLocalAuthDisabled
+	authStateMFARequired
 )
 
 const (
@@ -37,6 +39,9 @@ type Database interface {
 	GetUserByID(id uint) (*model.User, error)
 	UpdateClientTokensLastUsedAndExpiresAt(tokens []string, t *time.Time) error
 	UpdateApplicationTokenLastUsed(token string, t *time.Time) error
+	GetUserMFA(userID uint) (*model.UserMFA, error)
+	ConsumeRecoveryCode(userID uint, codeHash string) (bool, error)
+	GetSecurityPolicy() (model.SecurityPolicy, error)
 }
 
 // Auth is the provider for authentication middleware.
@@ -168,6 +173,17 @@ func (a *Auth) handleUser(checks ...func(*model.User) (authState, error)) func(c
 			if user, err := a.DB.GetUserByName(name); err != nil {
 				return authStateSkip, err
 			} else if user != nil && password.ComparePassword(user.Pass, []byte(pass)) {
+				mfa, mfaErr := a.DB.GetUserMFA(user.ID)
+				if mfaErr != nil { return authStateSkip, mfaErr }
+				if mfa != nil && mfa.Enabled {
+					code := strings.TrimSpace(ctx.GetHeader("X-Gotify-MFA-Code"))
+					valid := security.VerifyTOTP(mfa.Secret, code, timeNow())
+					if !valid && code != "" {
+						valid, mfaErr = a.DB.ConsumeRecoveryCode(user.ID, security.HashRecoveryCode(code))
+						if mfaErr != nil { return authStateSkip, mfaErr }
+					}
+					if !valid { return authStateMFARequired, nil }
+				}
 				RegisterUser(ctx, user)
 
 				for _, check := range checks {
@@ -205,6 +221,17 @@ func (a *Auth) handleClient(checks ...func(*model.Client) (authState, error)) fu
 			return authStateSkip, nil
 		}
 		RegisterClient(ctx, client)
+
+		policy, policyErr := a.DB.GetSecurityPolicy()
+		if policyErr != nil { return authStateSkip, policyErr }
+		if policy.RequireMFAForAllLocalUsers && !client.MFAAuthenticated &&
+			!strings.HasPrefix(ctx.Request.URL.Path, "/current/user/mfa") &&
+			!strings.HasPrefix(ctx.Request.URL.Path, "/current/user/passkeys") &&
+			!strings.HasPrefix(ctx.Request.URL.Path, "/auth/logout") {
+			user, userErr := a.DB.GetUserByID(client.UserID)
+			if userErr != nil { return authStateSkip, userErr }
+			if user != nil && user.OIDCID == nil && user.LDAPID == nil { return authStateMFARequired, nil }
+		}
 
 		now := timeNow()
 		if client.LastUsed == nil || client.LastUsed.Add(5*time.Minute).Before(now) {
@@ -313,6 +340,10 @@ func (a *Auth) checkClientAdmin(client *model.Client) (authState, error) {
 		return authStateForbidden, nil
 	} else if !user.Admin {
 		return authStateForbidden, nil
+	} else if user.OIDCID == nil && user.LDAPID == nil {
+		policy, err := a.DB.GetSecurityPolicy()
+		if err != nil { return authStateSkip, err }
+		if policy.RequireMFAForAdmins && !client.MFAAuthenticated { return authStateMFARequired, nil }
 	}
 	return authStateOk, nil
 }
@@ -327,6 +358,15 @@ func (a *Auth) checkClientElevated(client *model.Client) (authState, error) {
 func (a *Auth) checkUserAdmin(user *model.User) (authState, error) {
 	if !user.Admin {
 		return authStateForbidden, nil
+	}
+	if user.OIDCID == nil {
+		policy, err := a.DB.GetSecurityPolicy()
+		if err != nil { return authStateSkip, err }
+		if policy.RequireMFAForAdmins {
+			mfa, err := a.DB.GetUserMFA(user.ID)
+			if err != nil { return authStateSkip, err }
+			if mfa == nil || !mfa.Enabled { return authStateMFARequired, nil }
+		}
 	}
 	return authStateOk, nil
 }

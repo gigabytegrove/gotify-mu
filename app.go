@@ -14,6 +14,7 @@ import (
 	"github.com/gotify/server/v3/database"
 	"github.com/gotify/server/v3/mode"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/operations"
 	"github.com/gotify/server/v3/router"
 	"github.com/gotify/server/v3/runner"
 	"github.com/mattn/go-isatty"
@@ -150,6 +151,18 @@ func serve(vInfo *model.VersionInfo) int {
 	}
 	if exit {
 		return 1
+	}
+
+	dataDir := operations.DataDirectory(conf.Database.Dialect, conf.Database.Connection)
+	if dataDir != "" {
+		safetyBackup, pending, restoreErr := operations.ApplyPendingRestore(dataDir)
+		if restoreErr != nil {
+			log.Error().Err(restoreErr).Str("data_dir", dataDir).Msg("Pending restore could not be applied")
+			return 1
+		}
+		if pending {
+			log.Info().Str("safety_backup", safetyBackup).Msg("Pending backup restore applied before startup")
+		}
 	}
 
 	if conf.PluginsDir != "" {

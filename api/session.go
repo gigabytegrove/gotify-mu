@@ -2,12 +2,15 @@ package api
 
 import (
 	"errors"
+	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth"
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 )
 
 // SessionDatabase is the interface for session-related database access.
@@ -16,6 +19,10 @@ type SessionDatabase interface {
 	CreateClient(client *model.Client) error
 	GetClientByToken(token string) (*model.Client, error)
 	DeleteClientByID(id uint) error
+	GetUserMFA(userID uint) (*model.UserMFA, error)
+	ConsumeRecoveryCode(userID uint, codeHash string) (bool, error)
+	GetSecurityPolicy() (model.SecurityPolicy, error)
+	CreateAuditEvent(event *model.AuditEvent) error
 }
 
 // SessionAPI provides handlers for cookie-based session authentication.
@@ -76,8 +83,48 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		return
 	}
 	if user == nil || !password.ComparePassword(user.Pass, []byte(pass)) {
+		_ = a.DB.CreateAuditEvent(&model.AuditEvent{
+			Username:name, Action:"login_failed", Target:"local_auth", IPAddress:ctx.ClientIP(),
+		})
 		ctx.AbortWithError(401, errors.New("invalid credentials"))
 		return
+	}
+
+	policy, err := a.DB.GetSecurityPolicy()
+	if err != nil {
+		ctx.AbortWithError(500, err)
+		return
+	}
+	mfa, err := a.DB.GetUserMFA(user.ID)
+	if err != nil {
+		ctx.AbortWithError(500, err)
+		return
+	}
+	mfaRequired := (policy.RequireMFAForAdmins && user.Admin) || policy.RequireMFAForAllLocalUsers
+	mfaAuthenticated := false
+	if mfa != nil && mfa.Enabled {
+		code := strings.TrimSpace(ctx.GetHeader("X-Gotify-MFA-Code"))
+		if code == "" {
+			ctx.AbortWithStatusJSON(http.StatusPreconditionRequired, gin.H{
+				"error":"mfa_required", "mfaRequired":true,
+			})
+			return
+		}
+		mfaAuthenticated = security.VerifyTOTP(mfa.Secret, code, time.Now())
+		if !mfaAuthenticated {
+			mfaAuthenticated, err = a.DB.ConsumeRecoveryCode(user.ID, security.HashRecoveryCode(code))
+			if err != nil {
+				ctx.AbortWithError(500, err)
+				return
+			}
+		}
+		if !mfaAuthenticated {
+			_ = a.DB.CreateAuditEvent(&model.AuditEvent{
+				UserID:user.ID, Username:user.Name, Action:"mfa_failed", Target:"local_auth", IPAddress:ctx.ClientIP(),
+			})
+			ctx.AbortWithError(http.StatusUnauthorized, errors.New("invalid MFA code"))
+			return
+		}
 	}
 
 	clientParams := ClientParams{}
@@ -85,20 +132,28 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		return
 	}
 
-	elevatedUntil := time.Now().Add(model.DefaultElevationDuration)
+	elevationMinutes := policy.ElevationMinutes
+	if elevationMinutes <= 0 { elevationMinutes = 60 }
+	sessionMinutes := policy.SessionInactivityMinutes
+	if sessionMinutes <= 0 { sessionMinutes = auth.CookieMaxAge / 60 }
+	elevatedUntil := time.Now().Add(time.Duration(elevationMinutes) * time.Minute)
 	tokenPublic, tokenPrivate := generateClientToken()
 	client := model.Client{
 		Name:                          clientParams.Name,
 		Token:                         tokenPublic,
 		UserID:                        user.ID,
 		ElevatedUntil:                 &elevatedUntil,
-		ExpiresAfterInactivitySeconds: auth.CookieMaxAge,
+		ExpiresAfterInactivitySeconds: uint(sessionMinutes * 60),
+		MFAAuthenticated:              mfaAuthenticated,
 	}
 	if success := successOrAbort(ctx, 500, a.DB.CreateClient(&client)); !success {
 		return
 	}
 
-	auth.SetCookie(ctx.Writer, tokenPrivate, auth.CookieMaxAge, a.SecureCookie)
+	auth.SetCookie(ctx.Writer, tokenPrivate, sessionMinutes*60, a.SecureCookie)
+	_ = a.DB.CreateAuditEvent(&model.AuditEvent{
+		UserID:user.ID, Username:user.Name, Action:"login_success", Target:"local_auth", IPAddress:ctx.ClientIP(),
+	})
 
 	ctx.JSON(200, &model.CurrentUserExternal{
 		ID:            user.ID,
@@ -108,6 +163,9 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		CreatedAt:     user.CreatedAt,
 		ClientID:      client.ID,
 		ElevatedUntil: client.ElevatedUntil,
+		MFAEnabled:    mfa != nil && mfa.Enabled,
+		MFARequired:   mfaRequired && (mfa == nil || !mfa.Enabled),
+		AuthProvider:  "local",
 	})
 }
 

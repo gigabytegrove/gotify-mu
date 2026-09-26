@@ -3,3 +3,5 @@
 package compat
 
 var extraGoBuildFlags = []string{}
+
+var _ = extraGoBuildFlags

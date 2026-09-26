@@ -3,6 +3,7 @@ import {action, observable, runInAction} from 'mobx';
 import * as config from './config';
 import {SnackReporter} from './snack/SnackManager';
 import {CurrentUser} from './CurrentUser';
+import {elevateWithPasskey} from './passkey';
 
 export class ElevateStore {
     @observable accessor elevated = false;
@@ -42,20 +43,56 @@ export class ElevateStore {
         this.reauthenticationRequired = false;
     };
 
-    public localElevate = async (password: string, durationSeconds: number): Promise<void> => {
+    public localElevate = async (
+        password: string,
+        durationSeconds: number,
+        mfaCode = ''
+    ): Promise<void> => {
+        const headers: Record<string, string> = {
+            Authorization: 'Basic ' + btoa(this.currentUser.user.name + ':' + password),
+        };
+        if (mfaCode.trim()) {
+            headers['X-Gotify-MFA-Code'] = mfaCode.trim();
+        }
         await axios.create().request({
             url: `${config.get('url')}client/${this.currentUser.user.clientId}/elevate`,
             method: 'POST',
             data: {durationSeconds},
-            headers: {
-                Authorization: 'Basic ' + btoa(this.currentUser.user.name + ':' + password),
-            },
+            headers,
         });
         await this.currentUser.tryAuthenticate();
         runInAction(() => {
             this.reauthenticationRequired = false;
         });
         this.cleanupOidcElevate();
+    };
+
+    public passkeyElevate = async (): Promise<void> => {
+        await elevateWithPasskey();
+        await this.currentUser.tryAuthenticate();
+        runInAction(() => {
+            this.reauthenticationRequired = false;
+        });
+    };
+
+    public directoryElevate = async (
+        password: string,
+        durationSeconds: number
+    ): Promise<void> => {
+        await axios.create().request({
+            url: config.get('url') + 'auth/ldap/elevate',
+            method: 'POST',
+            data: {durationSeconds},
+            headers: {
+                Authorization:
+                    'Basic ' +
+                    btoa(this.currentUser.user.name + ':' + password),
+            },
+        });
+        await this.currentUser.tryAuthenticate();
+        runInAction(() => {
+            this.reauthenticationRequired = false;
+        });
     };
 
     public oidcElevate = (durationSeconds: number): void => {

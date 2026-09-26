@@ -4,7 +4,14 @@ import {action, runInAction} from 'mobx';
 import {BaseStore} from '../common/BaseStore';
 import * as config from '../config';
 import {SnackReporter} from '../snack/SnackManager';
-import {IApplication, IApplicationMember, IUser} from '../types';
+import {
+    ChannelRole,
+    IApplication,
+    IApplicationGroupAssignment,
+    IApplicationMember,
+    IUser,
+    IUserGroup,
+} from '../types';
 import {arrayMove} from '@dnd-kit/sortable';
 
 export class AppStore extends BaseStore<IApplication> {
@@ -86,7 +93,7 @@ export class AppStore extends BaseStore<IApplication> {
         ...app
     }: Pick<
         IApplication,
-        'id' | 'name' | 'description' | 'defaultPriority' | 'sortKey'
+        'id' | 'name' | 'description' | 'defaultPriority' | 'sortKey' | 'retentionDays'
     >): Promise<void> => {
         await axios.put(`${config.get('url')}application/${id}`, app);
         await this.refresh();
@@ -126,14 +133,43 @@ export class AppStore extends BaseStore<IApplication> {
     public setMember = async (
         id: number,
         userId: number,
-        receiveNotifications = true
+        receiveNotifications = true,
+        role: Exclude<ChannelRole, 'owner'> = 'member'
     ): Promise<IApplicationMember> =>
         axios
             .post<IApplicationMember>(`${config.get('url')}application/${id}/members`, {
                 userId,
                 receiveNotifications,
+                role,
             })
             .then((response) => response.data);
+
+    public getAssignableGroups = async (id: number): Promise<IUserGroup[]> =>
+        axios
+            .get<IUserGroup[]>(`${config.get('url')}application/${id}/assignable-groups`)
+            .then((response) => response.data);
+
+    public getGroupAssignments = async (id: number): Promise<IApplicationGroupAssignment[]> =>
+        axios
+            .get<IApplicationGroupAssignment[]>(`${config.get('url')}application/${id}/groups`)
+            .then((response) => response.data);
+
+    public setGroupAssignment = async (
+        id: number,
+        groupId: number,
+        role: Exclude<ChannelRole, 'owner'>,
+        receiveNotifications = true
+    ): Promise<void> => {
+        await axios.post(`${config.get('url')}application/${id}/groups`, {
+            groupId,
+            role,
+            receiveNotifications,
+        });
+    };
+
+    public removeGroupAssignment = async (id: number, groupId: number): Promise<void> => {
+        await axios.delete(`${config.get('url')}application/${id}/groups/${groupId}`);
+    };
 
     public removeMember = async (id: number, userId: number): Promise<void> => {
         await axios.delete(`${config.get('url')}application/${id}/members/${userId}`);

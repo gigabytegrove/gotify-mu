@@ -33,6 +33,15 @@ func (d *GormDatabase) GetUserByOIDC(oidcID string) (*model.User, error) {
 	return nil, err
 }
 
+// GetUserByLDAP returns the user linked to a normalized LDAP/Active Directory DN.
+func (d *GormDatabase) GetUserByLDAP(ldapID string) (*model.User, error) {
+	user := new(model.User)
+	err := d.DB.Where("ldap_id = ?", ldapID).Find(user).Error
+	if err == gorm.ErrRecordNotFound { err = nil }
+	if user.LDAPID != nil && *user.LDAPID == ldapID { return user, err }
+	return nil, err
+}
+
 // GetUserByID returns the user by the given id or nil.
 func (d *GormDatabase) GetUserByID(id uint) (*model.User, error) {
 	user := new(model.User)
@@ -102,6 +111,30 @@ func (d *GormDatabase) DeleteUserByID(id uint) error {
 		return err
 	}
 	if err := d.DB.Where("user_id = ?", id).Delete(&model.MessageDismissal{}).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.MessageAcknowledgement{}).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.DigestItem{}).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.DigestPolicy{}).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.QuietHoursPolicy{}).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.UserMFA{}).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.PasskeyCredential{}).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.WebAuthnChallenge{}).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", id).Delete(&model.DeferredNotification{}).Error; err != nil {
 		return err
 	}
 	if err := d.DeleteUserGroupMembershipsForUser(id); err != nil {

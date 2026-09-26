@@ -1,9 +1,13 @@
 import React from 'react';
+import axios from 'axios';
 import {
     Avatar,
     Box,
     Button,
     Chip,
+    Dialog,
+    DialogContent,
+    DialogTitle,
     IconButton,
     Paper,
     Stack,
@@ -14,11 +18,19 @@ import {ExpandLess, ExpandMore} from '@mui/icons-material';
 import Delete from '@mui/icons-material/Delete';
 import Archive from '@mui/icons-material/Archive';
 import Unarchive from '@mui/icons-material/Unarchive';
+import TaskAlt from '@mui/icons-material/TaskAlt';
+import RadioButtonUnchecked from '@mui/icons-material/RadioButtonUnchecked';
 import TimeAgo from 'react-timeago';
 import {Markdown} from '../common/Markdown';
 import * as config from '../config';
-import {IMessageExtras} from '../types';
-import {contentType, RenderMode} from './extras';
+import {IMessage, IMessageAcknowledgement, IMessageExtras} from '../types';
+import MessageCollaboration from './MessageCollaboration';
+import {
+    contentType,
+    notificationActions,
+    notificationFields,
+    RenderMode,
+} from './extras';
 import {TimeAgoFormatter} from '../common/TimeAgoFormatter';
 
 const PREVIEW_HEIGHT = 360;
@@ -33,6 +45,15 @@ interface IProps {
     fDelete?: VoidFunction;
     fArchive?: VoidFunction;
     fRestore?: VoidFunction;
+    messageId: number;
+    message: IMessage;
+    fRefresh: () => Promise<void>;
+    fAcknowledge?: VoidFunction;
+    acknowledged?: boolean;
+    acknowledgedByAnyone?: boolean;
+    acknowledgementCount?: number;
+    lastAcknowledgedBy?: string;
+    lastAcknowledgedAt?: string;
     senderName?: string;
     extras?: IMessageExtras;
     expanded: boolean;
@@ -43,6 +64,15 @@ const Message = ({
     fDelete,
     fArchive,
     fRestore,
+    messageId,
+    message,
+    fRefresh,
+    fAcknowledge,
+    acknowledged = false,
+    acknowledgedByAnyone = false,
+    acknowledgementCount = 0,
+    lastAcknowledgedBy,
+    lastAcknowledgedAt,
     senderName,
     title,
     date,
@@ -57,6 +87,8 @@ const Message = ({
     const contentRef = React.useRef<HTMLDivElement | null>(null);
     const [expanded, setExpanded] = React.useState(initialExpanded);
     const [isOverflowing, setOverflowing] = React.useState(false);
+    const [acknowledgements, setAcknowledgements] = React.useState<IMessageAcknowledgement[]>();
+
 
     const refreshOverflowing = React.useCallback(() => {
         const ref = contentRef.current;
@@ -66,6 +98,16 @@ const Message = ({
 
     React.useEffect(() => void onExpand(expanded), [expanded, onExpand]);
     React.useEffect(() => refreshOverflowing(), [content, refreshOverflowing]);
+
+    const richFields = notificationFields(extras);
+    const richActions = notificationActions(extras).filter((action) => {
+        try {
+            const parsed = new URL(action.url);
+            return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+        } catch {
+            return false;
+        }
+    });
 
     const renderContent = () => {
         switch (contentType(extras)) {
@@ -123,6 +165,39 @@ const Message = ({
                             {priority >= 4 && priority < 8 && (
                                 <Chip size="small" color="warning" variant="outlined" label="High" />
                             )}
+                            {acknowledgedByAnyone && (
+                                <Chip
+                                    size="small"
+                                    color="success"
+                                    variant="outlined"
+                                    icon={<TaskAlt fontSize="small" />}
+                                    clickable
+                                    onClick={async () => {
+                                        const response = await axios.get<{
+                                            acknowledgements: IMessageAcknowledgement[];
+                                        }>(
+                                            config.get('url') +
+                                                'message/' +
+                                                messageId +
+                                                '/acknowledgement'
+                                        );
+                                        setAcknowledgements(response.data.acknowledgements || []);
+                                    }}
+                                    label={
+                                        lastAcknowledgedBy
+                                            ? 'Acknowledged by ' + lastAcknowledgedBy
+                                            : acknowledgementCount === 1
+                                              ? 'Acknowledged'
+                                              : acknowledgementCount + ' acknowledgements'
+                                    }
+                                    title={
+                                        lastAcknowledgedAt
+                                            ? 'Last acknowledgement ' +
+                                              new Date(lastAcknowledgedAt).toLocaleString()
+                                            : undefined
+                                    }
+                                />
+                            )}
                         </Stack>
                         <Typography
                             variant="caption"
@@ -135,6 +210,17 @@ const Message = ({
                     </Box>
 
                     <Stack direction="row" spacing={0.1}>
+                        {fAcknowledge && (
+                            <Tooltip
+                                title={acknowledged ? 'Undo acknowledgement' : 'Acknowledge'}>
+                                <IconButton
+                                    onClick={fAcknowledge}
+                                    size="small"
+                                    color={acknowledged ? 'success' : 'default'}>
+                                    {acknowledged ? <TaskAlt /> : <RadioButtonUnchecked />}
+                                </IconButton>
+                            </Tooltip>
+                        )}
                         {fRestore && (
                             <Tooltip title="Restore from Archive">
                                 <IconButton onClick={fRestore} size="small">
@@ -182,6 +268,53 @@ const Message = ({
                     {renderContent()}
                 </Box>
 
+                {richFields.length > 0 && (
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: {xs: '1fr', sm: 'repeat(2, minmax(0, 1fr))'},
+                            gap: 1,
+                        }}>
+                        {richFields.map((field, index) => (
+                            <Box
+                                key={field.label + index}
+                                sx={{
+                                    border: 1,
+                                    borderColor: 'divider',
+                                    borderRadius: 1.5,
+                                    p: 1,
+                                    minWidth: 0,
+                                }}>
+                                <Typography variant="caption" color="text.secondary">
+                                    {field.label}
+                                </Typography>
+                                <Typography variant="body2" sx={{wordBreak: 'break-word'}}>
+                                    {field.value}
+                                </Typography>
+                            </Box>
+                        ))}
+                    </Box>
+                )}
+
+                {richActions.length > 0 && (
+                    <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
+                        {richActions.map((action, index) => (
+                            <Button
+                                key={action.label + index}
+                                size="small"
+                                variant="outlined"
+                                component="a"
+                                href={action.url}
+                                target="_blank"
+                                rel="noopener noreferrer">
+                                {action.label}
+                            </Button>
+                        ))}
+                    </Stack>
+                )}
+
+                <MessageCollaboration message={message} onChanged={fRefresh} />
+
                 {isOverflowing && (
                     <Button
                         onClick={() => setExpanded((current) => !current)}
@@ -191,6 +324,27 @@ const Message = ({
                     </Button>
                 )}
             </Stack>
+            <Dialog open={acknowledgements !== undefined} onClose={() => setAcknowledgements(undefined)}>
+                <DialogTitle>Message Acknowledgements</DialogTitle>
+                <DialogContent>
+                    {acknowledgements && acknowledgements.length > 0 ? (
+                        <Stack spacing={1}>
+                            {acknowledgements.map((item) => (
+                                <Box key={item.userId}>
+                                    <Typography sx={{fontWeight: 600}}>
+                                        {item.displayName || item.username}
+                                    </Typography>
+                                    <Typography variant="caption" color="text.secondary">
+                                        {new Date(item.acknowledgedAt).toLocaleString()}
+                                    </Typography>
+                                </Box>
+                            ))}
+                        </Stack>
+                    ) : (
+                        <Typography color="text.secondary">No acknowledgements.</Typography>
+                    )}
+                </DialogContent>
+            </Dialog>
         </Paper>
     );
 };

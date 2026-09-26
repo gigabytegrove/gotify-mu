@@ -23,6 +23,9 @@ type UserDatabase interface {
 	CountUser(condition ...any) (int64, error)
 	GetApplicationsByUser(userID uint) ([]*model.Application, error)
 	CountApplicationMemberships(applicationID uint) (int64, error)
+	GetSecurityPolicy() (model.SecurityPolicy, error)
+	GetUserMFA(userID uint) (*model.UserMFA, error)
+	GetPasskeysByUser(userID uint) ([]*model.PasskeyCredential, error)
 }
 
 // UserChangeNotifier notifies listeners for user changes.
@@ -65,6 +68,17 @@ type UserAPI struct {
 	PasswordStrength   int
 	UserChangeNotifier *UserChangeNotifier
 	Registration       bool
+}
+
+
+func (a *UserAPI) validatePassword(value string) error {
+	if err := password.ValidateNewPassword(value); err != nil { return err }
+	policy, err := a.DB.GetSecurityPolicy()
+	if err != nil { return err }
+	if len([]rune(value)) < policy.MinimumPasswordLength {
+		return fmt.Errorf("password must be at least %d characters", policy.MinimumPasswordLength)
+	}
+	return nil
 }
 
 // GetUsers returns all the users
@@ -133,12 +147,29 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 	if success := successOrAbort(ctx, 500, err); !success {
 		return
 	}
+	policy, policyErr := a.DB.GetSecurityPolicy()
+	if !successOrAbort(ctx, 500, policyErr) { return }
+	mfa, mfaErr := a.DB.GetUserMFA(user.ID)
+	if !successOrAbort(ctx, 500, mfaErr) { return }
+	passkeys, passkeyErr := a.DB.GetPasskeysByUser(user.ID)
+	if !successOrAbort(ctx, 500, passkeyErr) { return }
+	mfaEnabled := mfa != nil && mfa.Enabled
+	mfaRequired := user.OIDCID == nil && user.LDAPID == nil &&
+		((policy.RequireMFAForAdmins && user.Admin) || policy.RequireMFAForAllLocalUsers) &&
+		!mfaEnabled
+	provider := "local"
+	if user.OIDCID != nil { provider = "oidc" }
+	if user.LDAPID != nil { provider = "ldap" }
 	result := &model.CurrentUserExternal{
 		ID:          user.ID,
 		Name:        user.Name,
 		DisplayName: user.DisplayName,
 		Admin:       user.Admin,
 		CreatedAt: user.CreatedAt,
+		MFAEnabled: mfaEnabled,
+		MFARequired: mfaRequired,
+		AuthProvider: provider,
+		PasskeyCount: len(passkeys),
 	}
 	client := auth.GetClient(ctx)
 	if client != nil {
@@ -191,7 +222,17 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 func (a *UserAPI) CreateUser(ctx *gin.Context) {
 	user := model.CreateUserExternal{}
 	if err := ctx.Bind(&user); err == nil {
-		if err := password.ValidateNewPassword(user.Pass); err != nil {
+		if auth.TryGetUserID(ctx) == nil {
+			if !a.Registration {
+				ctx.AbortWithError(http.StatusUnauthorized, errors.New("you are not allowed to access this api"))
+				return
+			}
+			if user.Admin {
+				ctx.AbortWithError(http.StatusUnauthorized, errors.New("you are not allowed to create an admin user"))
+				return
+			}
+		}
+		if err := a.validatePassword(user.Pass); err != nil {
 			ctx.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
@@ -205,19 +246,6 @@ func (a *UserAPI) CreateUser(ctx *gin.Context) {
 			DisplayName: user.DisplayName,
 			Admin:       user.Admin,
 			Pass:        pw,
-		}
-
-		// The auth middleware guarantees authenticated requests to be elevated admins.
-		// Only unauthenticated requests are limited to the registration checks.
-		if auth.TryGetUserID(ctx) == nil {
-			if !a.Registration {
-				ctx.AbortWithError(http.StatusUnauthorized, errors.New("you are not allowed to access this api"))
-				return
-			}
-			if internal.Admin {
-				ctx.AbortWithError(http.StatusUnauthorized, errors.New("you are not allowed to create an admin user"))
-				return
-			}
 		}
 
 		existingUser, err := a.DB.GetUserByName(internal.Name)
@@ -413,7 +441,7 @@ func (a *UserAPI) DeleteUserByID(ctx *gin.Context) {
 func (a *UserAPI) ChangePassword(ctx *gin.Context) {
 	pw := model.UserExternalPass{}
 	if err := ctx.Bind(&pw); err == nil {
-		if err := password.ValidateNewPassword(pw.Pass); err != nil {
+		if err := a.validatePassword(pw.Pass); err != nil {
 			ctx.AbortWithError(http.StatusBadRequest, err)
 			return
 		}
@@ -499,7 +527,7 @@ func (a *UserAPI) UpdateUserByID(ctx *gin.Context) {
 				dbUser.Admin = updatedUser.Admin
 
 				if updatedUser.Pass != "" {
-					if err := password.ValidateNewPassword(updatedUser.Pass); err != nil {
+					if err := a.validatePassword(updatedUser.Pass); err != nil {
 						ctx.AbortWithError(http.StatusBadRequest, err)
 						return
 					}

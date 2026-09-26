@@ -32,12 +32,22 @@ func (d *GormDatabase) UpdateUserGroup(group *model.UserGroup) error {
 }
 
 func (d *GormDatabase) DeleteUserGroup(id uint) error {
-	return d.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("group_id = ?", id).Delete(&model.UserGroupMembership{}).Error; err != nil {
-			return err
-		}
+	var appIDs []uint
+	if err := d.DB.Model(&model.ApplicationGroupAssignment{}).
+		Where("group_id = ?", id).Distinct("application_id").Pluck("application_id", &appIDs).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("group_id = ?", id).Delete(&model.ApplicationGroupAssignment{}).Error; err != nil { return err }
+		if err := tx.Where("group_id = ?", id).Delete(&model.UserGroupMembership{}).Error; err != nil { return err }
 		return tx.Delete(&model.UserGroup{}, id).Error
-	})
+	}); err != nil {
+		return err
+	}
+	for _, applicationID := range appIDs {
+		if err := d.SyncApplicationGroupAssignments(applicationID); err != nil { return err }
+	}
+	return nil
 }
 
 func (d *GormDatabase) CountUserGroupMembers(groupID uint) (int64, error) {
@@ -67,17 +77,34 @@ func (d *GormDatabase) AddUserGroupMember(groupID, userID uint) error {
 	}
 
 	membership := model.UserGroupMembership{GroupID: groupID, UserID: userID}
-	return d.DB.Clauses(clause.OnConflict{
+	if err := d.DB.Clauses(clause.OnConflict{
 		Columns:   []clause.Column{{Name: "group_id"}, {Name: "user_id"}},
 		DoNothing: true,
-	}).Create(&membership).Error
+	}).Create(&membership).Error; err != nil {
+		return err
+	}
+	return d.SyncGroupAssignmentsForGroup(groupID)
 }
 
 func (d *GormDatabase) RemoveUserGroupMember(groupID, userID uint) error {
-	return d.DB.Where("group_id = ? AND user_id = ?", groupID, userID).
-		Delete(&model.UserGroupMembership{}).Error
+	if err := d.DB.Where("group_id = ? AND user_id = ?", groupID, userID).
+		Delete(&model.UserGroupMembership{}).Error; err != nil {
+		return err
+	}
+	return d.SyncGroupAssignmentsForGroup(groupID)
 }
 
 func (d *GormDatabase) DeleteUserGroupMembershipsForUser(userID uint) error {
-	return d.DB.Where("user_id = ?", userID).Delete(&model.UserGroupMembership{}).Error
+	var groupIDs []uint
+	if err := d.DB.Model(&model.UserGroupMembership{}).Where("user_id = ?", userID).
+		Pluck("group_id", &groupIDs).Error; err != nil {
+		return err
+	}
+	if err := d.DB.Where("user_id = ?", userID).Delete(&model.UserGroupMembership{}).Error; err != nil {
+		return err
+	}
+	for _, groupID := range groupIDs {
+		if err := d.SyncGroupAssignmentsForGroup(groupID); err != nil { return err }
+	}
+	return nil
 }

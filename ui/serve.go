@@ -22,6 +22,8 @@ type uiConfig struct {
 	OIDC             bool              `json:"oidc"`
 	OIDCIDPName      string            `json:"oidcIdpName"`
 	OIDCAutoRedirect bool              `json:"oidcAutoRedirect"`
+	LDAP             bool              `json:"ldap"`
+	LDAPIDPName      string            `json:"ldapIdpName"`
 }
 
 // Register registers the ui on the root path.
@@ -33,6 +35,8 @@ func Register(
 	oidcEnabled bool,
 	oidcIDPName string,
 	oidcAutoRedirect bool,
+	ldapEnabled bool,
+	ldapIDPName string,
 ) {
 	uiConfigBytes, err := json.Marshal(uiConfig{
 		Version:          version,
@@ -41,6 +45,8 @@ func Register(
 		OIDC:             oidcEnabled,
 		OIDCIDPName:      oidcIDPName,
 		OIDCAutoRedirect: oidcAutoRedirect,
+		LDAP:             ldapEnabled,
+		LDAPIDPName:      ldapIDPName,
 	})
 	if err != nil {
 		panic(err)

@@ -3,6 +3,7 @@ package api
 import (
 	"errors"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth"
@@ -13,6 +14,9 @@ type ApplicationMembershipDatabase interface {
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetUserByID(id uint) (*model.User, error)
 	GetUsers() ([]*model.User, error)
+	GetUserGroupByID(id uint) (*model.UserGroup, error)
+	GetUserGroups() ([]*model.UserGroup, error)
+	CountUserGroupMembers(groupID uint) (int64, error)
 	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	GetApplicationMemberships(applicationID uint) ([]*model.ApplicationMembership, error)
 	UpsertApplicationMembership(membership *model.ApplicationMembership) error
@@ -21,6 +25,9 @@ type ApplicationMembershipDatabase interface {
 	SetApplicationMembershipNotifications(applicationID, userID uint, enabled bool) error
 	TransferApplicationOwnership(applicationID, newOwnerID uint) error
 	SetApplicationMemberPosting(applicationID uint, enabled bool) error
+	GetApplicationGroupAssignments(applicationID uint) ([]*model.ApplicationGroupAssignment, error)
+	UpsertApplicationGroupAssignment(item *model.ApplicationGroupAssignment) error
+	DeleteApplicationGroupAssignment(applicationID, groupID uint) error
 }
 
 type ApplicationMembershipAPI struct {
@@ -28,8 +35,9 @@ type ApplicationMembershipAPI struct {
 }
 
 type ApplicationMemberParams struct {
-	UserID               uint  `json:"userId" binding:"required"`
-	ReceiveNotifications *bool `json:"receiveNotifications,omitempty"`
+	UserID               uint   `json:"userId" binding:"required"`
+	ReceiveNotifications *bool  `json:"receiveNotifications,omitempty"`
+	Role                 string `json:"role"`
 }
 
 type ApplicationMemberExternal struct {
@@ -38,6 +46,8 @@ type ApplicationMemberExternal struct {
 	Owner                bool   `json:"owner"`
 	ReceiveNotifications bool   `json:"receiveNotifications"`
 	AutoAssigned         bool   `json:"autoAssigned"`
+	GroupAssigned        bool   `json:"groupAssigned"`
+	Role                 string `json:"role"`
 }
 
 type ApplicationAutoAssignParams struct {
@@ -48,6 +58,7 @@ type ApplicationNotificationParams struct {
 	Enabled bool `json:"enabled"`
 }
 
+
 type ApplicationOwnerParams struct {
 	UserID uint `json:"userId" binding:"required"`
 }
@@ -56,22 +67,18 @@ type ApplicationMemberPostingParams struct {
 	Enabled bool `json:"enabled"`
 }
 
-func (a *ApplicationMembershipAPI) authorizeOwnerOrAdmin(
+func (a *ApplicationMembershipAPI) authorizeChannelManager(
 	userID uint,
 	app *model.Application,
 ) (bool, error) {
-	if app == nil {
-		return false, nil
-	}
-	if app.UserID == userID {
-		return true, nil
-	}
-
+	if app == nil { return false, nil }
+	if app.UserID == userID { return true, nil }
 	user, err := a.DB.GetUserByID(userID)
-	if err != nil {
-		return false, err
-	}
-	return user != nil && user.Admin, nil
+	if err != nil { return false, err }
+	if user != nil && user.Admin { return true, nil }
+	membership, err := a.DB.GetApplicationMembership(app.ID, userID)
+	if err != nil { return false, err }
+	return membership != nil && membership.EffectiveRole == model.ChannelRoleManager, nil
 }
 
 func (a *ApplicationMembershipAPI) getAuthorizedApplication(
@@ -83,7 +90,7 @@ func (a *ApplicationMembershipAPI) getAuthorizedApplication(
 		return nil, false
 	}
 
-	allowed, err := a.authorizeOwnerOrAdmin(auth.GetUserID(ctx), app)
+	allowed, err := a.authorizeChannelManager(auth.GetUserID(ctx), app)
 	if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
 		return nil, false
 	}
@@ -122,6 +129,8 @@ func (a *ApplicationMembershipAPI) GetMembers(ctx *gin.Context) {
 				Owner:                user.ID == app.UserID,
 				ReceiveNotifications: membership.ReceiveNotifications,
 				AutoAssigned:         membership.AutoAssigned,
+				GroupAssigned:        membership.GroupAssigned,
+				Role:                 membership.EffectiveRole,
 			})
 		}
 		ctx.JSON(http.StatusOK, result)
@@ -167,11 +176,20 @@ func (a *ApplicationMembershipAPI) UpsertMember(ctx *gin.Context) {
 		if params.ReceiveNotifications != nil {
 			receive = *params.ReceiveNotifications
 		}
+		role := strings.ToLower(strings.TrimSpace(params.Role))
+		if role == "" { role = model.ChannelRoleMember }
+		switch role {
+		case model.ChannelRoleReadOnly, model.ChannelRoleMember, model.ChannelRolePublisher, model.ChannelRoleManager:
+		default:
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid channel role"))
+			return
+		}
 
 		membership := &model.ApplicationMembership{
 			ApplicationID:        id,
 			UserID:               params.UserID,
 			ReceiveNotifications: receive,
+			Role:                 role,
 		}
 		if success := successOrAbort(
 			ctx,
@@ -185,6 +203,7 @@ func (a *ApplicationMembershipAPI) UpsertMember(ctx *gin.Context) {
 			UserID:               user.ID,
 			Name:                 user.Name,
 			ReceiveNotifications: membership.ReceiveNotifications,
+			Role:                 role,
 		})
 	})
 }
@@ -288,6 +307,28 @@ func (a *ApplicationMembershipAPI) GetAssignableUsers(ctx *gin.Context) {
 	})
 }
 
+func (a *ApplicationMembershipAPI) GetAssignableGroups(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if _, ok := a.getAuthorizedApplication(ctx, id); !ok { return }
+		groups, err := a.DB.GetUserGroups()
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		result := make([]model.UserGroupExternal, 0, len(groups))
+		for _, group := range groups {
+			count, err := a.DB.CountUserGroupMembers(group.ID)
+			if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+			result = append(result, model.UserGroupExternal{
+				ID:group.ID,
+				Name:group.Name,
+				Description:group.Description,
+				MemberCount:count,
+				CreatedAt:group.CreatedAt,
+				UpdatedAt:group.UpdatedAt,
+			})
+		}
+		ctx.JSON(http.StatusOK, result)
+	})
+}
+
 func (a *ApplicationMembershipAPI) SetCurrentUserNotifications(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		userID := auth.GetUserID(ctx)
@@ -364,6 +405,82 @@ func (a *ApplicationMembershipAPI) TransferOwnership(ctx *gin.Context) {
 			return
 		}
 		ctx.JSON(http.StatusOK, params)
+	})
+}
+
+type ApplicationGroupAssignmentParams struct {
+	GroupID              uint   `json:"groupId" binding:"required"`
+	Role                 string `json:"role"`
+	ReceiveNotifications *bool  `json:"receiveNotifications,omitempty"`
+}
+
+func (a *ApplicationMembershipAPI) GetGroupAssignments(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if _, ok := a.getAuthorizedApplication(ctx, id); !ok { return }
+		items, err := a.DB.GetApplicationGroupAssignments(id)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		result := make([]model.ApplicationGroupAssignmentExternal, 0, len(items))
+		for _, item := range items {
+			group, err := a.DB.GetUserGroupByID(item.GroupID)
+			if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+			if group == nil { continue }
+			count, err := a.DB.CountUserGroupMembers(group.ID)
+			if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+			result = append(result, model.ApplicationGroupAssignmentExternal{
+				GroupID:group.ID,
+				Name:group.Name,
+				Role:item.Role,
+				ReceiveNotifications:item.ReceiveNotifications,
+				MemberCount:count,
+			})
+		}
+		ctx.JSON(http.StatusOK, result)
+	})
+}
+
+func (a *ApplicationMembershipAPI) UpsertGroupAssignment(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		app, ok := a.getAuthorizedApplication(ctx, id)
+		if !ok { return }
+		if app.Internal {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("internal applications cannot be assigned to groups"))
+			return
+		}
+		var params ApplicationGroupAssignmentParams
+		if err := ctx.ShouldBindJSON(&params); err != nil { return }
+		group, err := a.DB.GetUserGroupByID(params.GroupID)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if group == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("group does not exist"))
+			return
+		}
+		role := strings.ToLower(strings.TrimSpace(params.Role))
+		if role == "" { role = model.ChannelRoleMember }
+		switch role {
+		case model.ChannelRoleReadOnly, model.ChannelRoleMember, model.ChannelRolePublisher, model.ChannelRoleManager:
+		default:
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid Channel role"))
+			return
+		}
+		receive := true
+		if params.ReceiveNotifications != nil { receive = *params.ReceiveNotifications }
+		item := &model.ApplicationGroupAssignment{
+			ApplicationID:id,
+			GroupID:params.GroupID,
+			Role:role,
+			ReceiveNotifications:receive,
+		}
+		if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.UpsertApplicationGroupAssignment(item)) { return }
+		ctx.JSON(http.StatusOK, item)
+	})
+}
+
+func (a *ApplicationMembershipAPI) DeleteGroupAssignment(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		if _, ok := a.getAuthorizedApplication(ctx, id); !ok { return }
+		withID(ctx, "groupId", func(groupID uint) {
+			successOrAbort(ctx, http.StatusInternalServerError, a.DB.DeleteApplicationGroupAssignment(id, groupID))
+		})
 	})
 }
 

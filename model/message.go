@@ -1,18 +1,33 @@
 package model
 
-import "time"
+import (
+	"time"
+)
 
 // Message holds information about a message.
 type Message struct {
-	ID            uint `gorm:"autoIncrement;primaryKey;index"`
-	ApplicationID uint
-	Message       string `gorm:"type:text"`
-	Title         string `gorm:"type:text"`
-	Priority      int
-	Extras        []byte
-	Date          time.Time
-	SenderUserID uint   `gorm:"index"`
-	SenderName   string `gorm:"type:text"`
+	ID                   uint                 `gorm:"autoIncrement;primaryKey;index"`
+	ApplicationID        uint
+	Message              string               `gorm:"type:text"`
+	Title                string               `gorm:"type:text"`
+	Priority             int
+	Extras               []byte
+	Date                 time.Time
+	SenderUserID         uint                 `gorm:"index"`
+	SenderName           string               `gorm:"type:text"`
+	DeduplicationKey     string               `gorm:"type:varchar(220);uniqueIndex" json:"-"`
+	ParentMessageID      uint                 `gorm:"index" json:"-"`
+	RootMessageID        uint                 `gorm:"index" json:"-"`
+	EscalationRuleID     uint                 `gorm:"index" json:"-"`
+	EscalationDepth      int                  `json:"-"`
+	ReplyToMessageID     uint                 `gorm:"index" json:"-"`
+	ThreadRootMessageID  uint                 `gorm:"index" json:"-"`
+	Collaboration        MessageCollaboration `gorm:"-" json:"-"`
+	Acknowledged         bool                 `gorm:"-" json:"-"`
+	AcknowledgedByAnyone bool                 `gorm:"-" json:"-"`
+	AcknowledgementCount int                  `gorm:"-" json:"-"`
+	LastAcknowledgedBy   string               `gorm:"-" json:"-"`
+	LastAcknowledgedAt   *time.Time           `gorm:"-" json:"-"`
 }
 
 // MessageExternal Model
@@ -26,27 +41,27 @@ type MessageExternal struct {
 	// read only: true
 	// required: true
 	// example: 25
-	ID uint `json:"id"`
+	ID                   uint                 `json:"id"`
 	// The application id that send this message.
 	//
 	// read only: true
 	// required: true
 	// example: 5
-	ApplicationID uint `form:"appid" query:"appid" json:"appid"`
+	ApplicationID        uint                 `form:"appid" query:"appid" json:"appid"`
 	// The message. Markdown (excluding html) is allowed.
 	//
 	// required: true
 	// example: **Backup** was successfully finished.
-	Message string `form:"message" query:"message" json:"message" binding:"required"`
+	Message              string               `form:"message" query:"message" json:"message" binding:"required"`
 	// The title of the message.
 	//
 	// example: Backup
-	Title string `form:"title" query:"title" json:"title"`
+	Title                string               `form:"title" query:"title" json:"title"`
 	// The priority of the message. If unset, then the default priority of the
 	// application will be used.
 	//
 	// example: 2
-	Priority *int `form:"priority" query:"priority" json:"priority"`
+	Priority             *int                 `form:"priority" query:"priority" json:"priority"`
 	// The extra data sent along the message.
 	//
 	// The extra fields are stored in a key-value scheme. Only accepted in CreateMessage requests with application/json content-type.
@@ -56,21 +71,45 @@ type MessageExternal struct {
 	// These namespaces are reserved and might be used in the official clients: gotify android ios web server client. Do not use them for other purposes.
 	//
 	// example: {"home::appliances::thermostat::change_temperature":{"temperature":23},"home::appliances::lighting::on":{"brightness":15}}
-	Extras map[string]any `form:"-" query:"-" json:"extras,omitempty"`
+	Extras               map[string]any       `form:"-" query:"-" json:"extras,omitempty"`
 	// The date the message was created.
 	//
 	// read only: true
 	// required: true
 	// example: 2018-02-27T19:36:10.5045044+01:00
-	Date time.Time `json:"date"`
+	Date                 time.Time            `json:"date"`
 	// The Gotify MU user id that posted this message, when the message was sent by a user.
 	//
 	// read only: true
-	SenderUserID uint `json:"senderUserId,omitempty"`
+	SenderUserID         uint                 `json:"senderUserId,omitempty"`
 	// The Gotify MU username that posted this message, when available.
 	//
 	// read only: true
-	SenderName string `json:"senderName,omitempty"`
+	SenderName           string               `json:"senderName,omitempty"`
+	// The message this notification was escalated from, when applicable.
+	ParentMessageID      uint                 `json:"parentMessageId,omitempty"`
+	// The root message for an escalation chain, when applicable.
+	RootMessageID        uint                 `json:"rootMessageId,omitempty"`
+	// The escalation rule that generated this message.
+	EscalationRuleID     uint                 `json:"escalationRuleId,omitempty"`
+	// The escalation stage depth.
+	EscalationDepth      int                  `json:"escalationDepth,omitempty"`
+	// Message this item replies to in a conversation thread.
+	ReplyToMessageID     uint                 `json:"replyToMessageId,omitempty"`
+	// Root message of a conversation thread.
+	ThreadRootMessageID  uint                 `json:"threadRootMessageId,omitempty"`
+	// Rich Gotify MU collaboration state. Official Gotify clients may ignore it.
+	Collaboration        MessageCollaboration `json:"collaboration,omitempty"`
+	// Whether the current requesting user has acknowledged this message.
+	Acknowledged         bool                 `json:"acknowledged,omitempty"`
+	// Whether anyone with access to the Channel has acknowledged this message.
+	AcknowledgedByAnyone bool                 `json:"acknowledgedByAnyone,omitempty"`
+	// Number of users that have acknowledged this message.
+	AcknowledgementCount int                  `json:"acknowledgementCount,omitempty"`
+	// Most recent user to acknowledge this message.
+	LastAcknowledgedBy   string               `json:"lastAcknowledgedBy,omitempty"`
+	// Time of the most recent acknowledgement.
+	LastAcknowledgedAt   *time.Time           `json:"lastAcknowledgedAt,omitempty"`
 }
 
 // CreateMessage Model
@@ -82,21 +121,21 @@ type CreateMessage struct {
 	// The application id that send this message. Always set when returned via the API.
 	//
 	// example: 5
-	ApplicationID uint `form:"appid" query:"appid" json:"appid"`
+	ApplicationID uint           `form:"appid" query:"appid" json:"appid"`
 	// The message. Markdown (excluding html) is allowed.
 	//
 	// required: true
 	// example: **Backup** was successfully finished.
-	Message string `form:"message" query:"message" json:"message" binding:"required"`
+	Message       string         `form:"message" query:"message" json:"message" binding:"required"`
 	// The title of the message.
 	//
 	// example: Backup
-	Title string `form:"title" query:"title" json:"title"`
+	Title         string         `form:"title" query:"title" json:"title"`
 	// The priority of the message. If unset, then the default priority of the
 	// application will be used.
 	//
 	// example: 2
-	Priority *int `form:"priority" query:"priority" json:"priority"`
+	Priority      *int           `form:"priority" query:"priority" json:"priority"`
 	// The extra data sent along the message.
 	//
 	// The extra fields are stored in a key-value scheme. Only accepted in CreateMessage requests with application/json content-type.
@@ -106,5 +145,5 @@ type CreateMessage struct {
 	// These namespaces are reserved and might be used in the official clients: gotify android ios web server client. Do not use them for other purposes.
 	//
 	// example: {"home::appliances::thermostat::change_temperature":{"temperature":23},"home::appliances::lighting::on":{"brightness":15}}
-	Extras map[string]any `form:"-" query:"-" json:"extras,omitempty"`
+	Extras        map[string]any `form:"-" query:"-" json:"extras,omitempty"`
 }

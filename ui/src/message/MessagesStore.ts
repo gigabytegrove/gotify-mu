@@ -4,7 +4,7 @@ import axios, {AxiosResponse} from 'axios';
 import * as config from '../config';
 import {createTransformer} from 'mobx-utils';
 import {SnackReporter} from '../snack/SnackManager';
-import {IApplication, IMessage, IPagedMessages} from '../types';
+import {IApplication, IMessage, IMessageExtras, IPagedMessages} from '../types';
 import {closeSnackbar, SnackbarKey} from 'notistack';
 
 const AllMessages = -1;
@@ -192,18 +192,45 @@ export class MessagesStore {
         this.cancelPendingDelete(message);
     };
 
+    @action
+    public setAcknowledged = async (message: IMessage, acknowledged: boolean): Promise<void> => {
+        const url = config.get('url') + 'message/' + message.id + '/acknowledgement';
+        if (acknowledged) {
+            await axios.post(url);
+        } else {
+            await axios.delete(url);
+        }
+
+        runInAction(() => {
+            const update = (states: Record<string, MessagesState>) => {
+                Object.values(states).forEach((state) => {
+                    const match = state.messages.find((item) => item.id === message.id);
+                    if (match) {
+                        match.acknowledged = acknowledged;
+                    }
+                });
+            };
+            update(this.state);
+            update(this.archivedState);
+        });
+        this.clearCache();
+        this.snack(acknowledged ? 'Message acknowledged' : 'Acknowledgement removed');
+    };
+
     public sendMessage = async (
         appId: number,
         message: string,
         title: string,
-        priority: number
+        priority: number,
+        extras?: IMessageExtras
     ): Promise<void> => {
         const app = this.appStore.getByID(appId);
-        const payload: Pick<IMessage, 'appid' | 'title' | 'message' | 'priority'> = {
+        const payload: Pick<IMessage, 'appid' | 'title' | 'message' | 'priority' | 'extras'> = {
             appid: appId,
             message,
             priority,
             title,
+            extras,
         };
 
         await axios.post(`${config.get('url')}message`, payload);

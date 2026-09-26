@@ -34,3 +34,12 @@ func (d *GormDatabase) GetAuditEvents(limit int, action, target string) ([]*mode
 func (d *GormDatabase) DeleteAuditEventsBefore(before time.Time) error {
 	return d.DB.Where("created_at < ?", before).Delete(&model.AuditEvent{}).Error
 }
+
+func (d *GormDatabase) GetAuditEventsForExport(limit int) ([]*model.AuditEvent, error) {
+	if limit <= 0 || limit > 100000 {
+		limit = 10000
+	}
+	var events []*model.AuditEvent
+	err := d.DB.Order("created_at DESC, id DESC").Limit(limit).Find(&events).Error
+	return events, err
+}

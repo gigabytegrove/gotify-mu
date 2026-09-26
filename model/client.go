@@ -39,7 +39,8 @@ type Client struct {
 	// The time until which this client's session is elevated.
 	//
 	// read only: true
-	ElevatedUntil *time.Time `json:"elevatedUntil,omitempty"`
+	ElevatedUntil    *time.Time `json:"elevatedUntil,omitempty"`
+	MFAAuthenticated bool       `gorm:"not null;default:false" json:"mfaAuthenticated,omitempty"`
 	// The number of seconds of inactivity after which the client is removed.
 	// 0 means the client never expires.
 	//

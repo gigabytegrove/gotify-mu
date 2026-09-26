@@ -6,23 +6,33 @@ import {observer} from 'mobx-react-lite';
 import {useStores} from '../stores';
 import * as config from '../config';
 import CircularProgress from '@mui/material/CircularProgress';
+import Key from '@mui/icons-material/Key';
 import {Box, Divider} from '@mui/material';
 
 const ElevateDuration = 60 * 60;
 
 const ElevationForm = observer(() => {
-    const {elevateStore} = useStores();
+    const {elevateStore, currentUser} = useStores();
     const [password, setPassword] = useState('');
+    const [mfaCode, setMfaCode] = useState('');
     const [error, setError] = useState('');
 
     const localAuthEnabled = config.get('localAuth');
     const oidcEnabled = config.get('oidc');
+    const ldapEnabled = config.get('ldap');
+    const ldapIdpName = config.get('ldapIdpName');
+    const provider = currentUser.user.authProvider || 'local';
+    const usePassword = provider === 'local' ? localAuthEnabled : provider === 'ldap' && ldapEnabled;
     const oidcPending = elevateStore.oidcElevatePending;
     const oidcIdpName = config.get('oidcIdpName');
 
     const handleLocalElevate = async () => {
         try {
-            await elevateStore.localElevate(password, ElevateDuration);
+            if (provider === 'ldap') {
+                await elevateStore.directoryElevate(password, ElevateDuration);
+            } else {
+                await elevateStore.localElevate(password, ElevateDuration, mfaCode);
+            }
         } catch {
             setError('Elevation failed. Check your password.');
         }
@@ -50,7 +60,7 @@ const ElevationForm = observer(() => {
     return (
         <>
             <Typography>This action requires re-authentication.</Typography>
-            {localAuthEnabled && (
+            {usePassword && (
                 <form
                     onSubmit={(e) => {
                         e.preventDefault();
@@ -60,7 +70,7 @@ const ElevationForm = observer(() => {
                         autoFocus
                         margin="dense"
                         type="password"
-                        label="Password"
+                        label={provider === 'ldap' ? ldapIdpName + ' Password' : 'Password'}
                         className="elevation-password"
                         value={password}
                         onChange={(e) => {
@@ -71,21 +81,61 @@ const ElevationForm = observer(() => {
                         error={!!error}
                         helperText={error}
                     />
+                    {provider === 'local' && currentUser.user.mfaEnabled && (
+                        <TextField
+                            margin="dense"
+                            label="Verification code"
+                            className="elevation-mfa-code"
+                            value={mfaCode}
+                            onChange={(e) => {
+                                setMfaCode(e.target.value);
+                                setError('');
+                            }}
+                            autoComplete="one-time-code"
+                            helperText="Authenticator code or recovery code."
+                            fullWidth
+                        />
+                    )}
                     <Button
                         type="submit"
                         className="elevation-submit"
-                        disabled={password.length === 0}
+                        disabled={
+                            password.length === 0 ||
+                            (provider === 'local' &&
+                                Boolean(currentUser.user.mfaEnabled) &&
+                                mfaCode.length === 0)
+                        }
                         color="primary"
                         variant="contained"
                         fullWidth>
-                        Elevate with Password
+                        {provider === 'ldap' ? 'Confirm with ' + ldapIdpName : 'Elevate with Password'}
                     </Button>
                 </form>
             )}
 
-            {oidcEnabled && (
+            {Boolean(currentUser.user.passkeyCount) && (
                 <>
-                    {localAuthEnabled && <Divider sx={{my: 2}}>or</Divider>}
+                    {usePassword && <Divider sx={{my: 2}}>or</Divider>}
+                    <Button
+                        className="elevation-passkey"
+                        variant="outlined"
+                        startIcon={<Key />}
+                        fullWidth
+                        onClick={async () => {
+                            try {
+                                await elevateStore.passkeyElevate();
+                            } catch {
+                                setError('Passkey verification was not completed.');
+                            }
+                        }}>
+                        Confirm with Passkey
+                    </Button>
+                </>
+            )}
+
+            {oidcEnabled && provider === 'oidc' && (
+                <>
+                    {usePassword && <Divider sx={{my: 2}}>or</Divider>}
                     <Button
                         className="elevation-oidc"
                         variant="contained"

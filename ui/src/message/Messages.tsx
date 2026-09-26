@@ -31,6 +31,7 @@ import {IMessage} from '../types';
 import {useStores} from '../stores';
 import {PushMessageDialog} from './PushMessageDialog';
 import ChatComposer from './ChatComposer';
+import MessageSearchDialog from './MessageSearchDialog';
 
 const UndoAutoHideMs = 5000;
 
@@ -43,6 +44,7 @@ const Messages = observer(() => {
     const [archivedView, setArchivedView] = React.useState(false);
     const [isLoadingMore, setLoadingMore] = React.useState(false);
     const [query, setQuery] = React.useState('');
+    const [advancedSearchOpen, setAdvancedSearchOpen] = React.useState(false);
 
     const {messagesStore, appStore, currentUser} = useStores();
     const messages = archivedView ? messagesStore.getArchived(appId) : messagesStore.get(appId);
@@ -105,6 +107,9 @@ const Messages = observer(() => {
     const renderMessage = (_index: number, message: IMessage) => (
         <Message
             key={message.id}
+            messageId={message.id}
+            message={message}
+            fRefresh={() => messagesStore.refreshByApp(message.appid, archivedView)}
             fDelete={
                 !archivedView && canDeleteMessage(message)
                     ? () => deleteMessage(message)
@@ -116,6 +121,14 @@ const Messages = observer(() => {
             fRestore={
                 archivedView ? () => void messagesStore.restoreSingle(message) : undefined
             }
+            fAcknowledge={() =>
+                void messagesStore.setAcknowledged(message, !Boolean(message.acknowledged))
+            }
+            acknowledged={Boolean(message.acknowledged)}
+            acknowledgedByAnyone={Boolean(message.acknowledgedByAnyone)}
+            acknowledgementCount={message.acknowledgementCount || 0}
+            lastAcknowledgedBy={message.lastAcknowledgedBy}
+            lastAcknowledgedAt={message.lastAcknowledgedAt}
             senderName={message.senderName}
             onExpand={(expanded) => (expandedState.current[message.id] = expanded)}
             title={message.title}
@@ -194,6 +207,12 @@ const Messages = observer(() => {
                                 Push Message
                             </Button>
                         )}
+                        <Button
+                            variant="outlined"
+                            startIcon={<Search />}
+                            onClick={() => setAdvancedSearchOpen(true)}>
+                            Advanced Search
+                        </Button>
                         <Button
                             id="toggle-archive-view"
                             variant="outlined"
@@ -316,6 +335,12 @@ const Messages = observer(() => {
                 )}
             </SurfaceCard>
 
+            <MessageSearchDialog
+                open={advancedSearchOpen}
+                onClose={() => setAdvancedSearchOpen(false)}
+                initialApplicationId={appId > 0 ? appId : undefined}
+            />
+
             {deleteAll && (
                 <ConfirmDialog
                     title="Delete Messages"
@@ -331,6 +356,7 @@ const Messages = observer(() => {
 
             {pushMessageOpen && app && (
                 <PushMessageDialog
+                    appId={app.id}
                     appName={app.name}
                     defaultPriority={app.defaultPriority}
                     fClose={() => setPushMessageOpen(false)}

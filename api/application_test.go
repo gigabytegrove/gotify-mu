@@ -87,7 +87,7 @@ func (s *ApplicationSuite) Test_ensureApplicationHasCorrectJsonRepresentation() 
 		SortKey:     "a1",
 		CreatedAt:   testdb.Now,
 	}
-	test.JSONEquals(s.T(), actual, `{"id":1,"token":"Aasdasfgeeg","ownerId":2,"name":"myapp","description":"mydesc", "internal":true, "autoAssign":false, "allowMemberPost":false, "image":"asd", "defaultPriority":0, "createdAt":"2020-01-01T00:00:00Z", "lastUsed":null, "sortKey":"a1"}`)
+	test.JSONEquals(s.T(), actual, `{"id":1,"token":"Aasdasfgeeg","ownerId":2,"name":"myapp","description":"mydesc", "internal":true, "autoAssign":false, "allowMemberPost":false, "image":"asd", "defaultPriority":0, "retentionDays":0, "createdAt":"2020-01-01T00:00:00Z", "lastUsed":null, "sortKey":"a1"}`)
 }
 
 func (s *ApplicationSuite) Test_CreateApplication_nonAdminCannotCreateChatChannel() {

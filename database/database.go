@@ -6,11 +6,13 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/gotify/server/v3/auth/password"
 	"github.com/gotify/server/v3/fracdex"
 	"github.com/gotify/server/v3/model"
+	"github.com/gotify/server/v3/security"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -94,11 +96,71 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		new(model.Client),
 		new(model.PluginConf),
 		new(model.ApplicationMembership),
+		new(model.ApplicationGroupAssignment),
 		new(model.MessageDismissal),
 		new(model.AuditEvent),
 		new(model.UserGroup),
 		new(model.UserGroupMembership),
+		new(model.WebhookRoute),
+		new(model.WebhookDelivery),
+		new(model.MQTTIntegration),
+		new(model.HomeAssistantIntegration),
+		new(model.ScheduledNotification),
+		new(model.ScheduledNotificationRun),
+		new(model.QuietHoursPolicy),
+		new(model.DigestPolicy),
+		new(model.DigestItem),
+		new(model.EscalationRule),
+		new(model.EscalationState),
+		new(model.EscalationTargetApplication),
+		new(model.MessageAcknowledgement),
+		new(model.DeferredNotification),
+		new(model.AutomationLease),
+		new(model.SystemSetting),
+		new(model.UserMFA),
+		new(model.EmailGateway),
+		new(model.SMTPRoute),
+		new(model.RSSMonitor),
+		new(model.SyslogRoute),
+		new(model.CalendarMonitor),
+		new(model.ConnectorSeenItem),
+		new(model.PasskeyCredential),
+		new(model.WebAuthnChallenge),
+		new(model.ServiceAccount),
+		new(model.ServiceAccountToken),
+		new(model.MessageAttachment),
+		new(model.MessageReaction),
+		new(model.MessageWorkflow),
+		new(model.MessageRead),
+		new(model.MessageMention),
+		new(model.MessageTemplate),
+		new(model.SavedMessageSearch),
 	); err != nil {
+		return nil, err
+	}
+
+	var secretStore *security.SecretStore
+	if dialect == "sqlite3" && strings.Contains(connection, "mode=memory") {
+		secretStore = security.NewTestSecretStore()
+	} else {
+		keyPath := filepath.Join("data", ".gotify-mu-secrets.key")
+		if dialect == "sqlite3" {
+			candidate := strings.TrimPrefix(connection, "file:")
+			if query := strings.IndexByte(candidate, '?'); query >= 0 {
+				candidate = candidate[:query]
+			}
+			if candidate != "" && candidate != ":memory:" {
+				keyPath = filepath.Join(filepath.Dir(candidate), ".gotify-mu-secrets.key")
+			}
+		}
+		var secretErr error
+		secretStore, secretErr = security.LoadOrCreateSecretStore(keyPath)
+		if secretErr != nil {
+			return nil, secretErr
+		}
+	}
+	wrapper := &GormDatabase{DB: db, Secrets: secretStore}
+	if err := wrapper.migrateIntegrationSecrets(); err != nil {
 		return nil, err
 	}
 
@@ -116,6 +178,12 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
+	if err := db.Model(&model.ApplicationMembership{}).
+		Where("(role IS NULL OR role = '') AND auto_assigned = ? AND group_assigned = ?", false, false).
+		Update("role", model.ChannelRoleMember).Error; err != nil {
+		return nil, err
+	}
+
 	if err := db.Transaction(fillMissingSortKeys, &sql.TxOptions{Isolation: sql.LevelSerializable}); err != nil {
 		return nil, err
 	}
@@ -124,7 +192,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
-	return &GormDatabase{DB: db}, nil
+	return wrapper, nil
 }
 
 func fillMissingCreatedAt(db *gorm.DB, now time.Time) error {
@@ -187,7 +255,8 @@ func createDirectoryIfSqlite(dialect, connection string) {
 
 // GormDatabase is a wrapper for the gorm framework.
 type GormDatabase struct {
-	DB *gorm.DB
+	DB      *gorm.DB
+	Secrets *security.SecretStore
 }
 
 // Close closes the gorm database connection.

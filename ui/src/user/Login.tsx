@@ -16,10 +16,13 @@ import {useStores} from '../stores';
 import {observer} from 'mobx-react-lite';
 import {useNavigate, useSearchParams} from 'react-router';
 import LockOutlined from '@mui/icons-material/LockOutlined';
+import Key from '@mui/icons-material/Key';
 
 const Login = observer(() => {
     const [username, setUsername] = React.useState('');
     const [password, setPassword] = React.useState('');
+    const [mfaCode, setMfaCode] = React.useState('');
+    const [mfaRequired, setMfaRequired] = React.useState(false);
     const [registerDialog, setRegisterDialog] = React.useState(false);
     const {currentUser} = useStores();
     const navigate = useNavigate();
@@ -28,6 +31,8 @@ const Login = observer(() => {
     const localAuthEnabled = config.get('localAuth');
     const oidcEnabled = config.get('oidc');
     const oidcIdpName = config.get('oidcIdpName');
+    const ldapEnabled = config.get('ldap');
+    const ldapIdpName = config.get('ldapIdpName');
 
     const oidcAutoRedirect =
         oidcEnabled &&
@@ -56,9 +61,12 @@ const Login = observer(() => {
         oidcLoginUrl,
     ]);
 
-    const login = (event: React.FormEvent) => {
+    const login = async (event: React.FormEvent) => {
         event.preventDefault();
-        void currentUser.login(username, password);
+        const result = await currentUser.login(username, password, mfaCode);
+        if (result.mfaRequired) {
+            setMfaRequired(true);
+        }
     };
 
     return (
@@ -104,6 +112,18 @@ const Login = observer(() => {
                                     onChange={(event) => setPassword(event.target.value)}
                                     fullWidth
                                 />
+                                {mfaRequired && (
+                                    <TextField
+                                        autoFocus
+                                        id="mfa-code"
+                                        label="Verification code"
+                                        value={mfaCode}
+                                        onChange={(event) => setMfaCode(event.target.value)}
+                                        autoComplete="one-time-code"
+                                        helperText="Enter your authenticator code or one recovery code."
+                                        fullWidth
+                                    />
+                                )}
                                 <Button
                                     type="submit"
                                     startIcon={<LockOutlined />}
@@ -120,6 +140,39 @@ const Login = observer(() => {
                                 </Button>
                             </Stack>
                         </Box>
+                    )}
+
+                    <Button
+                        variant="outlined"
+                        size="large"
+                        fullWidth
+                        startIcon={<Key />}
+                        disabled={
+                            !username ||
+                            Boolean(currentUser.connectionErrorMessage) ||
+                            currentUser.authenticating
+                        }
+                        onClick={() => void currentUser.loginPasskey(username)}>
+                        Sign in with Passkey
+                    </Button>
+
+                    {ldapEnabled && (
+                        <>
+                            {localAuthEnabled && <Divider>or</Divider>}
+                            <Button
+                                variant="outlined"
+                                size="large"
+                                fullWidth
+                                disabled={
+                                    !username ||
+                                    !password ||
+                                    Boolean(currentUser.connectionErrorMessage) ||
+                                    currentUser.authenticating
+                                }
+                                onClick={() => void currentUser.loginDirectory(username, password)}>
+                                Sign in with {ldapIdpName}
+                            </Button>
+                        </>
                     )}
 
                     {oidcEnabled && (
@@ -161,6 +214,9 @@ const Login = observer(() => {
                         )}
                         {oidcEnabled && (
                             <Chip size="small" variant="outlined" label={oidcIdpName} />
+                        )}
+                        {ldapEnabled && (
+                            <Chip size="small" variant="outlined" label={ldapIdpName} />
                         )}
                     </Stack>
                 </Stack>

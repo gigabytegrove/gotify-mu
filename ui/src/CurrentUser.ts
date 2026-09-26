@@ -4,6 +4,7 @@ import {detect} from 'detect-browser';
 import {SnackReporter} from './snack/SnackManager';
 import {observable, runInAction, action} from 'mobx';
 import {ICurrentUser} from './types';
+import {loginWithPasskey} from './passkey';
 
 export class CurrentUser {
     private reconnectTimeoutId: number | null = null;
@@ -48,36 +49,111 @@ export class CurrentUser {
         return (browser && browser.name + ' ' + browser.version) || 'unknown browser';
     };
 
-    public login = async (username: string, password: string) => {
+    public login = async (
+        username: string,
+        password: string,
+        mfaCode = ''
+    ): Promise<{success: boolean; mfaRequired: boolean}> => {
         runInAction(() => {
             this.loggedIn = false;
             this.authenticating = true;
         });
         const name = this.createClientName();
-        axios
-            .create()
-            .request({
+        try {
+            const headers: Record<string, string> = {
+                Authorization: 'Basic ' + btoa(username + ':' + password),
+            };
+            if (mfaCode.trim()) {
+                headers['X-Gotify-MFA-Code'] = mfaCode.trim();
+            }
+            const resp = await axios.create().request<ICurrentUser>({
                 url: config.get('url') + 'auth/local/login',
                 method: 'POST',
                 data: {name},
+                headers,
+            });
+            runInAction(() => {
+                this.snack(`A client named '${name}' was created for your session.`);
+                this.user = resp.data;
+                this.loggedIn = true;
+                this.authenticating = false;
+                this.connectionErrorMessage = null;
+                this.reconnectTime = 7500;
+            });
+            return {success: true, mfaRequired: false};
+        } catch (error) {
+            const response = (error as AxiosError<{error?: string; mfaRequired?: boolean}>).response;
+            const mfaRequired =
+                response?.status === 428 ||
+                response?.data?.mfaRequired === true ||
+                response?.data?.error === 'mfa_required';
+            runInAction(() => {
+                this.authenticating = false;
+                if (!mfaRequired) {
+                    this.snack('Login failed');
+                }
+            });
+            return {success: false, mfaRequired};
+        }
+    };
+
+    public loginPasskey = async (username: string): Promise<boolean> => {
+        runInAction(() => {
+            this.loggedIn = false;
+            this.authenticating = true;
+        });
+        try {
+            const user = await loginWithPasskey(username, this.createClientName());
+            runInAction(() => {
+                this.user = user;
+                this.loggedIn = true;
+                this.authenticating = false;
+                this.connectionErrorMessage = null;
+                this.reconnectTime = 7500;
+            });
+            this.snack('Passkey sign-in successful');
+            return true;
+        } catch {
+            runInAction(() => {
+                this.authenticating = false;
+            });
+            this.snack('Passkey sign-in was not completed');
+            return false;
+        }
+    };
+
+    public loginDirectory = async (
+        username: string,
+        password: string
+    ): Promise<boolean> => {
+        runInAction(() => {
+            this.loggedIn = false;
+            this.authenticating = true;
+        });
+        const name = this.createClientName();
+        try {
+            const response = await axios.create().request<ICurrentUser>({
+                url: config.get('url') + 'auth/ldap/login',
+                method: 'POST',
+                data: {name},
                 headers: {Authorization: 'Basic ' + btoa(username + ':' + password)},
-            })
-            .then(
-                action((resp: AxiosResponse<ICurrentUser>) => {
-                    this.snack(`A client named '${name}' was created for your session.`);
-                    this.user = resp.data;
-                    this.loggedIn = true;
-                    this.authenticating = false;
-                    this.connectionErrorMessage = null;
-                    this.reconnectTime = 7500;
-                })
-            )
-            .catch(
-                action(() => {
-                    this.authenticating = false;
-                    return this.snack('Login failed');
-                })
-            );
+            });
+            runInAction(() => {
+                this.user = response.data;
+                this.loggedIn = true;
+                this.authenticating = false;
+                this.connectionErrorMessage = null;
+                this.reconnectTime = 7500;
+            });
+            this.snack('Directory sign-in successful');
+            return true;
+        } catch {
+            runInAction(() => {
+                this.authenticating = false;
+            });
+            this.snack('Directory sign-in failed');
+            return false;
+        }
     };
 
     public tryAuthenticate = async (): Promise<AxiosResponse<ICurrentUser>> => {

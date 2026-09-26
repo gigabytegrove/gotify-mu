@@ -35,6 +35,8 @@ type UserSuite struct {
 
 func (s *UserSuite) BeforeTest(suiteName, testName string) {
 	mode.Set(mode.TestDev)
+	s.notifiedAdd = false
+	s.notifiedDelete = false
 	s.recorder = httptest.NewRecorder()
 	s.ctx, _ = gin.CreateTestContext(s.recorder)
 
@@ -73,7 +75,10 @@ func (s *UserSuite) Test_GetCurrentUser() {
 	s.a.GetCurrentUser(s.ctx)
 
 	assert.Equal(s.T(), 200, s.recorder.Code)
-	test.BodyEquals(s.T(), externalOf(user), s.recorder)
+	test.BodyEquals(s.T(), &model.CurrentUserExternal{
+		ID: user.ID, Name: user.Name, Admin: user.Admin, CreatedAt: user.CreatedAt,
+		MFAEnabled: false, MFARequired: false, AuthProvider: "local", PasskeyCount: 0,
+	}, s.recorder)
 }
 
 func (s *UserSuite) Test_GetUserByID() {
@@ -208,7 +213,7 @@ func (s *UserSuite) Test_CreateUser() {
 func (s *UserSuite) Test_CreateUser_Anonymous() {
 	s.noLogin()
 
-	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "1", "admin": false}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "secret-password-123", "admin": false}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.CreateUser(s.ctx)
@@ -221,7 +226,7 @@ func (s *UserSuite) Test_CreateUser_Register_Anonymous() {
 	s.a.Registration = true
 	s.noLogin()
 
-	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "1", "admin": false}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "secret-password-123", "admin": false}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.CreateUser(s.ctx)
@@ -236,7 +241,7 @@ func (s *UserSuite) Test_CreateUser_Register_Admin_Anonymous() {
 	s.a.Registration = true
 	s.noLogin()
 
-	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "1", "admin": true}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user", strings.NewReader(`{"name": "tom", "pass": "secret-password-123", "admin": true}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.CreateUser(s.ctx)
@@ -404,7 +409,7 @@ func (s *UserSuite) Test_UpdateUserByID_UpdatePassword() {
 
 	s.ctx.Params = gin.Params{{Key: "id", Value: "2"}}
 
-	s.ctx.Request = httptest.NewRequest("POST", "/user/2", strings.NewReader(`{"name": "tom", "pass": "new", "admin": true}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user/2", strings.NewReader(`{"name": "tom", "pass": "new-password-123", "admin": true}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.UpdateUserByID(s.ctx)
@@ -413,7 +418,7 @@ func (s *UserSuite) Test_UpdateUserByID_UpdatePassword() {
 	user, err := s.db.GetUserByID(2)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), user)
-	assert.True(s.T(), password.ComparePassword(user.Pass, []byte("new")))
+	assert.True(s.T(), password.ComparePassword(user.Pass, []byte("new-password-123")))
 }
 
 func (s *UserSuite) Test_UpdateUserByID_PreservesOIDCID() {
@@ -442,7 +447,7 @@ func (s *UserSuite) Test_UpdatePassword() {
 	s.db.CreateUser(&model.User{ID: 1, Name: "jmattheis", Pass: pw})
 
 	test.WithUser(s.ctx, 1)
-	s.ctx.Request = httptest.NewRequest("POST", "/user/current/password", strings.NewReader(`{"pass": "new"}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/user/current/password", strings.NewReader(`{"pass": "new-password-123"}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.ChangePassword(s.ctx)
@@ -451,7 +456,7 @@ func (s *UserSuite) Test_UpdatePassword() {
 	user, err := s.db.GetUserByID(1)
 	assert.NoError(s.T(), err)
 	assert.NotNil(s.T(), user)
-	assert.True(s.T(), password.ComparePassword(user.Pass, []byte("new")))
+	assert.True(s.T(), password.ComparePassword(user.Pass, []byte("new-password-123")))
 }
 
 func (s *UserSuite) Test_UpdatePassword_EmptyPassword() {
