@@ -5,7 +5,7 @@ on:
     branches:
       - master
       - feature/mobile-chat-current
-      - fix/chat-self-notifications
+      - fix/chat-self-notifications-v2
   pull_request:
     branches:
       - master
@@ -48,8 +48,8 @@ jobs:
       - name: Test mention candidates
         run: go test ./api -run '^TestApplicationMembershipMentionableUsers$' -count=1
 
-      - name: Test sender self-notification delivery
-        run: go test ./api -run '^TestMessageSuite/Test_CreateMessage_ChatNotifiesSender$' -count=1
+      - name: Test sender self-notification suppression
+        run: go test ./api -run '^TestMessageSuite/Test_CreateMessage_ChatDoesNotNotifySender$' -count=1
 
       - name: Test muted-member mention delivery
         run: go test ./api -run '^TestMessageSuite/Test_CreateMessage_MentionNotifiesMutedChatMember$' -count=1
@@ -58,7 +58,7 @@ jobs:
         run: go test ./api -run '^TestMessageSuite/Test_CreateMessage_MentionIgnoresEmailAndNonMember$' -count=1
 
       - name: Test automation delivery behavior
-        run: go test ./automation -run '^TestMUDeliveryNotifiesSenderAndIncludesMutedMention$' -count=1
+        run: go test ./automation -run '^TestMUDeliverySuppressesSenderAndIncludesMutedMention$' -count=1
 
       - name: Test realtime stream
         run: go test ./api/stream -count=1
