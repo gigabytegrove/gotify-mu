@@ -17,6 +17,7 @@ type WebhookRoute struct {
 	DefaultPriority int       `json:"defaultPriority"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
+	Status          *IntegrationStatus `gorm:"-" json:"status,omitempty"`
 }
 
 // WebhookRouteView includes the generated inbound path without exposing the secret itself.
@@ -33,6 +34,7 @@ type WebhookRouteView struct {
 	DefaultPriority int       `json:"defaultPriority"`
 	CreatedAt       time.Time `json:"createdAt"`
 	UpdatedAt       time.Time `json:"updatedAt"`
+	Status          *IntegrationStatus `gorm:"-" json:"status,omitempty"`
 }
 
 // MQTTIntegration subscribes to one broker/topic and publishes received payloads into a Channel.
@@ -63,6 +65,7 @@ type MQTTIntegrationView struct {
 	Enabled             bool      `json:"enabled"`
 	CreatedAt           time.Time `json:"createdAt"`
 	UpdatedAt           time.Time `json:"updatedAt"`
+	Status              *IntegrationStatus `gorm:"-" json:"status,omitempty"`
 }
 
 // HomeAssistantIntegration subscribes to Home Assistant events over its WebSocket API.
