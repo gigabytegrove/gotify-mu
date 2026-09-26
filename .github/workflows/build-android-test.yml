@@ -51,16 +51,30 @@ jobs:
         working-directory: android
         run: ./gradlew :app:assembleDebug --stacktrace
 
+      - name: Verify APK identity and Tailwind payload
+        working-directory: android
+        run: |
+          set -euo pipefail
+          APK="app/build/outputs/apk/debug/app-debug.apk"
+          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
+          "$BUILD_TOOLS/aapt" dump badging "$APK" | tee ../apk-badging.txt
+          grep -q "package: name='com.gigabytegrove.gotifymu.tailwindpreview'" ../apk-badging.txt
+          grep -q "application-label:'Gotify MU Tailwind Preview'" ../apk-badging.txt
+          unzip -p "$APK" assets/mu/views.js | grep -q "Tailwind Preview"
+          unzip -p "$APK" assets/mu/login.js | grep -q "Tailwind Preview"
+          unzip -l "$APK" | grep -q "assets/mu/gotify-mu-logo.png"
+
       - name: Package phone test
         run: |
           mkdir -p dist/generated
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/Gotify-MU-v0.2.0-tailwind-test.apk
+          cp apk-badging.txt dist/apk-badging.txt
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/Gotify-MU-v0.2.1-tailwind-preview.apk
           cp android/app/src/main/assets/mu/app.css dist/generated/app.css
           cp android/app/src/main/assets/mu/gotify-mu-logo.png dist/generated/gotify-mu-logo.png
           cp android/app/src/main/res/drawable/gotify_mu_logo.png dist/generated/gotify_mu_logo.png
-          sha256sum dist/Gotify-MU-v0.2.0-tailwind-test.apk | tee dist/SHA256SUMS.txt
+          sha256sum dist/Gotify-MU-v0.2.1-tailwind-preview.apk | tee dist/SHA256SUMS.txt
           {
-            echo "Gotify MU Android v0.2.0 Tailwind test build"
+            echo "Gotify MU Android v0.2.1 Tailwind preview build"
             echo "Android repository: gigabytegrove/gotify-mu-android"
             echo "Android ref: feature/gotify-mu-v0.2.0-tailwind-admin"
             echo "Built from workflow commit: $GITHUB_SHA"
@@ -70,6 +84,6 @@ jobs:
       - name: Upload phone test artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gotify-mu-android-v0.2.0-tailwind-test
+          name: gotify-mu-android-v0.2.1-tailwind-preview
           path: dist/
           if-no-files-found: error
