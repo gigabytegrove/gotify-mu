@@ -169,6 +169,10 @@ export interface IWebhookRoute {
     priorityField: string;
     defaultTitle: string;
     defaultPriority: number;
+    allowedCidrs?: string[];
+    requireSignature: boolean;
+    signatureConfigured: boolean;
+    replayWindowSeconds: number;
     createdAt: string;
     updatedAt: string;
     status?: IIntegrationStatus;
