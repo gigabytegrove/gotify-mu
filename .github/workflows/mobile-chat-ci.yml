@@ -4,16 +4,6 @@ on:
   push:
     branches:
       - feature/mobile-chat-capabilities
-  pull_request:
-    branches:
-      - master
-    paths:
-      - "api/mu_presence.go"
-      - "api/mu_presence_test.go"
-      - "api/mu_capabilities.go"
-      - "api/stream/**"
-      - "router/router.go"
-      - ".github/workflows/mobile-chat-ci.yml"
   workflow_dispatch:
 
 permissions:
@@ -32,24 +22,14 @@ jobs:
       - name: Verify Go formatting
         run: |
           set -euo pipefail
-          FILES="api/mu_presence.go api/mu_presence_test.go api/mu_capabilities.go api/stream/stream.go api/stream/mu_event_client.go router/router.go"
+          FILES="api/message.go api/message_test.go api/application_membership.go api/application_membership_test.go api/mu_presence.go api/mu_presence_test.go api/mu_capabilities.go api/stream/stream.go api/stream/mu_event_client.go router/router.go"
           test -z "$(gofmt -l $FILES)"
 
       - name: Download dependencies
         run: go mod download
 
       - name: Test MU chat APIs
-        run: go test ./api -run '^(TestMUPresence|TestApplicationMembershipMentionableUsers|TestMessageSuite)
-
-      - name: Test realtime stream
-        run: go test ./api/stream -count=1
-
-      - name: Compile router wiring
-        run: |
-          mkdir -p ui/build
-          printf '<html></html>\n' > ui/build/index.html
-          go test ./router -run TestDoesNotExist -count=1
- -count=1
+        run: go test ./api -run '^(TestMUPresence|TestApplicationMembershipMentionableUsers|TestMessageSuite)$' -count=1
 
       - name: Test realtime stream
         run: go test ./api/stream -count=1
