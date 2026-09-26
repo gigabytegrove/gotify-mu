@@ -25,10 +25,13 @@ import Sensors from '@mui/icons-material/Sensors';
 import Home from '@mui/icons-material/Home';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
+import ConfirmDialog from '../common/ConfirmDialog';
 import * as config from '../config';
 import {useStores} from '../stores';
 import {
     IHomeAssistantIntegration,
+    IIntegrationEvent,
+    IIntegrationStatus,
     IMQTTIntegration,
     IWebhookRoute,
 } from '../types';
@@ -50,6 +53,12 @@ const Integrations = () => {
     const [mqttEdit, setMqttEdit] = React.useState<IMQTTIntegration | null | undefined>();
     const [homeAssistantEdit, setHomeAssistantEdit] =
         React.useState<IHomeAssistantIntegration | null | undefined>();
+    const [history, setHistory] = React.useState<
+        {kind: string; id: number; title: string} | undefined
+    >();
+    const [confirmAction, setConfirmAction] = React.useState<
+        {title: string; text: string; run: () => Promise<void>} | undefined
+    >();
 
     const refresh = React.useCallback(async () => {
         setLoading(true);
@@ -107,6 +116,7 @@ const Integrations = () => {
                         title: item.name,
                         subtitle: channelName(channels, item.applicationId),
                         enabled: item.enabled,
+                        status: item.status,
                         details: (
                             <Stack spacing={0.75}>
                                 <Typography variant="body2" sx={{wordBreak: 'break-all'}}>
@@ -127,23 +137,43 @@ const Integrations = () => {
                                     <Button
                                         size="small"
                                         startIcon={<Refresh />}
-                                        onClick={async () => {
-                                            await axios.post(
-                                                api(`integration/webhook/${item.id}/regenerate`)
-                                            );
-                                            await refresh();
-                                            snackManager.snack('Webhook URL regenerated');
-                                        }}>
+                                        onClick={() =>
+                                            setConfirmAction({
+                                                title: 'Regenerate Webhook URL',
+                                                text: 'Regenerate this Webhook URL? The current URL will stop working immediately.',
+                                                run: async () => {
+                                                    await axios.post(
+                                                        api(`integration/webhook/${item.id}/regenerate`)
+                                                    );
+                                                    await refresh();
+                                                    snackManager.snack('Webhook URL regenerated');
+                                                },
+                                            })
+                                        }>
                                         Regenerate URL
+                                    </Button>
+                                    <Button
+                                        size="small"
+                                        onClick={() =>
+                                            setHistory({kind: 'webhook', id: item.id, title: item.name})
+                                        }>
+                                        Activity
                                     </Button>
                                 </Stack>
                             </Stack>
                         ),
                         onEdit: () => setWebhookEdit(item),
-                        onDelete: async () => {
-                            await axios.delete(api(`integration/webhook/${item.id}`));
-                            await refresh();
-                            snackManager.snack('Webhook deleted');
+                        onDelete: () => {
+                            setConfirmAction({
+                                title: 'Delete Webhook',
+                                text: `Delete ${item.name}? Its URL will stop working immediately.`,
+                                run: async () => {
+                                    await axios.delete(api(`integration/webhook/${item.id}`));
+                                    await refresh();
+                                    snackManager.snack('Webhook deleted');
+                                },
+                            });
+                            return Promise.resolve();
                         },
                     }))}
                 />
@@ -171,11 +201,39 @@ const Integrations = () => {
                             item.applicationId
                         )}`,
                         enabled: item.enabled,
+                        status: item.status,
+                        details: (
+                            <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
+                                <Button
+                                    size="small"
+                                    onClick={async () => {
+                                        await axios.post(api(`integration/mqtt/${item.id}/test`));
+                                        await refresh();
+                                        snackManager.snack('MQTT connection test succeeded');
+                                    }}>
+                                    Test Connection
+                                </Button>
+                                <Button
+                                    size="small"
+                                    onClick={() =>
+                                        setHistory({kind: 'mqtt', id: item.id, title: item.name})
+                                    }>
+                                    Activity
+                                </Button>
+                            </Stack>
+                        ),
                         onEdit: () => setMqttEdit(item),
-                        onDelete: async () => {
-                            await axios.delete(api(`integration/mqtt/${item.id}`));
-                            await refresh();
-                            snackManager.snack('MQTT connection deleted');
+                        onDelete: () => {
+                            setConfirmAction({
+                                title: 'Delete MQTT Connection',
+                                text: `Delete ${item.name}? Gotify MU will stop subscribing to this broker/topic.`,
+                                run: async () => {
+                                    await axios.delete(api(`integration/mqtt/${item.id}`));
+                                    await refresh();
+                                    snackManager.snack('MQTT connection deleted');
+                                },
+                            });
+                            return Promise.resolve();
                         },
                     }))}
                 />
@@ -203,7 +261,9 @@ const Integrations = () => {
                             item.applicationId
                         )}`,
                         enabled: item.enabled,
+                        status: item.status,
                         details: (
+                            <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
                             <Button
                                 size="small"
                                 onClick={async () => {
@@ -218,12 +278,27 @@ const Integrations = () => {
                                 }}>
                                 Send Test Event
                             </Button>
+                            <Button
+                                size="small"
+                                onClick={() =>
+                                    setHistory({kind: 'home-assistant', id: item.id, title: item.name})
+                                }>
+                                Activity
+                            </Button>
+                            </Stack>
                         ),
                         onEdit: () => setHomeAssistantEdit(item),
-                        onDelete: async () => {
-                            await axios.delete(api(`integration/home-assistant/${item.id}`));
-                            await refresh();
-                            snackManager.snack('Home Assistant connection deleted');
+                        onDelete: () => {
+                            setConfirmAction({
+                                title: 'Delete Home Assistant Connection',
+                                text: `Delete ${item.name}? Gotify MU will disconnect from this Home Assistant instance.`,
+                                run: async () => {
+                                    await axios.delete(api(`integration/home-assistant/${item.id}`));
+                                    await refresh();
+                                    snackManager.snack('Home Assistant connection deleted');
+                                },
+                            });
+                            return Promise.resolve();
                         },
                     }))}
                 />
@@ -262,6 +337,26 @@ const Integrations = () => {
                     }}
                 />
             )}
+            {history && (
+                <IntegrationHistoryDialog
+                    kind={history.kind}
+                    id={history.id}
+                    title={history.title}
+                    onClose={() => setHistory(undefined)}
+                />
+            )}
+            {confirmAction && (
+                <ConfirmDialog
+                    title={confirmAction.title}
+                    text={confirmAction.text}
+                    fClose={() => setConfirmAction(undefined)}
+                    fOnSubmit={async () => {
+                        const action = confirmAction;
+                        setConfirmAction(undefined);
+                        await action.run();
+                    }}
+                />
+            )}
         </DefaultPage>
     );
 };
@@ -272,6 +367,7 @@ interface ListItem {
     title: string;
     subtitle: string;
     enabled: boolean;
+    status?: IIntegrationStatus;
     details?: React.ReactNode;
     onEdit: VoidFunction;
     onDelete: () => Promise<void>;
@@ -311,11 +407,20 @@ const IntegrationList = ({items, empty}: {items: ListItem[]; empty: string}) => 
                                         variant={item.enabled ? 'filled' : 'outlined'}
                                         label={item.enabled ? 'Enabled' : 'Disabled'}
                                     />
+                                    {item.status && <IntegrationStatusChip status={item.status} />}
                                 </Stack>
                                 <Typography variant="body2" color="text.secondary">
                                     {item.subtitle}
                                 </Typography>
-                                {item.details && <Box sx={{mt: 1}}>{item.details}</Box>}
+                                {item.status?.message && (
+                                    <Typography variant="caption" color="text.secondary">
+                                        {item.status.message}
+                                        {item.status.lastEventAt
+                                            ? ` · Last activity ${new Date(item.status.lastEventAt).toLocaleString()}`
+                                            : ''}
+                                    </Typography>
+                                )}
+                                {item.details && <Box sx={{mt: 1}}>{item.details}</Box>
                             </Box>
                         </Stack>
                         <Stack direction="row" spacing={0.5}>
@@ -334,6 +439,79 @@ const IntegrationList = ({items, empty}: {items: ListItem[]; empty: string}) => 
                 </Box>
             ))}
         </Stack>
+    );
+};
+
+const IntegrationStatusChip = ({status}: {status: IIntegrationStatus}) => {
+    const state = status.state.toLowerCase();
+    const color =
+        state === 'connected' || state === 'ready'
+            ? 'success'
+            : state === 'error'
+              ? 'error'
+              : state === 'reconnecting' || state === 'connecting'
+                ? 'warning'
+                : 'default';
+    return <Chip size="small" color={color} variant="outlined" label={status.state} />;
+};
+
+const IntegrationHistoryDialog = ({
+    kind,
+    id,
+    title,
+    onClose,
+}: {
+    kind: string;
+    id: number;
+    title: string;
+    onClose: VoidFunction;
+}) => {
+    const [items, setItems] = React.useState<IIntegrationEvent[]>([]);
+
+    React.useEffect(() => {
+        void axios
+            .get<IIntegrationEvent[]>(api(`integration/${kind}/${id}/events?limit=100`))
+            .then((response) => setItems(response.data));
+    }, [kind, id]);
+
+    return (
+        <Dialog open onClose={onClose} fullWidth maxWidth="md">
+            <DialogTitle>{title} Activity</DialogTitle>
+            <DialogContent>
+                {items.length === 0 ? (
+                    <Typography color="text.secondary">No activity has been recorded yet.</Typography>
+                ) : (
+                    <Stack spacing={1}>
+                        {items.map((item) => (
+                            <Box
+                                key={item.id}
+                                sx={{p: 1.25, border: 1, borderColor: 'divider', borderRadius: 2}}>
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    sx={{alignItems: 'center', justifyContent: 'space-between'}}>
+                                    <Typography sx={{fontWeight: 700}}>
+                                        {item.event.replaceAll('_', ' ')}
+                                    </Typography>
+                                    <Chip
+                                        size="small"
+                                        color={item.level === 'error' ? 'error' : 'default'}
+                                        label={item.level}
+                                    />
+                                </Stack>
+                                <Typography variant="body2">{item.message}</Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    {new Date(item.createdAt).toLocaleString()}
+                                </Typography>
+                            </Box>
+                        ))}
+                    </Stack>
+                )}
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={onClose}>Close</Button>
+            </DialogActions>
+        </Dialog>
     );
 };
 
@@ -380,6 +558,12 @@ const WebhookDialog = ({
     const [priorityField, setPriorityField] = React.useState(item?.priorityField || 'priority');
     const [defaultTitle, setDefaultTitle] = React.useState(item?.defaultTitle || '');
     const [defaultPriority, setDefaultPriority] = React.useState(item?.defaultPriority || 0);
+    const [allowedCidrs, setAllowedCidrs] = React.useState((item?.allowedCidrs || []).join('\n'));
+    const [requireSignature, setRequireSignature] = React.useState(item?.requireSignature ?? false);
+    const [signingSecret, setSigningSecret] = React.useState('');
+    const [replayWindowSeconds, setReplayWindowSeconds] = React.useState(
+        item?.replayWindowSeconds || 300
+    );
     const [saving, setSaving] = React.useState(false);
 
     const save = async () => {
@@ -394,6 +578,13 @@ const WebhookDialog = ({
                 priorityField,
                 defaultTitle,
                 defaultPriority,
+                allowedCidrs: allowedCidrs
+                    .split(/[\n,]+/)
+                    .map((value) => value.trim())
+                    .filter(Boolean),
+                requireSignature,
+                signingSecret,
+                replayWindowSeconds,
             };
             if (item) {
                 await axios.put(api(`integration/webhook/${item.id}`), payload);
@@ -441,6 +632,47 @@ const WebhookDialog = ({
                         value={defaultPriority}
                         onChange={(e) => setDefaultPriority(Number(e.target.value))}
                     />
+                    <TextField
+                        label="Allowed source networks"
+                        value={allowedCidrs}
+                        onChange={(e) => setAllowedCidrs(e.target.value)}
+                        multiline
+                        minRows={2}
+                        placeholder={'192.0.2.0/24\n2001:db8::/32'}
+                        helperText="Optional. One CIDR per line. Leave blank to allow any source."
+                    />
+                    <FormControlLabel
+                        control={
+                            <Switch
+                                checked={requireSignature}
+                                onChange={(e) => setRequireSignature(e.target.checked)}
+                            />
+                        }
+                        label="Require signed requests"
+                    />
+                    {requireSignature && (
+                        <>
+                            <TextField
+                                label={item?.signatureConfigured ? 'New signing secret' : 'Signing secret'}
+                                type="password"
+                                value={signingSecret}
+                                onChange={(e) => setSigningSecret(e.target.value)}
+                                helperText={
+                                    item?.signatureConfigured
+                                        ? 'Leave blank to keep the current signing secret.'
+                                        : 'At least 16 characters.'
+                                }
+                            />
+                            <TextField
+                                label="Replay window"
+                                type="number"
+                                value={replayWindowSeconds}
+                                onChange={(e) => setReplayWindowSeconds(Number(e.target.value))}
+                                helperText="Maximum age in seconds for signed Webhook requests."
+                                slotProps={{htmlInput: {min: 1, max: 3600}}}
+                            />
+                        </>
+                    )}
                     <FormControlLabel
                         control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
                         label="Enabled"
@@ -449,7 +681,15 @@ const WebhookDialog = ({
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Cancel</Button>
-                <Button variant="contained" disabled={saving || !name || !applicationId} onClick={() => void save()}>
+                <Button
+                    variant="contained"
+                    disabled={
+                        saving ||
+                        !name ||
+                        !applicationId ||
+                        (requireSignature && !item?.signatureConfigured && signingSecret.length < 16)
+                    }
+                    onClick={() => void save()}>
                     Save
                 </Button>
             </DialogActions>
