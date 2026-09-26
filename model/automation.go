@@ -221,3 +221,12 @@ type IntegrationRuntimeStatus struct {
 	LastEventAt     *time.Time `json:"lastEventAt,omitempty"`
 	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
 }
+
+
+// MessageAcknowledgementView identifies who acknowledged a message and when.
+type MessageAcknowledgementView struct {
+	UserID         uint      `json:"userId"`
+	Name           string    `json:"name"`
+	DisplayName    string    `json:"displayName,omitempty"`
+	AcknowledgedAt time.Time `json:"acknowledgedAt"`
+}
