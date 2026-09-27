@@ -95,7 +95,7 @@ jobs:
       - name: Generate SPDX SBOM
         uses: anchore/sbom-action@f8bdd1d8ac5e901a77a92f111440fdb1b593736b # v0.20.6
         with:
-          image: gotify-mu:verify
+          image: monita:verify
           format: spdx-json
           output-file: monita.spdx.json
           upload-artifact: true
