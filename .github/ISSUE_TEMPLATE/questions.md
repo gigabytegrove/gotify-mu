@@ -1,44 +1,34 @@
 ---
-name: Questions
-about: Having difficulties with Gotify MU? Feel free to ask here
+name: Question
+about: Ask for help using Monita
 title: ''
 labels: question
 assignees: ''
-
 ---
 
-<!-- 
-Alternative ways to get help:
-Gotify MU repository - https://github.com/gigabytegrove/gotify-mu
-Upstream Gotify documentation - https://gotify.net/
--->
+## What are you trying to do?
 
-**Have you read the documentation?**
-- [ ] Yes, but it does not include related information regarding my question.
-- [ ] Yes, but the steps described in the documentation do not work on my machine.
-- [ ] Yes, but I am having difficulty understanding it and want clarification.
+Describe your goal and where you are getting stuck.
 
-**You are setting up Gotify MU in**
-- [ ] Docker
-- [ ] Linux native platform
-- [ ] Windows native platform
+## Installation
 
+- [ ] Docker / Docker Compose
+- [ ] Linux native
+- [ ] Windows native
+- [ ] Other
 
-**Describe your problem**
-<!-- EXAMPLE
-I'm having difficulties setting up my apache reverse proxy
-....
-my config is ...
--->
+## Monita version
 
+Example: `1.1.0`
 
+## What have you tried?
 
-**Any errors, logs, or other information that might help us identify your problem**
+Tell us what you have already attempted.
 
-Ex: `docker-compose.yml`, `nginx.conf`, android logcat, browser requests, etc.
+## Helpful details
 
-<details><summary>Name of the information here</summary><br><pre>
+You may include screenshots or relevant error messages.
 
-contents here
+Please remove passwords, tokens, private URLs, personal information, and other sensitive data before posting logs or configuration.
 
-</pre></details>
+Project documentation: https://github.com/gigabytegrove/monita
