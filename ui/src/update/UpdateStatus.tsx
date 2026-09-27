@@ -178,15 +178,21 @@ export const UpdateStatusCard = () => {
                 reloadScheduled.current = true;
                 window.setTimeout(() => window.location.reload(), 1500);
             }
-        } catch {
+        } catch (error) {
             const previous = updaterRef.current;
             if (previous && activeUpdaterStates.has(previous.state)) {
                 return;
             }
+            const status =
+                error instanceof Error && /HTTP \d+/.test(error.message)
+                    ? error.message.replace('HTTP ', '')
+                    : '';
             const unavailable: UpdaterStatus = {
                 ready: false,
                 state: 'unavailable',
-                message: 'Automatic updates are temporarily unavailable.',
+                message: status
+                    ? `Automatic updates are unavailable (HTTP ${status}).`
+                    : 'Automatic updates are temporarily unavailable.',
             };
             updaterRef.current = unavailable;
             setUpdater(unavailable);
