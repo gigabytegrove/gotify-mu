@@ -6,6 +6,7 @@ export interface IApplication {
     allowMemberPost?: boolean;
     channelType?: 'notification' | 'chat';
     receiveNotifications?: boolean;
+    role?: ChannelRole;
     name: string;
     sortKey: string;
     description: string;
