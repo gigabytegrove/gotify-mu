@@ -1,163 +1,104 @@
 <p align="center">
-  <img src="../assets/monita-banner.png" alt="Monita" width="720">
+  <img src="../assets/monita-banner.svg" alt="Monita" width="720">
 </p>
 
-# Home Assistant native pairing contract
+# Monita for Home Assistant
 
-Monita supports two Home Assistant connection methods:
+Monita can connect with Home Assistant so automations can send notifications, images, and events to Monita Channels.
 
-1. Long-Lived Access Token (existing direct Home Assistant API/WebSocket connection).
-2. Native pairing with the `gigabytegrove/monita-ha` custom integration.
+Two connection methods are supported:
 
-The native path is intended to remove the requirement for users to create a Home Assistant Long-Lived Access Token.
+- **Native pairing** with Monita for Home Assistant
+- **Long-Lived Access Token** for direct Home Assistant connections
 
-## Monita flow
+Native pairing is recommended for most new installations because it provides a guided setup without requiring the user to manually create and copy a Home Assistant token.
 
-An administrator creates a Home Assistant connection with:
+## What you can do
 
-```json
-{
-  "name": "Home Assistant",
-  "applicationId": 1,
-  "connectionMode": "integration",
-  "eventType": "",
-  "entityIds": "",
-  "dataField": "",
-  "dataValue": "",
-  "enabled": true
-}
-```
+With Home Assistant connected to Monita, you can:
 
-Monita returns a one-time pairing code in the form:
+- send Home Assistant notifications to a Monita Channel
+- include images such as doorbell or camera snapshots
+- route different automations to different Channels
+- use Home Assistant events as notification triggers
+- send test events between Home Assistant and Monita
+- keep notification history available in Monita
 
-```text
-<integration-id>.<random-secret>
-```
+## Native pairing
 
-The code expires after 15 minutes and is stored only as a SHA-256 hash.
+In Monita:
 
-A new code can be requested by an authenticated administrator:
+1. Open **Integrations**.
+2. Add or edit a **Home Assistant** connection.
+3. Choose the native pairing option.
+4. Generate a pairing code.
 
-```text
-POST /integration/home-assistant/:id/pairing
-```
+In Home Assistant:
 
-## Home Assistant pairing request
+1. Open the Monita integration.
+2. Choose **Pair with Monita**.
+3. Enter the pairing code.
+4. Complete the setup flow.
 
-The `monita-ha` integration already knows the Monita server URL from its config entry.
+Pairing codes are temporary and intended for one-time setup.
 
-It should expose an options/config flow named **Pair with Monita server** that asks for:
+## Image notifications
 
-- pairing code
-- Home Assistant URL reachable by Monita when it cannot be determined automatically, with an optional manual override when the automatically selected URL is not reachable from the Monita server
+Monita supports real image delivery from Home Assistant.
 
-The HA integration should register a private webhook handler with a random webhook ID and then call:
+For example:
 
 ```text
-POST <monita-server>/integrations/home-assistant/native/pair
-Content-Type: application/json
+Doorbell detects a person
+        ↓
+Home Assistant captures a camera snapshot
+        ↓
+Monita for Home Assistant sends the image to Monita
+        ↓
+The phone notification includes the image
+        ↓
+The same image remains available in Monita history
 ```
 
-Body:
+The image is transferred through the integration rather than relying on a local-only Home Assistant camera URL.
 
-```json
-{
-  "pairingCode": "<integration-id>.<random-secret>",
-  "webhookUrl": "https://home-assistant.example/api/webhook/<random-webhook-id>"
-}
-```
+## Direct token connection
 
-Successful response:
+Long-Lived Access Token mode remains available for installations that prefer a direct Home Assistant connection.
 
-```json
-{
-  "integrationId": 1,
-  "secret": "<shared-native-bridge-secret>",
-  "eventPath": "/integrations/home-assistant/native/1/event"
-}
-```
+Use native pairing unless you have a specific reason to manage the connection manually.
 
-The Home Assistant integration must store `secret`, `integrationId`, and `eventPath` in config-entry storage and redact them from diagnostics.
+## Filtering and routing
 
-The pairing code is one-time use. A successful pairing invalidates it immediately.
+A Home Assistant integration can be configured to route selected events and entities to a specific Monita Channel.
 
-## HA -> Monita events
+This makes it possible to create separate Channels for things such as:
 
-When paired, the HA integration sends selected Home Assistant events to:
+- security alerts
+- doorbells
+- system warnings
+- appliance notifications
+- household reminders
+- automation status
 
-```text
-POST <monita-server><eventPath>
-Authorization: Bearer <shared-native-bridge-secret>
-Content-Type: application/json
-```
+## Re-pairing
 
-Body:
+If the connection needs to be repaired, generate a new pairing code in Monita and complete the pairing flow again in Home Assistant.
 
-```json
-{
-  "eventType": "state_changed",
-  "data": {
-    "entity_id": "binary_sensor.front_door"
-  }
-}
-```
+Existing Monita Channels and notification history are not removed when a Home Assistant connection is re-paired.
 
-Monita applies the configured event type, entity ID, data-field and data-value filters before routing the event into the selected Channel.
+## Troubleshooting
 
-## Monita -> Home Assistant events
+If pairing fails:
 
-Monita posts to the webhook URL supplied during pairing:
+- confirm both systems can reach each other
+- verify the server address
+- generate a fresh pairing code
+- confirm the Home Assistant integration is current
+- check the Monita and Home Assistant logs for connection errors
 
-```text
-POST <home-assistant-webhook-url>
-Authorization: Bearer <shared-native-bridge-secret>
-Content-Type: application/json
-```
+## Security
 
-Body:
+Treat both Monita and Home Assistant as trusted services.
 
-```json
-{
-  "eventType": "gotify_mu_test",
-  "data": {
-    "message": "Monita connection test"
-  }
-}
-```
-
-The HA webhook handler must compare the Bearer credential to the stored shared secret and reject invalid requests. On success, it should fire the requested Home Assistant event on the HA event bus.
-
-## Required HA-side behavior
-
-- Keep the existing application-token/client-token Monita notification functionality unchanged.
-- Add native server pairing as an optional capability; do not replace the current setup flow.
-- Use Home Assistant config-entry storage for bridge credentials.
-- Redact the shared secret and pairing data from diagnostics/logs.
-- Use a random HA webhook ID.
-- Do not accept the pairing code after a successful pair.
-- Do not execute arbitrary Home Assistant services from bridge payloads.
-- Native inbound bridge payloads may fire Home Assistant events only.
-- Preserve LLT mode in Monita as a fully supported fallback.
-
-
-## Native unpair / revoke
-
-Home Assistant removes native pairing by revoking the shared bridge credential on Monita before deleting its local copy:
-
-```text
-DELETE <monita-server>/integrations/home-assistant/native/<integration-id>
-Authorization: Bearer <shared-native-bridge-secret>
-```
-
-A successful revoke returns HTTP 204. Monita clears the stored native webhook URL, shared secret, and any outstanding pairing state while preserving the normal Home Assistant connection record and its filters.
-
-Home Assistant must not silently discard local credentials when the revoke request fails. A force-local-remove escape hatch may be offered for recovery when the Monita server is unavailable or the remote connection has already been replaced.
-
-Regenerating a pairing code for an already paired connection does not tear down the working native bridge. The existing webhook and shared secret remain valid until a replacement pairing succeeds. The Monita admin UI exposes **Generate Repair Code** for an already paired native connection.
-
-## Health and delivery expectations
-
-- HTTP 400, 401, or 404 from the pairing endpoint indicates an invalid or no-longer-valid pairing code; HTTP 410 indicates expiration.
-- A paired client should expose bridge health separately from simple credential presence.
-- HTTP 401/403 from the native event endpoint means the shared credential is no longer valid and should surface as repair required.
-- Transient event-delivery failures should use bounded retry/backoff rather than silently dropping the first failed event.
+Use HTTPS for remote access and avoid exposing either administrative interface directly to the public internet.
