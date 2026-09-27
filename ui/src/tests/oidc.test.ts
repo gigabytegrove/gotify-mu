@@ -50,7 +50,7 @@ describe('OIDC login of an existing local user without link-by-username', () => 
             oidc: {autoRegister: true, linkByUsername: false, users: [linkUser]},
         });
         page = gotify.page;
-        await createLocalUser(gotify.url, linkUser.username, 'localpass');
+        await createLocalUser(gotify.url, linkUser.username, 'localpass-1234');
     });
     afterAll(async () => await gotify.close());
 
@@ -63,7 +63,7 @@ describe('OIDC login of an existing local user without link-by-username', () => 
 
     it('still allows the local user to log in with a password', async () => {
         await page.goto(gotify.url);
-        await auth.login(page, 'linkuser', 'localpass');
+        await auth.login(page, 'linkuser', 'localpass-1234');
         await auth.logout(page);
     });
 });
@@ -76,7 +76,7 @@ describe('OIDC login of an existing local user with link-by-username', () => {
             oidc: {autoRegister: true, linkByUsername: true, users: [linkUser]},
         });
         page = gotify.page;
-        await createLocalUser(gotify.url, linkUser.username, 'localpass');
+        await createLocalUser(gotify.url, linkUser.username, 'localpass-1234');
     });
     afterAll(async () => await gotify.close());
 

@@ -4,10 +4,10 @@ This document is the maintained deployment, validation, update, backup, and roll
 
 ## Release state
 
-- **Current published release:** v0.5.0 (pre-release)
-- **Previous rollback baseline:** v0.2.2
+- **Current published release:** v1.0.0
+- **Previous rollback baseline:** v0.5.0
 
-The v0.5.0 release commit is validated through the repository gate before publication. Documentation-only changes are part of the release candidate and pass the same gate.
+The v1.0.0 release commit is validated through the repository gate before publication. Documentation-only changes are part of the release candidate and pass the same gate.
 
 ## Supported deployment models
 
@@ -58,10 +58,13 @@ Edit `.env` and set at minimum:
 
 ```env
 GOTIFY_MU_PORT=8080
+GOTIFY_MU_DATA_DIR=./data
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
 GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
+
+For an existing installation, set `GOTIFY_MU_DATA_DIR` to the exact host directory already mounted at `/app/data`. Do not change that path during an upgrade. Compose also loads `.env` into the application container so existing `GOTIFY_*` runtime settings can be preserved instead of silently reverting to defaults.
 
 Build with the full server test suite enabled:
 
@@ -245,9 +248,9 @@ Preview branches are deployed manually and must pass the full validation gate.
 
 The in-app updater is intended for **published numbered releases**. A preview branch should not be presented as a normal downloadable release until it has been accepted, merged, tagged, and published.
 
-## v0.5.0 live validation checklist
+## v1.0.0 live validation checklist
 
-Before v0.5.0 is locked as a release:
+Before v1.0.0 is locked as a release:
 
 ### Core compatibility
 

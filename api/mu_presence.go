@@ -40,8 +40,8 @@ type TypingEvent struct {
 
 func (a *MUPresenceAPI) SetTyping(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		params := typingRequest{}
-		if err := ctx.BindJSON(&params); err != nil {
+		req := typingRequest{}
+		if err := ctx.BindJSON(&req); err != nil {
 			return
 		}
 
@@ -64,9 +64,21 @@ func (a *MUPresenceAPI) SetTyping(ctx *gin.Context) {
 			return
 		}
 
-		if !app.AllowMemberPost {
+		isChat := app.ChannelType == model.ChannelTypeChat ||
+			(app.ChannelType == "" && app.AllowMemberPost)
+		if !isChat {
 			ctx.AbortWithError(400, errors.New("typing presence is only available for chat channels"))
 			return
+		}
+		if app.UserID != userID {
+			role := membership.EffectiveRole
+			canPost := role == model.ChannelRoleManager ||
+				role == model.ChannelRolePublisher ||
+				(role == model.ChannelRoleMember && app.AllowMemberPost)
+			if !canPost {
+				ctx.AbortWithError(403, errors.New("your Channel role does not allow posting"))
+				return
+			}
 		}
 
 		user, err := a.DB.GetUserByID(userID)
@@ -84,23 +96,26 @@ func (a *MUPresenceAPI) SetTyping(ctx *gin.Context) {
 		}
 
 		expiry := time.Now().UTC()
-		if params.Typing {
+		if req.Typing {
 			expiry = expiry.Add(6 * time.Second)
 		}
+
 		event := &TypingEvent{
 			Type:          "typing",
 			ApplicationID: id,
 			UserID:        userID,
 			UserName:      user.Name,
-			Typing:        params.Typing,
+			Typing:        req.Typing,
 			ExpiresAt:     expiry,
 		}
-		for _, target := range memberships {
-			if target.UserID == userID {
+
+		for _, member := range memberships {
+			if member.UserID == userID {
 				continue
 			}
-			a.Notifier.NotifyMUEvent(target.UserID, event)
+			a.Notifier.NotifyMUEvent(member.UserID, event)
 		}
+
 		ctx.JSON(200, event)
 	})
 }

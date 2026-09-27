@@ -2,7 +2,9 @@ package api
 
 import "github.com/gin-gonic/gin"
 
-// MUCapabilitiesAPI exposes a stable discovery contract for Gotify MU-aware clients.
+// MUCapabilitiesAPI exposes a stable discovery contract for Gotify MU-aware
+// clients. A stock Gotify server does not expose this route, allowing clients
+// to fall back cleanly to the upstream feature set on HTTP 404.
 type MUCapabilitiesAPI struct {
 	Version string
 }
@@ -29,7 +31,6 @@ type MUCapabilityFlags struct {
 	AuditLog             bool `json:"auditLog"`
 	TypingPresence       bool `json:"typingPresence"`
 	ChatNotifications    bool `json:"chatNotifications"`
-	Mentions             bool `json:"mentions"`
 }
 
 func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
@@ -40,7 +41,7 @@ func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
 		Features: MUCapabilityFlags{
 			SharedChannels:       true,
 			GlobalChannels:       true,
-			ChannelTypes:         false,
+			ChannelTypes:         true,
 			ChatChannels:         true,
 			MemberPosting:        true,
 			SenderIdentity:       true,
@@ -52,7 +53,6 @@ func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
 			AuditLog:             true,
 			TypingPresence:       true,
 			ChatNotifications:    true,
-			Mentions:             true,
 		},
 	})
 }

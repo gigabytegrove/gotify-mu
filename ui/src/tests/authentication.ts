@@ -10,7 +10,16 @@ export const login = async (page: Page, user = 'admin', pass = 'admin'): Promise
     expect(page.url()).toContain('/login');
     await page.type($loginForm.input('.name'), user);
     await page.type($loginForm.input('.password'), pass);
-    await page.click($loginForm.button('.login'));
+    const loginButton = $loginForm.button('.login');
+    await page.waitForFunction(
+        (selector) => {
+            const button = document.querySelector(selector) as HTMLButtonElement | null;
+            return button !== null && !button.disabled;
+        },
+        {},
+        loginButton
+    );
+    await page.click(loginButton);
     await waitForExists(page, selector.heading(), 'Dashboard');
 };
 

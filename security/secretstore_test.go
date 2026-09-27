@@ -23,7 +23,10 @@ func TestSecretStoreRoundTripAndTamperDetection(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	if plain != "super-secret" { t.Fatalf("unexpected plaintext %q", plain) }
 
-	tampered := encrypted[:len(encrypted)-1] + "A"
+	payload, err := base64.RawStdEncoding.DecodeString(strings.TrimPrefix(encrypted, encryptedPrefix))
+	if err != nil { t.Fatal(err) }
+	payload[len(payload)-1] ^= 0x01
+	tampered := encryptedPrefix + base64.RawStdEncoding.EncodeToString(payload)
 	if _, err := store.Decrypt(tampered); err == nil {
 		t.Fatal("tampered ciphertext should fail authentication")
 	}
