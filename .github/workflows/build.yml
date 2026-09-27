@@ -88,6 +88,8 @@ jobs:
       - run: make download-tools
       - name: Go test suite with coverage
         run: make test-coverage
+      - name: Test one-shot update worker
+        run: (cd updater && go test ./...)
       - run: make check-ci
       - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
