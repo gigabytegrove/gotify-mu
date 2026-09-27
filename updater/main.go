@@ -19,7 +19,8 @@ import (
 const (
 	defaultRepository = "gigabytegrove/gotify-mu"
 	defaultTarget     = "gotify-mu"
-	defaultStatusFile = "/app/data/.gotify-mu-update-status.json"
+	defaultStatusFile  = "/app/data/.gotify-mu-update-status.json"
+	defaultRuntimeImage = "gotify-mu:managed"
 )
 
 var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
@@ -123,7 +124,8 @@ type manager struct {
 	status     updateStatus
 	repository string
 	target     string
-	statusFile string
+	statusFile   string
+	runtimeImage string
 }
 
 func newManager() *manager {
@@ -139,11 +141,16 @@ func newManager() *manager {
 	if statusFile == "" {
 		statusFile = defaultStatusFile
 	}
+	runtimeImage := strings.TrimSpace(os.Getenv("GOTIFY_MU_RUNTIME_IMAGE"))
+	if runtimeImage == "" {
+		runtimeImage = defaultRuntimeImage
+	}
 	return &manager{
-		status:     updateStatus{Ready: true, State: "idle"},
-		repository: repository,
-		target:     target,
-		statusFile: statusFile,
+		status:       updateStatus{Ready: true, State: "idle"},
+		repository:   repository,
+		target:       target,
+		statusFile:   statusFile,
+		runtimeImage: runtimeImage,
 	}
 }
 
@@ -258,8 +265,14 @@ func (m *manager) performInstall(version string, started time.Time) {
 		return
 	}
 
+	m.updateProgress("preparing", "Preparing restart", "Preparing restart", 78)
+	if _, err := runDocker("tag", image, m.runtimeImage); err != nil {
+		m.fail(version, started, "The verified update image could not be prepared.", err)
+		return
+	}
+
 	m.updateProgress("replacing", "Applying update", "Applying update", 82)
-	if err := m.replaceContainer(image, version, started); err != nil {
+	if err := m.replaceContainer(m.runtimeImage, version, started); err != nil {
 		return
 	}
 
