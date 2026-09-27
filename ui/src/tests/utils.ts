@@ -8,16 +8,6 @@ export const innerText = async (page: ElementHandle | Page, selector: string): P
     return (value as any).toString().trim();
 };
 
-const isVisible = (element: Element): boolean => {
-    const html = element as HTMLElement;
-    const style = window.getComputedStyle(html);
-    return (
-        style.display !== 'none' &&
-        style.visibility !== 'hidden' &&
-        html.getClientRects().length > 0
-    );
-};
-
 export const clickByText = async (page: Page, selector: string, text: string): Promise<void> => {
     await waitForExists(page, selector, text);
     text = text.toLowerCase();
