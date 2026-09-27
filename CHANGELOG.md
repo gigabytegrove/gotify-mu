@@ -26,8 +26,9 @@ Single-container updater and Software Update interface cleanup.
 
 ### Safety
 
-- Published source packages and SHA-256 checksums are still verified before installation.
-- Full server tests still run while building the replacement image.
+- Managed updates pull the numbered multi-architecture release image from GHCR instead of rebuilding the application locally.
+- The pulled image version, source repository, and revision labels are verified against the selected GitHub release tag before replacement.
+- Release images still pass the repository validation and production-container gates before publication.
 - Runtime configuration, persistent data, ports, networks, and the Docker socket mount are preserved.
 - Failed replacement health checks still restore the previous container automatically.
 
