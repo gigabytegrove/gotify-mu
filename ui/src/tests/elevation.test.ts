@@ -23,7 +23,7 @@ const cancelElevationViaUI = async (row: number) => {
     await page.goto(gotify.url + '/#/clients');
     await waitForExists(page, selector.heading(), 'Clients');
 
-    await page.click($clientTable.cell(row, ClientCol.Elevate, '.elevate'));
+    await page.click($clientTable.cell(row, ClientCol.Actions, '.elevate'));
     await page.waitForSelector('.elevate-client-dialog');
 
     await page.click('.elevate-client-dialog .elevate-duration [role=combobox]');
@@ -95,7 +95,7 @@ describe('Elevation', () => {
             await page.goto(gotify.url + '/#/clients');
             await waitForExists(page, selector.heading(), 'Clients');
 
-            await page.click($clientTable.cell(2, ClientCol.Delete, '.delete'));
+            await page.click($clientTable.cell(2, ClientCol.Actions, '.delete'));
             await page.waitForSelector(selector.$confirmDialog.selector());
             await page.click(selector.$confirmDialog.button('.confirm'));
 
@@ -116,7 +116,7 @@ describe('Elevation', () => {
             await waitForExists(page, selector.heading(), 'Clients');
         });
         it('clicks delete and sees elevation form in dialog', async () => {
-            await page.click($clientTable.cell(2, ClientCol.Delete, '.delete'));
+            await page.click($clientTable.cell(2, ClientCol.Actions, '.delete'));
             await page.waitForSelector(selector.$confirmDialog.selector());
             await page.waitForSelector('.confirm-dialog .elevation-password input');
         });
