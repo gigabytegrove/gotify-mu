@@ -38,10 +38,8 @@ import {
 
 const api = (path: string) => `${config.get('url')}${path}`;
 
-const channelName = (
-    channels: Array<{id: number; name: string}>,
-    id: number
-): string => channels.find((channel) => channel.id === id)?.name || 'Unknown Channel';
+const channelName = (channels: Array<{id: number; name: string}>, id: number): string =>
+    channels.find((channel) => channel.id === id)?.name || 'Unknown Channel';
 
 const Integrations = () => {
     const {appStore, snackManager} = useStores();
@@ -51,9 +49,12 @@ const Integrations = () => {
     const [loading, setLoading] = React.useState(true);
     const [webhookEdit, setWebhookEdit] = React.useState<IWebhookRoute | null | undefined>();
     const [mqttEdit, setMqttEdit] = React.useState<IMQTTIntegration | null | undefined>();
-    const [homeAssistantEdit, setHomeAssistantEdit] =
-        React.useState<IHomeAssistantIntegration | null | undefined>();
-    const [webhookHistory, setWebhookHistory] = React.useState<{name: string; items: IWebhookDelivery[]} | undefined>();
+    const [homeAssistantEdit, setHomeAssistantEdit] = React.useState<
+        IHomeAssistantIntegration | null | undefined
+    >();
+    const [webhookHistory, setWebhookHistory] = React.useState<
+        {name: string; items: IWebhookDelivery[]} | undefined
+    >();
     const [confirm, setConfirm] = React.useState<
         {title: string; text: string; run: () => Promise<void>} | undefined
     >();
@@ -119,7 +120,11 @@ const Integrations = () => {
                                 <Typography variant="body2" sx={{wordBreak: 'break-all'}}>
                                     {api(item.path.replace(/^\//, ''))}
                                 </Typography>
-                                <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
+                                <Stack
+                                    direction="row"
+                                    spacing={1}
+                                    useFlexGap
+                                    sx={{flexWrap: 'wrap'}}>
                                     <Button
                                         size="small"
                                         startIcon={<ContentCopy />}
@@ -134,7 +139,9 @@ const Integrations = () => {
                                     <Button
                                         size="small"
                                         onClick={async () => {
-                                            await axios.post(api(`integration/webhook/${item.id}/test`));
+                                            await axios.post(
+                                                api(`integration/webhook/${item.id}/test`)
+                                            );
                                             snackManager.snack('Webhook test notification sent');
                                         }}>
                                         Send Test
@@ -145,7 +152,10 @@ const Integrations = () => {
                                             const response = await axios.get<IWebhookDelivery[]>(
                                                 api('integration/webhook/' + item.id + '/history')
                                             );
-                                            setWebhookHistory({name: item.name, items: response.data});
+                                            setWebhookHistory({
+                                                name: item.name,
+                                                items: response.data,
+                                            });
                                         }}>
                                         History
                                     </Button>
@@ -158,7 +168,9 @@ const Integrations = () => {
                                                 text: 'The current webhook URL will stop working immediately. Systems using it must be updated.',
                                                 run: async () => {
                                                     await axios.post(
-                                                        api(`integration/webhook/${item.id}/regenerate`)
+                                                        api(
+                                                            `integration/webhook/${item.id}/regenerate`
+                                                        )
                                                     );
                                                     await refresh();
                                                     snackManager.snack('Webhook URL regenerated');
@@ -168,11 +180,25 @@ const Integrations = () => {
                                         Regenerate URL
                                     </Button>
                                 </Stack>
-                                <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
-                                    {item.requireSignature && <Chip size="small" label="Signed requests required" />}
-                                    <Chip size="small" variant="outlined" label={`${item.rateLimitPerMinute}/min`} />
+                                <Stack
+                                    direction="row"
+                                    spacing={0.75}
+                                    useFlexGap
+                                    sx={{flexWrap: 'wrap'}}>
+                                    {item.requireSignature && (
+                                        <Chip size="small" label="Signed requests required" />
+                                    )}
+                                    <Chip
+                                        size="small"
+                                        variant="outlined"
+                                        label={`${item.rateLimitPerMinute}/min`}
+                                    />
                                     {item.allowedCidrs && (
-                                        <Chip size="small" variant="outlined" label="Source IP restrictions" />
+                                        <Chip
+                                            size="small"
+                                            variant="outlined"
+                                            label="Source IP restrictions"
+                                        />
                                     )}
                                 </Stack>
                             </Stack>
@@ -284,17 +310,23 @@ const Integrations = () => {
                                     <Chip
                                         size="small"
                                         variant="outlined"
-                                        label={item.nativePaired ? 'Native integration paired' : 'Waiting for Home Assistant pairing'}
+                                        label={
+                                            item.nativePaired
+                                                ? 'Native integration paired'
+                                                : 'Waiting for Home Assistant pairing'
+                                        }
                                     />
                                 )}
                                 {item.connectionMode === 'integration' && (
                                     <Button
                                         size="small"
                                         onClick={async () => {
-                                            const response = await axios.post<IHomeAssistantIntegration & {pairingCode: string}>(
-                                                api(`integration/home-assistant/${item.id}/pairing`)
+                                            const response = await axios.post<
+                                                IHomeAssistantIntegration & {pairingCode: string}
+                                            >(api(`integration/home-assistant/${item.id}/pairing`));
+                                            await navigator.clipboard.writeText(
+                                                response.data.pairingCode
                                             );
-                                            await navigator.clipboard.writeText(response.data.pairingCode);
                                             snackManager.snack(
                                                 item.nativePaired
                                                     ? 'Home Assistant repair pairing code copied'
@@ -302,12 +334,16 @@ const Integrations = () => {
                                             );
                                             await refresh();
                                         }}>
-                                        {item.nativePaired ? 'Generate Repair Code' : 'Copy Pairing Code'}
+                                        {item.nativePaired
+                                            ? 'Generate Repair Code'
+                                            : 'Copy Pairing Code'}
                                     </Button>
                                 )}
                                 <Button
                                     size="small"
-                                    disabled={item.connectionMode === 'integration' && !item.nativePaired}
+                                    disabled={
+                                        item.connectionMode === 'integration' && !item.nativePaired
+                                    }
                                     onClick={async () => {
                                         await axios.post(
                                             api('integration/home-assistant/' + item.id + '/event'),
@@ -328,7 +364,9 @@ const Integrations = () => {
                                 title: 'Delete Home Assistant Connection?',
                                 text: 'Gotify MU will stop receiving events from this Home Assistant connection.',
                                 run: async () => {
-                                    await axios.delete(api(`integration/home-assistant/${item.id}`));
+                                    await axios.delete(
+                                        api(`integration/home-assistant/${item.id}`)
+                                    );
                                     await refresh();
                                     snackManager.snack('Home Assistant connection deleted');
                                 },
@@ -344,25 +382,64 @@ const Integrations = () => {
                     <DialogContent>
                         <Stack spacing={1} sx={{pt: 1}}>
                             {webhookHistory.items.length === 0 ? (
-                                <Typography color="text.secondary">No webhook requests have been recorded.</Typography>
-                            ) : webhookHistory.items.map((entry) => (
-                                <Box key={entry.id} sx={{p: 1.25, border: 1, borderColor: 'divider', borderRadius: 2}}>
-                                    <Stack direction={{xs: 'column', sm: 'row'}} spacing={1} sx={{justifyContent: 'space-between'}}>
-                                        <Stack direction="row" spacing={1} sx={{alignItems: 'center', flexWrap: 'wrap'}}>
-                                            <Chip
-                                                size="small"
-                                                label={entry.status}
-                                                color={entry.status === 'delivered' ? 'success' : entry.status === 'ignored' ? 'default' : 'warning'}
-                                                variant="outlined"
-                                            />
-                                            <Typography variant="body2">{new Date(entry.createdAt).toLocaleString()}</Typography>
-                                            {entry.ipAddress && <Typography variant="caption" color="text.secondary">{entry.ipAddress}</Typography>}
+                                <Typography color="text.secondary">
+                                    No webhook requests have been recorded.
+                                </Typography>
+                            ) : (
+                                webhookHistory.items.map((entry) => (
+                                    <Box
+                                        key={entry.id}
+                                        sx={{
+                                            p: 1.25,
+                                            border: 1,
+                                            borderColor: 'divider',
+                                            borderRadius: 2,
+                                        }}>
+                                        <Stack
+                                            direction={{xs: 'column', sm: 'row'}}
+                                            spacing={1}
+                                            sx={{justifyContent: 'space-between'}}>
+                                            <Stack
+                                                direction="row"
+                                                spacing={1}
+                                                sx={{alignItems: 'center', flexWrap: 'wrap'}}>
+                                                <Chip
+                                                    size="small"
+                                                    label={entry.status}
+                                                    color={
+                                                        entry.status === 'delivered'
+                                                            ? 'success'
+                                                            : entry.status === 'ignored'
+                                                              ? 'default'
+                                                              : 'warning'
+                                                    }
+                                                    variant="outlined"
+                                                />
+                                                <Typography variant="body2">
+                                                    {new Date(entry.createdAt).toLocaleString()}
+                                                </Typography>
+                                                {entry.ipAddress && (
+                                                    <Typography
+                                                        variant="caption"
+                                                        color="text.secondary">
+                                                        {entry.ipAddress}
+                                                    </Typography>
+                                                )}
+                                            </Stack>
+                                            {entry.messageId ? (
+                                                <Typography variant="caption">
+                                                    Message #{entry.messageId}
+                                                </Typography>
+                                            ) : null}
                                         </Stack>
-                                        {entry.messageId ? <Typography variant="caption">Message #{entry.messageId}</Typography> : null}
-                                    </Stack>
-                                    {entry.detail && <Typography variant="caption" color="text.secondary">{entry.detail}</Typography>}
-                                </Box>
-                            ))}
+                                        {entry.detail && (
+                                            <Typography variant="caption" color="text.secondary">
+                                                {entry.detail}
+                                            </Typography>
+                                        )}
+                                    </Box>
+                                ))
+                            )}
                         </Stack>
                     </DialogContent>
                     <DialogActions>
@@ -442,10 +519,20 @@ const IntegrationHealth = ({
     children?: React.ReactNode;
 }) => (
     <Stack spacing={0.75}>
-        <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap', alignItems: 'center'}}>
+        <Stack
+            direction="row"
+            spacing={0.75}
+            useFlexGap
+            sx={{flexWrap: 'wrap', alignItems: 'center'}}>
             <Chip
                 size="small"
-                color={status === 'connected' ? 'success' : status === 'reconnecting' ? 'warning' : 'default'}
+                color={
+                    status === 'connected'
+                        ? 'success'
+                        : status === 'reconnecting'
+                          ? 'warning'
+                          : 'default'
+                }
                 variant="outlined"
                 label={status || 'Waiting'}
             />
@@ -470,7 +557,11 @@ const IntegrationHealth = ({
                 {lastError}
             </Alert>
         )}
-        {children && <Stack direction="row" spacing={1}>{children}</Stack>}
+        {children && (
+            <Stack direction="row" spacing={1}>
+                {children}
+            </Stack>
+        )}
     </Stack>
 );
 
@@ -594,7 +685,9 @@ const WebhookDialog = ({
     const [defaultPriority, setDefaultPriority] = React.useState(item?.defaultPriority || 0);
     const [requireSignature, setRequireSignature] = React.useState(item?.requireSignature ?? true);
     const [allowedCidrs, setAllowedCidrs] = React.useState(item?.allowedCidrs || '');
-    const [rateLimitPerMinute, setRateLimitPerMinute] = React.useState(item?.rateLimitPerMinute || 120);
+    const [rateLimitPerMinute, setRateLimitPerMinute] = React.useState(
+        item?.rateLimitPerMinute || 120
+    );
     const [saving, setSaving] = React.useState(false);
 
     const save = async () => {
@@ -633,8 +726,17 @@ const WebhookDialog = ({
             <DialogTitle>{item ? 'Edit Webhook' : 'Add Webhook'}</DialogTitle>
             <DialogContent>
                 <Stack spacing={2} sx={{pt: 1}}>
-                    <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-                    <ChannelSelect value={applicationId} onChange={setApplicationId} channels={channels} />
+                    <TextField
+                        label="Name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                    />
+                    <ChannelSelect
+                        value={applicationId}
+                        onChange={setApplicationId}
+                        channels={channels}
+                    />
                     <TextField
                         label="Title field"
                         value={titleField}
@@ -690,7 +792,12 @@ const WebhookDialog = ({
                         onChange={(e) => setDefaultPriority(Number(e.target.value))}
                     />
                     <FormControlLabel
-                        control={<Switch checked={requireSignature} onChange={(e) => setRequireSignature(e.target.checked)} />}
+                        control={
+                            <Switch
+                                checked={requireSignature}
+                                onChange={(e) => setRequireSignature(e.target.checked)}
+                            />
+                        }
                         label="Require signed requests"
                     />
                     <TextField
@@ -708,14 +815,22 @@ const WebhookDialog = ({
                         slotProps={{htmlInput: {min: 1, max: 10000}}}
                     />
                     <FormControlLabel
-                        control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
+                        control={
+                            <Switch
+                                checked={enabled}
+                                onChange={(e) => setEnabled(e.target.checked)}
+                            />
+                        }
                         label="Enabled"
                     />
                 </Stack>
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose}>Cancel</Button>
-                <Button variant="contained" disabled={saving || !name || !applicationId} onClick={() => void save()}>
+                <Button
+                    variant="contained"
+                    disabled={saving || !name || !applicationId}
+                    onClick={() => void save()}>
                     Save
                 </Button>
             </DialogActions>
@@ -783,8 +898,17 @@ const MQTTDialog = ({
             <DialogTitle>{item ? 'Edit MQTT Connection' : 'Add MQTT Connection'}</DialogTitle>
             <DialogContent>
                 <Stack spacing={2} sx={{pt: 1}}>
-                    <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-                    <ChannelSelect value={applicationId} onChange={setApplicationId} channels={channels} />
+                    <TextField
+                        label="Name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                    />
+                    <ChannelSelect
+                        value={applicationId}
+                        onChange={setApplicationId}
+                        channels={channels}
+                    />
                     <TextField
                         label="Broker URL"
                         value={brokerUrl}
@@ -820,14 +944,26 @@ const MQTTDialog = ({
                             <MenuItem value={2}>2 · Exactly once</MenuItem>
                         </TextField>
                     </Stack>
-                    <TextField label="Client ID" value={clientId} onChange={(e) => setClientId(e.target.value)} />
-                    <TextField label="Username" value={username} onChange={(e) => setUsername(e.target.value)} />
+                    <TextField
+                        label="Client ID"
+                        value={clientId}
+                        onChange={(e) => setClientId(e.target.value)}
+                    />
+                    <TextField
+                        label="Username"
+                        value={username}
+                        onChange={(e) => setUsername(e.target.value)}
+                    />
                     <TextField
                         label={item?.passwordConfigured ? 'New password' : 'Password'}
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        helperText={item?.passwordConfigured ? 'Leave blank to keep the current password.' : ''}
+                        helperText={
+                            item?.passwordConfigured
+                                ? 'Leave blank to keep the current password.'
+                                : ''
+                        }
                     />
                     <TextField
                         label="Custom CA certificate"
@@ -848,7 +984,11 @@ const MQTTDialog = ({
                         helperText="Optional PEM client certificate for mutual TLS."
                     />
                     <TextField
-                        label={item?.clientKeyConfigured ? 'New client private key' : 'Client private key'}
+                        label={
+                            item?.clientKeyConfigured
+                                ? 'New client private key'
+                                : 'Client private key'
+                        }
                         type="password"
                         value={clientKey}
                         onChange={(e) => setClientKey(e.target.value)}
@@ -861,7 +1001,12 @@ const MQTTDialog = ({
                         }
                     />
                     <FormControlLabel
-                        control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
+                        control={
+                            <Switch
+                                checked={enabled}
+                                onChange={(e) => setEnabled(e.target.checked)}
+                            />
+                        }
                         label="Enabled"
                     />
                 </Stack>
@@ -923,10 +1068,9 @@ const HomeAssistantDialog = ({
             if (item) {
                 await axios.put(api(`integration/home-assistant/${item.id}`), payload);
             } else {
-                const response = await axios.post<IHomeAssistantIntegration & {pairingCode?: string}>(
-                    api('integration/home-assistant'),
-                    payload
-                );
+                const response = await axios.post<
+                    IHomeAssistantIntegration & {pairingCode?: string}
+                >(api('integration/home-assistant'), payload);
                 if (connectionMode === 'integration' && response.data.pairingCode) {
                     await navigator.clipboard.writeText(response.data.pairingCode);
                     snackManager.snack('Home Assistant pairing code copied');
@@ -943,22 +1087,35 @@ const HomeAssistantDialog = ({
             <DialogTitle>{item ? 'Edit Home Assistant' : 'Add Home Assistant'}</DialogTitle>
             <DialogContent>
                 <Stack spacing={2} sx={{pt: 1}}>
-                    <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-                    <ChannelSelect value={applicationId} onChange={setApplicationId} channels={channels} />
+                    <TextField
+                        label="Name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                    />
+                    <ChannelSelect
+                        value={applicationId}
+                        onChange={setApplicationId}
+                        channels={channels}
+                    />
                     <TextField
                         select
                         label="Connection method"
                         value={connectionMode}
-                        onChange={(e) => setConnectionMode(e.target.value as 'token' | 'integration')}>
-                        <MenuItem value="integration">Gotify MU Home Assistant Integration</MenuItem>
+                        onChange={(e) =>
+                            setConnectionMode(e.target.value as 'token' | 'integration')
+                        }>
+                        <MenuItem value="integration">
+                            Gotify MU Home Assistant Integration
+                        </MenuItem>
                         <MenuItem value="token">Long-Lived Access Token</MenuItem>
                     </TextField>
 
                     {connectionMode === 'integration' ? (
                         <Alert severity="info">
-                            Use the Gotify MU custom integration in Home Assistant. Saving copies a one-time
-                            pairing code. Paste that code into the Gotify MU integration in Home Assistant.
-                            No Home Assistant Long-Lived Access Token is required.
+                            Use the Gotify MU custom integration in Home Assistant. Saving copies a
+                            one-time pairing code. Paste that code into the Gotify MU integration in
+                            Home Assistant. No Home Assistant Long-Lived Access Token is required.
                         </Alert>
                     ) : (
                         <>
@@ -970,11 +1127,19 @@ const HomeAssistantDialog = ({
                                 required
                             />
                             <TextField
-                                label={item?.tokenConfigured ? 'New access token' : 'Long-Lived Access Token'}
+                                label={
+                                    item?.tokenConfigured
+                                        ? 'New access token'
+                                        : 'Long-Lived Access Token'
+                                }
                                 type="password"
                                 value={token}
                                 onChange={(e) => setToken(e.target.value)}
-                                helperText={item?.tokenConfigured ? 'Leave blank to keep the current token.' : ''}
+                                helperText={
+                                    item?.tokenConfigured
+                                        ? 'Leave blank to keep the current token.'
+                                        : ''
+                                }
                             />
                         </>
                     )}
@@ -1007,7 +1172,12 @@ const HomeAssistantDialog = ({
                         helperText="Optional exact value required for the event-data field."
                     />
                     <FormControlLabel
-                        control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
+                        control={
+                            <Switch
+                                checked={enabled}
+                                onChange={(e) => setEnabled(e.target.checked)}
+                            />
+                        }
                         label="Enabled"
                     />
                 </Stack>

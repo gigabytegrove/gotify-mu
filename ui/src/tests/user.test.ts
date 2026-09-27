@@ -59,7 +59,9 @@ describe('User', () => {
         (name: string, isAdmin: boolean, row: number): (() => Promise<void>) =>
         async () => {
             expect(await innerText(page, $table.cell(row, Col.Name))).toBe(name);
-            expect(await innerText(page, $table.cell(row, Col.Role))).toBe(isAdmin ? 'Administrator' : 'User');
+            expect(await innerText(page, $table.cell(row, Col.Role))).toBe(
+                isAdmin ? 'Administrator' : 'User'
+            );
         };
 
     describe('has created users', () => {
@@ -158,8 +160,10 @@ describe('User', () => {
         await auth.login(page, 'admin', 'changed-pass-123'));
     it('does logout admin', async () => await auth.logout(page));
 
-    it('can login with nicolas', async () => await auth.login(page, 'nicolas', 'nicories-pass-123'));
+    it('can login with nicolas', async () =>
+        await auth.login(page, 'nicolas', 'nicories-pass-123'));
     it('does logout nicolas', async () => await auth.logout(page));
-    it('can login with jmattheis', async () => await auth.login(page, 'jmattheis', 'unicorn-pass-123'));
+    it('can login with jmattheis', async () =>
+        await auth.login(page, 'jmattheis', 'unicorn-pass-123'));
     it('does logout jmattheis', async () => await auth.logout(page));
 });

@@ -19,12 +19,7 @@ import Delete from '@mui/icons-material/Delete';
 import Send from '@mui/icons-material/Send';
 import {PriorityField} from '../common/NotificationFields';
 import * as config from '../config';
-import {
-    IMessageExtras,
-    IMessageTemplate,
-    INotificationAction,
-    INotificationField,
-} from '../types';
+import {IMessageExtras, IMessageTemplate, INotificationAction, INotificationField} from '../types';
 import {useStores} from '../stores';
 
 interface IProps {
@@ -52,7 +47,9 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
     const {snackManager} = useStores();
 
     const loadTemplates = async () => {
-        const response = await axios.get<IMessageTemplate[]>(config.get('url') + 'message-template');
+        const response = await axios.get<IMessageTemplate[]>(
+            config.get('url') + 'message-template'
+        );
         setTemplates(response.data);
     };
 
@@ -120,8 +117,7 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
             <DialogTitle>Send Notification</DialogTitle>
             <DialogContent>
                 <DialogContentText sx={{mb: 2}}>
-                    Send a notification to {appName}. Leave the title blank to use the Channel
-                    name.
+                    Send a notification to {appName}. Leave the title blank to use the Channel name.
                 </DialogContentText>
                 <Stack spacing={2}>
                     <TextField
@@ -181,9 +177,7 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
                                     size="small"
                                     startIcon={<Add />}
                                     disabled={fields.length >= 20}
-                                    onClick={() =>
-                                        setFields([...fields, {label: '', value: ''}])
-                                    }>
+                                    onClick={() => setFields([...fields, {label: '', value: ''}])}>
                                     Add Detail
                                 </Button>
                             </Stack>

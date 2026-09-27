@@ -24,7 +24,12 @@ import History from '@mui/icons-material/History';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
 import ConfirmDialog from '../common/ConfirmDialog';
-import {PriorityField, TimeOfDayField, TimezoneField, priorityLabel} from '../common/NotificationFields';
+import {
+    PriorityField,
+    TimeOfDayField,
+    TimezoneField,
+    priorityLabel,
+} from '../common/NotificationFields';
 import * as config from '../config';
 import {useStores} from '../stores';
 import {
@@ -38,10 +43,8 @@ import {
 const api = (path: string) => config.get('url') + path;
 const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
-const channelName = (
-    channels: Array<{id: number; name: string}>,
-    id: number
-): string => channels.find((channel) => channel.id === id)?.name || 'Unknown Channel';
+const channelName = (channels: Array<{id: number; name: string}>, id: number): string =>
+    channels.find((channel) => channel.id === id)?.name || 'Unknown Channel';
 
 const escalationTargetName = (
     item: IEscalationRule,
@@ -67,10 +70,12 @@ const Automation = () => {
     const [escalations, setEscalations] = React.useState<IEscalationRule[]>([]);
     const [users, setUsers] = React.useState<IUser[]>([]);
     const [groups, setGroups] = React.useState<IUserGroup[]>([]);
-    const [scheduleEdit, setScheduleEdit] =
-        React.useState<IScheduledNotification | null | undefined>();
-    const [escalationEdit, setEscalationEdit] =
-        React.useState<IEscalationRule | null | undefined>();
+    const [scheduleEdit, setScheduleEdit] = React.useState<
+        IScheduledNotification | null | undefined
+    >();
+    const [escalationEdit, setEscalationEdit] = React.useState<
+        IEscalationRule | null | undefined
+    >();
     const [loading, setLoading] = React.useState(true);
     const [confirm, setConfirm] = React.useState<
         {title: string; text: string; run: () => Promise<void>} | undefined
@@ -157,7 +162,9 @@ const Automation = () => {
                                         title: 'Delete Schedule?',
                                         text: 'This scheduled notification and its run history will be deleted.',
                                         run: async () => {
-                                            await axios.delete(api('automation/schedule/' + item.id));
+                                            await axios.delete(
+                                                api('automation/schedule/' + item.id)
+                                            );
                                             await refresh();
                                             snackManager.snack('Schedule deleted');
                                         },
@@ -181,7 +188,9 @@ const Automation = () => {
                     </Button>
                 }>
                 {escalations.length === 0 ? (
-                    <Typography color="text.secondary">No escalation rules have been created.</Typography>
+                    <Typography color="text.secondary">
+                        No escalation rules have been created.
+                    </Typography>
                 ) : (
                     <Stack spacing={1}>
                         {escalations.map((item) => (
@@ -202,7 +211,9 @@ const Automation = () => {
                                     (item.delayMinutes === 1 ? '' : 's') +
                                     ' if priority is ' +
                                     priorityLabel(item.minPriority) +
-                                    ' (' + item.minPriority + ') or higher and the message is still unacknowledged.' +
+                                    ' (' +
+                                    item.minPriority +
+                                    ') or higher and the message is still unacknowledged.' +
                                     (item.repeatMinutes > 0 && item.maxRepeats > 0
                                         ? ' Repeats every ' +
                                           item.repeatMinutes +
@@ -218,7 +229,9 @@ const Automation = () => {
                                         title: 'Delete Escalation?',
                                         text: 'Pending escalation state for this rule will also be removed.',
                                         run: async () => {
-                                            await axios.delete(api('automation/escalation/' + item.id));
+                                            await axios.delete(
+                                                api('automation/escalation/' + item.id)
+                                            );
                                             await refresh();
                                             snackManager.snack('Escalation deleted');
                                         },
@@ -245,11 +258,7 @@ const Automation = () => {
             )}
 
             {scheduleHistory && (
-                <Dialog
-                    open
-                    onClose={() => setScheduleHistory(undefined)}
-                    fullWidth
-                    maxWidth="md">
+                <Dialog open onClose={() => setScheduleHistory(undefined)} fullWidth maxWidth="md">
                     <DialogTitle>{scheduleHistory.schedule.name} · Run History</DialogTitle>
                     <DialogContent>
                         {scheduleHistory.runs.length === 0 ? (
@@ -275,8 +284,11 @@ const Automation = () => {
                                                 <Typography sx={{fontWeight: 600}}>
                                                     {new Date(run.scheduledFor).toLocaleString()}
                                                 </Typography>
-                                                <Typography variant="caption" color="text.secondary">
-                                                    Started {new Date(run.startedAt).toLocaleString()}
+                                                <Typography
+                                                    variant="caption"
+                                                    color="text.secondary">
+                                                    Started{' '}
+                                                    {new Date(run.startedAt).toLocaleString()}
                                                 </Typography>
                                             </Box>
                                             <Chip
@@ -294,7 +306,10 @@ const Automation = () => {
                                             />
                                         </Stack>
                                         {run.error && (
-                                            <Typography variant="body2" color="error" sx={{mt: 0.75}}>
+                                            <Typography
+                                                variant="body2"
+                                                color="error"
+                                                sx={{mt: 0.75}}>
                                                 {run.error}
                                             </Typography>
                                         )}
@@ -489,9 +504,9 @@ const ScheduleDialog = ({
     const [title, setTitle] = React.useState(item?.title || '');
     const [message, setMessage] = React.useState(item?.message || '');
     const [priority, setPriority] = React.useState(item?.priority || 0);
-    const [scheduleType, setScheduleType] = React.useState<
-        IScheduledNotification['scheduleType']
-    >(item?.scheduleType || 'once');
+    const [scheduleType, setScheduleType] = React.useState<IScheduledNotification['scheduleType']>(
+        item?.scheduleType || 'once'
+    );
     const [runAt, setRunAt] = React.useState(
         item?.runAt
             ? localInputValue(item.runAt)
@@ -549,9 +564,22 @@ const ScheduleDialog = ({
             <DialogTitle>{item ? 'Edit Schedule' : 'Add Schedule'}</DialogTitle>
             <DialogContent>
                 <Stack spacing={2} sx={{pt: 1}}>
-                    <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
-                    <ChannelSelect value={applicationId} onChange={setApplicationId} channels={channels} />
-                    <TextField label="Title" value={title} onChange={(e) => setTitle(e.target.value)} />
+                    <TextField
+                        label="Name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                    />
+                    <ChannelSelect
+                        value={applicationId}
+                        onChange={setApplicationId}
+                        channels={channels}
+                    />
+                    <TextField
+                        label="Title"
+                        value={title}
+                        onChange={(e) => setTitle(e.target.value)}
+                    />
                     <TextField
                         label="Message"
                         value={message}
@@ -566,7 +594,9 @@ const ScheduleDialog = ({
                         label="Schedule"
                         value={scheduleType}
                         onChange={(e) =>
-                            setScheduleType(e.target.value as IScheduledNotification['scheduleType'])
+                            setScheduleType(
+                                e.target.value as IScheduledNotification['scheduleType']
+                            )
                         }>
                         <MenuItem value="once">One time</MenuItem>
                         <MenuItem value="hourly">Hourly</MenuItem>
@@ -664,7 +694,12 @@ const ScheduleDialog = ({
                         <MenuItem value="skip">Skip it and continue with the next run</MenuItem>
                     </TextField>
                     <FormControlLabel
-                        control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
+                        control={
+                            <Switch
+                                checked={enabled}
+                                onChange={(e) => setEnabled(e.target.checked)}
+                            />
+                        }
                         label="Enabled"
                     />
                 </Stack>
@@ -745,7 +780,12 @@ const EscalationDialog = ({
             <DialogTitle>{item ? 'Edit Escalation' : 'Add Escalation'}</DialogTitle>
             <DialogContent>
                 <Stack spacing={2} sx={{pt: 1}}>
-                    <TextField label="Name" value={name} onChange={(e) => setName(e.target.value)} required />
+                    <TextField
+                        label="Name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        required
+                    />
                     <ChannelSelect
                         label="Watch Channel"
                         value={sourceApplicationId}
@@ -769,7 +809,9 @@ const EscalationDialog = ({
                             label="Escalate to Channel"
                             value={targetId}
                             onChange={setTargetId}
-                            channels={channels.filter((channel) => channel.id !== sourceApplicationId)}
+                            channels={channels.filter(
+                                (channel) => channel.id !== sourceApplicationId
+                            )}
                         />
                     )}
                     {targetType === 'user' && (
@@ -830,7 +872,12 @@ const EscalationDialog = ({
                         slotProps={{htmlInput: {min: 0, max: 1000}}}
                     />
                     <FormControlLabel
-                        control={<Switch checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />}
+                        control={
+                            <Switch
+                                checked={enabled}
+                                onChange={(e) => setEnabled(e.target.checked)}
+                            />
+                        }
                         label="Enabled"
                     />
                 </Stack>

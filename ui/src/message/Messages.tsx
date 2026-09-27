@@ -1,14 +1,5 @@
 import React from 'react';
-import {
-    Box,
-    Button,
-    Chip,
-    Grid,
-    InputAdornment,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import {Box, Button, Chip, Grid, InputAdornment, Stack, TextField, Typography} from '@mui/material';
 import Archive from '@mui/icons-material/Archive';
 import Delete from '@mui/icons-material/Delete';
 import Refresh from '@mui/icons-material/Refresh';
@@ -61,8 +52,7 @@ const Messages = observer(() => {
     const hasMore = messagesStore.canLoadMore(appId, archivedView);
     const app = appId === -1 ? undefined : appStore.getByIDOrUndefined(appId);
     const isChat =
-        app?.channelType === 'chat' ||
-        (app?.channelType == null && Boolean(app?.allowMemberPost));
+        app?.channelType === 'chat' || (app?.channelType == null && Boolean(app?.allowMemberPost));
     const name = appStore.getName(appId);
     const [typingUsers, setTypingUsers] = React.useState<
         Record<number, {name: string; expiresAt: number}>
@@ -70,14 +60,11 @@ const Messages = observer(() => {
     const expandedState = React.useRef<Record<number, boolean>>({});
 
     const canPost =
-        app != null &&
-        (app.ownerId === currentUser.user.id || Boolean(app.allowMemberPost));
+        app != null && (app.ownerId === currentUser.user.id || Boolean(app.allowMemberPost));
 
     const canDeleteAll =
         !archivedView &&
-        (appId === -1
-            ? currentUser.user.admin
-            : !app?.autoAssign || currentUser.user.admin);
+        (appId === -1 ? currentUser.user.admin : !app?.autoAssign || currentUser.user.admin);
 
     const canDeleteMessage = (message: IMessage) => {
         const messageApp = appStore.getByIDOrUndefined(message.appid);
@@ -117,15 +104,18 @@ const Messages = observer(() => {
             });
 
             if (event.typing) {
-                window.setTimeout(() => {
-                    setTypingUsers((current) => {
-                        const existing = current[event.userId];
-                        if (!existing || existing.expiresAt > Date.now()) return current;
-                        const next = {...current};
-                        delete next[event.userId];
-                        return next;
-                    });
-                }, Math.max(250, expiresAt - Date.now() + 100));
+                window.setTimeout(
+                    () => {
+                        setTypingUsers((current) => {
+                            const existing = current[event.userId];
+                            if (!existing || existing.expiresAt > Date.now()) return current;
+                            const next = {...current};
+                            delete next[event.userId];
+                            return next;
+                        });
+                    },
+                    Math.max(250, expiresAt - Date.now() + 100)
+                );
             }
         });
 
@@ -179,15 +169,9 @@ const Messages = observer(() => {
                     ? () => deleteMessage(message)
                     : undefined
             }
-            fArchive={
-                !archivedView ? () => void messagesStore.archiveSingle(message) : undefined
-            }
-            fRestore={
-                archivedView ? () => void messagesStore.restoreSingle(message) : undefined
-            }
-            fAcknowledge={() =>
-                void messagesStore.setAcknowledged(message, !message.acknowledged)
-            }
+            fArchive={!archivedView ? () => void messagesStore.archiveSingle(message) : undefined}
+            fRestore={archivedView ? () => void messagesStore.restoreSingle(message) : undefined}
+            fAcknowledge={() => void messagesStore.setAcknowledged(message, !message.acknowledged)}
             acknowledged={Boolean(message.acknowledged)}
             acknowledgedByAnyone={Boolean(message.acknowledgedByAnyone)}
             acknowledgementCount={message.acknowledgementCount || 0}
@@ -209,9 +193,7 @@ const Messages = observer(() => {
     const checkIfLoadMore = () => {
         if (isLoadingMore || !messagesStore.canLoadMore(appId, archivedView)) return;
         setLoadingMore(true);
-        messagesStore
-            .loadMore(appId, archivedView)
-            .finally(() => setLoadingMore(false));
+        messagesStore.loadMore(appId, archivedView).finally(() => setLoadingMore(false));
     };
 
     const emptyLabel = archivedView ? 'No archived messages' : 'No messages';
@@ -394,10 +376,7 @@ const Messages = observer(() => {
                                     </Grid>
                                 ) : null,
                             EmptyPlaceholder: () => (
-                                <Typography
-                                    color="text.secondary"
-                                    align="center"
-                                    sx={{py: 5}}>
+                                <Typography color="text.secondary" align="center" sx={{py: 5}}>
                                     {normalizedQuery
                                         ? 'No messages match your search.'
                                         : emptyLabel}

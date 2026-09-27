@@ -43,12 +43,19 @@ const Plugins = observer(() => {
     const [filter, setFilter] = React.useState<'all' | 'enabled' | 'disabled'>('all');
     const [installOpen, setInstallOpen] = React.useState(false);
     const [catalog, setCatalog] = React.useState<IPluginCatalogEntry[]>([]);
-    const [confirm, setConfirm] = React.useState<{title: string; text: string; action: VoidFunction}>();
+    const [confirm, setConfirm] = React.useState<{
+        title: string;
+        text: string;
+        action: VoidFunction;
+    }>();
 
     React.useEffect(() => void pluginStore.refresh(), []);
     React.useEffect(() => {
         if (currentUser.user.admin) {
-            void pluginStore.getCatalog().then(setCatalog).catch(() => setCatalog([]));
+            void pluginStore
+                .getCatalog()
+                .then(setCatalog)
+                .catch(() => setCatalog([]));
         }
     }, [currentUser.user.admin, pluginStore]);
 
@@ -306,8 +313,8 @@ const PluginInstallDialog = observer(({fClose}: {fClose: VoidFunction}) => {
                         <Alert severity="info">
                             Plugins are native server code. Gotify MU verifies configured checksums
                             and trusted Ed25519 signatures before loading new uploads. Unsigned
-                            installation is disabled unless the server administrator explicitly
-                            opts in.
+                            installation is disabled unless the server administrator explicitly opts
+                            in.
                         </Alert>
                     </Stack>
                 )}

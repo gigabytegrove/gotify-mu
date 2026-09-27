@@ -27,7 +27,7 @@ const StatCard = ({label, value, icon, helper}: IProps) => (
         <Stack
             direction="row"
             spacing={2}
-            sx={{justifyContent: 'space-between', alignItems: 'flex-start'}}> 
+            sx={{justifyContent: 'space-between', alignItems: 'flex-start'}}>
             <Box>
                 <Typography variant="body2" color="text.secondary">
                     {label}

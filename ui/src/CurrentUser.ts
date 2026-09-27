@@ -82,7 +82,8 @@ export class CurrentUser {
             });
             return {success: true, mfaRequired: false};
         } catch (error) {
-            const response = (error as AxiosError<{error?: string; mfaRequired?: boolean}>).response;
+            const response = (error as AxiosError<{error?: string; mfaRequired?: boolean}>)
+                .response;
             const mfaRequired =
                 response?.status === 428 ||
                 response?.data?.mfaRequired === true ||
@@ -122,10 +123,7 @@ export class CurrentUser {
         }
     };
 
-    public loginDirectory = async (
-        username: string,
-        password: string
-    ): Promise<boolean> => {
+    public loginDirectory = async (username: string, password: string): Promise<boolean> => {
         runInAction(() => {
             this.loggedIn = false;
             this.authenticating = true;

@@ -49,7 +49,13 @@ interface UpdaterStatus {
 
 const releaseLabel = (release: PublishedRelease) => release.name || release.tag_name;
 const normalizeTag = (tag: string) => tag.replace(/^v/i, '');
-const activeUpdaterStates = new Set(['preparing', 'downloading', 'building', 'replacing', 'verifying']);
+const activeUpdaterStates = new Set([
+    'preparing',
+    'downloading',
+    'building',
+    'replacing',
+    'verifying',
+]);
 
 export const useReleaseUpdate = (refreshKey = 0): ReleaseState => {
     const [state, setState] = React.useState<ReleaseState>({status: 'loading'});
@@ -148,7 +154,10 @@ export const UpdateStatusCard = () => {
             if (!response.ok) {
                 let message = `HTTP ${response.status}`;
                 try {
-                    const payload = (await response.json()) as {message?: string; errorDescription?: string};
+                    const payload = (await response.json()) as {
+                        message?: string;
+                        errorDescription?: string;
+                    };
                     message = payload.message || payload.errorDescription || message;
                 } catch {
                     // Keep the HTTP status when the response is not JSON.
@@ -172,9 +181,7 @@ export const UpdateStatusCard = () => {
             }
 
             const completedThisSession =
-                updateStartedHere.current &&
-                sawActiveUpdate.current &&
-                next.state === 'completed';
+                updateStartedHere.current && sawActiveUpdate.current && next.state === 'completed';
 
             if (completedThisSession && !reloadScheduled.current) {
                 reloadScheduled.current = true;
@@ -253,9 +260,7 @@ export const UpdateStatusCard = () => {
             )}
 
             {state.status === 'error' && (
-                <Alert severity="warning">
-                    Could not check GitHub releases: {state.message}
-                </Alert>
+                <Alert severity="warning">Could not check GitHub releases: {state.message}</Alert>
             )}
 
             {state.status === 'ready' && (

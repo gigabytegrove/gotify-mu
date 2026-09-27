@@ -22,7 +22,8 @@ const ElevationForm = observer(() => {
     const ldapEnabled = config.get('ldap');
     const ldapIdpName = config.get('ldapIdpName');
     const provider = currentUser.user.authProvider || 'local';
-    const usePassword = provider === 'local' ? localAuthEnabled : provider === 'ldap' && ldapEnabled;
+    const usePassword =
+        provider === 'local' ? localAuthEnabled : provider === 'ldap' && ldapEnabled;
     const oidcPending = elevateStore.oidcElevatePending;
     const oidcIdpName = config.get('oidcIdpName');
 
@@ -108,7 +109,9 @@ const ElevationForm = observer(() => {
                         color="primary"
                         variant="contained"
                         fullWidth>
-                        {provider === 'ldap' ? 'Confirm with ' + ldapIdpName : 'Elevate with Password'}
+                        {provider === 'ldap'
+                            ? 'Confirm with ' + ldapIdpName
+                            : 'Elevate with Password'}
                     </Button>
                 </form>
             )}

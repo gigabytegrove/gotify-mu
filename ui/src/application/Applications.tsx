@@ -92,10 +92,7 @@ const Applications = observer(() => {
             title="Channels"
             description="Create notification destinations, control membership, and manage delivery behavior."
             rightControl={
-                <Button
-                    id="create-app"
-                    variant="contained"
-                    onClick={() => setCreateDialog(true)}>
+                <Button id="create-app" variant="contained" onClick={() => setCreateDialog(true)}>
                     Create Channel
                 </Button>
             }>
@@ -210,9 +207,7 @@ const Applications = observer(() => {
                                                         fUpload={() =>
                                                             handleImageUploadClick(app.id)
                                                         }
-                                                        fDeleteImage={() =>
-                                                            setToDeleteImage(app)
-                                                        }
+                                                        fDeleteImage={() => setToDeleteImage(app)}
                                                         fClearHistory={() =>
                                                             setToClearHistoryApp(app)
                                                         }
