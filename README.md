@@ -6,13 +6,13 @@
 
 <p align="center"><strong>Notifications · Messaging · Automation</strong></p>
 
-Monita (formerly Monita) is a self-hosted notifications, messaging, and automation platform built from the Gotify Server codebase. It preserves Gotify protocol and client compatibility while adding shared multi-user Channels, collaboration, integrations, automation, security controls, and operations tooling.
+Monita (formerly Gotify MU) is a self-hosted notifications, messaging, and automation platform built from the Gotify Server codebase. It preserves Gotify protocol and client compatibility while adding shared multi-user Channels, collaboration, integrations, automation, security controls, and operations tooling.
 
 > **Current release:** **v1.1.0**.
 
 ## Branding
 
-The canonical Monita brand system lives in [`assets/`](assets/README.md). During the transition, user-facing surfaces use **Monita (formerly Monita)** where historical context is useful. Technical Gotify compatibility identifiers remain unchanged when renaming them would break existing clients or deployments.
+The canonical Monita brand system lives in [`assets/`](assets/README.md). During the transition, user-facing surfaces use **Monita (formerly Gotify MU)** where historical context is useful. Technical Gotify compatibility identifiers remain unchanged when renaming them would break existing clients or deployments.
 
 Approved brand palette: `#2563EB` Primary, `#3B82F6` Blue, `#06B6D4` Teal, `#0F172A` Slate, and `#94A3B8` Gray.
 
@@ -20,7 +20,7 @@ Approved brand palette: `#2563EB` Primary, `#3B82F6` Blue, `#06B6D4` Teal, `#0F1
 
 Upstream Gotify applications are owned by a single user. Monita keeps that model for compatibility, but adds a membership layer so an application can function as a shared **Channel**.
 
-### Current MU features
+### Current Monita features
 
 - Shared notification channels across multiple users
 - Channel owner plus user memberships
@@ -46,7 +46,7 @@ Upstream Gotify applications are owned by a single user. Monita keeps that model
 
 Monita is intentionally designed to remain compatible with normal Gotify clients.
 
-The official [Gotify Android app](https://github.com/gotify/android) can continue to connect using its normal client token and WebSocket stream. MU-specific fields are additive, so clients that do not understand them can ignore them.
+The official [Gotify Android app](https://github.com/gotify/android) can continue to connect using its normal client token and WebSocket stream. Monita-specific fields are additive, so clients that do not understand them can ignore them.
 
 The existing Gotify CLI and API integrations should continue to work against the compatibility routes.
 
@@ -96,7 +96,7 @@ Authentication and security controls including MFA, passkeys, LDAP/Active Direct
 
 ### Monita channel-management API
 
-The compatibility API remains unchanged, and MU adds these management endpoints:
+The compatibility API remains unchanged, and Monita adds these management endpoints:
 
 ```text
 GET    /application/:id/members
@@ -197,7 +197,7 @@ Then build and start Monita:
 docker compose up -d --build
 ```
 
-The default deployment publishes the Web UI/API on port `8080`. Native SMTP and Syslog receivers are mapped to ports `2525/tcp` and `5514/udp` but bind to `127.0.0.1` by default. Set `GOTIFY_MU_RECEIVER_BIND` to a trusted LAN/host address only when remote devices must reach those listeners.
+The default deployment publishes the Web UI/API on port `8080`. Native SMTP and Syslog receivers are mapped to ports `2525/tcp` and `5514/udp` but bind to `127.0.0.1` by default. Set `MONITA_RECEIVER_BIND` to a trusted LAN/host address only when remote devices must reach those listeners.
 
 Open:
 
@@ -375,7 +375,7 @@ Once automated builds/releases are active, deployment will be able to use publis
 
 ## Upgrading an existing Gotify installation
 
-The MU database migration is additive. Existing users, applications, tokens and messages remain in place, and existing application owners are backfilled as channel members.
+The Monita database migration is additive. Existing users, applications, tokens and messages remain in place, and existing application owners are backfilled as channel members.
 
 **Back up your database before testing an upgrade.** This project is still in active development.
 
