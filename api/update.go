@@ -17,9 +17,9 @@ import (
 
 const (
 	defaultUpdateDockerSocket = "/var/run/docker.sock"
-	defaultUpdateTarget       = "gotify-mu"
-	defaultUpdateWorker       = "gotify-mu-update-worker"
-	defaultUpdateStatusFile   = "/app/data/.gotify-mu-update-status.json"
+	defaultUpdateTarget       = "monita"
+	defaultUpdateWorker       = "monita-update-worker"
+	defaultUpdateStatusFile   = "/app/data/.monita-update-status.json"
 	defaultUpdateRepository   = "gigabytegrove/gotify-mu"
 )
 
@@ -55,24 +55,33 @@ type managedUpdateStatus struct {
 	FinishedAt *time.Time       `json:"finishedAt,omitempty"`
 }
 
+func firstUpdateEnv(keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func NewUpdateAPIFromEnv() UpdateAPI {
-	socket := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATE_DOCKER_SOCKET"))
+	socket := firstUpdateEnv("MONITA_UPDATE_DOCKER_SOCKET", "GOTIFY_MU_UPDATE_DOCKER_SOCKET")
 	if socket == "" {
 		socket = defaultUpdateDockerSocket
 	}
-	target := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATE_TARGET_CONTAINER"))
+	target := firstUpdateEnv("MONITA_UPDATE_TARGET_CONTAINER", "GOTIFY_MU_UPDATE_TARGET_CONTAINER")
 	if target == "" {
 		target = defaultUpdateTarget
 	}
-	worker := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATE_WORKER_NAME"))
+	worker := firstUpdateEnv("MONITA_UPDATE_WORKER_NAME", "GOTIFY_MU_UPDATE_WORKER_NAME")
 	if worker == "" {
 		worker = defaultUpdateWorker
 	}
-	statusFile := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATE_STATUS_FILE"))
+	statusFile := firstUpdateEnv("MONITA_UPDATE_STATUS_FILE", "GOTIFY_MU_UPDATE_STATUS_FILE")
 	if statusFile == "" {
 		statusFile = defaultUpdateStatusFile
 	}
-	repository := strings.TrimSpace(os.Getenv("GOTIFY_MU_REPOSITORY"))
+	repository := firstUpdateEnv("MONITA_REPOSITORY", "GOTIFY_MU_REPOSITORY")
 	if repository == "" {
 		repository = defaultUpdateRepository
 	}
@@ -158,12 +167,12 @@ func (a *UpdateAPI) Install(ctx *gin.Context) {
 
 	image, err := runner("inspect", "--format", "{{.Config.Image}}", a.TargetContainer)
 	if err != nil {
-		ctx.AbortWithError(http.StatusBadGateway, fmt.Errorf("could not inspect current Gotify MU container: %w", err))
+		ctx.AbortWithError(http.StatusBadGateway, fmt.Errorf("could not inspect current Monita container: %w", err))
 		return
 	}
 	image = strings.TrimSpace(image)
 	if image == "" {
-		ctx.AbortWithError(http.StatusBadGateway, errors.New("current Gotify MU image could not be determined"))
+		ctx.AbortWithError(http.StatusBadGateway, errors.New("current Monita image could not be determined"))
 		return
 	}
 
@@ -191,10 +200,13 @@ func (a *UpdateAPI) Install(ctx *gin.Context) {
 		"--name", a.WorkerName,
 		"--volume", a.DockerSocket+":"+defaultUpdateDockerSocket,
 		"--volumes-from", a.TargetContainer,
+		"--env", "MONITA_TARGET_CONTAINER="+a.TargetContainer,
+		"--env", "MONITA_UPDATE_STATUS_FILE="+a.StatusFile,
+		"--env", "MONITA_REPOSITORY="+a.Repository,
 		"--env", "GOTIFY_MU_TARGET_CONTAINER="+a.TargetContainer,
 		"--env", "GOTIFY_MU_UPDATE_STATUS_FILE="+a.StatusFile,
 		"--env", "GOTIFY_MU_REPOSITORY="+a.Repository,
-		"--entrypoint", "/usr/local/bin/gotify-mu-updater",
+		"--entrypoint", "/usr/local/bin/monita-updater",
 		image,
 		"install", request.Version,
 	)
