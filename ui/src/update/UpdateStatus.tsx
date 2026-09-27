@@ -187,7 +187,7 @@ export const UpdateStatusCard = () => {
             const unavailable: UpdaterStatus = {
                 ready: false,
                 state: 'unavailable',
-                message: 'Automatic updates are temporarily unavailable.',
+                message: 'Updates are temporarily unavailable.',
             };
             updaterRef.current = unavailable;
             setUpdater(unavailable);
