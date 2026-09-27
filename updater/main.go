@@ -397,12 +397,19 @@ func (m *manager) resolveReleaseAssets(version string) (string, string, string, 
 		} `json:"assets"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil { return "", "", "", err }
-	expectedSource := fmt.Sprintf("gotify-mu-v%s-source.zip", version)
-	var sourceURL, checksumURL string
+	primarySource := fmt.Sprintf("monita-v%s-source.zip", version)
+	legacySource := fmt.Sprintf("gotify-mu-v%s-source.zip", version)
+	var sourceURL, checksumURL, sourceName string
 	for _, asset := range payload.Assets {
 		switch asset.Name {
-		case expectedSource:
+		case primarySource:
 			sourceURL = asset.BrowserDownloadURL
+			sourceName = primarySource
+		case legacySource:
+			if sourceURL == "" {
+				sourceURL = asset.BrowserDownloadURL
+				sourceName = legacySource
+			}
 		case "SHA256SUMS":
 			checksumURL = asset.BrowserDownloadURL
 		}
@@ -410,7 +417,7 @@ func (m *manager) resolveReleaseAssets(version string) (string, string, string, 
 	if sourceURL == "" || checksumURL == "" {
 		return "", "", "", errors.New("release is missing the signed source package or SHA256SUMS")
 	}
-	return sourceURL, checksumURL, expectedSource, nil
+	return sourceURL, checksumURL, sourceName, nil
 }
 
 func verifyReleaseChecksum(archivePath, checksumPath, expectedName string) error {
