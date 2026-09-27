@@ -439,6 +439,12 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		clientElevated.DELETE("/current/user/passkeys/:id", passkeyHandler.Delete)
 	}
 
+	adminReadOnly := g.Group("")
+	{
+		adminReadOnly.Use(authentication.RequireAdminClient)
+		adminReadOnly.GET("/update/status", updateHandler.Status)
+	}
+
 	authAdmin := g.Group("/user")
 	{
 		authAdmin.Use(authentication.RequireAdmin)
@@ -477,7 +483,6 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		adminPlatform.GET("/group/:id/members", groupHandler.GetMembers)
 		adminPlatform.POST("/group/:id/members", groupHandler.AddMember)
 		adminPlatform.DELETE("/group/:id/members/:userId", groupHandler.RemoveMember)
-		adminPlatform.GET("/update/status", updateHandler.Status)
 		adminPlatform.POST("/update/install", updateHandler.Install)
 
 		adminPlatform.GET("/integration/webhook", automationHandler.GetWebhookRoutes)
