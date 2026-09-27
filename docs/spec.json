@@ -1545,7 +1545,7 @@
             "basicAuth": []
           }
         ],
-        "description": "__NOTE__: When authenticating with a client token or basic auth, the request body\nmust include \"appid\" referencing an application owned by the authenticated user.\nWhen authenticating with an application token, the application is derived from the\ntoken and any \"appid\" in the body is ignored.",
+        "description": "__NOTE__: When authenticating with a client token or basic auth, the request body\nmust include \"appid\" referencing an application owned by the authenticated user,\nor a Gotify MU channel where the authenticated user is a member and member posting is enabled.\nWhen authenticating with an application token, the application is derived from the\ntoken and any \"appid\" in the body is ignored.",
         "consumes": [
           "application/json"
         ],
@@ -2560,6 +2560,11 @@
           "readOnly": true,
           "example": false
         },
+        "channelType": {
+          "description": "ChannelType controls how MU-aware clients present this Channel. Legacy\nmember-posting Channels remain compatible when this value is empty.",
+          "type": "string",
+          "x-go-name": "ChannelType"
+        },
         "createdAt": {
           "description": "The date the application was created.",
           "type": "string",
@@ -2630,6 +2635,17 @@
           "x-go-name": "ReceiveNotifications",
           "readOnly": true
         },
+        "retentionDays": {
+          "description": "Number of days to retain Channel message history. Zero keeps messages indefinitely.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "RetentionDays"
+        },
+        "role": {
+          "description": "Effective role of the current requesting user on this Channel.",
+          "type": "string",
+          "x-go-name": "CurrentRole"
+        },
         "sortKey": {
           "description": "The sort key of this application. Uses fractional indexing.",
           "type": "string",
@@ -2664,6 +2680,11 @@
           "type": "boolean",
           "x-go-name": "AutoAssign"
         },
+        "channelType": {
+          "description": "Presentation mode for MU-aware clients. Empty remains accepted for older clients.",
+          "type": "string",
+          "x-go-name": "ChannelType"
+        },
         "defaultPriority": {
           "description": "The default priority of messages sent by this application. Defaults to 0.",
           "type": "integer",
@@ -2682,6 +2703,12 @@
           "type": "string",
           "x-go-name": "Name",
           "example": "Backup Server"
+        },
+        "retentionDays": {
+          "description": "Number of days to retain message history. Zero keeps messages indefinitely.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "RetentionDays"
         },
         "sortKey": {
           "description": "The sortKey for the application. Uses fractional indexing.",
@@ -2748,6 +2775,10 @@
           "readOnly": true,
           "example": "2019-01-01T00:00:00Z"
         },
+        "mfaAuthenticated": {
+          "type": "boolean",
+          "x-go-name": "MFAAuthenticated"
+        },
         "name": {
           "description": "The client name. This is how the client should be displayed to the user.",
           "type": "string",
@@ -2804,7 +2835,7 @@
           "example": 5
         },
         "extras": {
-          "description": "The extra data sent along the message.\n\nThe extra fields are stored in a key-value scheme. Only accepted in CreateMessage requests with application/json content-type.\n\nThe keys should be in the following format: &lt;top-namespace&gt;::[&lt;sub-namespace&gt;::]&lt;action&gt;\n\nThese namespaces are reserved and might be used in the official clients: gotify android ios web server client. Do not use them for other purposes.",
+          "description": "The extra data sent along the message.\n\nThe extra fields are stored in a key-value scheme. Only accepted in CreateMessage requests with application/json content-type.\n\nThe keys should be in the following format: \u0026lt;top-namespace\u0026gt;::[\u0026lt;sub-namespace\u0026gt;::]\u0026lt;action\u0026gt;\n\nThese namespaces are reserved and might be used in the official clients: gotify android ios web server client. Do not use them for other purposes.",
           "type": "object",
           "additionalProperties": {},
           "x-go-name": "Extras",
@@ -2855,6 +2886,11 @@
           "x-go-name": "Admin",
           "example": true
         },
+        "displayName": {
+          "description": "Friendly display name.",
+          "type": "string",
+          "x-go-name": "DisplayName"
+        },
         "name": {
           "description": "The user name. For login.",
           "type": "string",
@@ -2886,6 +2922,10 @@
           "x-go-name": "Admin",
           "example": true
         },
+        "authProvider": {
+          "type": "string",
+          "x-go-name": "AuthProvider"
+        },
         "clientId": {
           "description": "The client id of the current session.",
           "type": "integer",
@@ -2902,6 +2942,11 @@
           "readOnly": true,
           "example": "2019-01-01T00:00:00Z"
         },
+        "displayName": {
+          "description": "Friendly display name.",
+          "type": "string",
+          "x-go-name": "DisplayName"
+        },
         "elevatedUntil": {
           "description": "The time until which the session is elevated.",
           "type": "string",
@@ -2917,11 +2962,24 @@
           "readOnly": true,
           "example": 25
         },
+        "mfaEnabled": {
+          "type": "boolean",
+          "x-go-name": "MFAEnabled"
+        },
+        "mfaRequired": {
+          "type": "boolean",
+          "x-go-name": "MFARequired"
+        },
         "name": {
           "description": "The user name. For login.",
           "type": "string",
           "x-go-name": "Name",
           "example": "unicorn"
+        },
+        "passkeyCount": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "PasskeyCount"
         }
       },
       "x-go-name": "CurrentUserExternal",
@@ -2988,6 +3046,14 @@
         "oidcAutoRedirect"
       ],
       "properties": {
+        "ldap": {
+          "type": "boolean",
+          "x-go-name": "LDAP"
+        },
+        "ldapIdpName": {
+          "type": "string",
+          "x-go-name": "LDAPIDPName"
+        },
         "localAuth": {
           "description": "If local authentication is enabled.",
           "type": "boolean",
@@ -3062,6 +3128,22 @@
         "date"
       ],
       "properties": {
+        "acknowledged": {
+          "description": "Whether the current requesting user has acknowledged this message.",
+          "type": "boolean",
+          "x-go-name": "Acknowledged"
+        },
+        "acknowledgedByAnyone": {
+          "description": "Whether anyone with access to the Channel has acknowledged this message.",
+          "type": "boolean",
+          "x-go-name": "AcknowledgedByAnyone"
+        },
+        "acknowledgementCount": {
+          "description": "Number of users that have acknowledged this message.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "AcknowledgementCount"
+        },
         "appid": {
           "description": "The application id that send this message.",
           "type": "integer",
@@ -3069,6 +3151,9 @@
           "x-go-name": "ApplicationID",
           "readOnly": true,
           "example": 5
+        },
+        "collaboration": {
+          "$ref": "#/definitions/MessageCollaboration"
         },
         "date": {
           "description": "The date the message was created.",
@@ -3078,8 +3163,20 @@
           "readOnly": true,
           "example": "2018-02-27T19:36:10.5045044+01:00"
         },
+        "escalationDepth": {
+          "description": "The escalation stage depth.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "EscalationDepth"
+        },
+        "escalationRuleId": {
+          "description": "The escalation rule that generated this message.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "EscalationRuleID"
+        },
         "extras": {
-          "description": "The extra data sent along the message.\n\nThe extra fields are stored in a key-value scheme. Only accepted in CreateMessage requests with application/json content-type.\n\nThe keys should be in the following format: &lt;top-namespace&gt;::[&lt;sub-namespace&gt;::]&lt;action&gt;\n\nThese namespaces are reserved and might be used in the official clients: gotify android ios web server client. Do not use them for other purposes.",
+          "description": "The extra data sent along the message.\n\nThe extra fields are stored in a key-value scheme. Only accepted in CreateMessage requests with application/json content-type.\n\nThe keys should be in the following format: \u0026lt;top-namespace\u0026gt;::[\u0026lt;sub-namespace\u0026gt;::]\u0026lt;action\u0026gt;\n\nThese namespaces are reserved and might be used in the official clients: gotify android ios web server client. Do not use them for other purposes.",
           "type": "object",
           "additionalProperties": {},
           "x-go-name": "Extras",
@@ -3100,11 +3197,28 @@
           "readOnly": true,
           "example": 25
         },
+        "lastAcknowledgedAt": {
+          "description": "Time of the most recent acknowledgement.",
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "LastAcknowledgedAt"
+        },
+        "lastAcknowledgedBy": {
+          "description": "Most recent user to acknowledge this message.",
+          "type": "string",
+          "x-go-name": "LastAcknowledgedBy"
+        },
         "message": {
           "description": "The message. Markdown (excluding html) is allowed.",
           "type": "string",
           "x-go-name": "Message",
           "example": "**Backup** was successfully finished."
+        },
+        "parentMessageId": {
+          "description": "The message this notification was escalated from, when applicable.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ParentMessageID"
         },
         "priority": {
           "description": "The priority of the message. If unset, then the default priority of the\napplication will be used.",
@@ -3112,6 +3226,18 @@
           "format": "int64",
           "x-go-name": "Priority",
           "example": 2
+        },
+        "replyToMessageId": {
+          "description": "Message this item replies to in a conversation thread.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ReplyToMessageID"
+        },
+        "rootMessageId": {
+          "description": "The root message for an escalation chain, when applicable.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "RootMessageID"
         },
         "senderName": {
           "description": "The Gotify MU username that posted this message, when available.",
@@ -3126,6 +3252,12 @@
           "x-go-name": "SenderUserID",
           "readOnly": true
         },
+        "threadRootMessageId": {
+          "description": "Root message of a conversation thread.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ThreadRootMessageID"
+        },
         "title": {
           "description": "The title of the message.",
           "type": "string",
@@ -3134,6 +3266,113 @@
         }
       },
       "x-go-name": "MessageExternal",
+      "x-go-package": "github.com/gotify/server/v3/model"
+    },
+    "MessageAttachmentView": {
+      "type": "object",
+      "properties": {
+        "contentType": {
+          "type": "string",
+          "x-go-name": "ContentType"
+        },
+        "filename": {
+          "type": "string",
+          "x-go-name": "Filename"
+        },
+        "id": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ID"
+        },
+        "size": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Size"
+        },
+        "url": {
+          "type": "string",
+          "x-go-name": "URL"
+        }
+      },
+      "x-go-package": "github.com/gotify/server/v3/model"
+    },
+    "MessageCollaboration": {
+      "type": "object",
+      "properties": {
+        "assignedUserId": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "AssignedUserID"
+        },
+        "assignedUserName": {
+          "type": "string",
+          "x-go-name": "AssignedUserName"
+        },
+        "attachments": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageAttachmentView"
+          },
+          "x-go-name": "Attachments"
+        },
+        "mentioned": {
+          "type": "boolean",
+          "x-go-name": "Mentioned"
+        },
+        "reactions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/MessageReactionSummary"
+          },
+          "x-go-name": "Reactions"
+        },
+        "read": {
+          "type": "boolean",
+          "x-go-name": "Read"
+        },
+        "replyCount": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ReplyCount"
+        },
+        "resolvedAt": {
+          "type": "string",
+          "format": "date-time",
+          "x-go-name": "ResolvedAt"
+        },
+        "resolvedBy": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ResolvedBy"
+        },
+        "resolvedByName": {
+          "type": "string",
+          "x-go-name": "ResolvedByName"
+        },
+        "status": {
+          "type": "string",
+          "x-go-name": "Status"
+        }
+      },
+      "x-go-package": "github.com/gotify/server/v3/model"
+    },
+    "MessageReactionSummary": {
+      "type": "object",
+      "properties": {
+        "count": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "Count"
+        },
+        "emoji": {
+          "type": "string",
+          "x-go-name": "Emoji"
+        },
+        "reactedByMe": {
+          "type": "boolean",
+          "x-go-name": "ReactedByMe"
+        }
+      },
       "x-go-package": "github.com/gotify/server/v3/model"
     },
     "OIDCExternalAuthorizeRequest": {
@@ -3180,7 +3419,7 @@
           "description": "The URL to open in the browser to authenticate with the OIDC provider.",
           "type": "string",
           "x-go-name": "AuthorizeURL",
-          "example": "https://auth.example.com/authorize?client_id=gotify&..."
+          "example": "https://auth.example.com/authorize?client_id=gotify\u0026..."
         },
         "state": {
           "description": "The state parameter to send back with the token exchange request.",
@@ -3291,7 +3530,7 @@
           "type": "string",
           "x-go-name": "Next",
           "readOnly": true,
-          "example": "/message?limit=50&since=123456"
+          "example": "/message?limit=50\u0026since=123456"
         },
         "since": {
           "description": "The ID of the last message returned in the current request. Use this as alternative to the next link.",
@@ -3464,6 +3703,11 @@
           "x-go-name": "Admin",
           "example": true
         },
+        "displayName": {
+          "description": "Friendly display name.",
+          "type": "string",
+          "x-go-name": "DisplayName"
+        },
         "name": {
           "description": "The user name. For login.",
           "type": "string",
@@ -3503,6 +3747,11 @@
           "x-go-name": "CreatedAt",
           "readOnly": true,
           "example": "2019-01-01T00:00:00Z"
+        },
+        "displayName": {
+          "description": "Friendly display name. Login continues to use Name.",
+          "type": "string",
+          "x-go-name": "DisplayName"
         },
         "id": {
           "description": "The user id.",
