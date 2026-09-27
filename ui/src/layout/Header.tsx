@@ -97,8 +97,8 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                         label={`@${version}`}
                         href={
                             version.startsWith('master-')
-                                ? `https://github.com/gigabytegrove/gotify-mu/commit/${version.replace('master-', '')}`
-                                : 'https://github.com/gigabytegrove/gotify-mu/releases'
+                                ? `https://github.com/gigabytegrove/monita/commit/${version.replace('master-', '')}`
+                                : 'https://github.com/gigabytegrove/monita/releases'
                         }
                         target="_blank"
                         rel="noreferrer"
