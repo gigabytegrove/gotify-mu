@@ -106,7 +106,8 @@ jobs:
         run: |
           mkdir -p build
           make build-linux-amd64 build-linux-arm64
-          chmod +x build/monita-linux-amd64 build/monita-linux-arm64
+          test -x build/monita-linux-amd64
+          test -x build/monita-linux-arm64
 
       - if: steps.release.outputs.release == 'true'
         name: Build verified source package
