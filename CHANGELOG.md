@@ -6,6 +6,16 @@
 
 This changelog highlights user-visible changes in Monita. Older releases may use the previous **Gotify MU** name.
 
+## 1.1.3 — 2026-09-27
+
+### Channel image management
+
+- Restored Channel image controls directly in **Edit Channel**.
+- Added the current Channel image preview with **Upload image**, **Change image**, and **Remove image** actions.
+- Kept Channel image shortcuts in the Channel action menu.
+- Allowed Channel managers to use the same edit and image-management controls already permitted by the server.
+- Kept token regeneration and destructive Channel actions restricted to owners and administrators.
+
 ## 1.1.2 — 2026-09-27
 
 ### Single-container software updates
