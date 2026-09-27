@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="../assets/monita-banner.png" alt="Monita" width="720">
+  <img src="../assets/monita-banner.svg" alt="Monita" width="720">
 </p>
 
 # Monita Deployment Guide
@@ -237,9 +237,9 @@ Preview branches are deployed manually and must pass the full validation gate.
 
 The in-app updater is intended for **published numbered releases**. A preview branch should not be presented as a normal downloadable release until it has been accepted, merged, tagged, and published.
 
-## v1.0.0 live validation checklist
+## v1.1.0 live validation checklist
 
-Before v1.0.0 is locked as a release:
+Before v1.1.0 is locked as a release:
 
 ### Core compatibility
 
@@ -346,7 +346,7 @@ After a preview is accepted:
 Never commit:
 
 - administrator passwords
-- - MQTT passwords
+- MQTT passwords
 - Home Assistant long-lived access tokens
 - SMTP/mail credentials
 - other integration credentials
