@@ -1,13 +1,9 @@
 package main
 
 import (
-	"archive/zip"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"os"
@@ -242,13 +238,6 @@ func (m *manager) snapshot() updateStatus {
 }
 
 func (m *manager) performInstall(version string, started time.Time) {
-	tempDir, err := os.MkdirTemp("", "gotify-mu-update-*")
-	if err != nil {
-		m.fail(version, started, "The update could not be prepared.", err)
-		return
-	}
-	defer os.RemoveAll(tempDir)
-
 	m.updateProgress("preparing", "Checking release", "Checking release", 5)
 	commit, err := m.resolveCommit(version)
 	if err != nil {
@@ -256,44 +245,16 @@ func (m *manager) performInstall(version string, started time.Time) {
 		return
 	}
 
-	sourceURL, checksumURL, sourceName, err := m.resolveReleaseAssets(version)
-	if err != nil {
-		m.fail(version, started, "The release package could not be verified.", err)
-		return
-	}
-	archivePath := filepath.Join(tempDir, sourceName)
-	checksumPath := filepath.Join(tempDir, "SHA256SUMS")
-	m.updateProgress("downloading", "Downloading update", "Downloading update", 10)
-	if err := m.downloadFile(sourceURL, archivePath, 10, 22); err != nil {
-		m.fail(version, started, "The update could not be downloaded.", err)
-		return
-	}
-	if err := m.downloadFile(checksumURL, checksumPath, 22, 24); err != nil {
-		m.fail(version, started, "The release checksum could not be downloaded.", err)
-		return
-	}
-	if err := verifyReleaseChecksum(archivePath, checksumPath, sourceName); err != nil {
-		m.fail(version, started, "The downloaded update failed integrity verification.", err)
+	image := fmt.Sprintf("ghcr.io/%s:%s", strings.ToLower(m.repository), version)
+	m.updateProgress("downloading", "Downloading update", "Downloading update", 15)
+	if err := m.pullReleaseImage(image); err != nil {
+		m.fail(version, started, "The update image could not be downloaded.", err)
 		return
 	}
 
-	m.updateProgress("preparing", "Preparing update files", "Preparing update files", 27)
-	sourceDir := filepath.Join(tempDir, "source")
-	if err := unzip(archivePath, sourceDir); err != nil {
-		m.fail(version, started, "The update files could not be prepared.", err)
-		return
-	}
-	root, err := singleDirectory(sourceDir)
-	if err != nil {
-		m.fail(version, started, "The update files could not be prepared.", err)
-		return
-	}
-
-	m.updateProgress("building", "Installing update", "Installing update", 30)
-	image := "gotify-mu:release-" + version
-	buildDate := time.Now().UTC().Format(time.RFC3339)
-	if err := m.buildRelease(root, image, version, commit, buildDate); err != nil {
-		m.fail(version, started, "The update could not be installed.", err)
+	m.updateProgress("preparing", "Verifying update", "Verifying update", 72)
+	if err := verifyReleaseImage(image, version, commit, m.repository); err != nil {
+		m.fail(version, started, "The downloaded update failed verification.", err)
 		return
 	}
 
@@ -306,64 +267,79 @@ func (m *manager) performInstall(version string, started time.Time) {
 	m.finishUpdate("completed", "Update complete", "Update installed successfully", 100, finished)
 }
 
-func (m *manager) resolveReleaseAssets(version string) (string, string, string, error) {
-	endpoint := fmt.Sprintf("https://api.github.com/repos/%s/releases/tags/v%s", m.repository, version)
-	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
-	if err != nil { return "", "", "", err }
-	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "gotify-mu-updater")
-	response, err := http.DefaultClient.Do(request)
-	if err != nil { return "", "", "", err }
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return "", "", "", fmt.Errorf("GitHub release lookup returned HTTP %d", response.StatusCode)
+func (m *manager) pullReleaseImage(image string) error {
+	command := exec.Command("docker", "pull", image)
+	writer := &pullProgressWriter{manager: m}
+	command.Stdout = writer
+	command.Stderr = writer
+	if err := command.Run(); err != nil {
+		return fmt.Errorf("docker pull %s: %w", image, err)
 	}
-	var payload struct {
-		Assets []struct {
-			Name string `json:"name"`
-			BrowserDownloadURL string `json:"browser_download_url"`
-		} `json:"assets"`
-	}
-	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil { return "", "", "", err }
-	expectedSource := fmt.Sprintf("gotify-mu-v%s-source.zip", version)
-	var sourceURL, checksumURL string
-	for _, asset := range payload.Assets {
-		switch asset.Name {
-		case expectedSource:
-			sourceURL = asset.BrowserDownloadURL
-		case "SHA256SUMS":
-			checksumURL = asset.BrowserDownloadURL
-		}
-	}
-	if sourceURL == "" || checksumURL == "" {
-		return "", "", "", errors.New("release is missing the signed source package or SHA256SUMS")
-	}
-	return sourceURL, checksumURL, expectedSource, nil
+	m.updateProgress("downloading", "Download complete", "Download complete", 70)
+	return nil
 }
 
-func verifyReleaseChecksum(archivePath, checksumPath, expectedName string) error {
-	content, err := os.ReadFile(checksumPath)
-	if err != nil { return err }
-	var expected string
-	for _, line := range strings.Split(string(content), "\n") {
-		fields := strings.Fields(line)
-		if len(fields) < 2 { continue }
-		if filepath.Base(strings.TrimPrefix(fields[len(fields)-1], "*")) == expectedName {
-			expected = strings.ToLower(fields[0])
+type pullProgressWriter struct {
+	mu      sync.Mutex
+	manager *manager
+	buffer  string
+}
+
+func (w *pullProgressWriter) Write(p []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	w.buffer += string(p)
+	for {
+		index := strings.IndexByte(w.buffer, '\n')
+		if index < 0 {
 			break
 		}
+		line := strings.TrimSpace(w.buffer[:index])
+		w.buffer = w.buffer[index+1:]
+		w.manager.handlePullProgress(line)
 	}
-	if len(expected) != 64 {
-		return errors.New("SHA256SUMS does not contain the release source package")
+	return len(p), nil
+}
+
+func (m *manager) handlePullProgress(line string) {
+	switch {
+	case strings.Contains(line, "Pulling from"):
+		m.updateProgress("downloading", "Downloading update", "Downloading update", 20)
+	case strings.Contains(line, "Downloading"):
+		m.updateProgress("downloading", "Downloading update", "Downloading update", 35)
+	case strings.Contains(line, "Extracting"):
+		m.updateProgress("downloading", "Preparing update", "Preparing update", 55)
+	case strings.Contains(line, "Pull complete"):
+		m.updateProgress("downloading", "Preparing update", "Preparing update", 65)
+	case strings.HasPrefix(line, "Digest:"):
+		m.updateProgress("downloading", "Download complete", "Download complete", 70)
 	}
-	file, err := os.Open(archivePath)
-	if err != nil { return err }
-	defer file.Close()
-	hash := sha256.New()
-	if _, err := io.Copy(hash, file); err != nil { return err }
-	actual := hex.EncodeToString(hash.Sum(nil))
-	if actual != expected {
-		return fmt.Errorf("source checksum mismatch: expected %s, got %s", expected, actual)
+}
+
+func verifyReleaseImage(image, version, commit, repository string) error {
+	output, err := runDocker(
+		"image", "inspect",
+		"--format",
+		`{{index .Config.Labels "org.opencontainers.image.version"}}|{{index .Config.Labels "org.opencontainers.image.revision"}}|{{index .Config.Labels "org.opencontainers.image.source"}}`,
+		image,
+	)
+	if err != nil {
+		return err
+	}
+	parts := strings.Split(strings.TrimSpace(output), "|")
+	if len(parts) != 3 {
+		return errors.New("release image metadata is incomplete")
+	}
+	if parts[0] != version {
+		return fmt.Errorf("release image version mismatch: expected %s, got %s", version, parts[0])
+	}
+	if parts[1] != commit {
+		return fmt.Errorf("release image revision mismatch: expected %s, got %s", commit, parts[1])
+	}
+	expectedSource := "https://github.com/" + repository
+	if parts[2] != expectedSource {
+		return fmt.Errorf("release image source mismatch: expected %s, got %s", expectedSource, parts[2])
 	}
 	return nil
 }
@@ -687,191 +663,10 @@ func redactDockerArgs(args []string) []string {
 	return out
 }
 
-func (m *manager) downloadFile(url, path string, startProgress, endProgress int) error {
-	request, err := http.NewRequest(http.MethodGet, url, nil)
-	if err != nil {
-		return err
-	}
-	request.Header.Set("User-Agent", "gotify-mu-updater")
-	response, err := http.DefaultClient.Do(request)
-	if err != nil {
-		return err
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return fmt.Errorf("HTTP %d", response.StatusCode)
-	}
-	file, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer file.Close()
-
-	if response.ContentLength <= 0 {
-		_, err = io.Copy(file, response.Body)
-		if err == nil {
-			m.updateProgress("downloading", "Downloading update", "Downloading update", endProgress)
-		}
-		return err
-	}
-
-	buffer := make([]byte, 64*1024)
-	var written int64
-	for {
-		n, readErr := response.Body.Read(buffer)
-		if n > 0 {
-			if _, err := file.Write(buffer[:n]); err != nil {
-				return err
-			}
-			written += int64(n)
-			fraction := float64(written) / float64(response.ContentLength)
-			progress := startProgress + int(fraction*float64(endProgress-startProgress))
-			m.updateProgress("downloading", "Downloading update", "Downloading update", progress)
-		}
-		if errors.Is(readErr, io.EOF) {
-			break
-		}
-		if readErr != nil {
-			return readErr
-		}
-	}
-	return nil
-}
-
-func unzip(archivePath, destination string) error {
-	reader, err := zip.OpenReader(archivePath)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-	if err := os.MkdirAll(destination, 0o755); err != nil {
-		return err
-	}
-	cleanRoot := filepath.Clean(destination) + string(os.PathSeparator)
-
-	for _, file := range reader.File {
-		target := filepath.Join(destination, file.Name)
-		if !strings.HasPrefix(filepath.Clean(target)+string(os.PathSeparator), cleanRoot) {
-			return fmt.Errorf("archive contains invalid path %q", file.Name)
-		}
-		if file.FileInfo().IsDir() {
-			if err := os.MkdirAll(target, 0o755); err != nil {
-				return err
-			}
-			continue
-		}
-		if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
-			return err
-		}
-		source, err := file.Open()
-		if err != nil {
-			return err
-		}
-		destinationFile, err := os.OpenFile(target, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, file.Mode())
-		if err != nil {
-			source.Close()
-			return err
-		}
-		_, copyErr := io.Copy(destinationFile, source)
-		closeErr := destinationFile.Close()
-		source.Close()
-		if copyErr != nil {
-			return copyErr
-		}
-		if closeErr != nil {
-			return closeErr
-		}
-	}
-	return nil
-}
-
-func singleDirectory(root string) (string, error) {
-	entries, err := os.ReadDir(root)
-	if err != nil {
-		return "", err
-	}
-	for _, entry := range entries {
-		if entry.IsDir() {
-			return filepath.Join(root, entry.Name()), nil
-		}
-	}
-	return "", errors.New("archive did not contain a source directory")
-}
-
 func (m *manager) fail(version string, started time.Time, publicMessage string, err error) {
 	finished := time.Now().UTC()
 	m.finishUpdate("failed", "Update stopped", publicMessage, m.snapshot().Progress, finished)
 	log.Printf("update v%s failed: %v", version, err)
-}
-
-type buildProgressWriter struct {
-	mu      sync.Mutex
-	manager *manager
-	buffer  string
-}
-
-func (w *buildProgressWriter) Write(p []byte) (int, error) {
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	w.buffer += string(p)
-	for {
-		index := strings.IndexByte(w.buffer, '\n')
-		if index < 0 {
-			break
-		}
-		line := strings.TrimSpace(w.buffer[:index])
-		w.buffer = w.buffer[index+1:]
-		w.manager.handleBuildProgress(line)
-	}
-	return len(p), nil
-}
-
-func (m *manager) buildRelease(root, image, version, commit, buildDate string) error {
-	command := exec.Command(
-		"docker",
-		"build",
-		"--progress=plain",
-		"--pull",
-		"--build-arg", "BUILD_JS=1",
-		"--build-arg", "RUN_TESTS=1",
-		"--build-arg", "GO_VERSION=1.26.0",
-		"--build-arg", "GOTIFY_MU_VERSION="+version,
-		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
-		"--build-arg", "GOTIFY_MU_BUILD_DATE="+buildDate,
-		"-f", filepath.Join(root, "docker", "Dockerfile"),
-		"-t", image,
-		root,
-	)
-	writer := &buildProgressWriter{manager: m}
-	command.Stdout = writer
-	command.Stderr = writer
-	if err := command.Run(); err != nil {
-		return err
-	}
-	m.updateProgress("building", "Update files ready", "Update files ready", 80)
-	return nil
-}
-
-func (m *manager) handleBuildProgress(line string) {
-	if line == "" {
-		return
-	}
-	switch {
-	case strings.Contains(line, "load build definition"):
-		m.updateProgress("building", "Reading update package", "Reading update package", 33)
-	case strings.Contains(line, "load metadata"):
-		m.updateProgress("building", "Checking required components", "Checking required components", 37)
-	case strings.Contains(line, "js-builder"):
-		m.updateProgress("building", "Preparing interface", "Preparing interface", 47)
-	case strings.Contains(line, "[builder "):
-		m.updateProgress("building", "Preparing application", "Preparing application", 62)
-	case strings.Contains(line, "COPY --from=builder /target") ||
-		strings.Contains(line, "COPY --from=updater-builder"):
-		m.updateProgress("building", "Assembling update", "Assembling update", 73)
-	case strings.Contains(line, "exporting to image"):
-		m.updateProgress("building", "Finalizing update files", "Finalizing update files", 78)
-	}
 }
 
 func main() {
