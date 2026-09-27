@@ -4,6 +4,14 @@
 
 # Changelog
 
+## 1.1.4 — 2026-09-27
+
+### Software update status cleanup
+
+- Completed update progress and activity are now transient instead of being shown again every time the Software Update page is reopened.
+- The completion state remains visible while an update is actively being watched, then clears after the page reloads or the user navigates away and returns.
+- Failed update states remain visible so errors are not silently hidden.
+
 This changelog highlights user-visible changes in Monita. Older releases may use the previous **Gotify MU** name.
 
 ## 1.1.3 — 2026-09-27
