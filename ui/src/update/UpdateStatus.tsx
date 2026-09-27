@@ -13,6 +13,7 @@ import OpenInNew from '@mui/icons-material/OpenInNew';
 import SystemUpdateAlt from '@mui/icons-material/SystemUpdateAlt';
 import {Link} from 'react-router';
 import SurfaceCard from '../common/SurfaceCard';
+import {useStores} from '../stores';
 import * as config from '../config';
 import {
     classifyUpdate,
@@ -126,6 +127,7 @@ export const UpdateAvailableBanner = () => {
 
 export const UpdateStatusCard = () => {
     const state = useReleaseUpdate();
+    const {elevateStore} = useStores();
     const current = config.get('version');
     const currentVersion = current.version;
     const [updater, setUpdater] = React.useState<UpdaterStatus>();
@@ -142,7 +144,21 @@ export const UpdateStatusCard = () => {
                 headers: {Accept: 'application/json'},
             });
             if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
+                let message = `HTTP ${response.status}`;
+                try {
+                    const payload = (await response.json()) as {message?: string; errorDescription?: string};
+                    message = payload.message || payload.errorDescription || message;
+                } catch {
+                    // Keep the HTTP status when the response is not JSON.
+                }
+                const unavailable: UpdaterStatus = {
+                    ready: false,
+                    state: 'unavailable',
+                    message,
+                };
+                updaterRef.current = unavailable;
+                setUpdater(unavailable);
+                return;
             }
 
             const next = (await response.json()) as UpdaterStatus;
@@ -184,6 +200,11 @@ export const UpdateStatusCard = () => {
     }, [loadUpdaterStatus]);
 
     const installRelease = async (release: PublishedRelease) => {
+        if (!elevateStore.elevated) {
+            elevateStore.requestReauthentication();
+            return;
+        }
+
         setInstalling(true);
         updateStartedHere.current = true;
         sawActiveUpdate.current = false;
@@ -232,6 +253,7 @@ export const UpdateStatusCard = () => {
                     currentVersion={currentVersion}
                     currentCommit={current.commit}
                     installRelease={installRelease}
+                    elevated={elevateStore.elevated}
                 />
             )}
         </SurfaceCard>
@@ -246,6 +268,7 @@ const ReleaseUpdateDetails = ({
     currentVersion,
     currentCommit,
     installRelease,
+    elevated,
 }: {
     state: Extract<ReleaseState, {status: 'ready'}>;
     updater?: UpdaterStatus;
@@ -254,6 +277,7 @@ const ReleaseUpdateDetails = ({
     currentVersion: string;
     currentCommit: string;
     installRelease: (release: PublishedRelease) => Promise<void>;
+    elevated: boolean;
 }) => {
     const sameCommit =
         Boolean(currentCommit) &&
@@ -347,7 +371,11 @@ const ReleaseUpdateDetails = ({
                     }
                     disabled={!safeAutomaticInstall || !updaterReady || updaterBusy || installing}
                     onClick={() => void installRelease(state.release)}>
-                    {updaterBusy ? 'Updating…' : `Install ${state.release.tag_name}`}
+                    {updaterBusy
+                        ? 'Updating…'
+                        : !elevated
+                          ? `Re-authenticate to install ${state.release.tag_name}`
+                          : `Install ${state.release.tag_name}`}
                 </Button>
             </Stack>
 
@@ -415,10 +443,9 @@ const ReleaseUpdateDetails = ({
                 updater.message && <Alert severity="warning">{updater.message}</Alert>}
 
             {!updaterReady && (
-                <Typography variant="body2" color="text.secondary">
-                    Automatic installation is not enabled on this server. Updates can still be
-                    downloaded below and installed by the server administrator.
-                </Typography>
+                <Alert severity="warning">
+                    {updater?.message || 'Managed updater status is unavailable.'}
+                </Alert>
             )}
 
             {state.release.assets.length > 0 && (
