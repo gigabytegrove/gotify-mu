@@ -1,17 +1,17 @@
 <p align="center">
-  <img src="../assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+  <img src="../assets/monita-banner.png" alt="Monita" width="720">
 </p>
 
 # Home Assistant native pairing contract
 
-Gotify MU supports two Home Assistant connection methods:
+Monita supports two Home Assistant connection methods:
 
 1. Long-Lived Access Token (existing direct Home Assistant API/WebSocket connection).
-2. Native pairing with the `gigabytegrove/gotify-mu-ha` custom integration.
+2. Native pairing with the `gigabytegrove/monita-ha` custom integration.
 
 The native path is intended to remove the requirement for users to create a Home Assistant Long-Lived Access Token.
 
-## Gotify MU flow
+## Monita flow
 
 An administrator creates a Home Assistant connection with:
 
@@ -28,7 +28,7 @@ An administrator creates a Home Assistant connection with:
 }
 ```
 
-Gotify MU returns a one-time pairing code in the form:
+Monita returns a one-time pairing code in the form:
 
 ```text
 <integration-id>.<random-secret>
@@ -44,17 +44,17 @@ POST /integration/home-assistant/:id/pairing
 
 ## Home Assistant pairing request
 
-The `gotify-mu-ha` integration already knows the Gotify MU server URL from its config entry.
+The `monita-ha` integration already knows the Monita server URL from its config entry.
 
-It should expose an options/config flow named **Pair with Gotify MU server** that asks for:
+It should expose an options/config flow named **Pair with Monita server** that asks for:
 
 - pairing code
-- Home Assistant URL reachable by Gotify MU when it cannot be determined automatically, with an optional manual override when the automatically selected URL is not reachable from the Gotify MU server
+- Home Assistant URL reachable by Monita when it cannot be determined automatically, with an optional manual override when the automatically selected URL is not reachable from the Monita server
 
 The HA integration should register a private webhook handler with a random webhook ID and then call:
 
 ```text
-POST <gotify-mu-server>/integrations/home-assistant/native/pair
+POST <monita-server>/integrations/home-assistant/native/pair
 Content-Type: application/json
 ```
 
@@ -81,12 +81,12 @@ The Home Assistant integration must store `secret`, `integrationId`, and `eventP
 
 The pairing code is one-time use. A successful pairing invalidates it immediately.
 
-## HA -> Gotify MU events
+## HA -> Monita events
 
 When paired, the HA integration sends selected Home Assistant events to:
 
 ```text
-POST <gotify-mu-server><eventPath>
+POST <monita-server><eventPath>
 Authorization: Bearer <shared-native-bridge-secret>
 Content-Type: application/json
 ```
@@ -102,11 +102,11 @@ Body:
 }
 ```
 
-Gotify MU applies the configured event type, entity ID, data-field and data-value filters before routing the event into the selected Channel.
+Monita applies the configured event type, entity ID, data-field and data-value filters before routing the event into the selected Channel.
 
-## Gotify MU -> Home Assistant events
+## Monita -> Home Assistant events
 
-Gotify MU posts to the webhook URL supplied during pairing:
+Monita posts to the webhook URL supplied during pairing:
 
 ```text
 POST <home-assistant-webhook-url>
@@ -120,7 +120,7 @@ Body:
 {
   "eventType": "gotify_mu_test",
   "data": {
-    "message": "Gotify MU connection test"
+    "message": "Monita connection test"
   }
 }
 ```
@@ -129,7 +129,7 @@ The HA webhook handler must compare the Bearer credential to the stored shared s
 
 ## Required HA-side behavior
 
-- Keep the existing application-token/client-token Gotify MU notification functionality unchanged.
+- Keep the existing application-token/client-token Monita notification functionality unchanged.
 - Add native server pairing as an optional capability; do not replace the current setup flow.
 - Use Home Assistant config-entry storage for bridge credentials.
 - Redact the shared secret and pairing data from diagnostics/logs.
@@ -137,23 +137,23 @@ The HA webhook handler must compare the Bearer credential to the stored shared s
 - Do not accept the pairing code after a successful pair.
 - Do not execute arbitrary Home Assistant services from bridge payloads.
 - Native inbound bridge payloads may fire Home Assistant events only.
-- Preserve LLT mode in Gotify MU as a fully supported fallback.
+- Preserve LLT mode in Monita as a fully supported fallback.
 
 
 ## Native unpair / revoke
 
-Home Assistant removes native pairing by revoking the shared bridge credential on Gotify MU before deleting its local copy:
+Home Assistant removes native pairing by revoking the shared bridge credential on Monita before deleting its local copy:
 
 ```text
-DELETE <gotify-mu-server>/integrations/home-assistant/native/<integration-id>
+DELETE <monita-server>/integrations/home-assistant/native/<integration-id>
 Authorization: Bearer <shared-native-bridge-secret>
 ```
 
-A successful revoke returns HTTP 204. Gotify MU clears the stored native webhook URL, shared secret, and any outstanding pairing state while preserving the normal Home Assistant connection record and its filters.
+A successful revoke returns HTTP 204. Monita clears the stored native webhook URL, shared secret, and any outstanding pairing state while preserving the normal Home Assistant connection record and its filters.
 
-Home Assistant must not silently discard local credentials when the revoke request fails. A force-local-remove escape hatch may be offered for recovery when the Gotify MU server is unavailable or the remote connection has already been replaced.
+Home Assistant must not silently discard local credentials when the revoke request fails. A force-local-remove escape hatch may be offered for recovery when the Monita server is unavailable or the remote connection has already been replaced.
 
-Regenerating a pairing code for an already paired connection does not tear down the working native bridge. The existing webhook and shared secret remain valid until a replacement pairing succeeds. The Gotify MU admin UI exposes **Generate Repair Code** for an already paired native connection.
+Regenerating a pairing code for an already paired connection does not tear down the working native bridge. The existing webhook and shared secret remain valid until a replacement pairing succeeds. The Monita admin UI exposes **Generate Repair Code** for an already paired native connection.
 
 ## Health and delivery expectations
 
