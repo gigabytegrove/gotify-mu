@@ -178,9 +178,15 @@ const Applications = observer(() => {
                                     <Grid container spacing={1}>
                                         {filteredApps.map((app) => {
                                             const isOwner = app.ownerId === currentUser.user.id;
-                                            const canManage = currentUser.user.admin || isOwner;
+                                            const canManage =
+                                                currentUser.user.admin ||
+                                                isOwner ||
+                                                app.role === 'manager';
+                                            const canManageSecurity =
+                                                currentUser.user.admin || isOwner;
                                             const canDeleteChannel =
-                                                currentUser.user.admin || !app.autoAssign;
+                                                currentUser.user.admin ||
+                                                (isOwner && !app.autoAssign);
                                             const canClearHistory =
                                                 currentUser.user.admin ||
                                                 (!app.autoAssign && isOwner);
@@ -190,6 +196,7 @@ const Applications = observer(() => {
                                                     <ChannelCard
                                                         app={app}
                                                         canManage={canManage}
+                                                        canManageSecurity={canManageSecurity}
                                                         isOwner={isOwner}
                                                         canDeleteChannel={canDeleteChannel}
                                                         canClearHistory={canClearHistory}
@@ -263,6 +270,9 @@ const Applications = observer(() => {
                     initialName={toUpdateApp.name}
                     initialDefaultPriority={toUpdateApp.defaultPriority}
                     initialRetentionDays={toUpdateApp.retentionDays || 0}
+                    initialImage={toUpdateApp.image}
+                    fUploadImage={(file) => appStore.uploadImage(toUpdateApp.id, file)}
+                    fDeleteImage={() => appStore.deleteImage(toUpdateApp.id)}
                     initialChannelType={
                         toUpdateApp.channelType === 'chat' ||
                         (toUpdateApp.channelType == null && toUpdateApp.allowMemberPost)
