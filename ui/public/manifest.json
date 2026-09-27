@@ -7,9 +7,9 @@
   "background_color": "#0F172A",
   "icons": [
     {
-      "src": "static/monita-icon.png",
-      "sizes": "1024x1024",
-      "type": "image/png",
+      "src": "static/monita-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
       "purpose": "any"
     }
   ]
