@@ -170,3 +170,81 @@ func TestApplicationMembershipMentionableUsers(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), `"displayName":"Jennifer"`)
 	assert.NotContains(t, recorder.Body.String(), `"userId":2`)
 }
+
+func TestApplicationMembershipMentionableUsersPublisherRole(t *testing.T) {
+	db := testdb.NewDB(t)
+	defer db.Close()
+
+	owner := db.NewUser(1)
+	publisher := db.NewUser(2)
+	jennifer := db.NewUser(3)
+	jennifer.Name = "jennifer"
+	jennifer.DisplayName = "Jennifer"
+	require.NoError(t, db.UpdateUser(jennifer))
+
+	app := &model.Application{
+		UserID:          owner.ID,
+		Token:           "MUAPIPUBMENT",
+		Name:            "Publisher Chat",
+		ChannelType:     model.ChannelTypeChat,
+		AllowMemberPost: false,
+	}
+	require.NoError(t, db.CreateApplication(app))
+	require.NoError(t, db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               publisher.ID,
+		ReceiveNotifications: true,
+		Role:                 model.ChannelRolePublisher,
+	}))
+	require.NoError(t, db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               jennifer.ID,
+		ReceiveNotifications: true,
+		Role:                 model.ChannelRoleMember,
+	}))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	test.WithUser(ctx, publisher.ID)
+	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	ctx.Request = httptest.NewRequest("GET", "/application/1/mentionable-users", nil)
+
+	handler := &ApplicationMembershipAPI{DB: db}
+	handler.GetMentionableUsers(ctx)
+
+	assert.Equal(t, 200, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"name":"jennifer"`)
+}
+
+func TestApplicationMembershipMentionableUsersReadOnlyDenied(t *testing.T) {
+	db := testdb.NewDB(t)
+	defer db.Close()
+
+	owner := db.NewUser(1)
+	readOnly := db.NewUser(2)
+	app := &model.Application{
+		UserID:          owner.ID,
+		Token:           "MUAPIROMENT",
+		Name:            "Read Only Chat",
+		ChannelType:     model.ChannelTypeChat,
+		AllowMemberPost: false,
+	}
+	require.NoError(t, db.CreateApplication(app))
+	require.NoError(t, db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               readOnly.ID,
+		ReceiveNotifications: true,
+		Role:                 model.ChannelRoleReadOnly,
+	}))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	test.WithUser(ctx, readOnly.ID)
+	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	ctx.Request = httptest.NewRequest("GET", "/application/1/mentionable-users", nil)
+
+	handler := &ApplicationMembershipAPI{DB: db}
+	handler.GetMentionableUsers(ctx)
+
+	assert.Equal(t, 403, recorder.Code)
+}
