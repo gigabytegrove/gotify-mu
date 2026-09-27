@@ -38,6 +38,14 @@ jobs:
       - name: Install Web UI dependencies
         run: (cd ui && yarn --frozen-lockfile)
 
+      - name: Verify canonical branding
+        run: |
+          echo "f2c4d39e3846f7b93468b2729251d1ad2f49a187b9090e98624ede7d97a07367  assets/gotify-mu-banner.png" | sha256sum -c -
+          echo "1acadb12c2bb38e4bb24d1cf21b3760f5909ba15b579fadb2df4f30026fa9783  assets/gotify-mu-icon.png" | sha256sum -c -
+          echo "fc4a7edae75b8002a7386bdab0062b43bd6b76c90a51070bf9334523595f45a6  assets/gotify-mu-logo.png" | sha256sum -c -
+          cmp assets/gotify-mu-logo.png ui/public/static/gotify-mu-logo.png
+          cmp assets/gotify-mu-icon.png ui/public/static/gotify-mu-icon.png
+
       - name: Build Web UI
         run: make build-js
 
