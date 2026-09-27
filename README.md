@@ -10,6 +10,10 @@ Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/serv
 
 > **Current release:** **v1.0.0**. It is the first stable Gotify MU release.
 
+## Branding
+
+The canonical Gotify MU branding lives in [`assets/`](assets/README.md). The approved banner, logo, and icon are release-controlled assets and must not be regenerated, recolored, cropped differently, or silently replaced during normal development or release work.
+
 ## Why Gotify MU?
 
 Upstream Gotify applications are owned by a single user. Gotify MU keeps that model for compatibility, but adds a membership layer so an application can function as a shared **Channel**.
