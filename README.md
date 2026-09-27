@@ -62,6 +62,17 @@ http://SERVER-IP:8080
 
 Persistent application data is stored in the configured Monita data directory and remains in place when the container is updated. Normal installs use the prebuilt Monita image, so users do not need to compile the application locally.
 
+## Prebuilt release image archives
+
+If your environment cannot pull directly from GitHub Container Registry, Monita also publishes prebuilt Docker image archives with each supported release.
+
+Download the archive that matches your server architecture, verify it with the published checksum file, load it with Docker, and start Monita with Docker Compose. This path does not compile Monita locally.
+
+Supported release archives:
+
+- `linux-amd64` for standard 64-bit Intel/AMD systems
+- `linux-arm64` for 64-bit ARM systems
+
 ## Updating
 
 Monita can check for published releases from **Settings → Software Update**. Normal updates download a prebuilt release image and restart Monita; they do not rebuild the application locally.
