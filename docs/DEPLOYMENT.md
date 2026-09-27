@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="../assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+  <img src="../assets/monita-banner.png" alt="Monita" width="720">
 </p>
 
-# Gotify MU Deployment Guide
+# Monita Deployment Guide
 
-This document is the maintained deployment, validation, update, backup, and rollback reference for Gotify MU.
+This document is the maintained deployment, validation, update, backup, and rollback reference for Monita.
 
 ## Release state
 
@@ -15,9 +15,9 @@ The v1.0.0 release commit is validated through the repository gate before public
 
 ## Supported deployment models
 
-Gotify MU supports:
+Monita supports:
 
-1. Docker Compose with the Gotify MU updater helper.
+1. Docker Compose with the Monita updater helper.
 2. Manual Docker deployment with a persistent data directory.
 3. Native source builds for development/testing.
 
@@ -34,7 +34,7 @@ The container stores persistent state under:
 For the manual deployment used during project validation, that is mounted from:
 
 ```text
-/opt/gotify-mu-data
+/opt/monita-data
 ```
 
 Do not replace or delete the persistent data directory during a normal container upgrade.
@@ -48,7 +48,7 @@ Clone the repository:
 ```bash
 cd /opt
 git clone https://github.com/gigabytegrove/gotify-mu.git
-cd gotify-mu
+cd monita
 cp .env.example .env
 ```
 
@@ -86,8 +86,8 @@ Verify:
 
 ```bash
 curl -fsS http://127.0.0.1:8080/health
-docker ps --filter name=gotify-mu
-docker logs --tail 100 gotify-mu
+docker ps --filter name=monita
+docker logs --tail 100 monita
 ```
 
 A healthy server returns:
@@ -103,7 +103,7 @@ A manual deployment should always keep application data outside the container.
 Example build:
 
 ```bash
-cd /opt/gotify-mu
+cd /opt/monita
 
 COMMIT="$(git rev-parse HEAD)"
 SHORT_COMMIT="$(git rev-parse --short HEAD)"
@@ -117,7 +117,7 @@ docker build \
   --build-arg GOTIFY_MU_COMMIT="${COMMIT}" \
   --build-arg GOTIFY_MU_BUILD_DATE="${BUILD_DATE}" \
   -f docker/Dockerfile \
-  -t gotify-mu:preview \
+  -t monita:preview \
   .
 ```
 
@@ -147,20 +147,20 @@ A failed build or failed test suite must not proceed to the replacement stage.
 
 ## Safe backup before an upgrade
 
-For a manual deployment using `/opt/gotify-mu-data`:
+For a manual deployment using `/opt/monita-data`:
 
 ```bash
-BACKUP_DIR="/opt/gotify-mu-backups"
+BACKUP_DIR="/opt/monita-backups"
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
 
 mkdir -p "${BACKUP_DIR}"
 
-docker stop gotify-mu
+docker stop monita
 
 tar \
   -C /opt \
   -czf "${BACKUP_DIR}/pre-upgrade-${TIMESTAMP}.tar.gz" \
-  gotify-mu-data
+  monita-data
 
 tar -tzf "${BACKUP_DIR}/pre-upgrade-${TIMESTAMP}.tar.gz" >/dev/null
 ```
@@ -173,7 +173,7 @@ Preserve the old container before starting the new one:
 
 ```bash
 TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-docker rename gotify-mu "gotify-mu-rollback-${TIMESTAMP}"
+docker rename monita "monita-rollback-${TIMESTAMP}"
 ```
 
 The replacement must use the same persistent data mount and required environment configuration.
@@ -182,46 +182,46 @@ Example:
 
 ```bash
 docker run -d \
-  --name gotify-mu \
+  --name monita \
   --restart unless-stopped \
-  --network gotify-mu-system \
+  --network monita-system \
   -p 8080:80 \
   --env-file /path/to/preserved.env \
-  -v /opt/gotify-mu-data:/app/data \
-  gotify-mu:preview
+  -v /opt/monita-data:/app/data \
+  monita:preview
 ```
 
 Then verify:
 
 ```bash
 curl -fsS http://127.0.0.1:8080/health
-docker logs --tail 150 gotify-mu
+docker logs --tail 150 monita
 ```
 
 ## Rollback after a migrated preview
 
-Do **not** simply start an older Gotify MU container against a database that has already been migrated by a newer preview.
+Do **not** simply start an older Monita container against a database that has already been migrated by a newer preview.
 
 For a rollback to the pre-upgrade version:
 
 1. Stop and remove the failed/new container.
 2. Preserve the failed preview data directory for investigation.
 3. Restore the pre-upgrade data backup.
-4. Rename the preserved old container back to `gotify-mu`.
+4. Rename the preserved old container back to `monita`.
 5. Start the old container.
 6. Verify health.
 
 Example:
 
 ```bash
-docker rm -f gotify-mu
+docker rm -f monita
 
-mv /opt/gotify-mu-data "/opt/gotify-mu-data-failed-$(date +%Y%m%d-%H%M%S)"
+mv /opt/monita-data "/opt/monita-data-failed-$(date +%Y%m%d-%H%M%S)"
 
-tar -C /opt -xzf /opt/gotify-mu-backups/PRE-UPGRADE-BACKUP.tar.gz
+tar -C /opt -xzf /opt/monita-backups/PRE-UPGRADE-BACKUP.tar.gz
 
-docker rename OLD-ROLLBACK-CONTAINER gotify-mu
-docker start gotify-mu
+docker rename OLD-ROLLBACK-CONTAINER monita
+docker start monita
 
 curl -fsS http://127.0.0.1:8080/health
 ```
@@ -235,7 +235,7 @@ Published releases can be installed from **Settings → Software Update** when t
 The updater helper:
 
 - runs without a published host port
-- communicates with Gotify MU over the private Docker network
+- communicates with Monita over the private Docker network
 - requires a shared random token
 - has access to the Docker socket so it can replace the application container
 - preserves the current runtime configuration
@@ -318,7 +318,7 @@ Before v1.0.0 is locked as a release:
 - checksum/signature/trusted-key policy is enforced
 - Plugin Catalog install/update works
 - plugin update and uninstall work
-- plugin-created notifications pass through Gotify MU delivery policy
+- plugin-created notifications pass through Monita delivery policy
 
 ### Operations and updater
 
