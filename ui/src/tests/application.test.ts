@@ -31,9 +31,9 @@ const updateChannel =
     (id: number, data: {name?: string; description?: string}): (() => Promise<void>) =>
     async () => {
         await page.click(`${card(id)} .channel-actions`);
-        await page.waitForSelector('.edit');
-        await page.click('.edit');
-        await page.waitForSelector($dialog.selector());
+        await page.waitForSelector('.MuiMenu-paper .edit', {visible: true});
+        await page.click('.MuiMenu-paper .edit');
+        await page.waitForSelector($dialog.selector(), {visible: true});
 
         if (data.name) {
             const nameSelector = $dialog.input('.name');
@@ -113,8 +113,8 @@ describe('Channels', () => {
 
     it('regenerates Channel token', async () => {
         await page.click(`${card(1)} .channel-actions`);
-        await page.waitForSelector('.regenerate-token');
-        await page.click('.regenerate-token');
+        await page.waitForSelector('.MuiMenu-paper .regenerate-token', {visible: true});
+        await page.click('.MuiMenu-paper .regenerate-token');
         await page.waitForSelector(selector.$confirmDialog.selector());
         await page.click(selector.$confirmDialog.button('.confirm'));
         await waitToDisappear(page, selector.$confirmDialog.selector());
@@ -128,8 +128,8 @@ describe('Channels', () => {
 
     it('deletes Channel', async () => {
         await page.click(`${card(2)} .channel-actions`);
-        await page.waitForSelector('.delete');
-        await page.click('.delete');
+        await page.waitForSelector('.MuiMenu-paper .delete', {visible: true});
+        await page.click('.MuiMenu-paper .delete');
         await page.waitForSelector(selector.$confirmDialog.selector());
         await page.click(selector.$confirmDialog.button('.confirm'));
     });
