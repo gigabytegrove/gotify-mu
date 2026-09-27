@@ -158,10 +158,23 @@ jobs:
         name: Create release tag
         shell: bash
         run: |
+          set -euo pipefail
+          TAG="v${{ steps.release.outputs.version }}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git tag -a "v${{ steps.release.outputs.version }}" -m "Gotify MU v${{ steps.release.outputs.version }}"
-          git push origin "v${{ steps.release.outputs.version }}"
+
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+            TAG_COMMIT="$(git rev-list -n 1 "${TAG}")"
+            if [[ "${TAG_COMMIT}" != "${GITHUB_SHA}" ]]; then
+              echo "Refusing to publish ${TAG}: remote tag points to ${TAG_COMMIT}, expected ${GITHUB_SHA}"
+              exit 1
+            fi
+            echo "${TAG} already points to this release commit"
+          else
+            git tag -a "${TAG}" -m "Gotify MU ${TAG}"
+            git push origin "${TAG}"
+          fi
 
       - if: steps.release.outputs.release == 'true'
         name: Publish GitHub release
