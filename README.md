@@ -8,7 +8,7 @@
 
 Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
 
-> **Current release:** **v1.0.0**. It is the first stable Gotify MU release.
+> **Current release:** **v1.0.2**.
 
 ## Branding
 
@@ -65,7 +65,7 @@ The Web UI uses **Channels** as the user-facing term and provides:
 - Standardized light, dark, and system themes
 - Responsive desktop and mobile-web navigation
 - Consistent dialogs, tables, cards, status indicators, and destructive-action language
-- Administrator update discovery with Dashboard notices, direct release downloads, and managed in-app installation from Settings
+- Administrator update discovery and one-click managed installation from Settings
 - Native Integrations administration for Webhooks, MQTT, and Home Assistant
 - Native Automation administration for Scheduled Notifications and Escalations
 - Per-user Quiet Hours and Digest preferences
@@ -138,7 +138,7 @@ The official Gotify Android app continues to receive Chat Channel messages as no
 
 ## Releases
 
-The current published release is **Gotify MU v1.0.0**. Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed notes in [docs/releases/v1.0.0.md](docs/releases/v1.0.0.md).
+The current published release is **Gotify MU v1.0.2**. Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed notes in [docs/releases/v1.0.2.md](docs/releases/v1.0.2.md).
 
 Deployment, validation, updater, backup, and rollback procedures are maintained in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
@@ -147,7 +147,7 @@ For a release checkout:
 ```bash
 git clone https://github.com/gigabytegrove/gotify-mu.git
 cd gotify-mu
-git checkout v1.0.0
+git checkout v1.0.2
 ```
 
 Release builds inject the release version, commit, and build date into the server binary. Development builds continue to use `master-<commit>`, `master-local`, or `dev-<commit>` identities as appropriate.
@@ -175,13 +175,9 @@ At minimum, change:
 
 ```text
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
-GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
 
-Generate `GOTIFY_MU_UPDATER_TOKEN` with `openssl rand -hex 32`.
-
-The included `docker-compose.yml` starts both Gotify MU and the private updater helper. The helper has no published host port and communicates with the application over the `gotify-mu-system` Docker network.
-
+The included `docker-compose.yml` starts exactly one persistent service: `gotify-mu`.
 
 Example `.env`:
 
@@ -191,7 +187,6 @@ GOTIFY_MU_COMMIT=local
 GOTIFY_MU_PORT=8080
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
-GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
 
 Then build and start Gotify MU:
@@ -248,19 +243,13 @@ docker ps --filter name=gotify-mu
 
 ### Managed in-app updates
 
-Docker installations can enable the Gotify MU updater helper for one-click release installation from **Settings → Software Update**.
+Docker Compose runs one persistent `gotify-mu` container. There is no always-running updater service.
 
-The helper runs on a private Docker network with no published host port. It requires a random shared token and access to the Docker socket so it can preserve the current runtime configuration, replace the Gotify MU application container, verify health, and automatically restore the previous container if the replacement fails.
+From **Settings → Software Update**, Gotify MU checks GitHub for the newest published release. An administrator can click **Update** to start the upgrade. The UI shows progress, the replacement container is health-checked, and the previous container is restored automatically if verification fails.
 
-Generate the shared token with:
+During an update only, Gotify MU starts a short-lived `gotify-mu-update-worker` container from the currently installed image. It exists only long enough to perform the replacement and removes itself when finished. Persistent application data remains mounted at `/app/data`.
 
-```bash
-openssl rand -hex 32
-```
-
-Store it as `GOTIFY_MU_UPDATER_TOKEN` in the local `.env`. Never commit that token.
-
-Docker socket access is privileged host access. If managed self-updating is not desired, omit the updater helper and continue to use the manual update procedure.
+Managed self-updating requires the Docker socket mount included in `docker-compose.yml`. Docker socket access is host-privileged. If managed updates are not wanted, remove that mount and use the manual update procedure instead.
 
 ### Updating a development installation
 
@@ -289,10 +278,10 @@ COMMIT="$(git rev-parse --short HEAD)"
 docker build --no-cache \
   --build-arg BUILD_JS=1 \
   --build-arg GO_VERSION=1.26.0 \
-  --build-arg GOTIFY_MU_VERSION="1.0.0" \
+  --build-arg GOTIFY_MU_VERSION="1.0.2" \
   --build-arg GOTIFY_MU_COMMIT="${COMMIT}" \
   -f docker/Dockerfile \
-  -t gotify-mu:1.0.0 \
+  -t gotify-mu:1.0.2 \
   .
 ```
 
