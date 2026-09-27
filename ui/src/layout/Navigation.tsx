@@ -67,7 +67,12 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
         {label: 'Groups', to: '/groups', icon: <GroupWork />, adminOnly: true},
         {label: 'Integrations', to: '/integrations', icon: <Hub />, adminOnly: true},
         {label: 'Automation', to: '/automation', icon: <AutoMode />, adminOnly: true},
-        {label: 'Security & Operations', to: '/system', icon: <AdminPanelSettings />, adminOnly: true},
+        {
+            label: 'Security & Operations',
+            to: '/system',
+            icon: <AdminPanelSettings />,
+            adminOnly: true,
+        },
         {label: 'Audit Log', to: '/audit', icon: <FactCheck />, adminOnly: true},
         {label: 'Clients', to: '/clients', icon: <DevicesOther />},
         {label: 'Plugins', to: '/plugins', icon: <Extension />},
@@ -140,10 +145,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                 <Stack
                     direction="row"
                     sx={{px: 1.25, mb: 0.5, alignItems: 'center', justifyContent: 'space-between'}}>
-                    <Typography
-                        variant="overline"
-                        color="text.secondary"
-                        sx={{letterSpacing: 1}}>
+                    <Typography variant="overline" color="text.secondary" sx={{letterSpacing: 1}}>
                         Your Channels
                     </Typography>
                     <Chip size="small" variant="outlined" label={apps.length} />
@@ -186,16 +188,17 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                                     <ListItemText
                                         primary={<Typography noWrap>{app.name}</Typography>}
                                     />
-                                    <Stack direction="row" spacing={0.5} sx={{alignItems: 'center'}}>
+                                    <Stack
+                                        direction="row"
+                                        spacing={0.5}
+                                        sx={{alignItems: 'center'}}>
                                         {app.receiveNotifications === false && (
                                             <NotificationsOff
                                                 sx={{fontSize: 15, color: 'text.disabled'}}
                                             />
                                         )}
                                         {app.autoAssign && (
-                                            <Public
-                                                sx={{fontSize: 15, color: 'text.secondary'}}
-                                            />
+                                            <Public sx={{fontSize: 15, color: 'text.secondary'}} />
                                         )}
                                     </Stack>
                                 </ListItemButton>
@@ -207,7 +210,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
             {showRequestNotification && (
                 <>
                     <Divider />
-                    <Stack sx={{p: 1.5}}> 
+                    <Stack sx={{p: 1.5}}>
                         <Button
                             variant="outlined"
                             onClick={() => {

@@ -69,8 +69,7 @@ const ChannelCard = ({
 }: IProps) => {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
     const isChat =
-        app.channelType === 'chat' ||
-        (app.channelType == null && Boolean(app.allowMemberPost));
+        app.channelType === 'chat' || (app.channelType == null && Boolean(app.allowMemberPost));
     const {attributes, listeners, setNodeRef, transform, transition, isDragging} = useSortable({
         id: app.id,
         disabled: !canManage,
@@ -94,7 +93,8 @@ const ChannelCard = ({
                 opacity: isDragging ? 0.55 : 1,
                 transform: CSS.Transform.toString(transform),
                 transition:
-                    transition || 'transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease',
+                    transition ||
+                    'transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease',
                 '&:hover': {
                     boxShadow: 2,
                     borderColor: 'action.selected',

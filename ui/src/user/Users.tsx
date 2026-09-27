@@ -35,14 +35,7 @@ interface IRowProps {
     fEdit: VoidFunction;
 }
 
-const UserRow: React.FC<IRowProps> = ({
-    name,
-    displayName,
-    admin,
-    createdAt,
-    fDelete,
-    fEdit,
-}) => (
+const UserRow: React.FC<IRowProps> = ({name, displayName, admin, createdAt, fDelete, fEdit}) => (
     <TableRow hover>
         <TableCell>
             <strong>{name}</strong>
@@ -96,10 +89,7 @@ const Users = observer(() => {
             title="Users"
             description="Manage local accounts and administrative access."
             rightControl={
-                <Button
-                    id="create-user"
-                    variant="contained"
-                    onClick={() => setCreateDialog(true)}>
+                <Button id="create-user" variant="contained" onClick={() => setCreateDialog(true)}>
                     Create User
                 </Button>
             }>

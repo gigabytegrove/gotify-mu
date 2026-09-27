@@ -67,11 +67,7 @@ const Dashboard = observer(() => {
             title="Dashboard"
             description="Notifications, access, and server status at a glance."
             rightControl={
-                <Button
-                    component={Link}
-                    to="/messages"
-                    variant="contained"
-                    startIcon={<Inbox />}>
+                <Button component={Link} to="/messages" variant="contained" startIcon={<Inbox />}>
                     Open Messages
                 </Button>
             }>
@@ -223,10 +219,7 @@ const Dashboard = observer(() => {
                                                 />
                                             )}
                                         </Stack>
-                                        <Typography
-                                            variant="body2"
-                                            color="text.secondary"
-                                            noWrap>
+                                        <Typography variant="body2" color="text.secondary" noWrap>
                                             {app.description || 'No description'}
                                         </Typography>
                                     </Box>
@@ -251,7 +244,9 @@ const Dashboard = observer(() => {
                             <Chip
                                 size="small"
                                 color={currentUser.connectionErrorMessage ? 'warning' : 'success'}
-                                label={currentUser.connectionErrorMessage ? 'Attention' : 'Connected'}
+                                label={
+                                    currentUser.connectionErrorMessage ? 'Attention' : 'Connected'
+                                }
                             />
                         }>
                         <Stack spacing={1}>
@@ -280,12 +275,20 @@ const Dashboard = observer(() => {
                                 <Typography variant="body2" color="text.secondary">
                                     Sign-in methods
                                 </Typography>
-                                <Stack direction="row" spacing={0.5} useFlexGap sx={{flexWrap: 'wrap'}}>
+                                <Stack
+                                    direction="row"
+                                    spacing={0.5}
+                                    useFlexGap
+                                    sx={{flexWrap: 'wrap'}}>
                                     {config.get('localAuth') && (
                                         <Chip size="small" variant="outlined" label="Password" />
                                     )}
                                     {config.get('oidc') && (
-                                        <Chip size="small" variant="outlined" label="Single sign-on" />
+                                        <Chip
+                                            size="small"
+                                            variant="outlined"
+                                            label="Single sign-on"
+                                        />
                                     )}
                                 </Stack>
                             </Stack>
@@ -298,10 +301,7 @@ const Dashboard = observer(() => {
 });
 
 const InfoRow = ({label, value}: {label: string; value: string}) => (
-    <Stack
-        direction="row"
-        spacing={2}
-        sx={{alignItems: 'center', justifyContent: 'space-between'}}>
+    <Stack direction="row" spacing={2} sx={{alignItems: 'center', justifyContent: 'space-between'}}>
         <Typography variant="body2" color="text.secondary">
             {label}
         </Typography>

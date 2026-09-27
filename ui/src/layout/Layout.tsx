@@ -126,27 +126,15 @@ const Layout = observer(() => {
                                     <Route path="/messages" element={authed(<Messages />)} />
                                     <Route path="/channels" element={authed(<Applications />)} />
                                     <Route path="/channels/:id" element={authed(<Messages />)} />
-                                    <Route
-                                        path="/messages/:id"
-                                        element={authed(<Messages />)}
-                                    />
+                                    <Route path="/messages/:id" element={authed(<Messages />)} />
                                     <Route
                                         path="/applications"
                                         element={<Navigate replace to="/channels" />}
                                     />
                                     <Route path="/clients" element={authed(<Clients />)} />
-                                    <Route
-                                        path="/users"
-                                        element={authed(elevated(<Users />))}
-                                    />
-                                    <Route
-                                        path="/groups"
-                                        element={authed(elevated(<Groups />))}
-                                    />
-                                    <Route
-                                        path="/audit"
-                                        element={authed(elevated(<Audit />))}
-                                    />
+                                    <Route path="/users" element={authed(elevated(<Users />))} />
+                                    <Route path="/groups" element={authed(elevated(<Groups />))} />
+                                    <Route path="/audit" element={authed(elevated(<Audit />))} />
                                     <Route
                                         path="/integrations"
                                         element={authed(elevated(<Integrations />))}

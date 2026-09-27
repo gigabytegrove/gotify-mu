@@ -4,7 +4,7 @@ export interface IApplication {
     ownerId?: number;
     autoAssign?: boolean;
     allowMemberPost?: boolean;
-    channelType?: "notification" | "chat";
+    channelType?: 'notification' | 'chat';
     receiveNotifications?: boolean;
     name: string;
     sortKey: string;
@@ -153,7 +153,6 @@ export interface IApplicationGroupAssignment {
     memberCount: number;
 }
 
-
 export interface IWebhookRoute {
     id: number;
     name: string;
@@ -300,14 +299,12 @@ export interface IEscalationRule {
     updatedAt: string;
 }
 
-
 export interface IMessageAcknowledgement {
     userId: number;
     username: string;
     displayName?: string;
     acknowledgedAt: string;
 }
-
 
 export interface IScheduledNotificationRun {
     id: number;
@@ -319,7 +316,6 @@ export interface IScheduledNotificationRun {
     messageId?: number;
     error?: string;
 }
-
 
 export interface IMFAStatus {
     enabled: boolean;
@@ -369,7 +365,6 @@ export interface IAdminSession {
     elevatedUntil?: string;
     expiresAt?: string;
 }
-
 
 export interface IEmailGateway {
     id: number;
@@ -450,7 +445,6 @@ export interface ICalendarMonitor {
     lastErrorAt?: string;
 }
 
-
 export interface IPluginCatalogEntry {
     name: string;
     modulePath: string;
@@ -464,14 +458,12 @@ export interface IPluginCatalogEntry {
     installed: boolean;
 }
 
-
 export interface IPasskey {
     id: number;
     name: string;
     createdAt: string;
     lastUsedAt?: string;
 }
-
 
 export interface IMessageAttachment {
     id: number;
@@ -527,7 +519,6 @@ export interface ISavedMessageSearch {
     updatedAt: string;
 }
 
-
 export interface INotificationAction {
     label: string;
     url: string;
@@ -537,7 +528,6 @@ export interface INotificationField {
     label: string;
     value: string;
 }
-
 
 export interface IMUTypingEvent {
     type: 'typing';

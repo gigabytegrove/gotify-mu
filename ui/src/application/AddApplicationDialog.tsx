@@ -133,10 +133,15 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                                 }
                             />
 
-                            <Accordion elevation={0} disableGutters sx={{border: 1, borderColor: 'divider'}}>
+                            <Accordion
+                                elevation={0}
+                                disableGutters
+                                sx={{border: 1, borderColor: 'divider'}}>
                                 <AccordionSummary expandIcon={<ExpandMore />}>
                                     <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
-                                        <Typography sx={{fontWeight: 600}}>Channel behavior</Typography>
+                                        <Typography sx={{fontWeight: 600}}>
+                                            Channel behavior
+                                        </Typography>
                                         {chatChannel && (
                                             <Chip
                                                 size="small"
@@ -164,8 +169,9 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                                             label="Two-way Chat Channel"
                                         />
                                         <Typography variant="body2" color="text.secondary">
-                                            Chat Channels use the conversation interface in Gotify MU
-                                            desktop and mobile clients instead of the notification feed.
+                                            Chat Channels use the conversation interface in Gotify
+                                            MU desktop and mobile clients instead of the
+                                            notification feed.
                                         </Typography>
                                         {chatChannel && (
                                             <FormControlLabel

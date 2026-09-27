@@ -69,13 +69,12 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
     };
 
     const react = async (emoji: string, reactedByMe: boolean) => {
-        await mutate(
-            () =>
-                reactedByMe
-                    ? axios.delete(api('message/' + message.id + '/reaction'), {
-                          params: {emoji},
-                      })
-                    : axios.post(api('message/' + message.id + '/reaction'), {emoji})
+        await mutate(() =>
+            reactedByMe
+                ? axios.delete(api('message/' + message.id + '/reaction'), {
+                      params: {emoji},
+                  })
+                : axios.post(api('message/' + message.id + '/reaction'), {emoji})
         );
     };
 
@@ -100,14 +99,16 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
         <>
             <Stack spacing={1}>
                 <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
-                    <Button
-                        size="small"
-                        startIcon={<Reply />}
-                        onClick={() => setReplyOpen(true)}>
+                    <Button size="small" startIcon={<Reply />} onClick={() => setReplyOpen(true)}>
                         Reply
                     </Button>
-                    {(collaboration.replyCount || message.threadRootMessageId || message.replyToMessageId) && (
-                        <Button size="small" startIcon={<Forum />} onClick={() => void openThread()}>
+                    {(collaboration.replyCount ||
+                        message.threadRootMessageId ||
+                        message.replyToMessageId) && (
+                        <Button
+                            size="small"
+                            startIcon={<Forum />}
+                            onClick={() => void openThread()}>
                             Thread
                             {collaboration.replyCount ? ' (' + collaboration.replyCount + ')' : ''}
                         </Button>
@@ -174,7 +175,9 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
 
                 <Stack direction="row" spacing={0.5} useFlexGap sx={{flexWrap: 'wrap'}}>
                     {reactions.map((emoji) => {
-                        const existing = collaboration.reactions?.find((item) => item.emoji === emoji);
+                        const existing = collaboration.reactions?.find(
+                            (item) => item.emoji === emoji
+                        );
                         return (
                             <Chip
                                 key={emoji}
@@ -194,11 +197,7 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
                             <Chip
                                 key={attachment.id}
                                 icon={<AttachFile fontSize="small" />}
-                                label={
-                                    attachment.filename +
-                                    ' · ' +
-                                    formatBytes(attachment.size)
-                                }
+                                label={attachment.filename + ' · ' + formatBytes(attachment.size)}
                                 component="a"
                                 clickable
                                 href={api(attachment.url.replace(/^\//, ''))}
@@ -231,7 +230,12 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
                             />
                         )}
                         {collaboration.mentioned && (
-                            <Chip size="small" color="info" variant="outlined" label="Mentioned you" />
+                            <Chip
+                                size="small"
+                                color="info"
+                                variant="outlined"
+                                label="Mentioned you"
+                            />
                         )}
                     </Stack>
                 )}
@@ -266,7 +270,11 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
                 </DialogActions>
             </Dialog>
 
-            <Dialog open={thread !== undefined} onClose={() => setThread(undefined)} fullWidth maxWidth="md">
+            <Dialog
+                open={thread !== undefined}
+                onClose={() => setThread(undefined)}
+                fullWidth
+                maxWidth="md">
                 <DialogTitle>Conversation Thread</DialogTitle>
                 <DialogContent>
                     <Stack spacing={1.25} sx={{pt: 1}}>

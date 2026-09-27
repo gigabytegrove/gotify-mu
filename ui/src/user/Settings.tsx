@@ -45,78 +45,80 @@ const Settings = ({themeMode, setTheme}: IProps) => {
     const {currentUser} = useStores();
 
     return (
-    <DefaultPage
-        title="Settings"
-        description="Account preferences and sign-in settings."
-        maxWidth={900}>
-        {currentUser.user.admin && <UpdateStatusCard />}
+        <DefaultPage
+            title="Settings"
+            description="Account preferences and sign-in settings."
+            maxWidth={900}>
+            {currentUser.user.admin && <UpdateStatusCard />}
 
-        <NotificationPreferences />
+            <NotificationPreferences />
 
-        <SurfaceCard
-            title="Appearance"
-            subtitle="Choose how Gotify MU looks on this device."
-            action={<DarkMode color="action" />}>
-            <FormControl fullWidth>
-                <InputLabel id="theme-select-label">Theme</InputLabel>
-                <Select
-                    labelId="theme-select-label"
-                    className="theme-select"
-                    label="Theme"
-                    value={themeMode}
-                    onChange={(e) => setTheme(e.target.value as ThemeKey)}>
-                    <MenuItem value="light">Light</MenuItem>
-                    <MenuItem value="dark">Dark</MenuItem>
-                    <MenuItem value="system">System</MenuItem>
-                </Select>
-            </FormControl>
-        </SurfaceCard>
+            <SurfaceCard
+                title="Appearance"
+                subtitle="Choose how Gotify MU looks on this device."
+                action={<DarkMode color="action" />}>
+                <FormControl fullWidth>
+                    <InputLabel id="theme-select-label">Theme</InputLabel>
+                    <Select
+                        labelId="theme-select-label"
+                        className="theme-select"
+                        label="Theme"
+                        value={themeMode}
+                        onChange={(e) => setTheme(e.target.value as ThemeKey)}>
+                        <MenuItem value="light">Light</MenuItem>
+                        <MenuItem value="dark">Dark</MenuItem>
+                        <MenuItem value="system">System</MenuItem>
+                    </Select>
+                </FormControl>
+            </SurfaceCard>
 
-        <MFASettings />
-        <PasskeySettings />
+            <MFASettings />
+            <PasskeySettings />
 
-        <SurfaceCard
-            title="Account Security"
-            subtitle="Security controls for your local Gotify MU account."
-            action={<Security color="action" />}>
-            <Stack spacing={2}>
-                <Stack
-                    direction={{xs: 'column', sm: 'row'}}
-                    spacing={1}
-                    sx={{justifyContent: 'space-between'}}> 
-                    <Typography>Password sign-in</Typography>
-                    <Chip
-                        size="small"
-                        label={config.get('localAuth') ? 'Enabled' : 'Disabled'}
-                    />
+            <SurfaceCard
+                title="Account Security"
+                subtitle="Security controls for your local Gotify MU account."
+                action={<Security color="action" />}>
+                <Stack spacing={2}>
+                    <Stack
+                        direction={{xs: 'column', sm: 'row'}}
+                        spacing={1}
+                        sx={{justifyContent: 'space-between'}}>
+                        <Typography>Password sign-in</Typography>
+                        <Chip
+                            size="small"
+                            label={config.get('localAuth') ? 'Enabled' : 'Disabled'}
+                        />
+                    </Stack>
+                    <Stack
+                        direction={{xs: 'column', sm: 'row'}}
+                        spacing={1}
+                        sx={{justifyContent: 'space-between'}}>
+                        <Typography>Single sign-on</Typography>
+                        <Chip size="small" label={config.get('oidc') ? 'Enabled' : 'Disabled'} />
+                    </Stack>
                 </Stack>
-                <Stack
-                    direction={{xs: 'column', sm: 'row'}}
-                    spacing={1}
-                    sx={{justifyContent: 'space-between'}}> 
-                    <Typography>Single sign-on</Typography>
-                    <Chip size="small" label={config.get('oidc') ? 'Enabled' : 'Disabled'} />
-                </Stack>
-            </Stack>
-        </SurfaceCard>
+            </SurfaceCard>
 
-        <SurfaceCard
-            title="Change Password"
-            subtitle="Choose a new password for your account."
-            action={<Key color="action" />}>
-            <ChangePasswordForm />
-        </SurfaceCard>
-    </DefaultPage>
+            <SurfaceCard
+                title="Change Password"
+                subtitle="Choose a new password for your account."
+                action={<Key color="action" />}>
+                <ChangePasswordForm />
+            </SurfaceCard>
+        </DefaultPage>
     );
 };
-
 
 const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
 const minuteToTime = (minute: number): string => {
     const normalized = Math.max(0, Math.min(1439, minute));
-    return String(Math.floor(normalized / 60)).padStart(2, '0') + ':' +
-        String(normalized % 60).padStart(2, '0');
+    return (
+        String(Math.floor(normalized / 60)).padStart(2, '0') +
+        ':' +
+        String(normalized % 60).padStart(2, '0')
+    );
 };
 
 const timeToMinute = (value: string): number => {
@@ -138,9 +140,7 @@ const NotificationPreferences = () => {
                 .then((response) =>
                     setQuiet({
                         ...response.data,
-                        timezone: response.data.id
-                            ? response.data.timezone
-                            : browserTimezone,
+                        timezone: response.data.id ? response.data.timezone : browserTimezone,
                         mode: response.data.mode || 'suppress',
                     })
                 ),
@@ -249,8 +249,12 @@ const NotificationPreferences = () => {
                         onChange={(event) =>
                             setQuiet({...quiet, mode: event.target.value as 'suppress' | 'defer'})
                         }>
-                        <MenuItem value="suppress">Keep in history without a realtime alert</MenuItem>
-                        <MenuItem value="defer">Send the realtime alert after quiet hours end</MenuItem>
+                        <MenuItem value="suppress">
+                            Keep in history without a realtime alert
+                        </MenuItem>
+                        <MenuItem value="defer">
+                            Send the realtime alert after quiet hours end
+                        </MenuItem>
                     </TextField>
                     <Button
                         variant="contained"
@@ -297,9 +301,7 @@ const NotificationPreferences = () => {
                     <PriorityField
                         label="Send immediately at priority"
                         value={digest.immediatePriority}
-                        onChange={(immediatePriority) =>
-                            setDigest({...digest, immediatePriority})
-                        }
+                        onChange={(immediatePriority) => setDigest({...digest, immediatePriority})}
                         helperText="Messages at this priority or higher skip the digest and notify you immediately."
                     />
                     <Button
@@ -314,7 +316,6 @@ const NotificationPreferences = () => {
         </>
     );
 };
-
 
 const MFASettings = () => {
     const {currentUser, elevateStore, snackManager} = useStores();
@@ -411,9 +412,7 @@ const MFASettings = () => {
                 action={<Security color="action" />}>
                 <Stack spacing={2}>
                     <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
-                        <Typography sx={{flex: 1}}>
-                            Authenticator verification
-                        </Typography>
+                        <Typography sx={{flex: 1}}>Authenticator verification</Typography>
                         <Chip
                             size="small"
                             color={status?.enabled ? 'success' : 'default'}
@@ -467,7 +466,11 @@ const MFASettings = () => {
                 </Stack>
             </SurfaceCard>
 
-            <Dialog open={Boolean(setup)} onClose={() => !busy && setSetup(undefined)} fullWidth maxWidth="sm">
+            <Dialog
+                open={Boolean(setup)}
+                onClose={() => !busy && setSetup(undefined)}
+                fullWidth
+                maxWidth="sm">
                 <DialogTitle>Set Up Authenticator</DialogTitle>
                 <DialogContent>
                     {setup && (
@@ -530,7 +533,9 @@ const MFASettings = () => {
                     <Alert severity="warning" sx={{mb: 2}}>
                         Store these recovery codes somewhere safe. They will not be shown again.
                     </Alert>
-                    <Typography component="pre" sx={{whiteSpace: 'pre-wrap', fontFamily: 'monospace'}}>
+                    <Typography
+                        component="pre"
+                        sx={{whiteSpace: 'pre-wrap', fontFamily: 'monospace'}}>
                         {(recoveryCodes || []).join('\n')}
                     </Typography>
                 </DialogContent>
@@ -541,7 +546,6 @@ const MFASettings = () => {
         </>
     );
 };
-
 
 const PasskeySettings = () => {
     const {currentUser, elevateStore, snackManager} = useStores();
@@ -635,10 +639,7 @@ const PasskeySettings = () => {
                             placeholder="Laptop, phone, security key"
                             fullWidth
                         />
-                        <Button
-                            variant="contained"
-                            disabled={busy}
-                            onClick={() => void add()}>
+                        <Button variant="contained" disabled={busy} onClick={() => void add()}>
                             Add Passkey
                         </Button>
                     </Stack>
@@ -668,7 +669,11 @@ const ChangePasswordForm = () => {
     };
 
     if (!localAuthEnabled) {
-        return <Typography color="text.secondary">Password sign-in is disabled on this server.</Typography>;
+        return (
+            <Typography color="text.secondary">
+                Password sign-in is disabled on this server.
+            </Typography>
+        );
     }
 
     if (!elevateStore.elevated) {

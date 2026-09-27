@@ -99,9 +99,7 @@ describe('Elevation', () => {
             await page.waitForSelector(selector.$confirmDialog.selector());
             await page.click(selector.$confirmDialog.button('.confirm'));
 
-            await page.waitForSelector(
-                '.global-reauthentication-dialog .elevation-password input'
-            );
+            await page.waitForSelector('.global-reauthentication-dialog .elevation-password input');
         });
         it('re-elevates from the global prompt', async () => {
             await elevateViaForm('admin');

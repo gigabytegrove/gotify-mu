@@ -25,12 +25,7 @@ import {Markdown} from '../common/Markdown';
 import * as config from '../config';
 import {IMessage, IMessageAcknowledgement, IMessageExtras} from '../types';
 import MessageCollaboration from './MessageCollaboration';
-import {
-    contentType,
-    notificationActions,
-    notificationFields,
-    RenderMode,
-} from './extras';
+import {contentType, notificationActions, notificationFields, RenderMode} from './extras';
 import {TimeAgoFormatter} from '../common/TimeAgoFormatter';
 
 const PREVIEW_HEIGHT = 360;
@@ -89,7 +84,6 @@ const Message = ({
     const [isOverflowing, setOverflowing] = React.useState(false);
     const [acknowledgements, setAcknowledgements] = React.useState<IMessageAcknowledgement[]>();
 
-
     const refreshOverflowing = React.useCallback(() => {
         const ref = contentRef.current;
         if (!ref) return;
@@ -137,7 +131,7 @@ const Message = ({
                     priority >= 8 ? 'error.main' : priority >= 4 ? 'warning.main' : 'divider',
             }}>
             <Stack spacing={1.15}>
-                <Stack direction="row" spacing={1.25} sx={{alignItems: 'flex-start'}}> 
+                <Stack direction="row" spacing={1.25} sx={{alignItems: 'flex-start'}}>
                     {image && (
                         <Avatar
                             src={config.get('url') + image}
@@ -159,11 +153,14 @@ const Message = ({
                                 sx={{fontSize: '0.98rem', lineHeight: 1.25}}>
                                 {title}
                             </Typography>
-                            {priority >= 8 && (
-                                <Chip size="small" color="error" label="Critical" />
-                            )}
+                            {priority >= 8 && <Chip size="small" color="error" label="Critical" />}
                             {priority >= 4 && priority < 8 && (
-                                <Chip size="small" color="warning" variant="outlined" label="High" />
+                                <Chip
+                                    size="small"
+                                    color="warning"
+                                    variant="outlined"
+                                    label="High"
+                                />
                             )}
                             {acknowledgedByAnyone && (
                                 <Chip
@@ -199,10 +196,7 @@ const Message = ({
                                 />
                             )}
                         </Stack>
-                        <Typography
-                            variant="caption"
-                            color="text.secondary"
-                            title={date}>
+                        <Typography variant="caption" color="text.secondary" title={date}>
                             {senderName ? `${senderName} · ${appName}` : appName}
                             {' · '}
                             <TimeAgo date={date} formatter={TimeAgoFormatter.long} />
@@ -211,8 +205,7 @@ const Message = ({
 
                     <Stack direction="row" spacing={0.1}>
                         {fAcknowledge && (
-                            <Tooltip
-                                title={acknowledged ? 'Undo acknowledgement' : 'Acknowledge'}>
+                            <Tooltip title={acknowledged ? 'Undo acknowledgement' : 'Acknowledge'}>
                                 <IconButton
                                     onClick={fAcknowledge}
                                     size="small"
@@ -324,7 +317,9 @@ const Message = ({
                     </Button>
                 )}
             </Stack>
-            <Dialog open={acknowledgements !== undefined} onClose={() => setAcknowledgements(undefined)}>
+            <Dialog
+                open={acknowledgements !== undefined}
+                onClose={() => setAcknowledgements(undefined)}>
                 <DialogTitle>Message Acknowledgements</DialogTitle>
                 <DialogContent>
                     {acknowledgements && acknowledgements.length > 0 ? (

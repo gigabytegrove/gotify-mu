@@ -310,9 +310,10 @@ export class MessagesStore {
             .getItems()
             .reduce((all, app) => ({...all, [app.id]: app.image}), {});
 
-        return this.stateOf(appId, true, false).messages.map(
-            (message: IMessage): IMessage => ({...message, image: appToImage[message.appid]})
-        );
+        return this.stateOf(appId, true, false).messages.map((message: IMessage): IMessage => ({
+            ...message,
+            image: appToImage[message.appid],
+        }));
     };
 
     public get = createTransformer(this.getUnCached);

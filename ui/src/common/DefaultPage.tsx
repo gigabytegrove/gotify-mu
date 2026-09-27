@@ -27,7 +27,10 @@ const DefaultPage: FC<React.PropsWithChildren<IProps>> = ({
                     justifyContent: 'space-between',
                 }}>
                 <Box sx={{minWidth: 0}}>
-                    <Typography variant="h4" component="h1" sx={{fontSize: {xs: '1.65rem', sm: '2rem'}}}>
+                    <Typography
+                        variant="h4"
+                        component="h1"
+                        sx={{fontSize: {xs: '1.65rem', sm: '2rem'}}}>
                         {title}
                     </Typography>
                     {description && (

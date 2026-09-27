@@ -1,13 +1,5 @@
 import React from 'react';
-import {
-    Box,
-    Button,
-    Chip,
-    Divider,
-    Stack,
-    TextField,
-    Typography,
-} from '@mui/material';
+import {Box, Button, Chip, Divider, Stack, TextField, Typography} from '@mui/material';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
 import * as config from '../config';
@@ -191,10 +183,7 @@ const Login = observer(() => {
                     )}
 
                     {localAuthEnabled && config.get('register') && (
-                        <Button
-                            id="register"
-                            onClick={() => setRegisterDialog(true)}
-                            fullWidth>
+                        <Button id="register" onClick={() => setRegisterDialog(true)} fullWidth>
                             Create an account
                         </Button>
                     )}

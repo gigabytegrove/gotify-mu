@@ -72,9 +72,7 @@ const memberStatus = (member: IApplicationMember | undefined, isOwner: boolean) 
             <Chip size="small" variant="outlined" label={roleLabel(member.role)} />
             {member.autoAssigned && <Chip size="small" variant="outlined" label="Global" />}
             {member.groupAssigned && <Chip size="small" variant="outlined" label="Via Group" />}
-            {!member.receiveNotifications && (
-                <Chip size="small" variant="outlined" label="Muted" />
-            )}
+            {!member.receiveNotifications && <Chip size="small" variant="outlined" label="Muted" />}
         </Stack>
     );
 };
@@ -128,24 +126,13 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
         await load();
     };
 
-    const setRole = async (
-        user: IUser,
-        role: Exclude<ChannelRole, 'owner'>
-    ) => {
+    const setRole = async (user: IUser, role: Exclude<ChannelRole, 'owner'>) => {
         const member = members.find((item) => item.userId === user.id);
-        await appStore.setMember(
-            app.id,
-            user.id,
-            member?.receiveNotifications !== false,
-            role
-        );
+        await appStore.setMember(app.id, user.id, member?.receiveNotifications !== false, role);
         await load();
     };
 
-    const setGroup = async (
-        group: IUserGroup,
-        role: Exclude<ChannelRole, 'owner'>
-    ) => {
+    const setGroup = async (group: IUserGroup, role: Exclude<ChannelRole, 'owner'>) => {
         await appStore.setGroupAssignment(app.id, group.id, role, true);
         await load();
     };
@@ -201,7 +188,10 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                         />
                                     }
                                     label={
-                                        <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                                        <Stack
+                                            direction="row"
+                                            spacing={1}
+                                            sx={{alignItems: 'center'}}>
                                             <span>Global Channel</span>
                                             <Chip
                                                 size="small"
@@ -225,7 +215,10 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                     disableGutters
                                     sx={{border: 1, borderColor: 'divider'}}>
                                     <AccordionSummary expandIcon={<ExpandMore />}>
-                                        <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                                        <Stack
+                                            direction="row"
+                                            spacing={1}
+                                            sx={{alignItems: 'center'}}>
                                             <Typography sx={{fontWeight: 600}}>Advanced</Typography>
                                             <Chip
                                                 size="small"
@@ -269,8 +262,8 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                         <Stack spacing={1}>
                             <Typography variant="h6">Group Access</Typography>
                             <Typography variant="body2" color="text.secondary">
-                                Assign a Group once and its members inherit the selected Channel role.
-                                Direct user roles can still grant additional access.
+                                Assign a Group once and its members inherit the selected Channel
+                                role. Direct user roles can still grant additional access.
                             </Typography>
                             {groups.length === 0 ? (
                                 <Typography color="text.secondary">
@@ -287,7 +280,10 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                                 key={group.id}
                                                 divider
                                                 secondaryAction={
-                                                    <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                                                    <Stack
+                                                        direction="row"
+                                                        spacing={1}
+                                                        sx={{alignItems: 'center'}}>
                                                         <TextField
                                                             select
                                                             size="small"
@@ -297,17 +293,25 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                                             onChange={(event) => {
                                                                 const value = event.target.value;
                                                                 if (!value) {
-                                                                    if (assignment) void removeGroup(group.id);
+                                                                    if (assignment)
+                                                                        void removeGroup(group.id);
                                                                     return;
                                                                 }
                                                                 void setGroup(
                                                                     group,
-                                                                    value as Exclude<ChannelRole, 'owner'>
+                                                                    value as Exclude<
+                                                                        ChannelRole,
+                                                                        'owner'
+                                                                    >
                                                                 );
                                                             }}>
-                                                            <MenuItem value="">Not assigned</MenuItem>
+                                                            <MenuItem value="">
+                                                                Not assigned
+                                                            </MenuItem>
                                                             {editableRoles.map((role) => (
-                                                                <MenuItem key={role.value} value={role.value}>
+                                                                <MenuItem
+                                                                    key={role.value}
+                                                                    value={role.value}>
                                                                     {role.label}
                                                                 </MenuItem>
                                                             ))}
@@ -352,7 +356,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                             <Stack
                                                 direction="row"
                                                 spacing={1}
-                                                sx={{alignItems: 'center'}}> 
+                                                sx={{alignItems: 'center'}}>
                                                 {!isOwner && member && (
                                                     <>
                                                         <TextField
@@ -396,7 +400,10 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                                         isOwner ||
                                                         autoAssign ||
                                                         loading ||
-                                                        Boolean(member?.groupAssigned && !member?.autoAssigned)
+                                                        Boolean(
+                                                            member?.groupAssigned &&
+                                                            !member?.autoAssigned
+                                                        )
                                                     }
                                                     onChange={() => void toggleUser(user)}
                                                 />
@@ -408,7 +415,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                                     direction="row"
                                                     spacing={1}
                                                     useFlexGap
-                                                    sx={{alignItems: 'center', flexWrap: 'wrap'}}> 
+                                                    sx={{alignItems: 'center', flexWrap: 'wrap'}}>
                                                     <Typography sx={{fontWeight: 600}}>
                                                         {user.name}
                                                     </Typography>

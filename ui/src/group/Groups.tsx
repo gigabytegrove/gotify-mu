@@ -61,10 +61,7 @@ const Groups = observer(() => {
             title="Groups"
             description="Organize users for shared administration, Channel assignment, and future policy rules."
             rightControl={
-                <Button
-                    variant="contained"
-                    startIcon={<Add />}
-                    onClick={() => setCreateOpen(true)}>
+                <Button variant="contained" startIcon={<Add />} onClick={() => setCreateOpen(true)}>
                     Create Group
                 </Button>
             }>
@@ -251,110 +248,106 @@ const GroupDialog = ({
     );
 };
 
-const MembersDialog = observer(
-    ({group, fClose}: {group: IUserGroup; fClose: VoidFunction}) => {
-        const {groupStore, userStore} = useStores();
-        const [members, setMembers] = React.useState<IUserGroupMember[]>([]);
-        const [selectedUser, setSelectedUser] = React.useState<number | ''>('');
+const MembersDialog = observer(({group, fClose}: {group: IUserGroup; fClose: VoidFunction}) => {
+    const {groupStore, userStore} = useStores();
+    const [members, setMembers] = React.useState<IUserGroupMember[]>([]);
+    const [selectedUser, setSelectedUser] = React.useState<number | ''>('');
 
-        const refresh = React.useCallback(async () => {
-            const next = await groupStore.getMembers(group.id);
-            setMembers(next);
-        }, [group.id, groupStore]);
+    const refresh = React.useCallback(async () => {
+        const next = await groupStore.getMembers(group.id);
+        setMembers(next);
+    }, [group.id, groupStore]);
 
-        React.useEffect(() => {
-            void refresh();
-            void userStore.refresh();
-        }, [refresh, userStore]);
+    React.useEffect(() => {
+        void refresh();
+        void userStore.refresh();
+    }, [refresh, userStore]);
 
-        const memberIds = new Set(members.map((member) => member.userId));
-        const availableUsers = userStore.getItems().filter((user) => !memberIds.has(user.id));
+    const memberIds = new Set(members.map((member) => member.userId));
+    const availableUsers = userStore.getItems().filter((user) => !memberIds.has(user.id));
 
-        return (
-            <Dialog open onClose={fClose} fullWidth maxWidth="sm">
-                <DialogTitle>{group.name} Members</DialogTitle>
-                <DialogContent>
-                    <Stack spacing={2} sx={{pt: 0.5}}>
-                        <Stack direction="row" spacing={1} sx={{alignItems: 'flex-end'}}>
-                            <FormControl fullWidth>
-                                <InputLabel id="group-user-select-label">Add user</InputLabel>
-                                <Select
-                                    labelId="group-user-select-label"
-                                    value={selectedUser}
-                                    label="Add user"
-                                    onChange={(event) =>
-                                        setSelectedUser(Number(event.target.value))
-                                    }>
-                                    {availableUsers.map((user) => (
-                                        <MenuItem key={user.id} value={user.id}>
-                                            {user.displayName
-                                                ? `${user.displayName} (${user.name})`
-                                                : user.name}
-                                        </MenuItem>
-                                    ))}
-                                </Select>
-                            </FormControl>
-                            <Button
-                                variant="contained"
-                                disabled={selectedUser === ''}
-                                onClick={() => {
-                                    if (selectedUser === '') return;
-                                    void groupStore
-                                        .addMember(group.id, selectedUser)
-                                        .then(() => refresh())
-                                        .then(() => setSelectedUser(''));
-                                }}>
-                                Add
-                            </Button>
-                        </Stack>
-
-                        <Stack spacing={0.5}>
-                            {members.length === 0 && (
-                                <Typography color="text.secondary">
-                                    This group has no members yet.
-                                </Typography>
-                            )}
-                            {members.map((member) => (
-                                <Stack
-                                    key={member.userId}
-                                    direction="row"
-                                    spacing={1}
-                                    sx={{
-                                        py: 0.75,
-                                        alignItems: 'center',
-                                        justifyContent: 'space-between',
-                                    }}>
-                                    <Stack spacing={0}>
-                                        <Typography sx={{fontWeight: 650}}>
-                                            {member.displayName || member.name}
-                                        </Typography>
-                                        {member.displayName && (
-                                            <Typography variant="caption" color="text.secondary">
-                                                {member.name}
-                                            </Typography>
-                                        )}
-                                    </Stack>
-                                    <Button
-                                        size="small"
-                                        color="error"
-                                        onClick={() =>
-                                            void groupStore
-                                                .removeMember(group.id, member.userId)
-                                                .then(() => refresh())
-                                        }>
-                                        Remove
-                                    </Button>
-                                </Stack>
-                            ))}
-                        </Stack>
+    return (
+        <Dialog open onClose={fClose} fullWidth maxWidth="sm">
+            <DialogTitle>{group.name} Members</DialogTitle>
+            <DialogContent>
+                <Stack spacing={2} sx={{pt: 0.5}}>
+                    <Stack direction="row" spacing={1} sx={{alignItems: 'flex-end'}}>
+                        <FormControl fullWidth>
+                            <InputLabel id="group-user-select-label">Add user</InputLabel>
+                            <Select
+                                labelId="group-user-select-label"
+                                value={selectedUser}
+                                label="Add user"
+                                onChange={(event) => setSelectedUser(Number(event.target.value))}>
+                                {availableUsers.map((user) => (
+                                    <MenuItem key={user.id} value={user.id}>
+                                        {user.displayName
+                                            ? `${user.displayName} (${user.name})`
+                                            : user.name}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
+                        <Button
+                            variant="contained"
+                            disabled={selectedUser === ''}
+                            onClick={() => {
+                                if (selectedUser === '') return;
+                                void groupStore
+                                    .addMember(group.id, selectedUser)
+                                    .then(() => refresh())
+                                    .then(() => setSelectedUser(''));
+                            }}>
+                            Add
+                        </Button>
                     </Stack>
-                </DialogContent>
-                <DialogActions>
-                    <Button onClick={fClose}>Close</Button>
-                </DialogActions>
-            </Dialog>
-        );
-    }
-);
+
+                    <Stack spacing={0.5}>
+                        {members.length === 0 && (
+                            <Typography color="text.secondary">
+                                This group has no members yet.
+                            </Typography>
+                        )}
+                        {members.map((member) => (
+                            <Stack
+                                key={member.userId}
+                                direction="row"
+                                spacing={1}
+                                sx={{
+                                    py: 0.75,
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                }}>
+                                <Stack spacing={0}>
+                                    <Typography sx={{fontWeight: 650}}>
+                                        {member.displayName || member.name}
+                                    </Typography>
+                                    {member.displayName && (
+                                        <Typography variant="caption" color="text.secondary">
+                                            {member.name}
+                                        </Typography>
+                                    )}
+                                </Stack>
+                                <Button
+                                    size="small"
+                                    color="error"
+                                    onClick={() =>
+                                        void groupStore
+                                            .removeMember(group.id, member.userId)
+                                            .then(() => refresh())
+                                    }>
+                                    Remove
+                                </Button>
+                            </Stack>
+                        ))}
+                    </Stack>
+                </Stack>
+            </DialogContent>
+            <DialogActions>
+                <Button onClick={fClose}>Close</Button>
+            </DialogActions>
+        </Dialog>
+    );
+});
 
 export default Groups;

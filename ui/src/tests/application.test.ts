@@ -1,12 +1,6 @@
 import {Page} from 'puppeteer';
 import {newTest, GotifyTest} from './setup';
-import {
-    clearField,
-    count,
-    innerText,
-    waitForExists,
-    waitToDisappear,
-} from './utils';
+import {clearField, count, innerText, waitForExists, waitToDisappear} from './utils';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import * as auth from './authentication';
 import * as selector from './selector';

@@ -33,8 +33,7 @@ export const clickByText = async (page: Page, selector: string, text: string): P
             };
             const element = Array.from(document.querySelectorAll(_selector)).find(
                 (candidate) =>
-                    active(candidate) &&
-                    candidate.textContent?.toLowerCase().trim() === _text
+                    active(candidate) && candidate.textContent?.toLowerCase().trim() === _text
             ) as HTMLButtonElement | undefined;
             if (!element) throw new Error(`No active element found for text: ${_text}`);
             element.click();

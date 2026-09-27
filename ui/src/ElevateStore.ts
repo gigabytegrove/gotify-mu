@@ -75,18 +75,13 @@ export class ElevateStore {
         });
     };
 
-    public directoryElevate = async (
-        password: string,
-        durationSeconds: number
-    ): Promise<void> => {
+    public directoryElevate = async (password: string, durationSeconds: number): Promise<void> => {
         await axios.create().request({
             url: config.get('url') + 'auth/ldap/elevate',
             method: 'POST',
             data: {durationSeconds},
             headers: {
-                Authorization:
-                    'Basic ' +
-                    btoa(this.currentUser.user.name + ':' + password),
+                Authorization: 'Basic ' + btoa(this.currentUser.user.name + ':' + password),
             },
         });
         await this.currentUser.tryAuthenticate();

@@ -63,10 +63,7 @@ const SystemAdministration = () => {
         if (!policy) return;
         setSaving(true);
         try {
-            const response = await axios.put<ISecurityPolicy>(
-                api('admin/security-policy'),
-                policy
-            );
+            const response = await axios.put<ISecurityPolicy>(api('admin/security-policy'), policy);
             setPolicy(response.data);
             snackManager.snack('Security policy saved');
         } finally {
@@ -286,7 +283,10 @@ const SystemAdministration = () => {
                                 <Stack
                                     direction={{xs: 'column', sm: 'row'}}
                                     spacing={1}
-                                    sx={{justifyContent: 'space-between', alignItems: {sm: 'center'}}}>
+                                    sx={{
+                                        justifyContent: 'space-between',
+                                        alignItems: {sm: 'center'},
+                                    }}>
                                     <Box>
                                         <Typography sx={{fontWeight: 700}}>
                                             {session.username || 'User #' + session.userId}

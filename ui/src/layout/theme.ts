@@ -36,9 +36,7 @@ export const createGotifyMuTheme = (mode: PaletteMode) => {
                 styleOverrides: {
                     body: {
                         scrollbarColor:
-                            mode === 'dark'
-                                ? '#49515a transparent'
-                                : '#b7bec6 transparent',
+                            mode === 'dark' ? '#49515a transparent' : '#b7bec6 transparent',
                     },
                 },
             },

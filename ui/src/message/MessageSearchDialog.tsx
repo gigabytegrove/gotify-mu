@@ -108,7 +108,11 @@ const MessageSearchDialog = ({open, onClose, initialApplicationId}: Props) => {
                     {saved.length > 0 && (
                         <Stack spacing={1}>
                             <Typography variant="subtitle2">Saved searches</Typography>
-                            <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
+                            <Stack
+                                direction="row"
+                                spacing={0.75}
+                                useFlexGap
+                                sx={{flexWrap: 'wrap'}}>
                                 {saved.map((item) => (
                                     <Chip
                                         key={item.id}
@@ -234,16 +238,23 @@ const MessageSearchDialog = ({open, onClose, initialApplicationId}: Props) => {
                                     </Box>
                                     <Stack direction="row" spacing={0.5}>
                                         {message.acknowledgedByAnyone && (
-                                            <Chip size="small" color="success" label="Acknowledged" />
+                                            <Chip
+                                                size="small"
+                                                color="success"
+                                                label="Acknowledged"
+                                            />
                                         )}
                                         {message.collaboration?.status === 'resolved' && (
-                                            <Chip size="small" color="success" variant="outlined" label="Resolved" />
+                                            <Chip
+                                                size="small"
+                                                color="success"
+                                                variant="outlined"
+                                                label="Resolved"
+                                            />
                                         )}
                                     </Stack>
                                 </Stack>
-                                <Typography
-                                    variant="body2"
-                                    sx={{whiteSpace: 'pre-wrap', mt: 0.75}}>
+                                <Typography variant="body2" sx={{whiteSpace: 'pre-wrap', mt: 0.75}}>
                                     {message.message}
                                 </Typography>
                             </Box>
