@@ -571,6 +571,9 @@ func createArgs(name, image string, inspected *inspectedContainer) []string {
 		args = append(args, "--env", env)
 	}
 	for key, value := range inspected.Config.Labels {
+		if strings.HasPrefix(key, "org.opencontainers.image.") {
+			continue
+		}
 		args = append(args, "--label", key+"="+value)
 	}
 	if inspected.Config.Hostname != "" {
