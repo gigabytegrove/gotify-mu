@@ -8,12 +8,12 @@ import (
 
 func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 	inspected := &inspectedContainer{}
-	inspected.Config.Env = []string{"GOTIFY_DEFAULTUSER_NAME=admin", "GOTIFY_MU_UPDATER_TOKEN=secret"}
+	inspected.Config.Env = []string{"GOTIFY_DEFAULTUSER_NAME=admin", "MONITA_UPDATER_TOKEN=secret"}
 	inspected.Config.User = "1000:1000"
 	inspected.Config.WorkingDir = "/app"
 	inspected.HostConfig.RestartPolicy = restartPolicy{Name: "unless-stopped"}
-	inspected.HostConfig.NetworkMode = "gotify-mu-system"
-	inspected.HostConfig.Binds = []string{"/opt/gotify-mu-data:/app/data"}
+	inspected.HostConfig.NetworkMode = "monita-system"
+	inspected.HostConfig.Binds = []string{"/opt/monita-data:/app/data"}
 	inspected.HostConfig.PortBindings = map[string][]portBinding{
 		"80/tcp": {{HostIP: "0.0.0.0", HostPort: "8799"}},
 	}
@@ -35,16 +35,16 @@ func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 	inspected.HostConfig.LogConfig = logConfig{Type:"local",Config:map[string]string{"max-size":"10m"}}
 	inspected.HostConfig.Ulimits = []ulimit{{Name:"nofile",Soft:1024,Hard:4096}}
 
-	args := createArgs("gotify-mu", "gotify-mu:release-0.2.2", inspected)
+	args := createArgs("monita", "monita:release-1.1.0", inspected)
 
 	expected := [][]string{
-		{"create", "--name", "gotify-mu"},
+		{"create", "--name", "monita"},
 		{"--restart", "unless-stopped"},
 		{"--env", "GOTIFY_DEFAULTUSER_NAME=admin"},
-		{"--env", "GOTIFY_MU_UPDATER_TOKEN=secret"},
-		{"--volume", "/opt/gotify-mu-data:/app/data"},
+		{"--env", "MONITA_UPDATER_TOKEN=secret"},
+		{"--volume", "/opt/monita-data:/app/data"},
 		{"--publish", "8799:80/tcp"},
-		{"--network", "gotify-mu-system"},
+		{"--network", "monita-system"},
 		{"--add-host", "example.local:192.0.2.10"},
 		{"--dns", "1.1.1.1"},
 		{"--dns-search", "example.local"},
@@ -72,7 +72,7 @@ func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 			t.Fatalf("expected %v in args: %v", pair, args)
 		}
 	}
-	if !slices.Equal(args[len(args)-1:], []string{"gotify-mu:release-0.2.2"}) {
+	if !slices.Equal(args[len(args)-1:], []string{"monita:release-1.1.0"}) {
 		t.Fatalf("expected image at end of args: %v", args)
 	}
 }
@@ -84,7 +84,7 @@ func TestCreateArgsFallsBackToMountInspection(t *testing.T) {
 		{Type: "volume", Name: "plugins", Destination: "/app/plugins", RW: false},
 	}
 
-	args := createArgs("gotify-mu", "image", inspected)
+	args := createArgs("monita", "image", inspected)
 	if !containsAdjacent(args, "--volume", "/srv/data:/app/data") {
 		t.Fatalf("missing bind mount: %v", args)
 	}
@@ -97,7 +97,7 @@ func TestCreateArgsFallsBackToMountInspection(t *testing.T) {
 func TestUpdateProgressIsMonotonicAndTracksActivity(t *testing.T) {
 	manager := &manager{token: "token"}
 	started := time.Now().UTC()
-	manager.beginUpdate("0.2.2", started)
+	manager.beginUpdate("1.1.0", started)
 	manager.updateProgress("building", "Installing update", "Installing update", 60)
 	manager.updateProgress("building", "Installing update", "Installing update", 40)
 	manager.updateProgress("verifying", "Checking updated version", "Checking updated version", 96)
@@ -123,7 +123,7 @@ func TestUpdateProgressIsMonotonicAndTracksActivity(t *testing.T) {
 func TestBuildProgressUsesUserFacingStages(t *testing.T) {
 	manager := &manager{token: "token"}
 	started := time.Now().UTC()
-	manager.beginUpdate("0.2.2", started)
+	manager.beginUpdate("1.1.0", started)
 
 	manager.handleBuildProgress("#7 [js-builder 4/4] RUN make build-js")
 	status := manager.snapshot()
