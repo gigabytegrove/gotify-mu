@@ -228,8 +228,8 @@ Published releases are installed from **Settings → Software Update**.
 The normal Docker deployment has exactly one persistent Gotify MU container. The application itself checks GitHub for published releases. When an administrator starts an update, Gotify MU launches a short-lived worker from the currently running Gotify MU image. The worker:
 
 - exists only for the duration of the update
-- verifies the published source package and SHA-256 checksum
-- builds the selected numbered release with the full server test suite
+- pulls the selected numbered multi-architecture release image from GHCR
+- verifies the image version, source repository, and revision against the selected GitHub release tag
 - preserves the application data mount, ports, environment, restart policy, network attachments, and Docker socket mount
 - replaces the application container
 - verifies the replacement health check
@@ -323,7 +323,7 @@ Before v1.0.0 is locked as a release:
 - retention cleanup runs without removing protected/live records
 - Settings remains stable and does not enter a refresh loop
 - managed update status exposes meaningful progress
-- checksum verification, full-test build, health verification, and automatic container rollback behave correctly
+- release-image metadata verification, health verification, and automatic container rollback behave correctly
 
 ### Final deployment gate
 
