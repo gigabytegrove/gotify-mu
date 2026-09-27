@@ -6,6 +6,15 @@
 
 This changelog highlights user-visible changes in Monita. Older releases may use the previous **Gotify MU** name.
 
+## 1.1.1 — 2026-09-27
+
+### Faster installs and updates
+
+- Normal Docker installations now download a prebuilt Monita image instead of compiling Monita on the server.
+- In-app updates now download the published release image, verify it, restart Monita, and confirm the updated service is healthy.
+- Local source builds remain available for development and troubleshooting.
+- Improved container publishing for common 64-bit Intel/AMD and ARM systems.
+
 ## 1.1.0 — 2026-09-27
 
 ### Monita rebrand
