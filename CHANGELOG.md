@@ -1,10 +1,21 @@
 <p align="center">
-  <img src="assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+  <img src="assets/monita-banner.svg" alt="Monita" width="720">
 </p>
 
 # Changelog
 
-All notable Gotify MU changes are documented here.
+All notable Monita changes are documented here. Historical entries retain the Gotify MU name used at the time of release.
+
+## Unreleased — Monita transition
+
+### Branding
+
+- Begins the product transition from **Gotify MU** to **Monita**.
+- Applies the approved Monita logo system and brand palette: Primary `#2563EB`, Blue `#3B82F6`, Teal `#06B6D4`, Slate `#0F172A`, and Gray `#94A3B8`.
+- Updates the Web UI, PWA/browser metadata, container metadata, README, and release presentation to Monita.
+- Uses **Monita (formerly Gotify MU)** where transition context is useful.
+- Preserves Gotify protocol routes, Go module identity, existing `GOTIFY_*` configuration, database structures, tokens, and other compatibility identifiers.
+- New release artifacts use Monita naming while the updater continues accepting legacy Gotify MU release package names.
 
 ## [1.0.2] - 2026-09-27
 
