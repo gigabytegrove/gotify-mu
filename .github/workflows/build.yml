@@ -69,6 +69,14 @@ jobs:
           echo "create_tag=${CREATE_TAG}" >> "${GITHUB_OUTPUT}"
           echo "version=${VERSION}" >> "${GITHUB_OUTPUT}"
 
+      - name: Verify canonical branding
+        run: |
+          echo "f2c4d39e3846f7b93468b2729251d1ad2f49a187b9090e98624ede7d97a07367  assets/gotify-mu-banner.png" | sha256sum -c -
+          echo "1acadb12c2bb38e4bb24d1cf21b3760f5909ba15b579fadb2df4f30026fa9783  assets/gotify-mu-icon.png" | sha256sum -c -
+          echo "fc4a7edae75b8002a7386bdab0062b43bd6b76c90a51070bf9334523595f45a6  assets/gotify-mu-logo.png" | sha256sum -c -
+          cmp assets/gotify-mu-logo.png ui/public/static/gotify-mu-logo.png
+          cmp assets/gotify-mu-icon.png ui/public/static/gotify-mu-icon.png
+
       - run: (cd ui && yarn --frozen-lockfile)
       - run: make build-js
       - name: Format Go sources for validation
@@ -167,3 +175,21 @@ jobs:
           prerelease: ${{ contains(steps.release.outputs.version, '-') }}
           overwrite: true
           file_glob: true
+
+      - if: steps.release.outputs.release == 'true'
+        name: Attach canonical branding assets when missing
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v${{ steps.release.outputs.version }}"
+          EXISTING="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.assets[].name')"
+          for ASSET in assets/gotify-mu-banner.png assets/gotify-mu-icon.png assets/gotify-mu-logo.png; do
+            NAME="$(basename "${ASSET}")"
+            if grep -Fxq "${NAME}" <<<"${EXISTING}"; then
+              echo "Preserving existing release branding asset: ${NAME}"
+            else
+              gh release upload "${TAG}" "${ASSET}" --repo "${GITHUB_REPOSITORY}"
+            fi
+          done
