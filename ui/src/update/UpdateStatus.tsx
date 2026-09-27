@@ -127,7 +127,8 @@ export const UpdateAvailableBanner = () => {
 };
 
 export const UpdateStatusCard = () => {
-    const state = useReleaseUpdate();
+    const [releaseRefreshKey, setReleaseRefreshKey] = React.useState(0);
+    const state = useReleaseUpdate(releaseRefreshKey);
     const {elevateStore} = useStores();
     const current = config.get('version');
     const currentVersion = current.version;
