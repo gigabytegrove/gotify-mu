@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+</p>
+
 # Gotify MU Product Roadmap
 
 Gotify MU keeps Gotify REST/WebSocket and token compatibility where practical while extending the server into a multi-user notification and operations platform.
