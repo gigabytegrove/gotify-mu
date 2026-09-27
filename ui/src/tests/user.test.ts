@@ -125,11 +125,11 @@ describe('User', () => {
         await page.waitForSelector('#user-menu-button');
         await page.click('#user-menu-button');
         await clickByText(page, 'a', 'Settings');
-        await waitToDisappear(page, '.MuiBackdrop-root');
         await waitForExists(page, selector.heading(), 'Settings');
         await page.waitForSelector($changepw.selector());
         await page.type($changepw.input('.newpass'), 'changed-pass-123');
         await page.click($changepw.button('.change'));
+        await waitForExists(page, '#notistack-snackbar', 'Password changed');
     });
     it('does logout', async () => await auth.logout(page));
     it('can login with new password (admin)', async () =>

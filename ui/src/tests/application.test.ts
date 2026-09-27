@@ -1,6 +1,13 @@
 import {Page} from 'puppeteer';
 import {newTest, GotifyTest} from './setup';
-import {count, innerText, waitForExists, waitToDisappear, clearField} from './utils';
+import {
+    clearField,
+    clickByText,
+    count,
+    innerText,
+    waitForExists,
+    waitToDisappear,
+} from './utils';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import * as auth from './authentication';
 import * as selector from './selector';
@@ -31,8 +38,7 @@ const updateChannel =
     (id: number, data: {name?: string; description?: string}): (() => Promise<void>) =>
     async () => {
         await page.click(`${card(id)} .channel-actions`);
-        await page.waitForSelector('.MuiMenu-paper .edit', {visible: true});
-        await page.click('.MuiMenu-paper .edit');
+        await clickByText(page, '[role="menuitem"]', 'Edit channel');
         await page.waitForSelector($dialog.selector(), {visible: true});
 
         if (data.name) {
@@ -113,8 +119,7 @@ describe('Channels', () => {
 
     it('regenerates Channel token', async () => {
         await page.click(`${card(1)} .channel-actions`);
-        await page.waitForSelector('.MuiMenu-paper .regenerate-token', {visible: true});
-        await page.click('.MuiMenu-paper .regenerate-token');
+        await clickByText(page, '[role="menuitem"]', 'Regenerate token');
         await page.waitForSelector(selector.$confirmDialog.selector());
         await page.click(selector.$confirmDialog.button('.confirm'));
         await waitToDisappear(page, selector.$confirmDialog.selector());
@@ -128,8 +133,7 @@ describe('Channels', () => {
 
     it('deletes Channel', async () => {
         await page.click(`${card(2)} .channel-actions`);
-        await page.waitForSelector('.MuiMenu-paper .delete', {visible: true});
-        await page.click('.MuiMenu-paper .delete');
+        await clickByText(page, '[role="menuitem"]', 'Delete channel');
         await page.waitForSelector(selector.$confirmDialog.selector());
         await page.click(selector.$confirmDialog.button('.confirm'));
     });
