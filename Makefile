@@ -25,8 +25,8 @@ format:
 	goimports -w $(shell find . -type f -name '*.go' -not -path "./vendor/*")
 
 test-js:
-	go build -ldflags="-s -w -X main.Mode=prod" -o removeme/gotify app.go
-	(cd ui && CI=true GOTIFY_EXE=../removeme/gotify yarn test)
+	go build -ldflags="-s -w -X main.Mode=prod" -o removeme/monita app.go
+	(cd ui && CI=true GOTIFY_EXE=../removeme/monita yarn test)
 	rm -rf removeme
 
 check-go:
@@ -70,10 +70,10 @@ build-docker-multiarch: require-version
 		--label org.opencontainers.image.revision=$(shell git rev-parse HEAD) \
 		--label org.opencontainers.image.version=$(VERSION) \
 		--label org.opencontainers.image.created=$(shell date -u +%Y-%m-%dT%H:%M:%SZ) \
-		-t ghcr.io/gigabytegrove/gotify-mu:latest \
-		-t ghcr.io/gigabytegrove/gotify-mu:${VERSION} \
-		-t ghcr.io/gigabytegrove/gotify-mu:$(shell echo $(VERSION) | cut -d '.' -f -2) \
-		-t ghcr.io/gigabytegrove/gotify-mu:$(shell echo $(VERSION) | cut -d '.' -f -1) \
+		-t ghcr.io/gigabytegrove/monita:latest \
+		-t ghcr.io/gigabytegrove/monita:${VERSION} \
+		-t ghcr.io/gigabytegrove/monita:$(shell echo $(VERSION) | cut -d '.' -f -2) \
+		-t ghcr.io/gigabytegrove/monita:$(shell echo $(VERSION) | cut -d '.' -f -1) \
 		--build-arg RUN_TESTS=$(DOCKER_TEST_LEVEL) \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg LD_FLAGS="$$LD_FLAGS" \
@@ -86,7 +86,7 @@ build-docker-multiarch-master:
 		--label org.opencontainers.image.revision=$(shell git rev-parse HEAD) \
 		--label org.opencontainers.image.version=master-$(shell git rev-parse --short HEAD) \
 		--label org.opencontainers.image.created=$(shell date -u +%Y-%m-%dT%H:%M:%SZ) \
-		-t ghcr.io/gigabytegrove/gotify-mu:master \
+		-t ghcr.io/gigabytegrove/monita:master \
 		--build-arg RUN_TESTS=$(DOCKER_TEST_LEVEL) \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg LD_FLAGS="-w -s -X main.Version=master-$(shell git rev-parse --short HEAD) -X main.BuildDate=$(shell date "+%F-%T") -X main.Commit=$(shell git rev-parse --verify HEAD) -X main.Mode=prod" \
@@ -94,7 +94,7 @@ build-docker-multiarch-master:
 		-f docker/Dockerfile .
 build-docker: build-docker-multiarch
 
-_build_within_docker: OUTPUT = gotify-mu
+_build_within_docker: OUTPUT = monita
 _build_within_docker:
 	${DOCKER_GO_BUILD} -o ${OUTPUT}
 
@@ -102,25 +102,25 @@ build-js:
 	(cd ui && yarn build)
 
 build-linux-amd64:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-amd64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-amd64
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-amd64 make _build_within_docker OUTPUT=${BUILD_DIR}/monita-linux-amd64
 
 build-linux-386:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-386 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-386
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-386 make _build_within_docker OUTPUT=${BUILD_DIR}/monita-linux-386
 
 build-linux-arm-7:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-arm-7 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-arm-7
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-arm-7 make _build_within_docker OUTPUT=${BUILD_DIR}/monita-linux-arm-7
 
 build-linux-arm64:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-arm64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-arm64
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-arm64 make _build_within_docker OUTPUT=${BUILD_DIR}/monita-linux-arm64
 
 build-linux-riscv64:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-riscv64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-linux-riscv64
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-linux-riscv64 make _build_within_docker OUTPUT=${BUILD_DIR}/monita-linux-riscv64
 
 build-windows-amd64:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-windows-amd64 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-windows-amd64.exe
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-windows-amd64 make _build_within_docker OUTPUT=${BUILD_DIR}/monita-windows-amd64.exe
 
 build-windows-386:
-	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-windows-386 make _build_within_docker OUTPUT=${BUILD_DIR}/gotify-mu-windows-386.exe
+	${DOCKER_RUN} ${DOCKER_BUILD_IMAGE}:$(GO_VERSION)-windows-386 make _build_within_docker OUTPUT=${BUILD_DIR}/monita-windows-386.exe
 
 build: build-linux-arm-7 build-linux-amd64 build-linux-386 build-linux-arm64 build-linux-riscv64 build-windows-amd64 build-windows-386
 
