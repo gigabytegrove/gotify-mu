@@ -147,7 +147,7 @@ Deployment, validation, updater, backup, and rollback procedures are maintained 
 For a release checkout:
 
 ```bash
-git clone https://github.com/gigabytegrove/gotify-mu.git monita
+git clone https://github.com/gigabytegrove/monita.git monita
 cd monita
 git checkout v1.1.0
 ```
@@ -166,7 +166,7 @@ On a Linux system with Git and Docker Compose installed:
 
 ```bash
 cd /opt
-git clone https://github.com/gigabytegrove/gotify-mu.git monita
+git clone https://github.com/gigabytegrove/monita.git monita
 cd monita
 
 cp .env.example .env
@@ -184,9 +184,13 @@ The included `docker-compose.yml` starts exactly one persistent service: `monita
 Example `.env`:
 
 ```env
-GOTIFY_MU_VERSION=master-local
-GOTIFY_MU_COMMIT=local
-GOTIFY_MU_PORT=8080
+MONITA_VERSION=master-local
+MONITA_COMMIT=local
+MONITA_PORT=8080
+MONITA_DATA_DIR=./data
+MONITA_RECEIVER_BIND=127.0.0.1
+MONITA_SMTP_PORT=2525
+MONITA_SYSLOG_PORT=5514
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
 ```
@@ -221,7 +225,7 @@ Persistent data is stored in:
 ./data
 ```
 
-That directory contains the SQLite database and other persistent Gotify data. Rebuilding or replacing the container does not remove it.
+That directory contains the SQLite database and other persistent Monita data. Rebuilding or replacing the container does not remove it.
 
 ### Verify the deployment
 
@@ -296,7 +300,7 @@ If you do not want to use Compose:
 ```bash
 cd /opt
 
-git clone https://github.com/gigabytegrove/gotify-mu.git monita
+git clone https://github.com/gigabytegrove/monita.git monita
 cd monita
 
 docker build \
@@ -327,7 +331,7 @@ The `BUILD_JS=1` build argument is required for the Docker build to include the 
 You can also run Monita without Docker:
 
 ```bash
-git clone https://github.com/gigabytegrove/gotify-mu.git monita
+git clone https://github.com/gigabytegrove/monita.git monita
 cd monita
 make build-js
 go build -o monita .
@@ -398,7 +402,7 @@ The Go module remains `github.com/gotify/server/v3` for upstream/plugin compatib
 
 Monita is based on Gotify and retains substantial upstream code and compatibility. The transition repository is maintained at:
 
-https://github.com/gigabytegrove/gotify-mu
+https://github.com/gigabytegrove/monita
 
 For upstream Gotify documentation and ecosystem information, see [gotify.net](https://gotify.net/).
 
