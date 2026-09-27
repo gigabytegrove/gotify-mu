@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/gotify-mu-logo.png" alt="Gotify MU" width="520">
+  <img src="assets/gotify-mu-banner.png" alt="Gotify MU" width="800">
 </p>
 
 <h1 align="center">Gotify MU</h1>
