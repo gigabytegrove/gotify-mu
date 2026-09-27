@@ -123,9 +123,23 @@ func (a *ApplicationMembershipAPI) GetMentionableUsers(ctx *gin.Context) {
 		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
 			return
 		}
-		if membership == nil || !app.AllowMemberPost {
+
+		isChat := app.ChannelType == model.ChannelTypeChat ||
+			(app.ChannelType == "" && app.AllowMemberPost)
+		if !isChat || membership == nil {
 			ctx.AbortWithError(http.StatusNotFound, errors.New("chat channel does not exist"))
 			return
+		}
+
+		if app.UserID != currentUserID {
+			role := membership.EffectiveRole
+			canPost := role == model.ChannelRoleManager ||
+				role == model.ChannelRolePublisher ||
+				(role == model.ChannelRoleMember && app.AllowMemberPost)
+			if !canPost {
+				ctx.AbortWithError(http.StatusForbidden, errors.New("your Channel role does not allow posting"))
+				return
+			}
 		}
 
 		memberships, err := a.DB.GetApplicationMemberships(id)

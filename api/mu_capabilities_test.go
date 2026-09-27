@@ -28,7 +28,7 @@ func TestMUCapabilitiesContract(t *testing.T) {
 	}
 	if !payload.Features.SharedChannels || !payload.Features.ChannelTypes ||
 		!payload.Features.ChatChannels || !payload.Features.TypingPresence ||
-		!payload.Features.ChatNotifications {
+		!payload.Features.ChatNotifications || !payload.Features.Mentions {
 		t.Fatalf("required MU feature flags are not advertised: %#v", payload.Features)
 	}
 }
