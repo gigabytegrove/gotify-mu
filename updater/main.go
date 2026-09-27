@@ -21,16 +21,12 @@ import (
 )
 
 const (
-	defaultListen     = ":8099"
 	defaultRepository = "gigabytegrove/gotify-mu"
 	defaultTarget     = "gotify-mu"
+	defaultStatusFile = "/app/data/.gotify-mu-update-status.json"
 )
 
 var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
-
-type installRequest struct {
-	Version string `json:"version"`
-}
 
 type activityEntry struct {
 	Timestamp time.Time `json:"timestamp"`
@@ -129,13 +125,12 @@ type inspectedContainer struct {
 type manager struct {
 	mu         sync.RWMutex
 	status     updateStatus
-	token      string
 	repository string
 	target     string
+	statusFile string
 }
 
 func newManager() *manager {
-	token := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATER_TOKEN"))
 	repository := strings.TrimSpace(os.Getenv("GOTIFY_MU_REPOSITORY"))
 	if repository == "" {
 		repository = defaultRepository
@@ -144,11 +139,15 @@ func newManager() *manager {
 	if target == "" {
 		target = defaultTarget
 	}
+	statusFile := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATE_STATUS_FILE"))
+	if statusFile == "" {
+		statusFile = defaultStatusFile
+	}
 	return &manager{
-		status:     updateStatus{Ready: token != "", State: "idle"},
-		token:      token,
+		status:     updateStatus{Ready: true, State: "idle"},
 		repository: repository,
 		target:     target,
+		statusFile: statusFile,
 	}
 }
 
@@ -156,7 +155,7 @@ func (m *manager) beginUpdate(version string, started time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status = updateStatus{
-		Ready:     m.token != "",
+		Ready:     true,
 		State:     "preparing",
 		Version:   version,
 		Message:   "Preparing update",
@@ -168,6 +167,7 @@ func (m *manager) beginUpdate(version string, started time.Time) {
 			Message:   "Update started",
 		}},
 	}
+	m.persistStatusLocked()
 }
 
 func (m *manager) updateProgress(state, step, message string, progress int) {
@@ -182,7 +182,7 @@ func (m *manager) updateProgress(state, step, message string, progress int) {
 	}
 
 	changed := step != "" && step != m.status.Step
-	m.status.Ready = m.token != ""
+	m.status.Ready = true
 	m.status.State = state
 	m.status.Step = step
 	m.status.Message = message
@@ -197,6 +197,7 @@ func (m *manager) updateProgress(state, step, message string, progress int) {
 			m.status.Activity = append([]activityEntry(nil), m.status.Activity[len(m.status.Activity)-40:]...)
 		}
 	}
+	m.persistStatusLocked()
 }
 
 func (m *manager) finishUpdate(state, step, message string, progress int, finished time.Time) {
@@ -204,6 +205,32 @@ func (m *manager) finishUpdate(state, step, message string, progress int, finish
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status.FinishedAt = &finished
+	m.persistStatusLocked()
+}
+
+func (m *manager) persistStatusLocked() {
+	if m.statusFile == "" {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(m.statusFile), 0o755); err != nil {
+		log.Printf("warning: could not create updater status directory: %v", err)
+		return
+	}
+	payload, err := json.MarshalIndent(m.status, "", "  ")
+	if err != nil {
+		log.Printf("warning: could not encode updater status: %v", err)
+		return
+	}
+	payload = append(payload, '\n')
+	temp := m.statusFile + ".tmp"
+	if err := os.WriteFile(temp, payload, 0o600); err != nil {
+		log.Printf("warning: could not write updater status: %v", err)
+		return
+	}
+	if err := os.Rename(temp, m.statusFile); err != nil {
+		_ = os.Remove(temp)
+		log.Printf("warning: could not publish updater status: %v", err)
+	}
 }
 
 func (m *manager) snapshot() updateStatus {
@@ -212,63 +239,6 @@ func (m *manager) snapshot() updateStatus {
 	status := m.status
 	status.Activity = append([]activityEntry(nil), m.status.Activity...)
 	return status
-}
-
-func (m *manager) authenticate(next http.HandlerFunc) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if m.token == "" {
-			writeJSON(w, http.StatusServiceUnavailable, updateStatus{
-				Ready:   false,
-				State:   "unavailable",
-				Message: "updater token is not configured",
-			})
-			return
-		}
-		if r.Header.Get("Authorization") != "Bearer "+m.token {
-			writeJSON(w, http.StatusUnauthorized, map[string]string{"error": "unauthorized"})
-			return
-		}
-		next(w, r)
-	}
-}
-
-func (m *manager) statusHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-	writeJSON(w, http.StatusOK, m.snapshot())
-}
-
-func (m *manager) installHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		w.WriteHeader(http.StatusMethodNotAllowed)
-		return
-	}
-
-	var request installRequest
-	if err := json.NewDecoder(io.LimitReader(r.Body, 4096)).Decode(&request); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "invalid request"})
-		return
-	}
-	request.Version = strings.TrimSpace(strings.TrimPrefix(request.Version, "v"))
-	if !versionPattern.MatchString(request.Version) {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "version must be semantic x.y.z"})
-		return
-	}
-
-	current := m.snapshot()
-	switch current.State {
-	case "preparing", "downloading", "building", "replacing", "verifying":
-		writeJSON(w, http.StatusConflict, current)
-		return
-	}
-
-	started := time.Now().UTC()
-	m.beginUpdate(request.Version, started)
-	go m.performInstall(request.Version, started)
-
-	writeJSON(w, http.StatusAccepted, m.snapshot())
 }
 
 func (m *manager) performInstall(version string, started time.Time) {
@@ -517,6 +487,11 @@ func createArgs(name, image string, inspected *inspectedContainer) []string {
 	}
 
 	for _, env := range inspected.Config.Env {
+		key, _, _ := strings.Cut(env, "=")
+		switch key {
+		case "GOTIFY_MU_UPDATER_URL", "GOTIFY_MU_UPDATER_TOKEN":
+			continue
+		}
 		args = append(args, "--env", env)
 	}
 	for key, value := range inspected.Config.Labels {
@@ -891,41 +866,31 @@ func (m *manager) handleBuildProgress(line string) {
 		m.updateProgress("building", "Preparing interface", "Preparing interface", 47)
 	case strings.Contains(line, "[builder "):
 		m.updateProgress("building", "Preparing application", "Preparing application", 62)
-	case strings.Contains(line, "[stage-2 "):
+	case strings.Contains(line, "COPY --from=builder /target") ||
+		strings.Contains(line, "COPY --from=updater-builder"):
 		m.updateProgress("building", "Assembling update", "Assembling update", 73)
 	case strings.Contains(line, "exporting to image"):
 		m.updateProgress("building", "Finalizing update files", "Finalizing update files", 78)
 	}
 }
 
-func writeJSON(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(status)
-	_ = json.NewEncoder(w).Encode(value)
-}
-
 func main() {
+	if len(os.Args) != 3 || os.Args[1] != "--oneshot" {
+		log.Fatal("usage: gotify-mu-updater --oneshot <x.y.z>")
+	}
+
+	version := strings.TrimSpace(strings.TrimPrefix(os.Args[2], "v"))
+	if !versionPattern.MatchString(version) {
+		log.Fatal("version must be semantic x.y.z")
+	}
+
 	manager := newManager()
-	listen := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATER_LISTEN"))
-	if listen == "" {
-		listen = defaultListen
-	}
+	started := time.Now().UTC()
+	manager.beginUpdate(version, started)
+	manager.performInstall(version, started)
 
-	mux := http.NewServeMux()
-	mux.HandleFunc("/status", manager.authenticate(manager.statusHandler))
-	mux.HandleFunc("/install", manager.authenticate(manager.installHandler))
-
-	server := &http.Server{
-		Addr:              listen,
-		Handler:           mux,
-		ReadHeaderTimeout: 10 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      15 * time.Second,
-		IdleTimeout:       60 * time.Second,
-	}
-
-	log.Printf("Gotify MU updater listening on %s for container %s", listen, manager.target)
-	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		log.Fatal(err)
+	status := manager.snapshot()
+	if status.State != "completed" {
+		os.Exit(1)
 	}
 }
