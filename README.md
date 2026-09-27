@@ -301,7 +301,7 @@ docker build \
   --build-arg BUILD_JS=1 \
   --build-arg GO_VERSION=1.26.0 \
   -f docker/Dockerfile \
-  -t gotify-mu:master \
+  -t gotify-mu:managed \
   .
 
 mkdir -p /opt/gotify-mu-data
@@ -315,7 +315,8 @@ docker run -d \
   -e GOTIFY_DEFAULTUSER_NAME=admin \
   -e GOTIFY_DEFAULTUSER_PASS='CHANGE-THIS-PASSWORD' \
   -v /opt/gotify-mu-data:/app/data \
-  gotify-mu:master
+  -v /var/run/docker.sock:/var/run/docker.sock \
+  gotify-mu:managed
 ```
 
 The `BUILD_JS=1` build argument is required for the Docker build to include the Web UI.
