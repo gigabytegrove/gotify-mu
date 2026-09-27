@@ -13,7 +13,7 @@ permissions:
   attestations: write
 
 jobs:
-  gotify:
+  monita:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
@@ -129,6 +129,7 @@ jobs:
 
       - if: steps.release.outputs.release == 'true'
         name: Attest release artifacts
+        continue-on-error: true
         uses: actions/attest-build-provenance@977bb373ede98d70efdf65b84cb5f73e068dcc2a # v3
         with:
           subject-path: 'build/*'

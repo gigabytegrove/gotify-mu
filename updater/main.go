@@ -22,7 +22,7 @@ import (
 
 const (
 	defaultListen     = ":8099"
-	defaultRepository = "gigabytegrove/gotify-mu"
+	defaultRepository = "gigabytegrove/monita"
 	defaultTarget     = "monita"
 	defaultStatusFile = "/app/data/.monita-update-status.json"
 )

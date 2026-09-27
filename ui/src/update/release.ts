@@ -1,5 +1,5 @@
 export const RELEASES_API =
-    'https://api.github.com/repos/gigabytegrove/gotify-mu/releases?per_page=10';
+    'https://api.github.com/repos/gigabytegrove/monita/releases?per_page=10';
 
 export interface ReleaseAsset {
     name: string;

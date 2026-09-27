@@ -31,9 +31,9 @@ ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 ARG BUILD_JS=0
 ARG RUN_TESTS=0
-ARG MONITA_VERSION=master-local
-ARG MONITA_COMMIT=local
-ARG MONITA_BUILD_DATE=local
+ARG MONITA_VERSION=
+ARG MONITA_COMMIT=
+ARG MONITA_BUILD_DATE=
 ARG GOTIFY_MU_VERSION=
 ARG GOTIFY_MU_COMMIT=
 ARG GOTIFY_MU_BUILD_DATE=
@@ -85,8 +85,8 @@ FROM debian:${DEBIAN}
 ARG MONITA_VERSION=master-local
 ARG MONITA_COMMIT=local
 
-LABEL org.opencontainers.image.documentation=https://github.com/gigabytegrove/gotify-mu
-LABEL org.opencontainers.image.source=https://github.com/gigabytegrove/gotify-mu
+LABEL org.opencontainers.image.documentation=https://github.com/gigabytegrove/monita
+LABEL org.opencontainers.image.source=https://github.com/gigabytegrove/monita
 LABEL org.opencontainers.image.title="Monita"
 LABEL org.opencontainers.image.description="Monita self-hosted notifications, messaging, and automation platform"
 LABEL org.opencontainers.image.version=${MONITA_VERSION}
