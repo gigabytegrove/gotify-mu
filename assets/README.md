@@ -1,13 +1,28 @@
-# Gotify MU branding
+# Monita branding
 
-These files are the canonical project branding assets approved on 2026-09-26.
+These files define the canonical Monita brand system used during the transition from Gotify MU.
 
-- `gotify-mu-icon.png` — square icon mark, 1024×1024, transparent PNG.
-- `gotify-mu-logo.png` — full project logo, 1024×1024, transparent PNG.
-- `gotify-mu-banner.png` — horizontal project banner, 1600×500, transparent PNG.
+## Canonical brand
+
+- Product name: **Monita**
+- Transition name: **Monita (formerly Gotify MU)**
+- Brand essence: **Notifications · Messaging · Automation**
+- Primary: `#2563EB`
+- Blue: `#3B82F6`
+- Teal: `#06B6D4`
+- Slate: `#0F172A`
+- Gray: `#94A3B8`
+
+## Assets
+
+- `monita-icon.svg` — application icon derived from the approved Monita brand sheet.
+- `monita-logo.svg` — horizontal Monita logo.
+- `monita-banner.svg` — Monita banner with the Notifications · Messaging · Automation lockup.
+
+The previous `gotify-mu-*.png` files remain temporarily for historical releases and compatibility only. New application surfaces and releases must use the Monita assets.
 
 ## Preservation rule
 
-**Do not overwrite, regenerate, replace, recolor, crop differently, or silently modify these assets during normal application, documentation, packaging, Android, Home Assistant, CI, or release work.**
+Do not regenerate, recolor, substitute, or silently restyle the Monita brand during normal feature work. Any branding change must be intentional and must preserve the approved palette and mark.
 
-A branding change must be an intentional branding-specific change. Release automation should attach these canonical files without replacing an existing release asset with the same name.
+Technical Gotify compatibility names, routes, and configuration identifiers are not branding assets and may remain unchanged where renaming would break compatibility.

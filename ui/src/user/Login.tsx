@@ -68,14 +68,13 @@ const Login = observer(() => {
                     <Box sx={{textAlign: 'center', pt: 0.5}}>
                         <Box
                             component="img"
-                            src={config.get('url') + 'static/gotify-mu-logo.png'}
-                            alt="Gotify MU"
+                            src={config.get('url') + 'static/monita-logo.svg'}
+                            alt="Monita"
                             sx={{width: 150, maxWidth: '65%', mb: 0.75}}
                         />
-                        <Typography variant="h5">Welcome to Gotify MU</Typography>
+                        <Typography variant="h5">Welcome to Monita</Typography>
                         <Typography variant="body2" color="text.secondary" sx={{mt: 0.4}}>
-                            Multi-user notification delivery with shared Channels and centralized
-                            administration.
+                            Notifications, messaging, and automation for teams and systems.
                         </Typography>
                     </Box>
 

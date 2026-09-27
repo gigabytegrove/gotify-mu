@@ -69,11 +69,11 @@ jobs:
 
       - name: Verify canonical branding
         run: |
-          echo "f2c4d39e3846f7b93468b2729251d1ad2f49a187b9090e98624ede7d97a07367  assets/gotify-mu-banner.png" | sha256sum -c -
-          echo "1acadb12c2bb38e4bb24d1cf21b3760f5909ba15b579fadb2df4f30026fa9783  assets/gotify-mu-icon.png" | sha256sum -c -
-          echo "fc4a7edae75b8002a7386bdab0062b43bd6b76c90a51070bf9334523595f45a6  assets/gotify-mu-logo.png" | sha256sum -c -
-          cmp assets/gotify-mu-logo.png ui/public/static/gotify-mu-logo.png
-          cmp assets/gotify-mu-icon.png ui/public/static/gotify-mu-icon.png
+          test -s assets/monita-banner.svg
+          test -s assets/monita-logo.svg
+          test -s assets/monita-icon.svg
+          cmp assets/monita-logo.svg ui/public/static/monita-logo.svg
+          cmp assets/monita-icon.svg ui/public/static/monita-icon.svg
 
       - run: (cd ui && yarn --frozen-lockfile)
       - run: make build-js
@@ -109,12 +109,12 @@ jobs:
           mkdir -p build
           git archive \
             --format=zip \
-            --prefix="gotify-mu-v${VERSION}/" \
-            --output="build/gotify-mu-v${VERSION}-source.zip" \
+            --prefix="monita-v${VERSION}/" \
+            --output="build/monita-v${VERSION}-source.zip" \
             HEAD
           (
             cd build
-            sha256sum "gotify-mu-v${VERSION}-source.zip" > SHA256SUMS
+            sha256sum "monita-v${VERSION}-source.zip" > SHA256SUMS
           )
           ls -lath build
 
@@ -124,7 +124,7 @@ jobs:
         with:
           path: .
           format: spdx-json
-          output-file: build/gotify-mu.spdx.json
+          output-file: build/monita.spdx.json
           upload-artifact: false
 
       - if: steps.release.outputs.release == 'true'
@@ -159,11 +159,11 @@ jobs:
                 echo "Refusing to move published release tag ${TAG} from ${TAG_COMMIT} to ${GITHUB_SHA}"
                 exit 1
               fi
-              git tag -fa "${TAG}" -m "Gotify MU ${TAG}" "${GITHUB_SHA}"
+              git tag -fa "${TAG}" -m "Monita ${TAG}" "${GITHUB_SHA}"
               git push --force origin "refs/tags/${TAG}"
             fi
           else
-            git tag -a "${TAG}" -m "Gotify MU ${TAG}" "${GITHUB_SHA}"
+            git tag -a "${TAG}" -m "Monita ${TAG}" "${GITHUB_SHA}"
             git push origin "refs/tags/${TAG}"
           fi
 
@@ -178,7 +178,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/*
           tag: "v${{ steps.release.outputs.version }}"
-          release_name: "Gotify MU v${{ steps.release.outputs.version }}"
+          release_name: "Monita v${{ steps.release.outputs.version }} (formerly Gotify MU)"
           body: "See CHANGELOG.md and docs/releases/v${{ steps.release.outputs.version }}.md for release notes and compatibility details."
           prerelease: ${{ contains(steps.release.outputs.version, '-') }}
           overwrite: true
@@ -193,7 +193,7 @@ jobs:
           set -euo pipefail
           TAG="v${{ steps.release.outputs.version }}"
           EXISTING="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.assets[].name')"
-          for ASSET in assets/gotify-mu-banner.png assets/gotify-mu-icon.png assets/gotify-mu-logo.png; do
+          for ASSET in assets/monita-banner.svg assets/monita-icon.svg assets/monita-logo.svg; do
             NAME="$(basename "${ASSET}")"
             if grep -Fxq "${NAME}" <<<"${EXISTING}"; then
               echo "Preserving existing release branding asset: ${NAME}"

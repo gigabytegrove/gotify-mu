@@ -24,6 +24,7 @@ const (
 	defaultListen     = ":8099"
 	defaultRepository = "gigabytegrove/gotify-mu"
 	defaultTarget     = "gotify-mu"
+	defaultStatusFile = "/app/data/.gotify-mu-update-status.json"
 )
 
 var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
@@ -132,6 +133,7 @@ type manager struct {
 	token      string
 	repository string
 	target     string
+	statusFile string
 }
 
 func newManager() *manager {
@@ -144,19 +146,33 @@ func newManager() *manager {
 	if target == "" {
 		target = defaultTarget
 	}
-	return &manager{
-		status:     updateStatus{Ready: token != "", State: "idle"},
+	statusFile := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATE_STATUS_FILE"))
+	if statusFile == "" {
+		statusFile = defaultStatusFile
+	}
+
+	manager := &manager{
+		status:     updateStatus{Ready: true, State: "idle"},
 		token:      token,
 		repository: repository,
 		target:     target,
+		statusFile: statusFile,
 	}
+	if content, err := os.ReadFile(statusFile); err == nil {
+		var previous updateStatus
+		if json.Unmarshal(content, &previous) == nil {
+			manager.status = previous
+			manager.status.Ready = true
+		}
+	}
+	return manager
 }
 
 func (m *manager) beginUpdate(version string, started time.Time) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status = updateStatus{
-		Ready:     m.token != "",
+		Ready:     true,
 		State:     "preparing",
 		Version:   version,
 		Message:   "Preparing update",
@@ -168,6 +184,7 @@ func (m *manager) beginUpdate(version string, started time.Time) {
 			Message:   "Update started",
 		}},
 	}
+	m.persistLocked()
 }
 
 func (m *manager) updateProgress(state, step, message string, progress int) {
@@ -182,7 +199,7 @@ func (m *manager) updateProgress(state, step, message string, progress int) {
 	}
 
 	changed := step != "" && step != m.status.Step
-	m.status.Ready = m.token != ""
+	m.status.Ready = true
 	m.status.State = state
 	m.status.Step = step
 	m.status.Message = message
@@ -197,6 +214,7 @@ func (m *manager) updateProgress(state, step, message string, progress int) {
 			m.status.Activity = append([]activityEntry(nil), m.status.Activity[len(m.status.Activity)-40:]...)
 		}
 	}
+	m.persistLocked()
 }
 
 func (m *manager) finishUpdate(state, step, message string, progress int, finished time.Time) {
@@ -204,6 +222,30 @@ func (m *manager) finishUpdate(state, step, message string, progress int, finish
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.status.FinishedAt = &finished
+	m.persistLocked()
+}
+
+func (m *manager) persistLocked() {
+	if strings.TrimSpace(m.statusFile) == "" {
+		return
+	}
+	if err := os.MkdirAll(filepath.Dir(m.statusFile), 0o700); err != nil {
+		log.Printf("could not create update status directory: %v", err)
+		return
+	}
+	content, err := json.Marshal(m.status)
+	if err != nil {
+		log.Printf("could not encode update status: %v", err)
+		return
+	}
+	temp := m.statusFile + ".tmp"
+	if err := os.WriteFile(temp, content, 0o600); err != nil {
+		log.Printf("could not write update status: %v", err)
+		return
+	}
+	if err := os.Rename(temp, m.statusFile); err != nil {
+		log.Printf("could not publish update status: %v", err)
+	}
 }
 
 func (m *manager) snapshot() updateStatus {
@@ -355,12 +397,19 @@ func (m *manager) resolveReleaseAssets(version string) (string, string, string, 
 		} `json:"assets"`
 	}
 	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil { return "", "", "", err }
-	expectedSource := fmt.Sprintf("gotify-mu-v%s-source.zip", version)
-	var sourceURL, checksumURL string
+	primarySource := fmt.Sprintf("monita-v%s-source.zip", version)
+	legacySource := fmt.Sprintf("gotify-mu-v%s-source.zip", version)
+	var sourceURL, checksumURL, sourceName string
 	for _, asset := range payload.Assets {
 		switch asset.Name {
-		case expectedSource:
+		case primarySource:
 			sourceURL = asset.BrowserDownloadURL
+			sourceName = primarySource
+		case legacySource:
+			if sourceURL == "" {
+				sourceURL = asset.BrowserDownloadURL
+				sourceName = legacySource
+			}
 		case "SHA256SUMS":
 			checksumURL = asset.BrowserDownloadURL
 		}
@@ -368,7 +417,7 @@ func (m *manager) resolveReleaseAssets(version string) (string, string, string, 
 	if sourceURL == "" || checksumURL == "" {
 		return "", "", "", errors.New("release is missing the signed source package or SHA256SUMS")
 	}
-	return sourceURL, checksumURL, expectedSource, nil
+	return sourceURL, checksumURL, sourceName, nil
 }
 
 func verifyReleaseChecksum(archivePath, checksumPath, expectedName string) error {
@@ -906,6 +955,29 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 
 func main() {
 	manager := newManager()
+
+	if len(os.Args) >= 2 && os.Args[1] == "install" {
+		if len(os.Args) != 3 {
+			log.Fatal("usage: gotify-mu-updater install <x.y.z>")
+		}
+		version := strings.TrimSpace(strings.TrimPrefix(os.Args[2], "v"))
+		if !versionPattern.MatchString(version) {
+			log.Fatalf("invalid release version %q", os.Args[2])
+		}
+
+		started := time.Now().UTC()
+		manager.beginUpdate(version, started)
+		manager.performInstall(version, started)
+
+		status := manager.snapshot()
+		if status.State != "completed" {
+			log.Fatalf("update v%s ended in state %s: %s", version, status.State, status.Message)
+		}
+		return
+	}
+
+	// Legacy HTTP mode remains available for compatibility with older deployments.
+	// Current Gotify MU releases launch this binary only as a short-lived worker.
 	listen := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATER_LISTEN"))
 	if listen == "" {
 		listen = defaultListen
@@ -924,7 +996,7 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	log.Printf("Gotify MU updater listening on %s for container %s", listen, manager.target)
+	log.Printf("Gotify MU updater compatibility service listening on %s for container %s", listen, manager.target)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}

@@ -4,15 +4,24 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-func TestUpdateAPIStatusWhenUnconfigured(t *testing.T) {
+func TestUpdateAPIStatusWhenDockerSocketMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	api := UpdateAPI{}
+	api := UpdateAPI{
+		DockerSocket:    filepath.Join(t.TempDir(), "missing.sock"),
+		TargetContainer: "gotify-mu",
+		StatusFile:      filepath.Join(t.TempDir(), "status.json"),
+	}
+
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/update/status", nil)
@@ -21,26 +30,23 @@ func TestUpdateAPIStatusWhenUnconfigured(t *testing.T) {
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
 	var payload map[string]any
-	assert.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
+	require.NoError(t, json.Unmarshal(recorder.Body.Bytes(), &payload))
 	assert.Equal(t, false, payload["ready"])
 	assert.Equal(t, "unavailable", payload["state"])
 }
 
-func TestUpdateAPIProxiesStatus(t *testing.T) {
-	helper := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, "Bearer test-token", r.Header.Get("Authorization"))
-		w.Header().Set("Content-Type", "application/json")
-		w.WriteHeader(http.StatusOK)
-		_, _ = w.Write([]byte(`{"ready":true,"state":"idle"}`))
-	}))
-	defer helper.Close()
-
+func TestUpdateAPIStatusDefaultsToIdle(t *testing.T) {
 	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	socket := filepath.Join(dir, "docker.sock")
+	require.NoError(t, os.WriteFile(socket, nil, 0o600))
+
 	api := UpdateAPI{
-		BaseURL: helper.URL,
-		Token:   "test-token",
-		Client:  helper.Client(),
+		DockerSocket:    socket,
+		TargetContainer: "gotify-mu",
+		StatusFile:      filepath.Join(dir, "status.json"),
 	}
+
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest(http.MethodGet, "/update/status", nil)
@@ -48,5 +54,82 @@ func TestUpdateAPIProxiesStatus(t *testing.T) {
 	api.Status(ctx)
 
 	assert.Equal(t, http.StatusOK, recorder.Code)
-	assert.JSONEq(t, `{"ready":true,"state":"idle"}`, recorder.Body.String())
+	assert.JSONEq(t, `{"ready":true,"state":"idle","progress":0}`, recorder.Body.String())
+}
+
+func TestUpdateAPIStartsTransientWorker(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	dir := t.TempDir()
+	socket := filepath.Join(dir, "docker.sock")
+	require.NoError(t, os.WriteFile(socket, nil, 0o600))
+
+	var calls [][]string
+	runner := func(args ...string) (string, error) {
+		copied := append([]string(nil), args...)
+		calls = append(calls, copied)
+		if len(args) >= 3 && args[0] == "inspect" && args[1] == "--format" && strings.Contains(args[2], ".State.Running") {
+			return "false\n", nil
+		}
+		if len(args) >= 3 && args[0] == "inspect" && args[1] == "--format" && strings.Contains(args[2], ".Config.Image") {
+			return "gotify-mu:1.0.2\n", nil
+		}
+		if len(args) > 0 && args[0] == "run" {
+			return "worker-id\n", nil
+		}
+		return "", nil
+	}
+
+	api := UpdateAPI{
+		DockerSocket:    socket,
+		TargetContainer: "gotify-mu",
+		WorkerName:      "gotify-mu-update-worker",
+		StatusFile:      filepath.Join(dir, "status.json"),
+		Repository:      "gigabytegrove/gotify-mu",
+		RunDocker:       runner,
+	}
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(
+		http.MethodPost,
+		"/update/install",
+		strings.NewReader(`{"version":"1.0.2"}`),
+	)
+	ctx.Request.Header.Set("Content-Type", "application/json")
+
+	api.Install(ctx)
+
+	assert.Equal(t, http.StatusAccepted, recorder.Code)
+	require.NotEmpty(t, calls)
+
+	var runArgs []string
+	for _, call := range calls {
+		if len(call) > 0 && call[0] == "run" {
+			runArgs = call
+			break
+		}
+	}
+	require.NotEmpty(t, runArgs)
+	assert.Contains(t, runArgs, "--rm")
+	assert.Contains(t, runArgs, "--volumes-from")
+	assert.Contains(t, runArgs, "gotify-mu")
+	assert.Contains(t, runArgs, "/usr/local/bin/gotify-mu-updater")
+	assert.Equal(t, []string{"install", "1.0.2"}, runArgs[len(runArgs)-2:])
+
+	content, err := os.ReadFile(api.StatusFile)
+	require.NoError(t, err)
+	var status managedUpdateStatus
+	require.NoError(t, json.Unmarshal(content, &status))
+	assert.Equal(t, "preparing", status.State)
+	assert.Equal(t, "1.0.2", status.Version)
+	assert.True(t, status.Ready)
+}
+
+func TestUpdateStateActive(t *testing.T) {
+	for _, state := range []string{"preparing", "downloading", "building", "replacing", "verifying"} {
+		assert.True(t, updateStateActive(state), state)
+	}
+	for _, state := range []string{"", "idle", "completed", "failed", "rolled_back"} {
+		assert.False(t, updateStateActive(state), state)
+	}
 }

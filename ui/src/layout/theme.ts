@@ -5,17 +5,30 @@ export type ThemeKey = 'dark' | 'light' | 'system';
 export const isThemeKey = (value: string | null): value is ThemeKey =>
     value === 'light' || value === 'dark' || value === 'system';
 
-export const createGotifyMuTheme = (mode: PaletteMode) => {
+export const createMonitaTheme = (mode: PaletteMode) => {
     const surfaceBorder = mode === 'dark' ? '#29323b' : '#dfe5eb';
     const tableBorder = mode === 'dark' ? '#232b33' : '#e9edf1';
 
     const theme = createTheme({
         palette: {
             mode,
+            primary: {
+                main: '#2563EB',
+                light: '#3B82F6',
+                dark: '#1D4ED8',
+                contrastText: '#ffffff',
+            },
+            info: {
+                main: '#06B6D4',
+            },
             background:
                 mode === 'dark'
-                    ? {default: '#0e1216', paper: '#151a20'}
-                    : {default: '#f4f6f8', paper: '#ffffff'},
+                    ? {default: '#0F172A', paper: '#151f32'}
+                    : {default: '#f6f8fb', paper: '#ffffff'},
+            text:
+                mode === 'dark'
+                    ? {primary: '#f8fafc', secondary: '#94A3B8'}
+                    : {primary: '#0F172A', secondary: '#64748b'},
         },
         shape: {
             borderRadius: 10,
