@@ -110,7 +110,5 @@ export enum ClientCol {
     ExpiresIn = 4,
     LastSeen = 5,
     Created = 6,
-    Elevate = 7,
-    Edit = 7,
-    Delete = 7,
+    Actions = 7,
 }
