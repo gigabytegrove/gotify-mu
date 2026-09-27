@@ -7,9 +7,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Download from '@mui/icons-material/Download';
 import NewReleases from '@mui/icons-material/NewReleases';
-import OpenInNew from '@mui/icons-material/OpenInNew';
 import SystemUpdateAlt from '@mui/icons-material/SystemUpdateAlt';
 import Refresh from '@mui/icons-material/Refresh';
 import {Link} from 'react-router';
@@ -241,7 +239,7 @@ export const UpdateStatusCard = () => {
     return (
         <SurfaceCard
             title="Software Update"
-            subtitle="Install available updates here. If an update cannot be completed safely, the previous version is restored automatically."
+            subtitle="Check for a new Gotify MU release and install it automatically."
             action={
                 <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
                     <Button
@@ -460,35 +458,6 @@ const ReleaseUpdateDetails = ({
                 </Alert>
             )}
 
-            {state.release.assets.length > 0 && (
-                <Stack spacing={1}>
-                    <Typography variant="subtitle2">Download files</Typography>
-                    <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
-                        {state.release.assets.map((asset) => (
-                            <Button
-                                key={asset.name}
-                                component="a"
-                                href={asset.browser_download_url}
-                                variant="outlined"
-                                size="small"
-                                startIcon={<Download />}>
-                                {asset.name}
-                            </Button>
-                        ))}
-                    </Stack>
-                </Stack>
-            )}
-
-            <Button
-                component="a"
-                href={state.release.html_url}
-                target="_blank"
-                rel="noreferrer"
-                variant="text"
-                sx={{alignSelf: 'flex-start'}}
-                endIcon={<OpenInNew />}>
-                Release Notes
-            </Button>
         </Stack>
     );
 };
