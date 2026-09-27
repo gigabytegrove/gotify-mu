@@ -1,0 +1,53 @@
+name: v1.0.0 source formatter
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Format UI source for v1.0.0
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          if [[ "${VERSION}" != "1.0.0" ]]; then
+            echo "VERSION is ${VERSION}; formatter is no longer needed."
+            exit 0
+          fi
+
+          RELEASE_HTTP="$(curl -sS -o /dev/null -w '%{http_code}'             -H "Accept: application/vnd.github+json"             -H "Authorization: Bearer ${GH_TOKEN}"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/${GITHUB_REPOSITORY}/releases/tags/v1.0.0")"
+          if [[ "${RELEASE_HTTP}" == "200" ]]; then
+            echo "v1.0.0 is already published; formatter is no longer needed."
+            exit 0
+          fi
+
+          (cd ui && yarn --frozen-lockfile)
+          (cd ui && yarn prettier "src/**/*.{ts,tsx}" --write)
+
+          if git diff --quiet -- ui/src; then
+            echo "UI source is already Prettier-clean."
+            exit 0
+          fi
+
+          BRANCH="automation/v1.0-prettier"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "${BRANCH}"
+          git add ui/src
+          git commit -m "style: format UI source for v1.0.0"
+          git push --force origin "${BRANCH}"
