@@ -3,7 +3,7 @@ BUILD_DIR=./build
 DOCKER_DIR=./docker/
 SHELL := /bin/bash
 VERSION ?= $(shell cat VERSION 2>/dev/null)
-GO_VERSION=$(shell go mod edit -json | jq -r .Toolchain | sed -e 's/go//')
+GO_VERSION=$(shell go mod edit -json | jq -r '(.Toolchain // ("go" + .Go))' | sed -e 's/^go//')
 DOCKER_BUILD_IMAGE=docker.io/gotify/build
 DOCKER_WORKDIR=/proj
 DOCKER_RUN=docker run --rm -e LD_FLAGS="$$LD_FLAGS" -v "$$PWD/.:${DOCKER_WORKDIR}" -v "`go env GOPATH`/pkg/mod/.:/go/pkg/mod:ro" -w ${DOCKER_WORKDIR}
