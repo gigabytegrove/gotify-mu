@@ -457,7 +457,6 @@ const ReleaseUpdateDetails = ({
                     {updater?.message || 'Managed updater status is unavailable.'}
                 </Alert>
             )}
-
         </Stack>
     );
 };
