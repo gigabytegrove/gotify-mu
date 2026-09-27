@@ -363,7 +363,10 @@ const PluginRow = observer(
                     <Typography className="plugin-name" sx={{fontWeight: 700}}>
                         {plugin.name}
                     </Typography>
-                    <Typography className="plugin-module-path" variant="caption" color="text.secondary">
+                    <Typography
+                        className="plugin-module-path"
+                        variant="caption"
+                        color="text.secondary">
                         {plugin.modulePath}
                     </Typography>
                 </Stack>
