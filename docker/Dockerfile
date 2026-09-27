@@ -65,19 +65,6 @@ RUN cd /src/gotify && \
     LD_FLAGS="$EFFECTIVE_LD_FLAGS" make OUTPUT=/target/app/monita-app _build_within_docker && \
     ln -s monita-app /target/app/gotify-app
 
-# --- Transient update worker binary ---
-
-FROM --platform=${BUILDPLATFORM} golang:1.26-alpine AS updater-builder
-
-WORKDIR /src
-COPY updater/go.mod ./
-COPY updater/main.go ./
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/monita-updater .
-
-# Docker CLI is embedded in the main image so it can start a short-lived
-# update worker only while an administrator-requested update is running.
-FROM docker:cli AS docker-cli
-
 # --- Runtime ---
 
 FROM debian:${DEBIAN}
@@ -108,9 +95,8 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD curl --fail http:/
 EXPOSE $GOTIFY_SERVER_EXPOSE
 
 COPY --from=builder /target /
-COPY --from=updater-builder /out/monita-updater /usr/local/bin/monita-updater
-COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
-COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
 
-ENTRYPOINT ["./monita-app"]
+COPY --chmod=0755 docker/monita-entrypoint.sh /usr/local/bin/monita-entrypoint
+
+ENTRYPOINT ["/usr/local/bin/monita-entrypoint"]
 CMD ["serve"]
