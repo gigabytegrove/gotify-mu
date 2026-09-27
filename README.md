@@ -245,7 +245,7 @@ docker ps --filter name=gotify-mu
 
 **Settings → Software Update** checks GitHub for the newest published Gotify MU release. An administrator can click **Install** and watch the current stage and progress percentage while the server updates itself.
 
-There is no permanent updater sidecar. The normal deployment has one persistent container, `gotify-mu`. During an active update only, the application starts a short-lived worker from the same Gotify MU image. The worker verifies the published source checksum, builds the replacement, preserves the current runtime configuration and application data, verifies health, restores the previous container on failure, and exits.
+There is no permanent updater sidecar. The normal deployment has one persistent container, `gotify-mu`. During an active update only, the application starts a short-lived worker from the same Gotify MU image. The worker pulls the selected numbered release image from GHCR, verifies its version/source/revision metadata against the GitHub release tag, preserves the current runtime configuration and application data, verifies health, restores the previous container on failure, and exits.
 
 The update worker writes progress under `/app/data`, so the UI can continue the update state across the application container restart.
 
@@ -361,15 +361,15 @@ For the current development or preview build, verify these behaviors before trea
 23. Digest settings save correctly and collect lower-priority notifications.
 24. Settings remains stable and does not enter a refresh loop after updates.
 
-### Future container namespace
+### Container images
 
-The project container namespace is reserved as:
+Published multi-architecture release images are available at:
 
 ```text
 ghcr.io/gigabytegrove/gotify-mu
 ```
 
-Once automated builds/releases are active, deployment will be able to use published images instead of compiling locally.
+Managed in-app updates use the numbered release image for the selected GitHub release.
 
 ## Upgrading an existing Gotify installation
 
