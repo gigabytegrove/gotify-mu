@@ -126,7 +126,7 @@ export const UpdateAvailableBanner = () => {
             }>
             {development
                 ? `Published release ${state.release.tag_name} is available. This server is running preview version ${currentVersion}.`
-                : `Gotify MU ${state.release.tag_name} is available. This server is running ${currentVersion}.`}
+                : `Monita ${state.release.tag_name} is available. This server is running ${currentVersion}.`}
         </Alert>
     );
 };
@@ -239,7 +239,7 @@ export const UpdateStatusCard = () => {
     return (
         <SurfaceCard
             title="Software Update"
-            subtitle="Check for a new Gotify MU release and install it automatically."
+            subtitle="Check for a new Monita release and install it automatically."
             action={
                 <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
                     <Button
@@ -261,7 +261,7 @@ export const UpdateStatusCard = () => {
             )}
 
             {state.status === 'none' && (
-                <Alert severity="info">No published Gotify MU release is available yet.</Alert>
+                <Alert severity="info">No published Monita release is available yet.</Alert>
             )}
 
             {state.status === 'error' && (
