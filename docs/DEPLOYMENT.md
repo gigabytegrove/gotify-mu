@@ -49,6 +49,17 @@ Open:
 http://SERVER-IP:8080
 ```
 
+## Prebuilt release image archives
+
+If your environment cannot pull directly from GitHub Container Registry, Monita also publishes prebuilt Docker image archives with each supported release.
+
+Download the archive that matches your server architecture, verify it with the published checksum file, load it with Docker, and start Monita with Docker Compose. This path does not compile Monita locally.
+
+Supported release archives:
+
+- `linux-amd64` for standard 64-bit Intel/AMD systems
+- `linux-arm64` for 64-bit ARM systems
+
 ## Configuration
 
 Monita uses environment variables from `.env`.
