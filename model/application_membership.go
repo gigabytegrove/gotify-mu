@@ -13,8 +13,8 @@ type ApplicationMembership struct {
 	AutoAssigned              bool   `gorm:"not null"`
 	Role                      string `gorm:"type:varchar(16)"`
 	GroupRole                 string `gorm:"type:varchar(16)"`
-	GroupAssigned             bool   `gorm:"not null"`
-	GroupReceiveNotifications bool   `gorm:"not null"`
+	GroupAssigned             bool   `gorm:"not null;default:false"`
+	GroupReceiveNotifications bool   `gorm:"not null;default:false"`
 	EffectiveRole             string `gorm:"-" json:"-"`
 	CreatedAt                 time.Time
 	UpdatedAt                 time.Time

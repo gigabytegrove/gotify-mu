@@ -72,3 +72,59 @@ func (s *MigrationSuite) TestMigration() {
 		assert.Equal(s.T(), "test application", app.Name)
 	}
 }
+
+
+func (s *MigrationSuite) TestMigrationFromPreviewApplicationMembershipSchema() {
+	path := s.tmpDir.Path("test_preview_membership.db")
+	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
+	assert.NoError(s.T(), err)
+
+	assert.NoError(s.T(), db.AutoMigrate(new(model.User), new(model.Application)))
+	user := &model.User{Name: "preview_user", Admin: true}
+	assert.NoError(s.T(), db.Create(user).Error)
+	app := &model.Application{
+		Token:       "PREVIEW123",
+		UserID:      user.ID,
+		Description: "preview channel",
+		Name:        "preview channel",
+	}
+	assert.NoError(s.T(), db.Create(app).Error)
+
+	assert.NoError(s.T(), db.Exec(`
+		CREATE TABLE application_memberships (
+			application_id integer NOT NULL,
+			user_id integer NOT NULL,
+			receive_notifications numeric NOT NULL,
+			auto_assigned numeric NOT NULL,
+			created_at datetime,
+			updated_at datetime,
+			PRIMARY KEY (application_id, user_id)
+		)
+	`).Error)
+	assert.NoError(s.T(), db.Exec(
+		"INSERT INTO application_memberships (application_id, user_id, receive_notifications, auto_assigned) VALUES (?, ?, ?, ?)",
+		app.ID, user.ID, true, false,
+	).Error)
+
+	sqlDB, err := db.DB()
+	assert.NoError(s.T(), err)
+	assert.NoError(s.T(), sqlDB.Close())
+
+	migrated, err := New("sqlite3", path, "admin", "admin", 6, false, fixedNow)
+	assert.NoError(s.T(), err)
+	if err != nil {
+		return
+	}
+	defer migrated.Close()
+
+	assert.True(s.T(), migrated.DB.Migrator().HasColumn(new(model.ApplicationMembership), "group_assigned"))
+	assert.True(s.T(), migrated.DB.Migrator().HasColumn(new(model.ApplicationMembership), "group_receive_notifications"))
+
+	var membership model.ApplicationMembership
+	assert.NoError(s.T(), migrated.DB.Where(
+		"application_id = ? AND user_id = ?", app.ID, user.ID,
+	).First(&membership).Error)
+	assert.False(s.T(), membership.GroupAssigned)
+	assert.False(s.T(), membership.GroupReceiveNotifications)
+	assert.Equal(s.T(), model.ChannelRoleMember, membership.Role)
+}
