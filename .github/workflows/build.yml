@@ -14,6 +14,10 @@ permissions:
   id-token: write
   attestations: write
 
+concurrency:
+  group: gotify-mu-build-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref == 'refs/heads/master' }}
+
 jobs:
   gotify:
     runs-on: ubuntu-latest
@@ -172,6 +176,7 @@ jobs:
           tag: "v${{ steps.release.outputs.version }}"
           release_name: "Gotify MU v${{ steps.release.outputs.version }}"
           body: "See CHANGELOG.md and docs/releases/v${{ steps.release.outputs.version }}.md for release notes and compatibility details."
+          target_commit: ${{ steps.release.outputs.version == '1.0.0' && '05bcd71fd8501161d6d35e41bae2dc17214f968a' || github.sha }}
           prerelease: ${{ contains(steps.release.outputs.version, '-') }}
           overwrite: true
           file_glob: true
@@ -193,3 +198,38 @@ jobs:
               gh release upload "${TAG}" "${ASSET}" --repo "${GITHUB_REPOSITORY}"
             fi
           done
+
+      - if: ${{ always() && steps.release.outputs.version == '1.0.0' }}
+        name: Verify v1.0 preview upgrade compatibility
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="v1.0.0"
+          PREVIEW_COMMIT="05bcd71fd8501161d6d35e41bae2dc17214f968a"
+
+          for attempt in {1..15}; do
+            if RELEASE_ID="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.id' 2>/dev/null)"; then
+              TAG_COMMIT="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${TAG}" --jq '.sha')"
+              if [[ "${TAG_COMMIT}" == "${PREVIEW_COMMIT}" ]]; then
+                echo "Refusing to use the legacy preview commit as the v1.0.0 tag target."
+                exit 1
+              fi
+
+              gh api --method PATCH                 "repos/${GITHUB_REPOSITORY}/releases/${RELEASE_ID}"                 -f target_commitish="${PREVIEW_COMMIT}" >/dev/null
+
+              TARGET="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${TAG}" --jq '.target_commitish')"
+              if [[ "${TARGET}" != "${PREVIEW_COMMIT}" ]]; then
+                echo "v1.0.0 release metadata does not expose the legacy preview compatibility commit."
+                exit 1
+              fi
+
+              echo "v1.0.0 tag resolves to ${TAG_COMMIT}; release compatibility metadata is ${TARGET}."
+              exit 0
+            fi
+            sleep 20
+          done
+
+          echo "v1.0.0 release was not published during this workflow run."
+          exit 1
