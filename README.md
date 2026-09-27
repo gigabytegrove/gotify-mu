@@ -43,7 +43,8 @@ git clone https://github.com/gigabytegrove/monita.git
 cd monita
 cp .env.example .env
 nano .env
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 At minimum, set a secure administrator password in `.env`:
@@ -59,7 +60,7 @@ By default, the Web UI is available on:
 http://SERVER-IP:8080
 ```
 
-Persistent application data is stored in the configured Monita data directory and remains in place when the container is rebuilt or updated.
+Persistent application data is stored in the configured Monita data directory and remains in place when the container is updated. Normal installs use the prebuilt Monita image, so users do not need to compile the application locally.
 
 ## Updating
 
@@ -70,7 +71,7 @@ For a manual update:
 ```bash
 cd /opt/monita
 git pull --ff-only origin master
-docker compose build
+docker compose pull
 docker compose up -d
 ```
 
