@@ -8,8 +8,8 @@ This document is the maintained deployment, validation, update, backup, and roll
 
 ## Release state
 
-- **Current published release:** v1.0.0
-- **Previous rollback baseline:** v0.5.0
+- **Current published release:** v1.0.2
+- **Previous rollback baseline:** v1.0.1
 
 The v1.0.0 release commit is validated through the repository gate before publication. Documentation-only changes are part of the release candidate and pass the same gate.
 
@@ -17,7 +17,7 @@ The v1.0.0 release commit is validated through the repository gate before public
 
 Gotify MU supports:
 
-1. Docker Compose with the Gotify MU updater helper.
+1. Docker Compose with one persistent Gotify MU container and integrated managed updates.
 2. Manual Docker deployment with a persistent data directory.
 3. Native source builds for development/testing.
 
@@ -52,12 +52,6 @@ cd gotify-mu
 cp .env.example .env
 ```
 
-Generate the private updater token:
-
-```bash
-openssl rand -hex 32
-```
-
 Edit `.env` and set at minimum:
 
 ```env
@@ -65,7 +59,6 @@ GOTIFY_MU_PORT=8080
 GOTIFY_MU_DATA_DIR=./data
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
-GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
 
 For an existing installation, set `GOTIFY_MU_DATA_DIR` to the exact host directory already mounted at `/app/data`. Do not change that path during an upgrade. Compose also loads `.env` into the application container so existing `GOTIFY_*` runtime settings can be preserved instead of silently reverting to defaults.
@@ -76,7 +69,7 @@ Build with the full server test suite enabled:
 docker compose build --build-arg RUN_TESTS=1
 ```
 
-Start the services:
+Start the service:
 
 ```bash
 docker compose up -d
@@ -230,21 +223,22 @@ Keep the failed preview data until the issue has been understood.
 
 ## Managed in-app updates
 
-Published releases can be installed from **Settings → Software Update** when the updater helper is enabled.
+Published releases are installed from **Settings → Software Update**.
 
-The updater helper:
+The normal Docker deployment has exactly one persistent Gotify MU container. The application itself checks GitHub for published releases. When an administrator starts an update, Gotify MU launches a short-lived worker from the currently running Gotify MU image. The worker:
 
-- runs without a published host port
-- communicates with Gotify MU over the private Docker network
-- requires a shared random token
-- has access to the Docker socket so it can replace the application container
-- preserves the current runtime configuration
-- verifies the replacement
-- automatically restores the previous container when replacement/startup verification fails
+- exists only for the duration of the update
+- verifies the published source package and SHA-256 checksum
+- builds the selected numbered release with the full server test suite
+- preserves the application data mount, ports, environment, restart policy, network attachments, and Docker socket mount
+- replaces the application container
+- verifies the replacement health check
+- automatically restores the previous container when replacement or verification fails
+- exits automatically after success or failure
 
-Because Docker socket access is privileged host access, only enable the helper on systems where managed updates are desired.
+Update state is persisted under `/app/data/.gotify-mu-update-status.json` so progress survives the application container restart.
 
-The shared token must never be committed to Git.
+The recommended Compose deployment mounts `/var/run/docker.sock` into Gotify MU. Docker socket access is privileged host access and should only be granted to a trusted installation.
 
 ## Preview builds versus published releases
 
@@ -361,7 +355,6 @@ After a preview is accepted:
 Never commit:
 
 - administrator passwords
-- updater tokens
 - MQTT passwords
 - Home Assistant long-lived access tokens
 - SMTP/mail credentials
