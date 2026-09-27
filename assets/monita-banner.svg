@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 500" role="img" aria-labelledby="title desc">
+  <title id="title">Monita</title>
+  <desc id="desc">Monita notifications, messaging, and automation</desc>
+  <rect width="1600" height="500" fill="#FFFFFF"/>
+  <g transform="translate(90 80)">
+    <defs>
+      <linearGradient id="mark2" x1="0" y1="1" x2="1" y2="0">
+        <stop offset="0" stop-color="#2563EB"/>
+        <stop offset="0.55" stop-color="#3B82F6"/>
+        <stop offset="1" stop-color="#06B6D4"/>
+      </linearGradient>
+    </defs>
+    <path d="M0 260V70c0-34 38-54 66-36l114 75 114-75c28-18 66 2 66 36v190c0 24-27 39-47 25l-78-52V131l-55 36-55-36v102l-78 52c-20 14-47-1-47-25Z" fill="url(#mark2)"/>
+    <circle cx="140" cy="198" r="12" fill="#2563EB"/>
+    <circle cx="180" cy="198" r="12" fill="#3B82F6"/>
+    <circle cx="220" cy="198" r="12" fill="#06B6D4"/>
+    <path d="M280 12c44 8 79 43 87 87" fill="none" stroke="#25DCE3" stroke-width="20" stroke-linecap="round"/>
+    <path d="M292 63c20 5 36 21 41 41" fill="none" stroke="#25DCE3" stroke-width="20" stroke-linecap="round"/>
+  </g>
+  <text x="500" y="310" font-family="Arial, Helvetica, sans-serif" font-size="235" font-weight="800" fill="#0F172A" letter-spacing="-8">Monita</text>
+  <text x="505" y="395" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="500" fill="#94A3B8" letter-spacing="9">NOTIFICATIONS · MESSAGING · AUTOMATION</text>
+</svg>
