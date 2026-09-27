@@ -31,9 +31,12 @@ ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 ARG BUILD_JS=0
 ARG RUN_TESTS=0
-ARG GOTIFY_MU_VERSION=master-local
-ARG GOTIFY_MU_COMMIT=local
-ARG GOTIFY_MU_BUILD_DATE=local
+ARG MONITA_VERSION=master-local
+ARG MONITA_COMMIT=local
+ARG MONITA_BUILD_DATE=local
+ARG GOTIFY_MU_VERSION=
+ARG GOTIFY_MU_COMMIT=
+ARG GOTIFY_MU_BUILD_DATE=
 ARG LD_FLAGS=""
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -54,7 +57,10 @@ RUN cd /src/gotify && \
     fi && \
     EFFECTIVE_LD_FLAGS="$LD_FLAGS" && \
     if [ -z "$EFFECTIVE_LD_FLAGS" ]; then \
-    EFFECTIVE_LD_FLAGS="-w -s -X main.Version=${GOTIFY_MU_VERSION} -X main.Commit=${GOTIFY_MU_COMMIT} -X main.BuildDate=${GOTIFY_MU_BUILD_DATE} -X main.Mode=prod"; \
+    EFFECTIVE_VERSION="${MONITA_VERSION:-${GOTIFY_MU_VERSION:-master-local}}"; \
+    EFFECTIVE_COMMIT="${MONITA_COMMIT:-${GOTIFY_MU_COMMIT:-local}}"; \
+    EFFECTIVE_BUILD_DATE="${MONITA_BUILD_DATE:-${GOTIFY_MU_BUILD_DATE:-local}}"; \
+    EFFECTIVE_LD_FLAGS="-w -s -X main.Version=${EFFECTIVE_VERSION} -X main.Commit=${EFFECTIVE_COMMIT} -X main.BuildDate=${EFFECTIVE_BUILD_DATE} -X main.Mode=prod"; \
     fi && \
     LD_FLAGS="$EFFECTIVE_LD_FLAGS" make OUTPUT=/target/app/gotify-app _build_within_docker
 
@@ -65,7 +71,7 @@ FROM --platform=${BUILDPLATFORM} golang:1.26-alpine AS updater-builder
 WORKDIR /src
 COPY updater/go.mod ./
 COPY updater/main.go ./
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/gotify-mu-updater .
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/monita-updater .
 
 # Docker CLI is embedded in the main image so it can start a short-lived
 # update worker only while an administrator-requested update is running.
@@ -75,15 +81,15 @@ FROM docker:cli AS docker-cli
 
 FROM debian:${DEBIAN}
 
-ARG GOTIFY_MU_VERSION=master-local
-ARG GOTIFY_MU_COMMIT=local
+ARG MONITA_VERSION=master-local
+ARG MONITA_COMMIT=local
 
 LABEL org.opencontainers.image.documentation=https://github.com/gigabytegrove/gotify-mu
 LABEL org.opencontainers.image.source=https://github.com/gigabytegrove/gotify-mu
 LABEL org.opencontainers.image.title="Monita"
 LABEL org.opencontainers.image.description="Monita self-hosted notifications, messaging, and automation platform"
-LABEL org.opencontainers.image.version=${GOTIFY_MU_VERSION}
-LABEL org.opencontainers.image.revision=${GOTIFY_MU_COMMIT}
+LABEL org.opencontainers.image.version=${MONITA_VERSION}
+LABEL org.opencontainers.image.revision=${MONITA_COMMIT}
 LABEL org.opencontainers.image.licenses="MIT"
 
 ARG GOTIFY_SERVER_EXPOSE=80
@@ -101,7 +107,7 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD curl --fail http:/
 EXPOSE $GOTIFY_SERVER_EXPOSE
 
 COPY --from=builder /target /
-COPY --from=updater-builder /out/gotify-mu-updater /usr/local/bin/gotify-mu-updater
+COPY --from=updater-builder /out/monita-updater /usr/local/bin/monita-updater
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
 
