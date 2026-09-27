@@ -186,7 +186,7 @@ const Messages = observer(() => {
                 archivedView ? () => void messagesStore.restoreSingle(message) : undefined
             }
             fAcknowledge={() =>
-                void messagesStore.setAcknowledged(message, !Boolean(message.acknowledged))
+                void messagesStore.setAcknowledged(message, !message.acknowledged)
             }
             acknowledged={Boolean(message.acknowledged)}
             acknowledgedByAnyone={Boolean(message.acknowledgedByAnyone)}
