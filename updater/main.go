@@ -919,9 +919,9 @@ func (m *manager) buildRelease(root, image, version, commit, buildDate string) e
 		"--build-arg", "BUILD_JS=1",
 		"--build-arg", "RUN_TESTS=1",
 		"--build-arg", "GO_VERSION=1.26.0",
-		"--build-arg", "GOTIFY_MU_VERSION="+version,
-		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
-		"--build-arg", "GOTIFY_MU_BUILD_DATE="+buildDate,
+		"--build-arg", "MONITA_VERSION="+version,
+		"--build-arg", "MONITA_COMMIT="+commit,
+		"--build-arg", "MONITA_BUILD_DATE="+buildDate,
 		"-f", filepath.Join(root, "docker", "Dockerfile"),
 		"-t", image,
 		root,
@@ -987,7 +987,7 @@ func main() {
 
 	// Legacy HTTP mode remains available for compatibility with older deployments.
 	// Current Monita releases launch this binary only as a short-lived worker.
-	listen := strings.TrimSpace(os.Getenv("MONITA_UPDATER_LISTEN"))
+	listen := firstEnv("MONITA_UPDATER_LISTEN", "GOTIFY_MU_UPDATER_LISTEN")
 	if listen == "" {
 		listen = defaultListen
 	}
