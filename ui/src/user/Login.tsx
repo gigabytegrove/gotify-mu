@@ -68,7 +68,7 @@ const Login = observer(() => {
                     <Box sx={{textAlign: 'center', pt: 0.5}}>
                         <Box
                             component="img"
-                            src={config.get('url') + 'static/monita-logo.png'}
+                            src={config.get('url') + 'static/monita-logo.svg'}
                             alt="Monita"
                             sx={{width: 150, maxWidth: '65%', mb: 0.75}}
                         />
