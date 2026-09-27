@@ -124,7 +124,8 @@ describe('User', () => {
         const $changepw = selector.form('#changepw-form');
         await page.waitForSelector('#user-menu-button');
         await page.click('#user-menu-button');
-        await clickByText(page, 'a', 'Settings');
+        await clickByText(page, '#user-menu [role="menuitem"]', 'Settings');
+        await waitToDisappear(page, '#user-menu');
         await waitForExists(page, selector.heading(), 'Settings');
         await page.waitForSelector($changepw.selector());
         await page.type($changepw.input('.newpass'), 'changed-pass-123');
