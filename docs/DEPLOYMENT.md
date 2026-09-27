@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+</p>
+
 # Gotify MU Deployment Guide
 
 This document is the maintained deployment, validation, update, backup, and rollback reference for Gotify MU.
