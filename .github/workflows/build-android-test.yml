@@ -9,20 +9,24 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: gotify-mu-android-master-bridge
+  cancel-in-progress: true
+
 jobs:
   build-android-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out Gotify MU server assets
+      - name: Check out bridge repository
         uses: actions/checkout@v4
         with:
           path: server
 
-      - name: Check out Android Tailwind test branch
+      - name: Check out Gotify MU Android master
         uses: actions/checkout@v4
         with:
           repository: gigabytegrove/gotify-mu-android
-          ref: feature/gotify-mu-v0.2.0-tailwind-admin
+          ref: master
           path: android
 
       - name: Set up Node 24
@@ -43,11 +47,6 @@ jobs:
           node --check app/src/main/assets/mu/views.js
           node --check app/src/main/assets/mu/login.js
 
-      - name: Apply Gotify MU logo
-        run: |
-          cp server/assets/gotify-mu-logo.png android/app/src/main/assets/mu/gotify-mu-logo.png
-          cp server/assets/gotify-mu-logo.png android/app/src/main/res/drawable/gotify_mu_logo.png
-
       - name: Verify stable Gotify MU test signing key
         working-directory: android
         run: |
@@ -64,50 +63,41 @@ jobs:
         working-directory: android
         run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Verify APK identity and Tailwind payload
+      - name: Verify APK identity, role contract and signer
         working-directory: android
         run: |
           set -euo pipefail
           APK="app/build/outputs/apk/debug/app-debug.apk"
           BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
           "$BUILD_TOOLS/aapt" dump badging "$APK" | tee ../apk-badging.txt
-          grep -q "package: name='com.gigabytegrove.gotifymu.tailwindpreview'" ../apk-badging.txt
-          grep -q "application-label:'Gotify MU Gotify MU v0.3.1 polish'" ../apk-badging.txt
-          unzip -p "$APK" assets/mu/views.js | grep -q "Gotify MU v0.3.1 polish"
-          unzip -p "$APK" assets/mu/login.js | grep -q "Gotify MU v0.3.1 polish"
-          unzip -l "$APK" | grep -q "assets/mu/gotify-mu-logo.png"
-
-      - name: Verify APK package and version
-        working-directory: android
-        run: |
-          set -euo pipefail
-          APK="app/build/outputs/apk/debug/app-debug.apk"
-          BUILD_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)"
-          "$BUILD_TOOLS/aapt" dump badging "$APK" | tee ../apk-badging.txt
-          grep -q "package: name='com.gigabytegrove.gotifymu.test'" ../apk-badging.txt
-          grep -q "versionName='0.3.1-dev-test'" ../apk-badging.txt
+          grep -q "package: name='com.gigabytegrove.gotifymu'" ../apk-badging.txt
+          grep -q "versionName='0.3.3-dev-test'" ../apk-badging.txt
           grep -q "application-label:'Gotify MU'" ../apk-badging.txt
+          grep -q 'SERIALIZED_NAME_ROLE = "role"' client/src/main/java/com/github/gotify/client/model/Application.java
+          grep -q 'function canPost(channel)' app/src/main/assets/mu/views.js
+          unzip -l "$APK" | grep -q "assets/mu/gotify-mu-logo.png"
+          "$BUILD_TOOLS/apksigner" verify --print-certs "$APK" | tee ../signer.txt
 
       - name: Package phone test
         run: |
-          mkdir -p dist/generated
+          mkdir -p dist
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/Gotify-MU-v0.3.3-test.apk
           cp apk-badging.txt dist/apk-badging.txt
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/Gotify-MU-v0.3.1-polish-test.apk
-          cp android/app/src/main/assets/mu/app.css dist/generated/app.css
-          cp android/app/src/main/assets/mu/gotify-mu-logo.png dist/generated/gotify-mu-logo.png
-          cp android/app/src/main/res/drawable/gotify_mu_logo.png dist/generated/gotify_mu_logo.png
-          sha256sum dist/Gotify-MU-v0.3.1-polish-test.apk | tee dist/SHA256SUMS.txt
+          cp signer.txt dist/signer.txt
+          sha256sum dist/Gotify-MU-v0.3.3-test.apk | tee dist/SHA256SUMS.txt
           {
-            echo "Gotify MU Android v0.3.1 Tailwind preview build"
+            echo "Gotify MU Android v0.3.3 test build"
             echo "Android repository: gigabytegrove/gotify-mu-android"
-            echo "Android ref: feature/gotify-mu-v0.2.0-tailwind-admin"
-            echo "Built from workflow commit: $GITHUB_SHA"
+            echo "Android ref: master"
+            echo "Package: com.gigabytegrove.gotifymu"
+            echo "Stable test signing key: enabled"
+            echo "Bridge commit: $GITHUB_SHA"
             echo "Built: $(date -u +'%Y-%m-%dT%H:%M:%SZ')"
           } > dist/build-info.txt
 
       - name: Upload phone test artifact
         uses: actions/upload-artifact@v4
         with:
-          name: gotify-mu-android-v0.3.1-polish-test
+          name: gotify-mu-android-v0.3.3-test
           path: dist/
           if-no-files-found: error
