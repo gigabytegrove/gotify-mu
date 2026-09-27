@@ -72,7 +72,7 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                     }}>
                     <Box
                         component="img"
-                        src={config.get('url') + 'static/monita-icon.png'}
+                        src={config.get('url') + 'static/monita-icon.svg'}
                         alt="Monita"
                         sx={{width: 34, height: 34, objectFit: 'contain'}}
                     />
