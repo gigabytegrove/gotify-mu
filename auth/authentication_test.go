@@ -334,6 +334,13 @@ func (s *AuthenticationSuite) TestOptionalAdminAuth() {
 	assert.Equal(s.T(), uint(2), *TryGetUserID(ctx))
 }
 
+func (s *AuthenticationSuite) TestRequireAdminClientDoesNotRequireElevation() {
+	s.assertCookieRequest("clienttoken_admin", s.auth.RequireAdminClient, 200)
+	s.assertCookieRequest("clienttoken_admin_elevated", s.auth.RequireAdminClient, 200)
+	s.assertCookieRequest("clienttoken", s.auth.RequireAdminClient, 403)
+	s.assertCookieRequest("ergerogerg", s.auth.RequireAdminClient, 401)
+}
+
 func (s *AuthenticationSuite) TestCookieToken() {
 	// not existing token
 	s.assertCookieRequest("ergerogerg", s.auth.RequireApplicationToken, 401)
