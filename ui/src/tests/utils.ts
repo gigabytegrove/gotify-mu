@@ -8,16 +8,33 @@ export const innerText = async (page: ElementHandle | Page, selector: string): P
     return (value as any).toString().trim();
 };
 
+const isVisible = (element: Element): boolean => {
+    const html = element as HTMLElement;
+    const style = window.getComputedStyle(html);
+    return (
+        style.display !== 'none' &&
+        style.visibility !== 'hidden' &&
+        html.getClientRects().length > 0
+    );
+};
+
 export const clickByText = async (page: Page, selector: string, text: string): Promise<void> => {
     await waitForExists(page, selector, text);
     text = text.toLowerCase();
     await page.evaluate(
         (_selector, _text) => {
-            (
-                Array.from(document.querySelectorAll(_selector)).filter(
-                    (element) => element.textContent?.toLowerCase().trim() === _text
-                )[0] as HTMLButtonElement
-            ).click();
+            const element = Array.from(document.querySelectorAll(_selector)).find((candidate) => {
+                const html = candidate as HTMLElement;
+                const style = window.getComputedStyle(html);
+                return (
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    html.getClientRects().length > 0 &&
+                    candidate.textContent?.toLowerCase().trim() === _text
+                );
+            }) as HTMLButtonElement | undefined;
+            if (!element) throw new Error(`No visible element found for text: ${_text}`);
+            element.click();
         },
         selector,
         text
@@ -47,9 +64,16 @@ export const waitForExists = async (page: Page, selector: string, text: string):
     text = text.toLowerCase();
     await page.waitForFunction(
         (_selector: string, _text: string) =>
-            Array.from(document.querySelectorAll(_selector)).filter(
-                (element) => element.textContent!.toLowerCase().trim() === _text
-            ).length > 0,
+            Array.from(document.querySelectorAll(_selector)).some((element) => {
+                const html = element as HTMLElement;
+                const style = window.getComputedStyle(html);
+                return (
+                    style.display !== 'none' &&
+                    style.visibility !== 'hidden' &&
+                    html.getClientRects().length > 0 &&
+                    element.textContent!.toLowerCase().trim() === _text
+                );
+            }),
         {},
         selector,
         text
