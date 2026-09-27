@@ -64,7 +64,7 @@ const Layout = observer(() => {
     });
     const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
     const paletteMode = currentTheme === 'system' ? (prefersDark ? 'dark' : 'light') : currentTheme;
-    const theme = React.useMemo(() => createGotifyMuTheme(paletteMode), [paletteMode]);
+    const theme = React.useMemo(() => createMonitaTheme(paletteMode), [paletteMode]);
     const {version} = config.get('version');
     const [navOpen, setNavOpen] = React.useState(false);
 
