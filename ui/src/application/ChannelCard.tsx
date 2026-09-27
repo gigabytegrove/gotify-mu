@@ -39,6 +39,7 @@ import {formatDate} from '../common/TimeAgoFormatter';
 interface IProps {
     app: IApplication;
     canManage: boolean;
+    canManageSecurity: boolean;
     isOwner: boolean;
     canDeleteChannel: boolean;
     canClearHistory: boolean;
@@ -55,6 +56,7 @@ interface IProps {
 const ChannelCard = ({
     app,
     canManage,
+    canManageSecurity,
     isOwner,
     canDeleteChannel,
     canClearHistory,
@@ -265,7 +267,7 @@ const ChannelCard = ({
                 <MenuItem
                     className="regenerate-token"
                     onClick={() => action(fRegenerateToken)}
-                    disabled={!canManage}>
+                    disabled={!canManageSecurity}>
                     <ListItemIcon>
                         <Key fontSize="small" />
                     </ListItemIcon>
