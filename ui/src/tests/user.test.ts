@@ -134,13 +134,22 @@ describe('User', () => {
         }
         await page.waitForSelector($changepw.selector());
         await page.type($changepw.input('.newpass'), 'changed-pass-123');
+        const changeButton = $changepw.button('.change');
+        await page.waitForFunction(
+            (buttonSelector) => {
+                const button = document.querySelector(buttonSelector) as HTMLButtonElement | null;
+                return button !== null && !button.disabled;
+            },
+            {},
+            changeButton
+        );
         const [response] = await Promise.all([
             page.waitForResponse(
                 (candidate) =>
                     candidate.request().method() === 'POST' &&
                     candidate.url().endsWith('/current/user/password')
             ),
-            page.click($changepw.button('.change')),
+            page.click(changeButton),
         ]);
         expect(response.status()).toBe(200);
     });
