@@ -6,6 +6,16 @@
 
 All notable Gotify MU changes are documented here.
 
+## [1.0.1] - 2026-09-27
+
+Updater compatibility fix for installations running a preview or locally built master image.
+
+### Fixed
+
+- Allows an administrator to intentionally replace a preview/development build with the latest published release instead of permanently disabling the install button.
+- Removes the invalid comparison between the installed commit SHA and GitHub release `target_commitish`, which can be a branch name such as `master` rather than a commit SHA.
+- Requires an explicit confirmation before a preview-to-release transition while preserving the existing managed rollback and health-verification protections.
+
 ## [1.0.0] - 2026-09-26
 
 First stable Gotify MU release, promoting the completed multi-user platform and the final 1.0 interoperability work.
