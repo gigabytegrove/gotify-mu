@@ -37,10 +37,11 @@ import {ConnectionErrorBanner} from '../common/ConnectionErrorBanner';
 import {useStores} from '../stores';
 import {SnackbarProvider} from 'notistack';
 import LoadingSpinner from '../common/LoadingSpinner';
-import {createGotifyMuTheme, isThemeKey, ThemeKey} from './theme';
+import {createMonitaTheme, isThemeKey, ThemeKey} from './theme';
 import DefaultPage from '../common/DefaultPage';
 
-const localStorageThemeKey = 'gotify-theme';
+const localStorageThemeKey = 'monita-theme';
+const legacyThemeKey = 'gotify-theme';
 
 const Layout = observer(() => {
     const {
@@ -56,7 +57,9 @@ const Layout = observer(() => {
     } = useStores();
 
     const [currentTheme, setCurrentTheme] = React.useState<ThemeKey>(() => {
-        const stored = window.localStorage.getItem(localStorageThemeKey);
+        const stored =
+            window.localStorage.getItem(localStorageThemeKey) ??
+            window.localStorage.getItem(legacyThemeKey);
         return isThemeKey(stored) ? stored : 'system';
     });
     const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
@@ -68,6 +71,7 @@ const Layout = observer(() => {
     const setTheme = (next: ThemeKey) => {
         setCurrentTheme(next);
         localStorage.setItem(localStorageThemeKey, next);
+        localStorage.removeItem(legacyThemeKey);
     };
 
     const authed = (children: React.ReactNode) => (
