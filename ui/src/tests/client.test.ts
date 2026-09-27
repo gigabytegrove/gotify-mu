@@ -62,7 +62,7 @@ const createClient = (data: ClientFields) =>
     fillClientDialog('#create-client', '.create', data, true);
 
 const updateClient = (id: number, data: ClientFields) =>
-    fillClientDialog($table.cell(id, ClientCol.Edit, '.edit'), '.update', data, false);
+    fillClientDialog($table.cell(id, ClientCol.Actions, '.edit'), '.update', data, false);
 
 const $table = selector.table('#client-table');
 const $dialog = selector.form('#client-dialog');
@@ -113,7 +113,7 @@ describe('Client', () => {
         expect(await innerText(page, $table.cell(3, ClientCol.LastSeen))).toBeTruthy();
     });
     it('deletes client', async () => {
-        await page.click($table.cell(2, ClientCol.Delete, '.delete'));
+        await page.click($table.cell(2, ClientCol.Actions, '.delete'));
 
         await page.waitForSelector(selector.$confirmDialog.selector());
         await page.click(selector.$confirmDialog.button('.confirm'));
@@ -124,7 +124,7 @@ describe('Client', () => {
         expect(await count(page, $table.rows())).toBe(2);
     });
     it('deletes own client', async () => {
-        await page.click($table.cell(1, ClientCol.Delete, '.delete'));
+        await page.click($table.cell(1, ClientCol.Actions, '.delete'));
 
         // confirm delete
         await page.waitForSelector(selector.$confirmDialog.selector());
