@@ -11,6 +11,7 @@ import Download from '@mui/icons-material/Download';
 import NewReleases from '@mui/icons-material/NewReleases';
 import OpenInNew from '@mui/icons-material/OpenInNew';
 import SystemUpdateAlt from '@mui/icons-material/SystemUpdateAlt';
+import Refresh from '@mui/icons-material/Refresh';
 import {Link} from 'react-router';
 import SurfaceCard from '../common/SurfaceCard';
 import {useStores} from '../stores';
@@ -50,7 +51,7 @@ const releaseLabel = (release: PublishedRelease) => release.name || release.tag_
 const normalizeTag = (tag: string) => tag.replace(/^v/i, '');
 const activeUpdaterStates = new Set(['preparing', 'downloading', 'building', 'replacing', 'verifying']);
 
-export const useReleaseUpdate = (): ReleaseState => {
+export const useReleaseUpdate = (refreshKey = 0): ReleaseState => {
     const [state, setState] = React.useState<ReleaseState>({status: 'loading'});
     const currentVersion = config.get('version').version;
 
@@ -90,7 +91,7 @@ export const useReleaseUpdate = (): ReleaseState => {
 
         void check();
         return () => controller.abort();
-    }, [currentVersion]);
+    }, [currentVersion, refreshKey]);
 
     return state;
 };
@@ -226,7 +227,19 @@ export const UpdateStatusCard = () => {
         <SurfaceCard
             title="Software Update"
             subtitle="Install available updates here. If an update cannot be completed safely, the previous version is restored automatically."
-            action={<NewReleases color="action" />}>
+            action={
+                <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
+                    <Button
+                        size="small"
+                        variant="outlined"
+                        startIcon={<Refresh fontSize="small" />}
+                        disabled={state.status === 'loading'}
+                        onClick={() => setReleaseRefreshKey((value) => value + 1)}>
+                        Check for Updates
+                    </Button>
+                    <NewReleases color="action" />
+                </Stack>
+            }>
             {state.status === 'loading' && (
                 <Stack direction="row" spacing={1.25} sx={{alignItems: 'center'}}>
                     <CircularProgress size={20} />
