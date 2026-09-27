@@ -1,20 +1,22 @@
 <p align="center">
-  <img src="assets/gotify-mu-banner.png" alt="Gotify MU" width="800">
+  <img src="assets/monita-banner.svg" alt="Monita" width="800">
 </p>
 
-<h1 align="center">Gotify MU</h1>
+<h1 align="center">Monita</h1>
 
-<p align="center"><strong>Gotify-compatible push notifications with real multi-user channels.</strong></p>
+<p align="center"><strong>Notifications · Messaging · Automation</strong></p>
 
-Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
+Monita (formerly Gotify MU) is a self-hosted notifications, messaging, and automation platform built from the Gotify Server codebase. It preserves Gotify protocol and client compatibility while adding shared multi-user Channels, collaboration, integrations, automation, security controls, and operations tooling.
 
 > **Current release:** **v1.0.2**.
 
 ## Branding
 
-The canonical Gotify MU branding lives in [`assets/`](assets/README.md). The approved banner, logo, and icon are release-controlled assets and must not be regenerated, recolored, cropped differently, or silently replaced during normal development or release work.
+The canonical Monita brand system lives in [`assets/`](assets/README.md). During the transition, user-facing surfaces use **Monita (formerly Gotify MU)** where historical context is useful. Technical Gotify compatibility identifiers remain unchanged when renaming them would break existing clients or deployments.
 
-## Why Gotify MU?
+Approved brand palette: `#2563EB` Primary, `#3B82F6` Blue, `#06B6D4` Teal, `#0F172A` Slate, and `#94A3B8` Gray.
+
+## Why Monita?
 
 Upstream Gotify applications are owned by a single user. Gotify MU keeps that model for compatibility, but adds a membership layer so an application can function as a shared **Channel**.
 
@@ -42,7 +44,7 @@ Upstream Gotify applications are owned by a single user. Gotify MU keeps that mo
 
 ## Client compatibility
 
-Gotify MU is intentionally designed to remain compatible with normal Gotify clients.
+Monita is intentionally designed to remain compatible with normal Gotify clients.
 
 The official [Gotify Android app](https://github.com/gotify/android) can continue to connect using its normal client token and WebSocket stream. MU-specific fields are additive, so clients that do not understand them can ignore them.
 
@@ -50,7 +52,7 @@ The existing Gotify CLI and API integrations should continue to work against the
 
 ## Web UI
 
-Gotify MU includes a redesigned Web UI built around a consistent multi-user administration model instead of the inherited upstream Gotify screen layout.
+Monita includes a redesigned Web UI built around a consistent multi-user administration model instead of the inherited upstream Gotify screen layout.
 
 The Web UI uses **Channels** as the user-facing term and provides:
 
@@ -92,7 +94,7 @@ Administrators can install compatible Linux Go plugin binaries from **Plugins �
 
 Authentication and security controls including MFA, passkeys, LDAP/Active Directory, session policy, service accounts, encrypted stored secrets, and audit/security administration are implemented in the v0.5 preview. See [docs/SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md) for the current security status and trust boundaries.
 
-### Gotify MU channel-management API
+### Monita channel-management API
 
 The compatibility API remains unchanged, and MU adds these management endpoints:
 
@@ -245,7 +247,7 @@ docker ps --filter name=gotify-mu
 
 Docker Compose runs one persistent `gotify-mu` container. There is no always-running updater service.
 
-From **Settings → Software Update**, Gotify MU checks GitHub for the newest published release. An administrator can click **Update** to start the upgrade. The UI shows progress, the replacement container is health-checked, and the previous container is restored automatically if verification fails.
+From **Settings → Software Update**, Monita checks GitHub for the newest published release. An administrator can click **Update** to start the upgrade. The UI shows progress, the replacement container is health-checked, and the previous container is restored automatically if verification fails.
 
 During an update only, Gotify MU starts a short-lived `gotify-mu-update-worker` container from the currently installed image. It exists only long enough to perform the replacement and removes itself when finished. Persistent application data remains mounted at `/app/data`.
 
@@ -322,7 +324,7 @@ The `BUILD_JS=1` build argument is required for the Docker build to include the 
 
 ### Native development/test build
 
-You can also run Gotify MU without Docker:
+You can also run Monita without Docker:
 
 ```bash
 git clone https://github.com/gigabytegrove/gotify-mu.git
@@ -336,7 +338,7 @@ go build -o gotify-mu .
 
 For the current development or preview build, verify these behaviors before treating an installation as production-ready:
 
-1. The Gotify MU Web UI loads.
+1. The Monita Web UI loads.
 2. The administrator can sign in.
 3. Multiple users can be created.
 4. A Channel can be created.
@@ -394,18 +396,18 @@ The Go module remains `github.com/gotify/server/v3` for upstream/plugin compatib
 
 ## Upstream relationship
 
-Gotify MU is based on Gotify and retains substantial upstream code and compatibility. It is a separate fork maintained at:
+Monita is based on Gotify and retains substantial upstream code and compatibility. The transition repository is maintained at:
 
 https://github.com/gigabytegrove/gotify-mu
 
 For upstream Gotify documentation and ecosystem information, see [gotify.net](https://gotify.net/).
 
-Gotify MU is not presented as an official Gotify project.
+Monita is not presented as an official Gotify project.
 
 ## Contributing
 
-Issues and pull requests for Gotify MU should be opened in this repository. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Issues and pull requests for Monita should be opened in this repository. See [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## License
 
-Gotify MU remains licensed under the MIT License inherited from Gotify. See [LICENSE](LICENSE).
+Monita remains licensed under the MIT License inherited from Gotify. See [LICENSE](LICENSE).
