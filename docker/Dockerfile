@@ -3,12 +3,11 @@ ARG BUILDKIT_SBOM_SCAN_CONTEXT=true
 ARG GO_VERSION=PLEASE_PROVIDE_GO_VERSION
 ARG DEBIAN=sid-slim
 
-# Hack to normalize platform to match the chosed build image
-# Get the gotify/build image tag
+# Normalize the target platform to the upstream gotify/build image tag format.
 ARG __TARGETPLATFORM_DASHES=${TARGETPLATFORM/\//-}
 ARG __TARGETPLATFORM_GO_NOTATION=${__TARGETPLATFORM_DASHES/arm\/v7/arm-7}
 
-# --- JS Builder ---
+# --- Web UI builder ---
 
 FROM --platform=${BUILDPLATFORM} node:24 AS js-builder
 
@@ -19,19 +18,19 @@ COPY ./ui /src/gotify/ui
 
 RUN if [ "$BUILD_JS" = "1" ]; then \
     (cd /src/gotify/ui && yarn install) && \
-    (cd /src/gotify && make build-js) \
+    (cd /src/gotify && make build-js); \
     else \
     mkdir -p /src/gotify/ui/build; \
     fi
 
-# --- Go Builder ---
+# --- Gotify MU application builder ---
 
 FROM --platform=${BUILDPLATFORM} gotify/build:${GO_VERSION}-${__TARGETPLATFORM_GO_NOTATION} AS builder
 
 ARG BUILDPLATFORM
 ARG TARGETPLATFORM
 ARG BUILD_JS=0
-ARG RUN_TESTS=0 # 0=never, 1=native only
+ARG RUN_TESTS=0
 ARG GOTIFY_MU_VERSION=master-local
 ARG GOTIFY_MU_COMMIT=local
 ARG GOTIFY_MU_BUILD_DATE=local
@@ -59,6 +58,23 @@ RUN cd /src/gotify && \
     fi && \
     LD_FLAGS="$EFFECTIVE_LD_FLAGS" make OUTPUT=/target/app/gotify-app _build_within_docker
 
+# --- Internal one-shot update worker ---
+
+FROM --platform=${BUILDPLATFORM} golang:1.26-alpine AS updater-builder
+
+WORKDIR /src/updater
+COPY updater/go.mod ./
+COPY updater/main.go ./
+COPY updater/main_test.go ./
+RUN go test ./... && \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/gotify-mu-updater .
+
+# The running Gotify MU container uses the Docker client only to launch the
+# short-lived update worker and replace itself. No Docker daemon runs here.
+FROM docker:cli AS docker-cli
+
+# --- Runtime ---
+
 FROM debian:${DEBIAN}
 
 ARG GOTIFY_MU_VERSION=master-local
@@ -72,7 +88,6 @@ LABEL org.opencontainers.image.version=${GOTIFY_MU_VERSION}
 LABEL org.opencontainers.image.revision=${GOTIFY_MU_COMMIT}
 LABEL org.opencontainers.image.licenses="MIT"
 
-# Build-time configurables
 ARG GOTIFY_SERVER_EXPOSE=80
 ENV GOTIFY_SERVER_PORT=$GOTIFY_SERVER_EXPOSE
 
@@ -88,6 +103,9 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD curl --fail http:/
 EXPOSE $GOTIFY_SERVER_EXPOSE
 
 COPY --from=builder /target /
+COPY --from=updater-builder /out/gotify-mu-updater /usr/local/bin/gotify-mu-updater
+COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/ /usr/local/libexec/docker/cli-plugins/
 
 ENTRYPOINT ["./gotify-app"]
 CMD ["serve"]
