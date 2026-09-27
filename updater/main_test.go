@@ -155,33 +155,33 @@ func TestUpdateProgressIsMonotonicTracksActivityAndPersistsStatus(t *testing.T) 
 	}
 }
 
-func TestBuildProgressUsesUserFacingStages(t *testing.T) {
+func TestPullProgressUsesUserFacingStages(t *testing.T) {
 	manager := &manager{}
 	started := time.Now().UTC()
 	manager.beginUpdate("1.0.2", started)
 
-	manager.handleBuildProgress("#7 [js-builder 4/4] RUN make build-js")
+	manager.handlePullProgress("1.0.2: Pulling from gigabytegrove/gotify-mu")
 	status := manager.snapshot()
-	if status.Step != "Preparing interface" || status.Progress < 47 {
-		t.Fatalf("unexpected web build status: %#v", status)
+	if status.Step != "Downloading update" || status.Progress < 20 {
+		t.Fatalf("unexpected pull start status: %#v", status)
 	}
 
-	manager.handleBuildProgress("#11 [builder 6/6] RUN make")
+	manager.handlePullProgress("abcd1234: Downloading")
 	status = manager.snapshot()
-	if status.Step != "Preparing application" || status.Progress < 62 {
-		t.Fatalf("unexpected server build status: %#v", status)
+	if status.Step != "Downloading update" || status.Progress < 35 {
+		t.Fatalf("unexpected download status: %#v", status)
 	}
 
-	manager.handleBuildProgress("#19 [stage-5 4/8] COPY --from=updater-builder /out/gotify-mu-updater /usr/local/bin/gotify-mu-updater")
+	manager.handlePullProgress("abcd1234: Extracting")
 	status = manager.snapshot()
-	if status.Step != "Assembling update" || status.Progress < 73 {
-		t.Fatalf("unexpected assembly status: %#v", status)
+	if status.Step != "Preparing update" || status.Progress < 55 {
+		t.Fatalf("unexpected extraction status: %#v", status)
 	}
 
-	manager.handleBuildProgress("#22 exporting to image")
+	manager.handlePullProgress("Digest: sha256:abc")
 	status = manager.snapshot()
-	if status.Step != "Finalizing update files" || status.Progress < 78 {
-		t.Fatalf("unexpected final build status: %#v", status)
+	if status.Step != "Download complete" || status.Progress < 70 {
+		t.Fatalf("unexpected pull completion status: %#v", status)
 	}
 }
 
