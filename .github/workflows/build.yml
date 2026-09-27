@@ -135,6 +135,24 @@ jobs:
         with:
           subject-path: 'build/*'
 
+      - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
+        name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
+      - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
+        name: Set up QEMU
+        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
+      - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - if: steps.release.outputs.release == 'true'
+        name: Publish release container
+        run: |
+          make VERSION="${{ steps.release.outputs.version }}" DOCKER_BUILD_PUSH=true build-docker
+
       - if: steps.release.outputs.release == 'true'
         name: Ensure release tag points to this commit
         shell: bash
@@ -203,24 +221,6 @@ jobs:
               gh release upload "${TAG}" "${ASSET}" --repo "${GITHUB_REPOSITORY}"
             fi
           done
-
-      - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
-        name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4
-      - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
-        name: Set up QEMU
-        uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4
-      - if: steps.release.outputs.release == 'true' || startsWith(github.ref, 'refs/heads/master')
-        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ github.token }}
-
-      - if: steps.release.outputs.release == 'true'
-        name: Publish release container
-        run: |
-          make VERSION="${{ steps.release.outputs.version }}" DOCKER_BUILD_PUSH=true build-docker
 
       - if: startsWith(github.ref, 'refs/heads/master')
         name: Publish master container
