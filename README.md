@@ -65,7 +65,7 @@ The Web UI uses **Channels** as the user-facing term and provides:
 - Standardized light, dark, and system themes
 - Responsive desktop and mobile-web navigation
 - Consistent dialogs, tables, cards, status indicators, and destructive-action language
-- Administrator update discovery with Dashboard notices, direct release downloads, and managed in-app installation from Settings
+- Administrator update discovery with Dashboard notices and managed in-app installation from Settings
 - Native Integrations administration for Webhooks, MQTT, and Home Assistant
 - Native Automation administration for Scheduled Notifications and Escalations
 - Per-user Quiet Hours and Digest preferences
@@ -175,13 +175,9 @@ At minimum, change:
 
 ```text
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
-GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
 
-Generate `GOTIFY_MU_UPDATER_TOKEN` with `openssl rand -hex 32`.
-
-The included `docker-compose.yml` starts both Gotify MU and the private updater helper. The helper has no published host port and communicates with the application over the `gotify-mu-system` Docker network.
-
+The included `docker-compose.yml` starts exactly one persistent service: `gotify-mu`. The Docker socket is mounted into that trusted container so administrator-requested in-app updates can replace the application container safely.
 
 Example `.env`:
 
@@ -191,7 +187,6 @@ GOTIFY_MU_COMMIT=local
 GOTIFY_MU_PORT=8080
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
-GOTIFY_MU_UPDATER_TOKEN=CHANGE-THIS-TO-A-RANDOM-64-HEX-TOKEN
 ```
 
 Then build and start Gotify MU:
@@ -248,19 +243,13 @@ docker ps --filter name=gotify-mu
 
 ### Managed in-app updates
 
-Docker installations can enable the Gotify MU updater helper for one-click release installation from **Settings → Software Update**.
+**Settings → Software Update** checks GitHub for the newest published Gotify MU release. An administrator can click **Install** and watch the current stage and progress percentage while the server updates itself.
 
-The helper runs on a private Docker network with no published host port. It requires a random shared token and access to the Docker socket so it can preserve the current runtime configuration, replace the Gotify MU application container, verify health, and automatically restore the previous container if the replacement fails.
+There is no permanent updater sidecar. The normal deployment has one persistent container, `gotify-mu`. During an active update only, the application starts a short-lived worker from the same Gotify MU image. The worker verifies the published source checksum, builds the replacement, preserves the current runtime configuration and application data, verifies health, restores the previous container on failure, and exits.
 
-Generate the shared token with:
+The update worker writes progress under `/app/data`, so the UI can continue the update state across the application container restart.
 
-```bash
-openssl rand -hex 32
-```
-
-Store it as `GOTIFY_MU_UPDATER_TOKEN` in the local `.env`. Never commit that token.
-
-Docker socket access is privileged host access. If managed self-updating is not desired, omit the updater helper and continue to use the manual update procedure.
+The recommended Compose file mounts `/var/run/docker.sock` into Gotify MU for this purpose. Docker socket access is privileged host access; only use managed self-updating on a trusted Gotify MU installation.
 
 ### Updating a development installation
 
