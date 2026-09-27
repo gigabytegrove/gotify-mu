@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+</p>
+
 # Gotify MU Security Status
 
 This document tracks the security controls implemented in Gotify MU 1.0 and the remaining architectural boundaries administrators should understand.
