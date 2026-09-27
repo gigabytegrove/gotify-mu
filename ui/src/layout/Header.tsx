@@ -72,16 +72,16 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                     }}>
                     <Box
                         component="img"
-                        src={config.get('url') + 'static/gotify-mu-icon.png'}
-                        alt="Gotify MU"
+                        src={config.get('url') + 'static/monita-icon.png'}
+                        alt="Monita"
                         sx={{width: 34, height: 34, objectFit: 'contain'}}
                     />
                     <Box sx={{display: {xs: 'none', sm: 'block'}}}>
                         <Typography variant="h6" sx={{fontSize: '1rem', lineHeight: 1.1}}>
-                            Gotify MU
+                            Monita
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                            Multi-user notifications
+                            formerly Gotify MU
                         </Typography>
                     </Box>
                 </Box>
