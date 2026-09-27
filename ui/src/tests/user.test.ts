@@ -134,8 +134,15 @@ describe('User', () => {
         }
         await page.waitForSelector($changepw.selector());
         await page.type($changepw.input('.newpass'), 'changed-pass-123');
-        await page.click($changepw.button('.change'));
-        await waitForExists(page, '#notistack-snackbar', 'Password changed');
+        const [response] = await Promise.all([
+            page.waitForResponse(
+                (candidate) =>
+                    candidate.request().method() === 'POST' &&
+                    candidate.url().endsWith('/current/user/password')
+            ),
+            page.click($changepw.button('.change')),
+        ]);
+        expect(response.status()).toBe(200);
     });
     it('does logout', async () => await auth.logout(page));
     it('can login with new password (admin)', async () =>
