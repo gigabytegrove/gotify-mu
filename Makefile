@@ -77,7 +77,7 @@ build-docker-multiarch: require-version
 		--build-arg RUN_TESTS=$(DOCKER_TEST_LEVEL) \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg LD_FLAGS="$$LD_FLAGS" \
-		--platform linux/amd64,linux/arm64,linux/386,linux/arm/v7,linux/riscv64 \
+		--platform linux/amd64,linux/arm64 \
 		-f docker/Dockerfile .
 
 build-docker-multiarch-master:
@@ -90,7 +90,7 @@ build-docker-multiarch-master:
 		--build-arg RUN_TESTS=$(DOCKER_TEST_LEVEL) \
 		--build-arg GO_VERSION=$(GO_VERSION) \
 		--build-arg LD_FLAGS="-w -s -X main.Version=master-$(shell git rev-parse --short HEAD) -X main.BuildDate=$(shell date "+%F-%T") -X main.Commit=$(shell git rev-parse --verify HEAD) -X main.Mode=prod" \
-		--platform linux/amd64,linux/arm64,linux/386,linux/arm/v7,linux/riscv64 \
+		--platform linux/amd64,linux/arm64 \
 		-f docker/Dockerfile .
 build-docker: build-docker-multiarch
 

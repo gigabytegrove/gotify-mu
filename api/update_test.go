@@ -84,7 +84,7 @@ func TestUpdateAPIStartsTransientWorker(t *testing.T) {
 		TargetContainer: "monita",
 		WorkerName:      "monita-update-worker",
 		StatusFile:      filepath.Join(dir, "status.json"),
-		Repository:      "gigabytegrove/gotify-mu",
+		Repository:      "gigabytegrove/monita",
 		RunDocker:       runner,
 	}
 

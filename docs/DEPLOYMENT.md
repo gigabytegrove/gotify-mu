@@ -8,7 +8,7 @@ This guide covers a normal Monita installation, updates, backups, and basic trou
 
 ## Recommended installation
 
-Docker Compose is the recommended way to run Monita.
+Docker Compose is the recommended way to run Monita. The standard deployment downloads the published Monita image from GitHub Container Registry, so the server does not need to compile the Web UI or Go application.
 
 ### Requirements
 
@@ -39,7 +39,8 @@ GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
 Then start Monita:
 
 ```bash
-docker compose up -d --build
+docker compose pull
+docker compose up -d
 ```
 
 Open:
@@ -78,6 +79,8 @@ Keep this directory when rebuilding, moving, or updating Monita.
 
 ## Updating
 
+Normal updates use published Monita images. Building from source is not part of the standard update path.
+
 ### In the Web UI
 
 Go to:
@@ -91,7 +94,7 @@ Monita checks for published releases and can install supported updates from the 
 ```bash
 cd /opt/monita
 git pull --ff-only origin master
-docker compose build
+docker compose pull
 docker compose up -d
 ```
 
@@ -192,6 +195,16 @@ Check the Software Update page and container logs. Your existing persistent data
 ### Data appears missing
 
 Confirm that the same persistent data directory is still mounted into the container.
+
+## Local source builds
+
+Normal installations should use the published container image. Building from source is intended for development or troubleshooting.
+
+To build locally with Compose:
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
 
 ## Manual Docker deployment
 

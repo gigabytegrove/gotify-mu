@@ -323,13 +323,6 @@ func (m *manager) installHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *manager) performInstall(version string, started time.Time) {
-	tempDir, err := os.MkdirTemp("", "monita-update-*")
-	if err != nil {
-		m.fail(version, started, "The update could not be prepared.", err)
-		return
-	}
-	defer os.RemoveAll(tempDir)
-
 	m.updateProgress("preparing", "Checking release", "Checking release", 5)
 	commit, err := m.resolveCommit(version)
 	if err != nil {
@@ -337,44 +330,10 @@ func (m *manager) performInstall(version string, started time.Time) {
 		return
 	}
 
-	sourceURL, checksumURL, sourceName, err := m.resolveReleaseAssets(version)
-	if err != nil {
-		m.fail(version, started, "The release package could not be verified.", err)
-		return
-	}
-	archivePath := filepath.Join(tempDir, sourceName)
-	checksumPath := filepath.Join(tempDir, "SHA256SUMS")
-	m.updateProgress("downloading", "Downloading update", "Downloading update", 10)
-	if err := m.downloadFile(sourceURL, archivePath, 10, 22); err != nil {
-		m.fail(version, started, "The update could not be downloaded.", err)
-		return
-	}
-	if err := m.downloadFile(checksumURL, checksumPath, 22, 24); err != nil {
-		m.fail(version, started, "The release checksum could not be downloaded.", err)
-		return
-	}
-	if err := verifyReleaseChecksum(archivePath, checksumPath, sourceName); err != nil {
-		m.fail(version, started, "The downloaded update failed integrity verification.", err)
-		return
-	}
-
-	m.updateProgress("preparing", "Preparing update files", "Preparing update files", 27)
-	sourceDir := filepath.Join(tempDir, "source")
-	if err := unzip(archivePath, sourceDir); err != nil {
-		m.fail(version, started, "The update files could not be prepared.", err)
-		return
-	}
-	root, err := singleDirectory(sourceDir)
-	if err != nil {
-		m.fail(version, started, "The update files could not be prepared.", err)
-		return
-	}
-
-	m.updateProgress("building", "Installing update", "Installing update", 30)
-	image := "monita:release-" + version
-	buildDate := time.Now().UTC().Format(time.RFC3339)
-	if err := m.buildRelease(root, image, version, commit, buildDate); err != nil {
-		m.fail(version, started, "The update could not be installed.", err)
+	image := "ghcr.io/gigabytegrove/monita:" + version
+	m.updateProgress("downloading", "Downloading update", "Downloading update", 12)
+	if err := m.pullReleaseImage(image, version, commit); err != nil {
+		m.fail(version, started, "The update image could not be downloaded or verified.", err)
 		return
 	}
 
@@ -385,6 +344,40 @@ func (m *manager) performInstall(version string, started time.Time) {
 
 	finished := time.Now().UTC()
 	m.finishUpdate("completed", "Update complete", "Update installed successfully", 100, finished)
+}
+
+func (m *manager) pullReleaseImage(image, version, commit string) error {
+	if _, err := runDocker("pull", image); err != nil {
+		return err
+	}
+	m.updateProgress("downloading", "Verifying update", "Verifying update", 76)
+
+	actualVersion, err := runDocker(
+		"image", "inspect",
+		"--format", "{{index .Config.Labels \"org.opencontainers.image.version\"}}",
+		image,
+	)
+	if err != nil {
+		return fmt.Errorf("could not inspect downloaded image: %w", err)
+	}
+	if strings.TrimSpace(actualVersion) != version {
+		return fmt.Errorf("downloaded image version mismatch: expected %s, got %s", version, strings.TrimSpace(actualVersion))
+	}
+
+	actualCommit, err := runDocker(
+		"image", "inspect",
+		"--format", "{{index .Config.Labels \"org.opencontainers.image.revision\"}}",
+		image,
+	)
+	if err != nil {
+		return fmt.Errorf("could not inspect downloaded image revision: %w", err)
+	}
+	if strings.TrimSpace(actualCommit) != commit {
+		return fmt.Errorf("downloaded image revision mismatch")
+	}
+
+	m.updateProgress("downloading", "Update ready", "Update ready", 80)
+	return nil
 }
 
 func (m *manager) resolveReleaseAssets(version string) (string, string, string, error) {
@@ -578,6 +571,9 @@ func createArgs(name, image string, inspected *inspectedContainer) []string {
 		args = append(args, "--env", env)
 	}
 	for key, value := range inspected.Config.Labels {
+		if strings.HasPrefix(key, "org.opencontainers.image.") {
+			continue
+		}
 		args = append(args, "--label", key+"="+value)
 	}
 	if inspected.Config.Hostname != "" {
