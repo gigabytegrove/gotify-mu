@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+</p>
+
 # Changelog
 
 All notable Gotify MU changes are documented here.
