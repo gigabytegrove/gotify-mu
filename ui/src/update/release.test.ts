@@ -1,5 +1,11 @@
 import {describe, expect, it} from 'vitest';
-import {classifyUpdate, compareVersions, latestPublishedRelease, parseVersion} from './release';
+import {
+    canInstallPublishedRelease,
+    classifyUpdate,
+    compareVersions,
+    latestPublishedRelease,
+    parseVersion,
+} from './release';
 
 describe('release update helpers', () => {
     it('parses release versions with or without v prefix', () => {
@@ -23,6 +29,13 @@ describe('release update helpers', () => {
         expect(classifyUpdate('0.2.0', '0.2.0')).toBe('current');
         expect(classifyUpdate('0.3.0', '0.2.0')).toBe('newer');
         expect(classifyUpdate('master-local', '0.2.0')).toBe('development');
+    });
+
+    it('allows an explicit published-release install from preview builds', () => {
+        expect(canInstallPublishedRelease('available')).toBe(true);
+        expect(canInstallPublishedRelease('development')).toBe(true);
+        expect(canInstallPublishedRelease('current')).toBe(false);
+        expect(canInstallPublishedRelease('newer')).toBe(false);
     });
 
     it('includes prereleases while ignoring drafts', () => {
