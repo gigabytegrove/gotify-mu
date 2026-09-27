@@ -1,15 +1,14 @@
-# Monita brand transition
+# Monita Branding
 
-Monita is the new product identity for Gotify MU.
+Monita is the product name for the project formerly known as Gotify MU.
 
-## User-facing identity
+## Brand
 
-- Product: **Monita**
-- Transition reference: **Monita (formerly Gotify MU)**
-- Brand essence: **Notifications · Messaging · Automation**
-- Brand statement: **Monita is a self-hosted notifications, messaging, and automation communication platform for teams and systems.**
+**Monita**
 
-## Color system
+**Notifications · Messaging · Automation**
+
+## Colors
 
 | Role | Color |
 | --- | --- |
@@ -19,26 +18,16 @@ Monita is the new product identity for Gotify MU.
 | Slate | `#0F172A` |
 | Gray | `#94A3B8` |
 
-The approved Monita mark, app icon, horizontal logo, palette, and brand essence are derived from the supplied canonical brand sheet.
+## Assets
 
-## Compatibility policy
+Official brand assets are stored in the repository `assets/` directory.
 
-The rebrand must not break existing Gotify-compatible clients or existing Monita/Gotify MU installations.
+Use the supplied Monita logo and icon files without changing their proportions, colors, or layout.
 
-The following are compatibility identifiers and are **not** renamed merely for visual branding:
+## Naming
 
-- Gotify REST compatibility routes such as `/application`, `/message`, and `/stream`
-- the Go module path `github.com/gotify/server/v3`
-- existing upstream-compatible `GOTIFY_*` configuration variables
-- persisted database structures and existing tokens
-- existing repository/container identifiers until a separately planned migration provides compatibility aliases
+Use **Monita** for current product-facing text.
 
-Existing Gotify-MU-specific `GOTIFY_MU_*` configuration may gain `MONITA_*` aliases in a later migration, but existing deployments must continue to work without mandatory configuration rewrites.
+The phrase **formerly Gotify MU** may be used where historical context is useful during the transition.
 
-## Transition rules
-
-1. New user-facing product surfaces say **Monita**.
-2. During the transition, documentation and release metadata may use **Monita (formerly Gotify MU)**.
-3. Historical release notes retain their original Gotify MU terminology.
-4. New release branding uses Monita assets and the Monita palette.
-5. Compatibility identifiers are changed only with an explicit migration and backward-compatible aliases.
+Gotify may still appear in compatibility documentation where it refers to the Gotify protocol, upstream project, or supported Gotify clients.
