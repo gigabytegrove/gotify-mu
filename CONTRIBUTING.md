@@ -1,12 +1,12 @@
 <p align="center">
-  <img src="assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+  <img src="assets/monita-banner.png" alt="Monita" width="720">
 </p>
 
-# Contributing to Gotify MU
+# Contributing to Monita
 
-Thanks for your interest in Gotify MU.
+Thanks for your interest in Monita.
 
-Gotify MU is a compatibility-focused fork of [Gotify Server](https://github.com/gotify/server) that adds real multi-user notification channels.
+Monita is a compatibility-focused fork of [Gotify Server](https://github.com/gotify/server) that adds real multi-user notification channels.
 
 ## Where to contribute
 
@@ -62,4 +62,4 @@ yarn build
 
 ## Upstream credit
 
-Gotify MU is derived from Gotify and remains under the MIT License. Keep applicable upstream copyright and license notices intact.
+Monita is derived from Gotify and remains under the MIT License. Keep applicable upstream copyright and license notices intact.

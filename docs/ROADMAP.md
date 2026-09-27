@@ -1,10 +1,10 @@
 <p align="center">
-  <img src="../assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+  <img src="../assets/monita-banner.png" alt="Monita" width="720">
 </p>
 
-# Gotify MU Product Roadmap
+# Monita Product Roadmap
 
-Gotify MU keeps Gotify REST/WebSocket and token compatibility where practical while extending the server into a multi-user notification and operations platform.
+Monita keeps Gotify REST/WebSocket and token compatibility where practical while extending the server into a multi-user notification and operations platform.
 
 ## v0.5 platform
 
@@ -122,7 +122,7 @@ The following capabilities are implemented in the v0.5 preview branch.
 - Syslog Receiver
 - Calendar / iCal
 
-These are native first-party connectors rather than optional third-party plugins because they are supported as part of the Gotify MU server.
+These are native first-party connectors rather than optional third-party plugins because they are supported as part of the Monita server.
 
 ### Plugin platform
 
@@ -135,7 +135,7 @@ These are native first-party connectors rather than optional third-party plugins
 - catalog install/update
 - verified manual update staging
 - uninstall
-- plugin-created messages routed through Gotify MU delivery policy
+- plugin-created messages routed through Monita delivery policy
 
 Native Go plugins remain trusted in-process extensions. They are not a sandbox boundary.
 
@@ -179,11 +179,11 @@ Potential later work:
 - larger-scale performance tuning based on measured installations
 - additional first-party connectors only when there is a demonstrated need
 
-## Gotify MU Android
+## Monita Android
 
 A dedicated Android client remains a separate client project. The server preserves normal official Gotify Android receive/display compatibility.
 
-A Gotify MU Android client can later expose MU-specific features such as:
+A Monita Android client can later expose MU-specific features such as:
 
 - Channel management
 - compose/send
@@ -196,4 +196,4 @@ A Gotify MU Android client can later expose MU-specific features such as:
 - account security/MFA
 - multiple-server support
 
-The Android client should continue using compatible Gotify REST/WebSocket behavior for existing functions and layer Gotify MU endpoints on top.
+The Android client should continue using compatible Gotify REST/WebSocket behavior for existing functions and layer Monita endpoints on top.

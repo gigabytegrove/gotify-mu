@@ -6,16 +6,30 @@
 
 All notable Monita changes are documented here. Historical entries retain the Gotify MU name used at the time of release.
 
-## Unreleased — Monita transition
+## [1.1.0] - 2026-09-27
+
+Monita brand launch and deployment identity release.
 
 ### Branding
 
-- Begins the product transition from **Gotify MU** to **Monita**.
-- Applies the approved Monita logo system and brand palette: Primary `#2563EB`, Blue `#3B82F6`, Teal `#06B6D4`, Slate `#0F172A`, and Gray `#94A3B8`.
-- Updates the Web UI, PWA/browser metadata, container metadata, README, and release presentation to Monita.
-- Uses **Monita (formerly Gotify MU)** where transition context is useful.
-- Preserves Gotify protocol routes, Go module identity, existing `GOTIFY_*` configuration, database structures, tokens, and other compatibility identifiers.
-- New release artifacts use Monita naming while the updater continues accepting legacy Gotify MU release package names.
+- Renames the active product from Gotify MU to **Monita** across the Web UI, PWA/browser metadata, documentation, release presentation, container metadata, deployment examples, build artifacts, and managed update experience.
+- Applies the approved Monita brand system: Primary `#2563EB`, Blue `#3B82F6`, Teal `#06B6D4`, Slate `#0F172A`, and Gray `#94A3B8`.
+- Uses the approved Monita mark, app icon, horizontal logo, and Notifications · Messaging · Automation positioning.
+- Keeps Gotify protocol compatibility only where required for existing clients and integrations.
+
+### Deployment
+
+- Renames the Compose service, persistent container, local image, and Docker network to `monita`, `monita`, `monita:master`, and `monita-system`.
+- Renames the transient managed update worker to `monita-update-worker`.
+- Introduces `MONITA_*` deployment variables for new installations while retaining compatibility aliases in application code for older `GOTIFY_MU_*` updater settings.
+- Publishes new GHCR images under `ghcr.io/gigabytegrove/monita`.
+- Renames native build artifacts from `gotify-mu-*` to `monita-*`.
+- Keeps the existing persistent `/app/data` data layout so the rebrand does not reset users, Channels, messages, tokens, or configuration.
+
+### Updates
+
+- Managed releases use Monita source package names and continue accepting legacy Gotify MU source package names during migration.
+- The in-app updater remains a single-container deployment at rest and uses only a short-lived worker while an update is being applied.
 
 ## [1.0.2] - 2026-09-27
 

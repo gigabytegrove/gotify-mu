@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Gotify MU is currently in active development. Security fixes target the latest release and the current `master` branch.
+Monita is currently in active development. Security fixes target the latest release and the current `master` branch.
 
 ## Reporting a Vulnerability
 

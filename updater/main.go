@@ -23,8 +23,8 @@ import (
 const (
 	defaultListen     = ":8099"
 	defaultRepository = "gigabytegrove/gotify-mu"
-	defaultTarget     = "gotify-mu"
-	defaultStatusFile = "/app/data/.gotify-mu-update-status.json"
+	defaultTarget     = "monita"
+	defaultStatusFile = "/app/data/.monita-update-status.json"
 )
 
 var versionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
@@ -136,17 +136,26 @@ type manager struct {
 	statusFile string
 }
 
+func firstEnv(keys ...string) string {
+	for _, key := range keys {
+		if value := strings.TrimSpace(os.Getenv(key)); value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
 func newManager() *manager {
-	token := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATER_TOKEN"))
-	repository := strings.TrimSpace(os.Getenv("GOTIFY_MU_REPOSITORY"))
+	token := firstEnv("MONITA_UPDATER_TOKEN", "GOTIFY_MU_UPDATER_TOKEN")
+	repository := firstEnv("MONITA_REPOSITORY", "GOTIFY_MU_REPOSITORY")
 	if repository == "" {
 		repository = defaultRepository
 	}
-	target := strings.TrimSpace(os.Getenv("GOTIFY_MU_TARGET_CONTAINER"))
+	target := firstEnv("MONITA_TARGET_CONTAINER", "GOTIFY_MU_TARGET_CONTAINER")
 	if target == "" {
 		target = defaultTarget
 	}
-	statusFile := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATE_STATUS_FILE"))
+	statusFile := firstEnv("MONITA_UPDATE_STATUS_FILE", "GOTIFY_MU_UPDATE_STATUS_FILE")
 	if statusFile == "" {
 		statusFile = defaultStatusFile
 	}
@@ -314,7 +323,7 @@ func (m *manager) installHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (m *manager) performInstall(version string, started time.Time) {
-	tempDir, err := os.MkdirTemp("", "gotify-mu-update-*")
+	tempDir, err := os.MkdirTemp("", "monita-update-*")
 	if err != nil {
 		m.fail(version, started, "The update could not be prepared.", err)
 		return
@@ -362,7 +371,7 @@ func (m *manager) performInstall(version string, started time.Time) {
 	}
 
 	m.updateProgress("building", "Installing update", "Installing update", 30)
-	image := "gotify-mu:release-" + version
+	image := "monita:release-" + version
 	buildDate := time.Now().UTC().Format(time.RFC3339)
 	if err := m.buildRelease(root, image, version, commit, buildDate); err != nil {
 		m.fail(version, started, "The update could not be installed.", err)
@@ -383,7 +392,7 @@ func (m *manager) resolveReleaseAssets(version string) (string, string, string, 
 	request, err := http.NewRequest(http.MethodGet, endpoint, nil)
 	if err != nil { return "", "", "", err }
 	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "gotify-mu-updater")
+	request.Header.Set("User-Agent", "monita-updater")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil { return "", "", "", err }
 	defer response.Body.Close()
@@ -454,7 +463,7 @@ func (m *manager) resolveCommit(version string) (string, error) {
 		return "", err
 	}
 	request.Header.Set("Accept", "application/vnd.github+json")
-	request.Header.Set("User-Agent", "gotify-mu-updater")
+	request.Header.Set("User-Agent", "monita-updater")
 
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
@@ -766,7 +775,7 @@ func (m *manager) downloadFile(url, path string, startProgress, endProgress int)
 	if err != nil {
 		return err
 	}
-	request.Header.Set("User-Agent", "gotify-mu-updater")
+	request.Header.Set("User-Agent", "monita-updater")
 	response, err := http.DefaultClient.Do(request)
 	if err != nil {
 		return err
@@ -910,9 +919,9 @@ func (m *manager) buildRelease(root, image, version, commit, buildDate string) e
 		"--build-arg", "BUILD_JS=1",
 		"--build-arg", "RUN_TESTS=1",
 		"--build-arg", "GO_VERSION=1.26.0",
-		"--build-arg", "GOTIFY_MU_VERSION="+version,
-		"--build-arg", "GOTIFY_MU_COMMIT="+commit,
-		"--build-arg", "GOTIFY_MU_BUILD_DATE="+buildDate,
+		"--build-arg", "MONITA_VERSION="+version,
+		"--build-arg", "MONITA_COMMIT="+commit,
+		"--build-arg", "MONITA_BUILD_DATE="+buildDate,
 		"-f", filepath.Join(root, "docker", "Dockerfile"),
 		"-t", image,
 		root,
@@ -958,7 +967,7 @@ func main() {
 
 	if len(os.Args) >= 2 && os.Args[1] == "install" {
 		if len(os.Args) != 3 {
-			log.Fatal("usage: gotify-mu-updater install <x.y.z>")
+			log.Fatal("usage: monita-updater install <x.y.z>")
 		}
 		version := strings.TrimSpace(strings.TrimPrefix(os.Args[2], "v"))
 		if !versionPattern.MatchString(version) {
@@ -977,8 +986,8 @@ func main() {
 	}
 
 	// Legacy HTTP mode remains available for compatibility with older deployments.
-	// Current Gotify MU releases launch this binary only as a short-lived worker.
-	listen := strings.TrimSpace(os.Getenv("GOTIFY_MU_UPDATER_LISTEN"))
+	// Current Monita releases launch this binary only as a short-lived worker.
+	listen := firstEnv("MONITA_UPDATER_LISTEN", "GOTIFY_MU_UPDATER_LISTEN")
 	if listen == "" {
 		listen = defaultListen
 	}
@@ -996,7 +1005,7 @@ func main() {
 		IdleTimeout:       60 * time.Second,
 	}
 
-	log.Printf("Gotify MU updater compatibility service listening on %s for container %s", listen, manager.target)
+	log.Printf("Monita updater compatibility service listening on %s for container %s", listen, manager.target)
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Fatal(err)
 	}

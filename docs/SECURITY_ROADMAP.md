@@ -1,21 +1,21 @@
 <p align="center">
-  <img src="../assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+  <img src="../assets/monita-banner.png" alt="Monita" width="720">
 </p>
 
-# Gotify MU Security Status
+# Monita Security Status
 
-This document tracks the security controls implemented in Gotify MU 1.0 and the remaining architectural boundaries administrators should understand.
+This document tracks the security controls implemented in Monita 1.0 and the remaining architectural boundaries administrators should understand.
 
 ## Authentication providers
 
-Gotify MU supports:
+Monita supports:
 
 - local username/password authentication
 - OIDC
 - LDAP / Active Directory
 - Gotify client tokens
 - Gotify application tokens
-- scoped Gotify MU service-account credentials
+- scoped Monita service-account credentials
 
 Authentication providers can coexist during migration.
 
@@ -71,14 +71,14 @@ Session cookies are HttpOnly and SameSite=Strict. Deployments served over HTTPS 
 
 ## Stored secrets
 
-Protected Gotify MU secrets are encrypted at rest using AES-GCM with a persistent 32-byte server key.
+Protected Monita secrets are encrypted at rest using AES-GCM with a persistent 32-byte server key.
 
 The key can be supplied by:
 
 - `GOTIFY_MU_SECRET_KEY`
 - `GOTIFY_MU_SECRET_KEY_FILE`
 
-If neither is supplied, Gotify MU creates a private key file in persistent data with mode 0600.
+If neither is supplied, Monita creates a private key file in persistent data with mode 0600.
 
 The encryption key must be included in disaster-recovery planning. A database backup containing encrypted values is not sufficient by itself if the corresponding encryption key is lost.
 
@@ -113,7 +113,7 @@ Inbound Webhooks can use:
 
 ## Plugin trust boundary
 
-Native Gotify-compatible Go plugins execute inside the Gotify MU process. They must therefore be treated as trusted server code.
+Native Gotify-compatible Go plugins execute inside the Monita process. They must therefore be treated as trusted server code.
 
 v1.0 reduces plugin supply-chain risk through:
 
@@ -166,7 +166,7 @@ Security-policy changes must not silently remove the final usable administrator 
 Backups must preserve:
 
 - database/application data
-- the Gotify MU encryption key
+- the Monita encryption key
 - relevant TLS/certificate material
 - external authentication configuration
 

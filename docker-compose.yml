@@ -1,5 +1,5 @@
 services:
-  gotify-mu:
+  monita:
     build:
       context: .
       dockerfile: docker/Dockerfile
@@ -7,28 +7,30 @@ services:
         BUILD_JS: "1"
         RUN_TESTS: "1"
         GO_VERSION: "1.26.0"
-        GOTIFY_MU_VERSION: "${GOTIFY_MU_VERSION:-master-local}"
-        GOTIFY_MU_COMMIT: "${GOTIFY_MU_COMMIT:-local}"
-    image: gotify-mu:master
-    container_name: gotify-mu
+        MONITA_VERSION: "${MONITA_VERSION:-master-local}"
+        MONITA_COMMIT: "${MONITA_COMMIT:-local}"
+    image: monita:master
+    container_name: monita
     restart: unless-stopped
     ports:
-      - "${GOTIFY_MU_PORT:-8080}:80"
-      - "${GOTIFY_MU_RECEIVER_BIND:-127.0.0.1}:${GOTIFY_MU_SMTP_PORT:-2525}:2525"
-      - "${GOTIFY_MU_RECEIVER_BIND:-127.0.0.1}:${GOTIFY_MU_SYSLOG_PORT:-5514}:5514/udp"
+      - "${MONITA_PORT:-8080}:80"
+      - "${MONITA_RECEIVER_BIND:-127.0.0.1}:${MONITA_SMTP_PORT:-2525}:2525"
+      - "${MONITA_RECEIVER_BIND:-127.0.0.1}:${MONITA_SYSLOG_PORT:-5514}:5514/udp"
     env_file:
       - .env
     environment:
       GOTIFY_DEFAULTUSER_NAME: "${GOTIFY_DEFAULTUSER_NAME:-admin}"
       GOTIFY_DEFAULTUSER_PASS: "${GOTIFY_DEFAULTUSER_PASS:?Set GOTIFY_DEFAULTUSER_PASS in .env}"
-      GOTIFY_MU_UPDATE_TARGET_CONTAINER: "gotify-mu"
+      MONITA_UPDATE_TARGET_CONTAINER: "monita"
+      MONITA_REPOSITORY: "gigabytegrove/gotify-mu"
+      GOTIFY_MU_UPDATE_TARGET_CONTAINER: "monita"
       GOTIFY_MU_REPOSITORY: "gigabytegrove/gotify-mu"
     volumes:
-      - "${GOTIFY_MU_DATA_DIR:-./data}:/app/data"
+      - "${MONITA_DATA_DIR:-./data}:/app/data"
       - "/var/run/docker.sock:/var/run/docker.sock"
     networks:
-      - gotify-mu-system
+      - monita-system
 
 networks:
-  gotify-mu-system:
-    name: gotify-mu-system
+  monita-system:
+    name: monita-system
