@@ -33,14 +33,19 @@ export class AppStore extends BaseStore<IApplication> {
         });
 
     @action
-    public uploadImage = async (id: number, file: Blob): Promise<void> => {
+    public uploadImage = async (id: number, file: Blob): Promise<string> => {
         const formData = new FormData();
         formData.append('file', file);
-        await axios.post(`${config.get('url')}application/${id}/image`, formData, {
-            headers: {'content-type': 'multipart/form-data'},
-        });
+        const response = await axios.post<IApplication>(
+            `${config.get('url')}application/${id}/image`,
+            formData,
+            {
+                headers: {'content-type': 'multipart/form-data'},
+            }
+        );
         await this.refresh();
         this.snack('Channel image updated');
+        return response.data.image;
     };
 
     public async regenerateToken(id: number): Promise<string> {
@@ -53,11 +58,14 @@ export class AppStore extends BaseStore<IApplication> {
         return response.data.regenerateToken.token;
     }
 
-    public async deleteImage(id: number): Promise<void> {
+    public async deleteImage(id: number): Promise<string> {
         try {
-            await axios.delete(`${config.get('url')}application/${id}/image`);
+            const response = await axios.delete<IApplication>(
+                `${config.get('url')}application/${id}/image`
+            );
             await this.refresh();
             this.snack('Channel image deleted');
+            return response.data.image;
         } catch (error) {
             console.error('Error deleting application image:', error);
             throw error;
