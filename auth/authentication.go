@@ -57,6 +57,18 @@ func (a *Auth) RequireAdmin(ctx *gin.Context) {
 	a.evaluateOr401(ctx, a.adminHandlers()...)
 }
 
+// RequireAdminClient requires an authenticated admin user/client but does not
+// require the browser client session to be elevated. Use this only for
+// read-only administrative endpoints whose availability should remain visible
+// after an elevation window expires.
+func (a *Auth) RequireAdminClient(ctx *gin.Context) {
+	a.evaluateOr401(
+		ctx,
+		a.handleUser(a.checkUserAdmin),
+		a.handleClient(a.checkClientAdmin),
+	)
+}
+
 // RequireAdminClient requires an authenticated admin client or admin basic auth,
 // but does not require the client session to be elevated. Use this only for
 // read-only administrative state that is safe to expose without re-authentication.
