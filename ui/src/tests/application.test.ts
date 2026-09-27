@@ -100,6 +100,20 @@ describe('Channels', () => {
         it('has raspberry Channel', waitForChannel(3, 'raspberry', '#3'));
     });
 
+    it('shows Channel image controls in the editor', async () => {
+        await page.click(`${card(1)} .channel-actions`);
+        await page.waitForSelector('[role="menu"] .edit', {visible: true});
+        await page.click('[role="menu"] .edit');
+        await waitToDisappear(page, '[role="menu"]');
+        await page.waitForSelector($dialog.selector(), {visible: true});
+
+        expect(await page.$('.channel-image-upload')).not.toBeNull();
+        expect(await page.$('.channel-image-remove')).not.toBeNull();
+
+        await page.keyboard.press('Escape');
+        await waitToDisappear(page, $dialog.selector());
+    });
+
     it('updates Channels', async () => {
         await updateChannel(1, {name: 'server_linux'})();
         await updateChannel(2, {description: 'kitchen_computer'})();
