@@ -6,6 +6,31 @@
 
 All notable Gotify MU changes are documented here.
 
+## [1.0.2] - 2026-09-27
+
+Single-container updater and Software Update interface cleanup.
+
+### Changed
+
+- Docker Compose now runs exactly one persistent Gotify MU service.
+- Managed updates are initiated by the Gotify MU application itself. A short-lived internal worker is started only while an update is actively being installed and exits automatically afterward.
+- The permanent `gotify-mu-updater` service, private updater token, and server-to-helper HTTP control channel are removed.
+- The main container carries the Docker client and one-shot update worker required for safe container replacement and rollback.
+- Update state is stored under persistent application data so progress survives the application container restart.
+
+### Interface
+
+- Removes the Download files section from **Settings → Software Update**.
+- Removes release-asset buttons, release-note clutter, the updater Ready/Unavailable badge row, and the verbose update activity list.
+- The update flow is now: check GitHub, click Install, watch the current stage/progress, and reload into the installed release.
+
+### Safety
+
+- Published source packages and SHA-256 checksums are still verified before installation.
+- Full server tests still run while building the replacement image.
+- Runtime configuration, persistent data, ports, networks, and the Docker socket mount are preserved.
+- Failed replacement health checks still restore the previous container automatically.
+
 ## [1.0.1] - 2026-09-27
 
 Updater compatibility fix for installations running a preview or locally built master image.
