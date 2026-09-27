@@ -125,9 +125,11 @@ describe('Channels', () => {
         await page.click('[role="menu"] .regenerate-token');
         await waitToDisappear(page, '[role="menu"]');
         await page.waitForSelector(selector.$confirmDialog.selector());
-        await page.waitForSelector('.confirm-dialog .elevation-password input');
-        await page.type('.confirm-dialog .elevation-password input', 'admin');
-        await page.click('.confirm-dialog .elevation-submit');
+        const elevationPassword = '.confirm-dialog .elevation-password input';
+        if (await page.$(elevationPassword)) {
+            await page.type(elevationPassword, 'admin');
+            await page.click('.confirm-dialog .elevation-submit');
+        }
         await page.waitForSelector(selector.$confirmDialog.button('.confirm'));
         await page.click(selector.$confirmDialog.button('.confirm'));
         await waitToDisappear(page, selector.$confirmDialog.selector());
@@ -140,9 +142,11 @@ describe('Channels', () => {
     });
 
     it('deletes Channel', async () => {
-        await page.click(`${card(2)} .channel-actions`);
-        await page.waitForSelector('[role="menu"]', {visible: true});
-        await clickByText(page, '[role="menuitem"]', 'Delete channel');
+        await page.$eval(`${card(2)} .channel-actions`, (element) =>
+            (element as HTMLElement).click()
+        );
+        await page.waitForSelector('[role="menu"] .delete', {visible: true});
+        await page.click('[role="menu"] .delete');
         await waitToDisappear(page, '[role="menu"]');
         await page.waitForSelector(selector.$confirmDialog.selector());
         await page.click(selector.$confirmDialog.button('.confirm'));
