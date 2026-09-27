@@ -1,17 +1,9 @@
 services:
   monita:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile
-      args:
-        BUILD_JS: "1"
-        RUN_TESTS: "1"
-        GO_VERSION: "1.26.0"
-        MONITA_VERSION: "${MONITA_VERSION:-master-local}"
-        MONITA_COMMIT: "${MONITA_COMMIT:-local}"
-    image: monita:master
+    image: "${MONITA_IMAGE:-ghcr.io/gigabytegrove/monita:latest}"
     container_name: monita
     restart: unless-stopped
+    pull_policy: always
     ports:
       - "${MONITA_PORT:-8080}:80"
       - "${MONITA_RECEIVER_BIND:-127.0.0.1}:${MONITA_SMTP_PORT:-2525}:2525"
@@ -23,8 +15,6 @@ services:
       GOTIFY_DEFAULTUSER_PASS: "${GOTIFY_DEFAULTUSER_PASS:?Set GOTIFY_DEFAULTUSER_PASS in .env}"
       MONITA_UPDATE_TARGET_CONTAINER: "monita"
       MONITA_REPOSITORY: "gigabytegrove/monita"
-      GOTIFY_MU_UPDATE_TARGET_CONTAINER: "monita"
-      GOTIFY_MU_REPOSITORY: "gigabytegrove/monita"
     volumes:
       - "${MONITA_DATA_DIR:-./data}:/app/data"
       - "/var/run/docker.sock:/var/run/docker.sock"
