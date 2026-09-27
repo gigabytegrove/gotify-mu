@@ -1,0 +1,13 @@
+services:
+  monita:
+    image: monita:local
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      args:
+        BUILD_JS: "1"
+        RUN_TESTS: "${MONITA_BUILD_TESTS:-0}"
+        GO_VERSION: "1.26.0"
+        MONITA_VERSION: "${MONITA_VERSION:-master-local}"
+        MONITA_COMMIT: "${MONITA_COMMIT:-local}"
