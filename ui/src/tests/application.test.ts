@@ -38,8 +38,8 @@ const updateChannel =
     (id: number, data: {name?: string; description?: string}): (() => Promise<void>) =>
     async () => {
         await page.click(`${card(id)} .channel-actions`);
-        await page.waitForSelector('[role="menu"]', {visible: true});
-        await clickByText(page, '[role="menuitem"]', 'Edit channel');
+        await page.waitForSelector('[role="menu"] .edit', {visible: true});
+        await page.click('[role="menu"] .edit');
         await waitToDisappear(page, '[role="menu"]');
         await page.waitForSelector($dialog.selector(), {visible: true});
 
@@ -121,8 +121,8 @@ describe('Channels', () => {
 
     it('regenerates Channel token', async () => {
         await page.click(`${card(1)} .channel-actions`);
-        await page.waitForSelector('[role="menu"]', {visible: true});
-        await clickByText(page, '[role="menuitem"]', 'Regenerate token');
+        await page.waitForSelector('[role="menu"] .regenerate-token', {visible: true});
+        await page.click('[role="menu"] .regenerate-token');
         await waitToDisappear(page, '[role="menu"]');
         await page.waitForSelector(selector.$confirmDialog.selector());
         await page.waitForSelector('.confirm-dialog .elevation-password input');
