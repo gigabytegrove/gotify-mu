@@ -80,8 +80,8 @@ ARG GOTIFY_MU_COMMIT=local
 
 LABEL org.opencontainers.image.documentation=https://github.com/gigabytegrove/gotify-mu
 LABEL org.opencontainers.image.source=https://github.com/gigabytegrove/gotify-mu
-LABEL org.opencontainers.image.title="Gotify MU"
-LABEL org.opencontainers.image.description="Gotify-compatible multi-user notification server"
+LABEL org.opencontainers.image.title="Monita"
+LABEL org.opencontainers.image.description="Monita self-hosted notifications, messaging, and automation platform"
 LABEL org.opencontainers.image.version=${GOTIFY_MU_VERSION}
 LABEL org.opencontainers.image.revision=${GOTIFY_MU_COMMIT}
 LABEL org.opencontainers.image.licenses="MIT"
