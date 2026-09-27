@@ -1,23 +1,28 @@
 # Security Policy
 
-## Supported Versions
+## Supported versions
 
-Monita is currently in active development. Security fixes target the latest release and the current `master` branch.
+Security fixes are focused on the latest stable Monita release and the current development branch.
 
-## Reporting a Vulnerability
+## Reporting a vulnerability
 
-Please report suspected vulnerabilities privately through this repository's GitHub Security Advisory page:
+Please report suspected security issues privately through GitHub Security Advisories:
 
-https://github.com/gigabytegrove/gotify-mu/security/advisories/new
-
-Please include, where possible:
-
-- the affected component, package, file, or function
-- the root cause or weakness
-- attack prerequisites and expected impact
-- reproduction steps or a proof of concept
-- whether the issue also reproduces on upstream Gotify
+https://github.com/gigabytegrove/monita/security/advisories/new
 
 Do not open a public issue for an unpatched vulnerability.
 
-If a problem is confirmed to originate in upstream Gotify rather than the MU-specific changes, we may coordinate disclosure with the upstream Gotify maintainers.
+Please include enough information to help reproduce and understand the issue, such as:
+
+- affected version
+- affected feature
+- steps to reproduce
+- expected impact
+
+Avoid including real credentials, private keys, access tokens, personal information, or production data in reports.
+
+## Security updates
+
+Confirmed security issues are handled privately until a fix or mitigation is available.
+
+When an issue is inherited from an upstream dependency or project, disclosure may also be coordinated with the relevant upstream maintainers.
