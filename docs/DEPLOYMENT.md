@@ -8,7 +8,7 @@ This guide covers a normal Monita installation, updates, backups, and basic trou
 
 ## Recommended installation
 
-Docker Compose is the recommended way to run Monita.
+Docker Compose is the recommended way to run Monita. The standard deployment downloads the published Monita image from GitHub Container Registry, so the server does not need to compile the Web UI or Go application.
 
 ### Requirements
 
@@ -78,6 +78,8 @@ For the default Compose setup:
 Keep this directory when rebuilding, moving, or updating Monita.
 
 ## Updating
+
+Normal updates use published Monita images. Building from source is not part of the standard update path.
 
 ### In the Web UI
 
