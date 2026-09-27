@@ -1,6 +1,9 @@
 package main
 
 import (
+	"encoding/json"
+	"os"
+	"path/filepath"
 	"slices"
 	"testing"
 	"time"
@@ -8,19 +11,26 @@ import (
 
 func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 	inspected := &inspectedContainer{}
-	inspected.Config.Env = []string{"GOTIFY_DEFAULTUSER_NAME=admin", "GOTIFY_MU_UPDATER_TOKEN=secret"}
+	inspected.Config.Env = []string{
+		"GOTIFY_DEFAULTUSER_NAME=admin",
+		"GOTIFY_MU_UPDATER_TOKEN=legacy-secret",
+		"GOTIFY_MU_UPDATER_URL=http://legacy-updater:8099",
+	}
 	inspected.Config.User = "1000:1000"
 	inspected.Config.WorkingDir = "/app"
 	inspected.HostConfig.RestartPolicy = restartPolicy{Name: "unless-stopped"}
 	inspected.HostConfig.NetworkMode = "gotify-mu-system"
-	inspected.HostConfig.Binds = []string{"/opt/gotify-mu-data:/app/data"}
+	inspected.HostConfig.Binds = []string{
+		"/opt/gotify-mu-data:/app/data",
+		"/var/run/docker.sock:/var/run/docker.sock",
+	}
 	inspected.HostConfig.PortBindings = map[string][]portBinding{
 		"80/tcp": {{HostIP: "0.0.0.0", HostPort: "8799"}},
 	}
 	inspected.HostConfig.ExtraHosts = []string{"example.local:192.0.2.10"}
 	inspected.HostConfig.DNS = []string{"1.1.1.1"}
 	inspected.HostConfig.DNSSearch = []string{"example.local"}
-	inspected.Config.Labels = map[string]string{"com.example.role":"notifications"}
+	inspected.Config.Labels = map[string]string{"com.example.role": "notifications"}
 	inspected.Config.Hostname = "notify01"
 	inspected.HostConfig.Memory = 536870912
 	inspected.HostConfig.NanoCPUs = 1500000000
@@ -30,19 +40,26 @@ func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 	inspected.HostConfig.ReadonlyRootfs = true
 	inspected.HostConfig.SecurityOpt = []string{"no-new-privileges"}
 	inspected.HostConfig.ShmSize = 67108864
-	inspected.HostConfig.Tmpfs = map[string]string{"/tmp":"rw,noexec,nosuid,size=64m"}
-	inspected.HostConfig.Devices = []deviceMapping{{PathOnHost:"/dev/null",PathInContainer:"/dev/testnull",CgroupPermissions:"r"}}
-	inspected.HostConfig.LogConfig = logConfig{Type:"local",Config:map[string]string{"max-size":"10m"}}
-	inspected.HostConfig.Ulimits = []ulimit{{Name:"nofile",Soft:1024,Hard:4096}}
+	inspected.HostConfig.Tmpfs = map[string]string{"/tmp": "rw,noexec,nosuid,size=64m"}
+	inspected.HostConfig.Devices = []deviceMapping{{
+		PathOnHost:        "/dev/null",
+		PathInContainer:   "/dev/testnull",
+		CgroupPermissions: "r",
+	}}
+	inspected.HostConfig.LogConfig = logConfig{
+		Type:   "local",
+		Config: map[string]string{"max-size": "10m"},
+	}
+	inspected.HostConfig.Ulimits = []ulimit{{Name: "nofile", Soft: 1024, Hard: 4096}}
 
-	args := createArgs("gotify-mu", "gotify-mu:release-0.2.2", inspected)
+	args := createArgs("gotify-mu", "gotify-mu:release-1.0.2", inspected)
 
 	expected := [][]string{
 		{"create", "--name", "gotify-mu"},
 		{"--restart", "unless-stopped"},
 		{"--env", "GOTIFY_DEFAULTUSER_NAME=admin"},
-		{"--env", "GOTIFY_MU_UPDATER_TOKEN=secret"},
 		{"--volume", "/opt/gotify-mu-data:/app/data"},
+		{"--volume", "/var/run/docker.sock:/var/run/docker.sock"},
 		{"--publish", "8799:80/tcp"},
 		{"--network", "gotify-mu-system"},
 		{"--add-host", "example.local:192.0.2.10"},
@@ -72,7 +89,13 @@ func TestCreateArgsPreservesRuntimeConfiguration(t *testing.T) {
 			t.Fatalf("expected %v in args: %v", pair, args)
 		}
 	}
-	if !slices.Equal(args[len(args)-1:], []string{"gotify-mu:release-0.2.2"}) {
+	for _, value := range args {
+		if value == "GOTIFY_MU_UPDATER_TOKEN=legacy-secret" ||
+			value == "GOTIFY_MU_UPDATER_URL=http://legacy-updater:8099" {
+			t.Fatalf("legacy persistent-updater setting leaked into replacement: %v", args)
+		}
+	}
+	if !slices.Equal(args[len(args)-1:], []string{"gotify-mu:release-1.0.2"}) {
 		t.Fatalf("expected image at end of args: %v", args)
 	}
 }
@@ -93,11 +116,11 @@ func TestCreateArgsFallsBackToMountInspection(t *testing.T) {
 	}
 }
 
-
-func TestUpdateProgressIsMonotonicAndTracksActivity(t *testing.T) {
-	manager := &manager{token: "token"}
+func TestUpdateProgressIsMonotonicTracksActivityAndPersistsStatus(t *testing.T) {
+	statusFile := filepath.Join(t.TempDir(), "status.json")
+	manager := &manager{statusFile: statusFile}
 	started := time.Now().UTC()
-	manager.beginUpdate("0.2.2", started)
+	manager.beginUpdate("1.0.2", started)
 	manager.updateProgress("building", "Installing update", "Installing update", 60)
 	manager.updateProgress("building", "Installing update", "Installing update", 40)
 	manager.updateProgress("verifying", "Checking updated version", "Checking updated version", 96)
@@ -118,12 +141,24 @@ func TestUpdateProgressIsMonotonicAndTracksActivity(t *testing.T) {
 	if fresh.Activity[0].Message == "changed outside manager" {
 		t.Fatal("snapshot activity must not share mutable backing storage")
 	}
+
+	payload, err := os.ReadFile(statusFile)
+	if err != nil {
+		t.Fatalf("could not read persisted status: %v", err)
+	}
+	var persisted updateStatus
+	if err := json.Unmarshal(payload, &persisted); err != nil {
+		t.Fatalf("could not decode persisted status: %v", err)
+	}
+	if persisted.State != "verifying" || persisted.Progress != 96 {
+		t.Fatalf("unexpected persisted status: %#v", persisted)
+	}
 }
 
 func TestBuildProgressUsesUserFacingStages(t *testing.T) {
-	manager := &manager{token: "token"}
+	manager := &manager{}
 	started := time.Now().UTC()
-	manager.beginUpdate("0.2.2", started)
+	manager.beginUpdate("1.0.2", started)
 
 	manager.handleBuildProgress("#7 [js-builder 4/4] RUN make build-js")
 	status := manager.snapshot()
@@ -137,7 +172,13 @@ func TestBuildProgressUsesUserFacingStages(t *testing.T) {
 		t.Fatalf("unexpected server build status: %#v", status)
 	}
 
-	manager.handleBuildProgress("#18 exporting to image")
+	manager.handleBuildProgress("#19 [stage-5 4/8] COPY --from=updater-builder /out/gotify-mu-updater /usr/local/bin/gotify-mu-updater")
+	status = manager.snapshot()
+	if status.Step != "Assembling update" || status.Progress < 73 {
+		t.Fatalf("unexpected assembly status: %#v", status)
+	}
+
+	manager.handleBuildProgress("#22 exporting to image")
 	status = manager.snapshot()
 	if status.Step != "Finalizing update files" || status.Progress < 78 {
 		t.Fatalf("unexpected final build status: %#v", status)
