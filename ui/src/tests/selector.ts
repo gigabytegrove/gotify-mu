@@ -1,4 +1,4 @@
-export const heading = () => `main h4`;
+export const heading = () => `main h1`;
 
 export const table = (tableSelector: string) => ({
     selector: () => tableSelector,
