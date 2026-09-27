@@ -22,6 +22,7 @@ import {
     RELEASES_API,
     UpdateClassification,
 } from './release';
+import {activeUpdaterStates, updaterStatusForDisplay, type UpdaterStatus} from './status';
 
 type ReleaseState =
     | {status: 'loading'}
@@ -29,32 +30,8 @@ type ReleaseState =
     | {status: 'error'; message: string}
     | {status: 'ready'; release: PublishedRelease; classification: UpdateClassification};
 
-interface UpdateActivity {
-    timestamp: string;
-    message: string;
-}
-
-interface UpdaterStatus {
-    ready: boolean;
-    state: string;
-    version?: string;
-    message?: string;
-    step?: string;
-    progress?: number;
-    activity?: UpdateActivity[];
-    startedAt?: string;
-    finishedAt?: string;
-}
-
 const releaseLabel = (release: PublishedRelease) => release.name || release.tag_name;
 const normalizeTag = (tag: string) => tag.replace(/^v/i, '');
-const activeUpdaterStates = new Set([
-    'preparing',
-    'downloading',
-    'verifying',
-    'installing',
-    'restarting',
-]);
 
 export const useReleaseUpdate = (refreshKey = 0): ReleaseState => {
     const [state, setState] = React.useState<ReleaseState>({status: 'loading'});
@@ -171,12 +148,18 @@ export const UpdateStatusCard = () => {
             }
 
             const next = (await response.json()) as UpdaterStatus;
-            updaterRef.current = next;
-            setUpdater(next);
 
             if (activeUpdaterStates.has(next.state)) {
                 sawActiveUpdate.current = true;
             }
+
+            const visibleNext = updaterStatusForDisplay(
+                next,
+                updateStartedHere.current,
+                sawActiveUpdate.current
+            );
+            updaterRef.current = visibleNext;
+            setUpdater(visibleNext);
 
             const completedThisSession =
                 updateStartedHere.current && sawActiveUpdate.current && next.state === 'completed';
