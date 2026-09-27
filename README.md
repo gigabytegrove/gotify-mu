@@ -35,7 +35,7 @@ Monita is designed to remain familiar to Gotify users while adding the features 
 
 ### Docker Compose
 
-Docker Compose is the recommended installation method.
+Docker Compose is the recommended installation method. **Normal installs use a prebuilt Monita image; nothing is compiled on your server.**
 
 ```bash
 cd /opt
@@ -64,7 +64,7 @@ Persistent application data is stored in the configured Monita data directory an
 
 ## Updating
 
-Monita can check for published releases from **Settings → Software Update**.
+Monita can check for published releases from **Settings → Software Update**. Normal updates download a prebuilt release image and restart Monita; they do not rebuild the application locally.
 
 For a manual update:
 
