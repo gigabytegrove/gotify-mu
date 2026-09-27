@@ -51,5 +51,8 @@ export const classifyUpdate = (
     return 'current';
 };
 
+export const canInstallPublishedRelease = (classification: UpdateClassification): boolean =>
+    classification === 'available' || classification === 'development';
+
 export const latestPublishedRelease = (releases: PublishedRelease[]): PublishedRelease | null =>
     releases.find((release) => !release.draft) ?? null;

@@ -17,6 +17,7 @@ import SurfaceCard from '../common/SurfaceCard';
 import {useStores} from '../stores';
 import * as config from '../config';
 import {
+    canInstallPublishedRelease,
     classifyUpdate,
     latestPublishedRelease,
     PublishedRelease,
@@ -136,8 +137,7 @@ export const UpdateStatusCard = () => {
     const [releaseRefreshKey, setReleaseRefreshKey] = React.useState(0);
     const state = useReleaseUpdate(releaseRefreshKey);
     const {elevateStore} = useStores();
-    const current = config.get('version');
-    const currentVersion = current.version;
+    const currentVersion = config.get('version').version;
     const [updater, setUpdater] = React.useState<UpdaterStatus>();
     const [installing, setInstalling] = React.useState(false);
     const updaterRef = React.useRef<UpdaterStatus | undefined>(undefined);
@@ -214,6 +214,13 @@ export const UpdateStatusCard = () => {
             return;
         }
 
+        if (state.status === 'ready' && state.classification === 'development') {
+            const confirmed = window.confirm(
+                `Replace preview build ${currentVersion} with published ${release.tag_name}? Your application data will be preserved. If verification fails, the updater will restore the previous container automatically.`
+            );
+            if (!confirmed) return;
+        }
+
         setInstalling(true);
         updateStartedHere.current = true;
         sawActiveUpdate.current = false;
@@ -270,7 +277,6 @@ export const UpdateStatusCard = () => {
                     installing={installing}
                     updaterBusy={updaterBusy}
                     currentVersion={currentVersion}
-                    currentCommit={current.commit}
                     installRelease={installRelease}
                     elevated={elevateStore.elevated}
                 />
@@ -285,7 +291,6 @@ const ReleaseUpdateDetails = ({
     installing,
     updaterBusy,
     currentVersion,
-    currentCommit,
     installRelease,
     elevated,
 }: {
@@ -294,17 +299,10 @@ const ReleaseUpdateDetails = ({
     installing: boolean;
     updaterBusy: boolean;
     currentVersion: string;
-    currentCommit: string;
     installRelease: (release: PublishedRelease) => Promise<void>;
     elevated: boolean;
 }) => {
-    const sameCommit =
-        Boolean(currentCommit) &&
-        Boolean(state.release.target_commitish) &&
-        currentCommit === state.release.target_commitish;
-    const safeAutomaticInstall =
-        state.classification === 'available' ||
-        (state.classification === 'development' && sameCommit);
+    const safeAutomaticInstall = canInstallPublishedRelease(state.classification);
     const updaterReady = updater?.ready === true;
 
     return (
@@ -349,17 +347,12 @@ const ReleaseUpdateDetails = ({
                     This server is newer than the latest published release.
                 </Alert>
             )}
-            {state.classification === 'development' && sameCommit && (
-                <Alert severity="success">
-                    This preview version matches {state.release.tag_name}. You can install the
-                    published version without changing your application data.
-                </Alert>
-            )}
-            {state.classification === 'development' && !sameCommit && (
-                <Alert severity="info">
-                    This server is running a preview version newer than {state.release.tag_name}.
-                    Installing the older published version is disabled to prevent an accidental
-                    downgrade.
+            {state.classification === 'development' && (
+                <Alert severity="warning">
+                    This server is running preview build {currentVersion}. Installing{' '}
+                    {state.release.tag_name} will switch this server to the published release.
+                    Application data is preserved, and the managed updater restores the previous
+                    container automatically if verification fails.
                 </Alert>
             )}
 
