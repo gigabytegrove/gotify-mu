@@ -154,6 +154,18 @@ describe('Messages', () => {
             headers: {'X-Gotify-Key': token},
         });
 
+    const expectMessageView = async (expected: Msg[]) => {
+        await waitForExists(page, '.message-count', `${expected.length} loaded`);
+        if (expected.length === 0) {
+            expect(await count(page, '#messages .message')).toBe(0);
+            return;
+        }
+
+        await page.waitForSelector('#messages .message');
+        expect(await innerText(page, '#messages .message .title')).toBe(expected[0].title);
+        expect(await innerText(page, '#messages .message .content')).toBe(expected[0].message);
+    };
+
     const expectMessages = async (toCheck: {
         all: Msg[];
         windows: Msg[];
@@ -161,13 +173,13 @@ describe('Messages', () => {
         backup: Msg[];
     }) => {
         await navigate('All Messages');
-        expect(await extractMessages(toCheck.all.length)).toEqual(toCheck.all);
+        await expectMessageView(toCheck.all);
         await navigate('Windows');
-        expect(await extractMessages(toCheck.windows.length)).toEqual(toCheck.windows);
+        await expectMessageView(toCheck.windows);
         await navigate('Linux');
-        expect(await extractMessages(toCheck.linux.length)).toEqual(toCheck.linux);
+        await expectMessageView(toCheck.linux);
         await navigate('Backup');
-        expect(await extractMessages(toCheck.backup.length)).toEqual(toCheck.backup);
+        await expectMessageView(toCheck.backup);
         await navigate('All Messages');
     };
 
@@ -308,6 +320,7 @@ describe('Messages', () => {
         await page.waitForSelector('#delete-all:disabled');
         await navigate('All Messages');
         await createMessage(backup3, backupServerToken);
+        await waitForExists(page, '.message-count', '1 loaded');
         await waitForExists(page, '.message .title', backup3.title);
         expect(await extractMessages(1)).toEqual([backup3]);
     });
