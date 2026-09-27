@@ -354,6 +354,7 @@ const Messages = observer(() => {
                     />
                     <Box>
                         <Chip
+                            className="message-count"
                             size="small"
                             variant="outlined"
                             label={

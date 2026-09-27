@@ -16,9 +16,10 @@ afterAll(async () => await gotify.close());
 
 enum Col {
     Name = 1,
-    Admin = 2,
-    Created = 3,
-    EditDelete = 4,
+    DisplayName = 2,
+    Role = 3,
+    Created = 4,
+    EditDelete = 5,
 }
 
 const $table = selector.table('#user-table');
@@ -58,7 +59,7 @@ describe('User', () => {
         (name: string, isAdmin: boolean, row: number): (() => Promise<void>) =>
         async () => {
             expect(await innerText(page, $table.cell(row, Col.Name))).toBe(name);
-            expect(await innerText(page, $table.cell(row, Col.Admin))).toBe(isAdmin ? 'Administrator' : 'User');
+            expect(await innerText(page, $table.cell(row, Col.Role))).toBe(isAdmin ? 'Administrator' : 'User');
         };
 
     describe('has created users', () => {
@@ -104,7 +105,7 @@ describe('User', () => {
             await page.click($dialog.button('.save-create'));
             await waitToDisappear(page, $dialog.selector());
 
-            await waitForExists(page, $table.cell(4, Col.Admin), 'Administrator');
+            await waitForExists(page, $table.cell(4, Col.Role), 'Administrator');
         });
         it('made dude admin', hasUser('dude', true, 4));
     });
