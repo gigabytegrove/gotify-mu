@@ -20,7 +20,7 @@ const (
 	defaultUpdateTarget       = "monita"
 	defaultUpdateWorker       = "monita-update-worker"
 	defaultUpdateStatusFile   = "/app/data/.monita-update-status.json"
-	defaultUpdateRepository   = "gigabytegrove/gotify-mu"
+	defaultUpdateRepository   = "gigabytegrove/monita"
 )
 
 var updateVersionPattern = regexp.MustCompile(`^[0-9]+\.[0-9]+\.[0-9]+$`)
