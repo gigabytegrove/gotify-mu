@@ -6,19 +6,19 @@
 
 <p align="center"><strong>Notifications · Messaging · Automation</strong></p>
 
-Monita (formerly Gotify MU) is a self-hosted notifications, messaging, and automation platform built from the Gotify Server codebase. It preserves Gotify protocol and client compatibility while adding shared multi-user Channels, collaboration, integrations, automation, security controls, and operations tooling.
+Monita (formerly Monita) is a self-hosted notifications, messaging, and automation platform built from the Gotify Server codebase. It preserves Gotify protocol and client compatibility while adding shared multi-user Channels, collaboration, integrations, automation, security controls, and operations tooling.
 
-> **Current release:** **v1.0.2**.
+> **Current release:** **v1.1.0**.
 
 ## Branding
 
-The canonical Monita brand system lives in [`assets/`](assets/README.md). During the transition, user-facing surfaces use **Monita (formerly Gotify MU)** where historical context is useful. Technical Gotify compatibility identifiers remain unchanged when renaming them would break existing clients or deployments.
+The canonical Monita brand system lives in [`assets/`](assets/README.md). During the transition, user-facing surfaces use **Monita (formerly Monita)** where historical context is useful. Technical Gotify compatibility identifiers remain unchanged when renaming them would break existing clients or deployments.
 
 Approved brand palette: `#2563EB` Primary, `#3B82F6` Blue, `#06B6D4` Teal, `#0F172A` Slate, and `#94A3B8` Gray.
 
 ## Why Monita?
 
-Upstream Gotify applications are owned by a single user. Gotify MU keeps that model for compatibility, but adds a membership layer so an application can function as a shared **Channel**.
+Upstream Gotify applications are owned by a single user. Monita keeps that model for compatibility, but adds a membership layer so an application can function as a shared **Channel**.
 
 ### Current MU features
 
@@ -90,7 +90,7 @@ The underlying `/application` API naming remains in place to avoid breaking exis
 
 The official Gotify Android app is not modified by the Web UI rewrite.
 
-Administrators can install compatible Linux Go plugin binaries from **Plugins → Install Plugin**. Uploaded plugins are stored under the configured `GOTIFY_PLUGINSDIR` (the default Docker data volume resolves to `/app/data/plugins`) and are loaded immediately. Plugin binaries execute native code inside the Gotify MU process, so only trusted plugins built for the matching Gotify MU/Go ABI and server architecture should be installed.
+Administrators can install compatible Linux Go plugin binaries from **Plugins → Install Plugin**. Uploaded plugins are stored under the configured `GOTIFY_PLUGINSDIR` (the default Docker data volume resolves to `/app/data/plugins`) and are loaded immediately. Plugin binaries execute native code inside the Monita process, so only trusted plugins built for the matching Monita/Go ABI and server architecture should be installed.
 
 Authentication and security controls including MFA, passkeys, LDAP/Active Directory, session policy, service accounts, encrypted stored secrets, and audit/security administration are implemented in the v0.5 preview. See [docs/SECURITY_ROADMAP.md](docs/SECURITY_ROADMAP.md) for the current security status and trust boundaries.
 
@@ -134,29 +134,29 @@ Non-admin users can archive messages instead. Archive is per-user and reversible
 
 An administrator can enable **Allow channel members to post (Chat Channel)** on a Channel. When enabled, any assigned member may post using normal user/client authentication.
 
-Gotify MU records the sender's user ID and username. If a member leaves the title blank, the sender's username is used as the title so existing Gotify clients can still show who sent the message.
+Monita records the sender's user ID and username. If a member leaves the title blank, the sender's username is used as the title so existing Gotify clients can still show who sent the message.
 
-The official Gotify Android app continues to receive Chat Channel messages as normal Gotify messages. The stock Android app does not gain a compose/chat interface from this server feature; sending is available in the Gotify MU Web UI or through compatible API clients.
+The official Gotify Android app continues to receive Chat Channel messages as normal Gotify messages. The stock Android app does not gain a compose/chat interface from this server feature; sending is available in the Monita Web UI or through compatible API clients.
 
 ## Releases
 
-The current published release is **Gotify MU v1.0.2**. Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed notes in [docs/releases/v1.0.2.md](docs/releases/v1.0.2.md).
+The current published release is **Monita v1.1.0**. Release history is tracked in [CHANGELOG.md](CHANGELOG.md), with detailed notes in [docs/releases/v1.1.0.md](docs/releases/v1.1.0.md).
 
 Deployment, validation, updater, backup, and rollback procedures are maintained in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 For a release checkout:
 
 ```bash
-git clone https://github.com/gigabytegrove/gotify-mu.git
-cd gotify-mu
-git checkout v1.0.2
+git clone https://github.com/gigabytegrove/gotify-mu.git monita
+cd monita
+git checkout v1.1.0
 ```
 
 Release builds inject the release version, commit, and build date into the server binary. Development builds continue to use `master-<commit>`, `master-local`, or `dev-<commit>` identities as appropriate.
 
 ## Deployment
 
-Gotify MU currently follows the upstream Gotify configuration model. Existing `GOTIFY_*` environment variables are intentionally retained for compatibility.
+Monita currently follows the upstream Gotify configuration model. Existing `GOTIFY_*` environment variables are intentionally retained for compatibility.
 
 > **Release automation:** the repository workflow publishes versioned release ZIPs and GHCR images from the version in `VERSION`. If GitHub Actions is disabled for the repository, source/Docker builds remain available as a fallback.
 
@@ -166,8 +166,8 @@ On a Linux system with Git and Docker Compose installed:
 
 ```bash
 cd /opt
-git clone https://github.com/gigabytegrove/gotify-mu.git
-cd gotify-mu
+git clone https://github.com/gigabytegrove/gotify-mu.git monita
+cd monita
 
 cp .env.example .env
 nano .env
@@ -179,7 +179,7 @@ At minimum, change:
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
 ```
 
-The included `docker-compose.yml` starts exactly one persistent service: `gotify-mu`.
+The included `docker-compose.yml` starts exactly one persistent service: `monita`.
 
 Example `.env`:
 
@@ -191,7 +191,7 @@ GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
 ```
 
-Then build and start Gotify MU:
+Then build and start Monita:
 
 ```bash
 docker compose up -d --build
@@ -228,7 +228,7 @@ That directory contains the SQLite database and other persistent Gotify data. Re
 Watch startup logs:
 
 ```bash
-docker logs -f gotify-mu
+docker logs -f monita
 ```
 
 Check the health endpoint:
@@ -240,16 +240,16 @@ curl http://127.0.0.1:8080/health
 Inspect the running container:
 
 ```bash
-docker ps --filter name=gotify-mu
+docker ps --filter name=monita
 ```
 
 ### Managed in-app updates
 
-Docker Compose runs one persistent `gotify-mu` container. There is no always-running updater service.
+Docker Compose runs one persistent `monita` container. There is no always-running updater service.
 
 From **Settings → Software Update**, Monita checks GitHub for the newest published release. An administrator can click **Update** to start the upgrade. The UI shows progress, the replacement container is health-checked, and the previous container is restored automatically if verification fails.
 
-During an update only, Gotify MU starts a short-lived `gotify-mu-update-worker` container from the currently installed image. It exists only long enough to perform the replacement and removes itself when finished. Persistent application data remains mounted at `/app/data`.
+During an update only, Monita starts a short-lived `monita-update-worker` container from the currently installed image. It exists only long enough to perform the replacement and removes itself when finished. Persistent application data remains mounted at `/app/data`.
 
 Managed self-updating requires the Docker socket mount included in `docker-compose.yml`. Docker socket access is host-privileged. If managed updates are not wanted, remove that mount and use the manual update procedure instead.
 
@@ -260,7 +260,7 @@ Development and preview builds should be validated with the full Web UI build an
 For ordinary Compose development after changes are merged into `master`:
 
 ```bash
-cd /opt/gotify-mu
+cd /opt/monita
 git pull --ff-only origin master
 docker compose build --build-arg RUN_TESTS=1
 docker compose up -d
@@ -273,17 +273,17 @@ Your `./data` directory remains in place. Keep a verified pre-upgrade data backu
 After checking out the release tag, build with explicit release identity:
 
 ```bash
-cd /opt/gotify-mu
+cd /opt/monita
 
 COMMIT="$(git rev-parse --short HEAD)"
 
 docker build --no-cache \
   --build-arg BUILD_JS=1 \
   --build-arg GO_VERSION=1.26.0 \
-  --build-arg GOTIFY_MU_VERSION="1.0.2" \
-  --build-arg GOTIFY_MU_COMMIT="${COMMIT}" \
+  --build-arg MONITA_VERSION="1.1.0" \
+  --build-arg MONITA_COMMIT="${COMMIT}" \
   -f docker/Dockerfile \
-  -t gotify-mu:1.0.2 \
+  -t monita:1.1.0 \
   .
 ```
 
@@ -296,28 +296,28 @@ If you do not want to use Compose:
 ```bash
 cd /opt
 
-git clone https://github.com/gigabytegrove/gotify-mu.git
-cd gotify-mu
+git clone https://github.com/gigabytegrove/gotify-mu.git monita
+cd monita
 
 docker build \
   --build-arg BUILD_JS=1 \
   --build-arg GO_VERSION=1.26.0 \
   -f docker/Dockerfile \
-  -t gotify-mu:master \
+  -t monita:master \
   .
 
-mkdir -p /opt/gotify-mu-data
+mkdir -p /opt/monita-data
 
-docker rm -f gotify-mu 2>/dev/null || true
+docker rm -f monita 2>/dev/null || true
 
 docker run -d \
-  --name gotify-mu \
+  --name monita \
   --restart unless-stopped \
   -p 8080:80 \
   -e GOTIFY_DEFAULTUSER_NAME=admin \
   -e GOTIFY_DEFAULTUSER_PASS='CHANGE-THIS-PASSWORD' \
-  -v /opt/gotify-mu-data:/app/data \
-  gotify-mu:master
+  -v /opt/monita-data:/app/data \
+  monita:master
 ```
 
 The `BUILD_JS=1` build argument is required for the Docker build to include the Web UI.
@@ -327,11 +327,11 @@ The `BUILD_JS=1` build argument is required for the Docker build to include the 
 You can also run Monita without Docker:
 
 ```bash
-git clone https://github.com/gigabytegrove/gotify-mu.git
-cd gotify-mu
+git clone https://github.com/gigabytegrove/gotify-mu.git monita
+cd monita
 make build-js
-go build -o gotify-mu .
-./gotify-mu serve
+go build -o monita .
+./monita serve
 ```
 
 ### First-test checklist
@@ -368,7 +368,7 @@ For the current development or preview build, verify these behaviors before trea
 The project container namespace is reserved as:
 
 ```text
-ghcr.io/gigabytegrove/gotify-mu
+ghcr.io/gigabytegrove/monita
 ```
 
 Once automated builds/releases are active, deployment will be able to use published images instead of compiling locally.
