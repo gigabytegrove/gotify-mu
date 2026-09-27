@@ -365,7 +365,7 @@ const ReleaseUpdateDetails = ({
                 </Button>
             </Stack>
 
-            {updater && updater.state !== 'idle' && updater.state !== 'unavailable' && (
+            {updater && activeUpdaterStates.has(updater.state) && (
                 <Stack spacing={1.25}>
                     <Stack
                         direction="row"
@@ -387,7 +387,6 @@ const ReleaseUpdateDetails = ({
                             {updater.message}
                         </Typography>
                     )}
-
                 </Stack>
             )}
 
@@ -399,7 +398,6 @@ const ReleaseUpdateDetails = ({
                     {updater?.message || 'Managed updater status is unavailable.'}
                 </Alert>
             )}
-
         </Stack>
     );
 };
