@@ -178,7 +178,7 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: build/*
           tag: "v${{ steps.release.outputs.version }}"
-          release_name: "Monita v${{ steps.release.outputs.version }} (formerly Gotify MU)"
+          release_name: "Monita v${{ steps.release.outputs.version }}"
           body: "See CHANGELOG.md and docs/releases/v${{ steps.release.outputs.version }}.md for release notes and compatibility details."
           prerelease: ${{ contains(steps.release.outputs.version, '-') }}
           overwrite: true
