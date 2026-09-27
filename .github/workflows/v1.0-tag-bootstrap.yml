@@ -1,0 +1,43 @@
+name: v1.0.0 tag bootstrap
+
+on:
+  push:
+    branches:
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  tag-v1:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - name: Pin v1.0.0 tag to corrected release commit
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          if [[ "${VERSION}" != "1.0.0" ]]; then
+            echo "VERSION is ${VERSION}; bootstrap is no longer needed."
+            exit 0
+          fi
+
+          TAG="v1.0.0"
+          if git ls-remote --exit-code --tags origin "refs/tags/${TAG}" >/dev/null 2>&1; then
+            git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+            TAG_COMMIT="$(git rev-list -n 1 "${TAG}")"
+            if [[ "${TAG_COMMIT}" != "${GITHUB_SHA}" ]]; then
+              echo "Existing ${TAG} points to ${TAG_COMMIT}; refusing to rewrite a release tag."
+              exit 1
+            fi
+            echo "${TAG} already points to ${GITHUB_SHA}"
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git tag -a "${TAG}" -m "Gotify MU v1.0.0"
+          git push origin "${TAG}"
