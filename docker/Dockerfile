@@ -62,7 +62,8 @@ RUN cd /src/gotify && \
     EFFECTIVE_BUILD_DATE="${MONITA_BUILD_DATE:-${GOTIFY_MU_BUILD_DATE:-local}}"; \
     EFFECTIVE_LD_FLAGS="-w -s -X main.Version=${EFFECTIVE_VERSION} -X main.Commit=${EFFECTIVE_COMMIT} -X main.BuildDate=${EFFECTIVE_BUILD_DATE} -X main.Mode=prod"; \
     fi && \
-    LD_FLAGS="$EFFECTIVE_LD_FLAGS" make OUTPUT=/target/app/gotify-app _build_within_docker
+    LD_FLAGS="$EFFECTIVE_LD_FLAGS" make OUTPUT=/target/app/monita-app _build_within_docker && \
+    ln -s monita-app /target/app/gotify-app
 
 # --- Transient update worker binary ---
 
@@ -111,5 +112,5 @@ COPY --from=updater-builder /out/monita-updater /usr/local/bin/monita-updater
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
 COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins /usr/local/libexec/docker/cli-plugins
 
-ENTRYPOINT ["./gotify-app"]
+ENTRYPOINT ["./monita-app"]
 CMD ["serve"]
