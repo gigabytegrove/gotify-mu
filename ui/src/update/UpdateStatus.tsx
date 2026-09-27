@@ -7,9 +7,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import LinearProgress from '@mui/material/LinearProgress';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import Download from '@mui/icons-material/Download';
 import NewReleases from '@mui/icons-material/NewReleases';
-import OpenInNew from '@mui/icons-material/OpenInNew';
 import SystemUpdateAlt from '@mui/icons-material/SystemUpdateAlt';
 import Refresh from '@mui/icons-material/Refresh';
 import {Link} from 'react-router';
@@ -31,11 +29,6 @@ type ReleaseState =
     | {status: 'error'; message: string}
     | {status: 'ready'; release: PublishedRelease; classification: UpdateClassification};
 
-interface UpdateActivity {
-    timestamp: string;
-    message: string;
-}
-
 interface UpdaterStatus {
     ready: boolean;
     state: string;
@@ -43,7 +36,6 @@ interface UpdaterStatus {
     message?: string;
     step?: string;
     progress?: number;
-    activity?: UpdateActivity[];
     startedAt?: string;
     finishedAt?: string;
 }
@@ -241,19 +233,16 @@ export const UpdateStatusCard = () => {
     return (
         <SurfaceCard
             title="Software Update"
-            subtitle="Install available updates here. If an update cannot be completed safely, the previous version is restored automatically."
+            subtitle="Check GitHub for a published update, install it, and restart into the new version."
             action={
-                <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
-                    <Button
-                        size="small"
-                        variant="outlined"
-                        startIcon={<Refresh fontSize="small" />}
-                        disabled={state.status === 'loading'}
-                        onClick={() => setReleaseRefreshKey((value) => value + 1)}>
-                        Check for Updates
-                    </Button>
-                    <NewReleases color="action" />
-                </Stack>
+                <Button
+                    size="small"
+                    variant="outlined"
+                    startIcon={<Refresh fontSize="small" />}
+                    disabled={state.status === 'loading'}
+                    onClick={() => setReleaseRefreshKey((value) => value + 1)}>
+                    Check for Updates
+                </Button>
             }>
             {state.status === 'loading' && (
                 <Stack direction="row" spacing={1.25} sx={{alignItems: 'center'}}>
@@ -356,22 +345,7 @@ const ReleaseUpdateDetails = ({
                 </Alert>
             )}
 
-            <Stack
-                direction={{xs: 'column', sm: 'row'}}
-                spacing={1}
-                sx={{alignItems: {sm: 'center'}, justifyContent: 'space-between'}}>
-                <Stack direction="row" spacing={0.75} sx={{alignItems: 'center'}}>
-                    <Typography variant="body2" color="text.secondary">
-                        Automatic updates
-                    </Typography>
-                    <Chip
-                        size="small"
-                        color={updaterReady ? 'success' : 'default'}
-                        variant={updaterReady ? 'filled' : 'outlined'}
-                        label={updaterReady ? 'Ready' : 'Unavailable'}
-                    />
-                </Stack>
-
+            <Stack direction="row" sx={{justifyContent: 'flex-end'}}>
                 <Button
                     variant="contained"
                     startIcon={
@@ -414,40 +388,6 @@ const ReleaseUpdateDetails = ({
                         </Typography>
                     )}
 
-                    {updater.activity && updater.activity.length > 0 && (
-                        <Stack spacing={0.5}>
-                            <Typography variant="subtitle2">Update activity</Typography>
-                            <Stack
-                                spacing={0.5}
-                                sx={{
-                                    maxHeight: 220,
-                                    overflowY: 'auto',
-                                    p: 1.25,
-                                    borderRadius: 1.5,
-                                    bgcolor: 'action.hover',
-                                }}>
-                                {updater.activity.slice(-12).map((entry, index) => (
-                                    <Stack
-                                        key={`${entry.timestamp}-${index}`}
-                                        direction="row"
-                                        spacing={1}
-                                        sx={{alignItems: 'baseline'}}>
-                                        <Typography
-                                            variant="caption"
-                                            color="text.secondary"
-                                            sx={{minWidth: 74}}>
-                                            {new Date(entry.timestamp).toLocaleTimeString([], {
-                                                hour: 'numeric',
-                                                minute: '2-digit',
-                                                second: '2-digit',
-                                            })}
-                                        </Typography>
-                                        <Typography variant="body2">{entry.message}</Typography>
-                                    </Stack>
-                                ))}
-                            </Stack>
-                        </Stack>
-                    )}
                 </Stack>
             )}
 
@@ -460,35 +400,6 @@ const ReleaseUpdateDetails = ({
                 </Alert>
             )}
 
-            {state.release.assets.length > 0 && (
-                <Stack spacing={1}>
-                    <Typography variant="subtitle2">Download files</Typography>
-                    <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
-                        {state.release.assets.map((asset) => (
-                            <Button
-                                key={asset.name}
-                                component="a"
-                                href={asset.browser_download_url}
-                                variant="outlined"
-                                size="small"
-                                startIcon={<Download />}>
-                                {asset.name}
-                            </Button>
-                        ))}
-                    </Stack>
-                </Stack>
-            )}
-
-            <Button
-                component="a"
-                href={state.release.html_url}
-                target="_blank"
-                rel="noreferrer"
-                variant="text"
-                sx={{alignSelf: 'flex-start'}}
-                endIcon={<OpenInNew />}>
-                Release Notes
-            </Button>
         </Stack>
     );
 };
