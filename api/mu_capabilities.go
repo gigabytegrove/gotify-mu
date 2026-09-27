@@ -31,6 +31,7 @@ type MUCapabilityFlags struct {
 	AuditLog             bool `json:"auditLog"`
 	TypingPresence       bool `json:"typingPresence"`
 	ChatNotifications    bool `json:"chatNotifications"`
+	Mentions             bool `json:"mentions"`
 }
 
 func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
@@ -53,6 +54,7 @@ func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
 			AuditLog:             true,
 			TypingPresence:       true,
 			ChatNotifications:    true,
+			Mentions:             true,
 		},
 	})
 }
