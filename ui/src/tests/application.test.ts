@@ -2,7 +2,6 @@ import {Page} from 'puppeteer';
 import {newTest, GotifyTest} from './setup';
 import {
     clearField,
-    clickByText,
     count,
     innerText,
     waitForExists,
