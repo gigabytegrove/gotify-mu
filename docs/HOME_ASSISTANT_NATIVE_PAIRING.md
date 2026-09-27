@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="../assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+</p>
+
 # Home Assistant native pairing contract
 
 Gotify MU supports two Home Assistant connection methods:

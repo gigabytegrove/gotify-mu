@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/gotify-mu-logo.png" alt="Gotify MU" width="520">
+  <img src="assets/gotify-mu-banner.png" alt="Gotify MU" width="800">
 </p>
 
 <h1 align="center">Gotify MU</h1>
@@ -9,6 +9,10 @@
 Gotify MU is a multi-user fork of [Gotify Server](https://github.com/gotify/server). It keeps the Gotify protocol and client compatibility while extending the server so a notification channel can be shared with multiple users instead of belonging to only one account.
 
 > **Current release:** **v1.0.0**. It is the first stable Gotify MU release.
+
+## Branding
+
+The canonical Gotify MU branding lives in [`assets/`](assets/README.md). The approved banner, logo, and icon are release-controlled assets and must not be regenerated, recolored, cropped differently, or silently replaced during normal development or release work.
 
 ## Why Gotify MU?
 

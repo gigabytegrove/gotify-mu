@@ -72,9 +72,9 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                     }}>
                     <Box
                         component="img"
-                        src={config.get('url') + 'static/gotify-mu-logo.png'}
+                        src={config.get('url') + 'static/gotify-mu-icon.png'}
                         alt="Gotify MU"
-                        sx={{width: 40, height: 30, objectFit: 'contain', borderRadius: 1}}
+                        sx={{width: 34, height: 34, objectFit: 'contain'}}
                     />
                     <Box sx={{display: {xs: 'none', sm: 'block'}}}>
                         <Typography variant="h6" sx={{fontSize: '1rem', lineHeight: 1.1}}>
