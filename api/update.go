@@ -259,15 +259,15 @@ func (a *UpdateAPI) ready() error {
 
 	dockerBin := a.dockerBin()
 	if _, err := exec.LookPath(dockerBin); err != nil {
-		return errors.New("Managed updates are unavailable because the Docker client is not installed.")
+		return errors.New("Managed updates are unavailable because the Docker client is not installed")
 	}
 
 	info, err := os.Stat(defaultDockerSocket)
 	if err != nil {
-		return errors.New("Managed updates are unavailable because Docker socket access is not available.")
+		return errors.New("Managed updates are unavailable because Docker socket access is not available")
 	}
 	if info.Mode()&os.ModeSocket == 0 {
-		return errors.New("Managed updates are unavailable because the Docker socket mount is invalid.")
+		return errors.New("Managed updates are unavailable because the Docker socket mount is invalid")
 	}
 	return nil
 }
