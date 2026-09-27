@@ -127,6 +127,11 @@ describe('User', () => {
         await clickByText(page, '#user-menu [role="menuitem"]', 'Settings');
         await waitToDisappear(page, '#user-menu');
         await waitForExists(page, selector.heading(), 'Settings');
+        const elevationPassword = '.elevation-password input';
+        if (await page.$(elevationPassword)) {
+            await page.type(elevationPassword, 'admin');
+            await page.click('.elevation-submit');
+        }
         await page.waitForSelector($changepw.selector());
         await page.type($changepw.input('.newpass'), 'changed-pass-123');
         await page.click($changepw.button('.change'));
