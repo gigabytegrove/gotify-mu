@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="assets/gotify-mu-banner.png" alt="Gotify MU" width="720">
+</p>
+
 # Contributing to Gotify MU
 
 Thanks for your interest in Gotify MU.
