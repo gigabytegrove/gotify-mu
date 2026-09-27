@@ -68,8 +68,8 @@ const hasReceivedMessage = async (title: RegExp, content: RegExp) => {
 };
 
 const inDetailPage = async (id: number, callback: () => Promise<void>) => {
-    const name = await innerText(page, $table.cell(id, Col.Name));
-    await page.click($table.cell(id, Col.Details, 'button'));
+    const name = await innerText(page, $table.cell(id, Col.Name, '.plugin-name'));
+    await page.click($table.cell(id, Col.Details, 'a'));
     await waitForExists(page, '.plugin-info .name > span', name);
     await callback();
     await page.click('#navigate-plugins');
@@ -92,7 +92,9 @@ describe('plugin', () => {
         describe('initial status', () => {
             it('has echo plugin', async () => {
                 await waitForCount(page, $table.rows(), 1);
-                expect(await innerText(page, $table.cell(1, Col.Name))).toEqual('test plugin');
+                expect(await innerText(page, $table.cell(1, Col.Name, '.plugin-name'))).toEqual(
+                    'test plugin'
+                );
                 expect(await innerText(page, $table.cell(1, Col.Token))).toBe(hiddenToken);
                 expect(parseInt(await innerText(page, $table.cell(1, Col.ID)), 10)).toBeGreaterThan(
                     0
