@@ -454,6 +454,12 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		authAdmin.POST("/:id", userHandler.UpdateUserByID)
 	}
 
+	adminRead := g.Group("")
+	{
+		adminRead.Use(authentication.RequireAdminClient)
+		adminRead.GET("/update/status", updateHandler.Status)
+	}
+
 	adminPlatform := g.Group("")
 	{
 		adminPlatform.Use(authentication.RequireAdmin)
