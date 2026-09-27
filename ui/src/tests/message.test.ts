@@ -320,6 +320,8 @@ describe('Messages', () => {
         await page.waitForSelector('#delete-all:disabled');
         await navigate('All Messages');
         await createMessage(backup3, backupServerToken);
+        await page.reload();
+        await waitForExists(page, selector.heading(), 'Messages');
         await waitForExists(page, '.message-count', '1 loaded');
         await waitForExists(page, '.message .title', backup3.title);
         expect(await extractMessages(1)).toEqual([backup3]);
