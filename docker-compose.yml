@@ -3,7 +3,6 @@ services:
     image: "${MONITA_IMAGE:-ghcr.io/gigabytegrove/monita:latest}"
     container_name: monita
     restart: unless-stopped
-    pull_policy: always
     ports:
       - "${MONITA_PORT:-8080}:80"
       - "${MONITA_RECEIVER_BIND:-127.0.0.1}:${MONITA_SMTP_PORT:-2525}:2525"
