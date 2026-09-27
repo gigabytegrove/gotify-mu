@@ -69,7 +69,7 @@ COPY updater/main_test.go ./
 RUN go test ./... && \
     CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/gotify-mu-updater .
 
-# The running Gotify MU container uses the Docker client only to launch the
+# The running Gotify MU container uses the Docker client to launch the
 # short-lived update worker and replace itself. No Docker daemon runs here.
 FROM docker:cli AS docker-cli
 
@@ -105,7 +105,6 @@ EXPOSE $GOTIFY_SERVER_EXPOSE
 COPY --from=builder /target /
 COPY --from=updater-builder /out/gotify-mu-updater /usr/local/bin/gotify-mu-updater
 COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
-COPY --from=docker-cli /usr/local/libexec/docker/cli-plugins/ /usr/local/libexec/docker/cli-plugins/
 
 ENTRYPOINT ["./gotify-app"]
 CMD ["serve"]
