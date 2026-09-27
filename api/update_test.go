@@ -18,7 +18,7 @@ func TestUpdateAPIStatusWhenDockerSocketMissing(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	api := UpdateAPI{
 		DockerSocket:    filepath.Join(t.TempDir(), "missing.sock"),
-		TargetContainer: "gotify-mu",
+		TargetContainer: "monita",
 		StatusFile:      filepath.Join(t.TempDir(), "status.json"),
 	}
 
@@ -43,7 +43,7 @@ func TestUpdateAPIStatusDefaultsToIdle(t *testing.T) {
 
 	api := UpdateAPI{
 		DockerSocket:    socket,
-		TargetContainer: "gotify-mu",
+		TargetContainer: "monita",
 		StatusFile:      filepath.Join(dir, "status.json"),
 	}
 
@@ -71,7 +71,7 @@ func TestUpdateAPIStartsTransientWorker(t *testing.T) {
 			return "false\n", nil
 		}
 		if len(args) >= 3 && args[0] == "inspect" && args[1] == "--format" && strings.Contains(args[2], ".Config.Image") {
-			return "gotify-mu:1.0.2\n", nil
+			return "monita:1.1.0\n", nil
 		}
 		if len(args) > 0 && args[0] == "run" {
 			return "worker-id\n", nil
@@ -81,8 +81,8 @@ func TestUpdateAPIStartsTransientWorker(t *testing.T) {
 
 	api := UpdateAPI{
 		DockerSocket:    socket,
-		TargetContainer: "gotify-mu",
-		WorkerName:      "gotify-mu-update-worker",
+		TargetContainer: "monita",
+		WorkerName:      "monita-update-worker",
 		StatusFile:      filepath.Join(dir, "status.json"),
 		Repository:      "gigabytegrove/gotify-mu",
 		RunDocker:       runner,
@@ -93,7 +93,7 @@ func TestUpdateAPIStartsTransientWorker(t *testing.T) {
 	ctx.Request = httptest.NewRequest(
 		http.MethodPost,
 		"/update/install",
-		strings.NewReader(`{"version":"1.0.2"}`),
+		strings.NewReader(`{"version":"1.1.0"}`),
 	)
 	ctx.Request.Header.Set("Content-Type", "application/json")
 
@@ -112,16 +112,16 @@ func TestUpdateAPIStartsTransientWorker(t *testing.T) {
 	require.NotEmpty(t, runArgs)
 	assert.Contains(t, runArgs, "--rm")
 	assert.Contains(t, runArgs, "--volumes-from")
-	assert.Contains(t, runArgs, "gotify-mu")
-	assert.Contains(t, runArgs, "/usr/local/bin/gotify-mu-updater")
-	assert.Equal(t, []string{"install", "1.0.2"}, runArgs[len(runArgs)-2:])
+	assert.Contains(t, runArgs, "monita")
+	assert.Contains(t, runArgs, "/usr/local/bin/monita-updater")
+	assert.Equal(t, []string{"install", "1.1.0"}, runArgs[len(runArgs)-2:])
 
 	content, err := os.ReadFile(api.StatusFile)
 	require.NoError(t, err)
 	var status managedUpdateStatus
 	require.NoError(t, json.Unmarshal(content, &status))
 	assert.Equal(t, "preparing", status.State)
-	assert.Equal(t, "1.0.2", status.Version)
+	assert.Equal(t, "1.1.0", status.Version)
 	assert.True(t, status.Ready)
 }
 
