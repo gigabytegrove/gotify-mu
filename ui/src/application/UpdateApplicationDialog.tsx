@@ -107,6 +107,7 @@ export const UpdateApplicationDialog = ({
                             <Typography variant="subtitle2">Channel image</Typography>
                             <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
                                 <Button
+                                    className="channel-image-upload"
                                     component="label"
                                     variant="outlined"
                                     size="small"
@@ -120,6 +121,7 @@ export const UpdateApplicationDialog = ({
                                     />
                                 </Button>
                                 <Button
+                                    className="channel-image-remove"
                                     size="small"
                                     disabled={imageBusy || defaultImage}
                                     onClick={() => void deleteImage()}>
