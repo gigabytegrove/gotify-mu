@@ -400,8 +400,8 @@ func TestRevokeNativeHomeAssistantEndpoint(t *testing.T) {
 
 	api.RevokeNativeHomeAssistant(ctx)
 
-	if recorder.Code != 204 {
-		t.Fatalf("unexpected status %d: %s", recorder.Code, recorder.Body.String())
+	if ctx.Writer.Status() != 204 {
+		t.Fatalf("unexpected status %d: %s", ctx.Writer.Status(), recorder.Body.String())
 	}
 	if db.item.NativeWebhookURL != "" || db.item.NativeSecret != "" || db.item.Status != "not_paired" {
 		t.Fatal("native bridge was not revoked")
