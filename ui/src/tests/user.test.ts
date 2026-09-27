@@ -105,7 +105,7 @@ describe('User', () => {
             await page.click($dialog.button('.save-create'));
             await waitToDisappear(page, $dialog.selector());
 
-            await waitForExists(page, $table.cell(4, Col.Admin), 'Administrator');
+            await waitForExists(page, $table.cell(4, Col.Role), 'Administrator');
         });
         it('made dude admin', hasUser('dude', true, 4));
     });
