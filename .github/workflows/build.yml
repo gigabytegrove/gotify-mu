@@ -154,6 +154,15 @@ jobs:
           make VERSION="${{ steps.release.outputs.version }}" DOCKER_BUILD_PUSH=true build-docker
 
       - if: steps.release.outputs.release == 'true'
+        name: Verify release container is publicly pullable
+        shell: bash
+        run: |
+          set -euo pipefail
+          ANON_DOCKER_CONFIG="$(mktemp -d)"
+          trap 'rm -rf "${ANON_DOCKER_CONFIG}"' EXIT
+          DOCKER_CONFIG="${ANON_DOCKER_CONFIG}" docker pull "ghcr.io/gigabytegrove/gotify-mu:${{ steps.release.outputs.version }}"
+
+      - if: steps.release.outputs.release == 'true'
         name: Ensure release tag points to this commit
         shell: bash
         env:
