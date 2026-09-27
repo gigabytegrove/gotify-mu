@@ -75,7 +75,7 @@ Supported release archives:
 
 ## Updating
 
-Monita can check for published releases from **Settings → Software Update**. Normal updates download a prebuilt release image and restart Monita; they do not rebuild the application locally.
+Monita can check for published releases from **Settings → Software Update**. Starting with 1.1.2, updates are handled entirely inside the single Monita container: Monita downloads and verifies the published runtime, restarts itself in place, and keeps the same persistent data. No updater container or local compilation is used.
 
 For a manual update:
 

@@ -51,9 +51,9 @@ const normalizeTag = (tag: string) => tag.replace(/^v/i, '');
 const activeUpdaterStates = new Set([
     'preparing',
     'downloading',
-    'building',
-    'replacing',
     'verifying',
+    'installing',
+    'restarting',
 ]);
 
 export const useReleaseUpdate = (refreshKey = 0): ReleaseState => {
@@ -214,7 +214,7 @@ export const UpdateStatusCard = () => {
 
         if (state.status === 'ready' && state.classification === 'development') {
             const confirmed = window.confirm(
-                `Replace preview build ${currentVersion} with published ${release.tag_name}? Your application data will be preserved. If verification fails, the updater will restore the previous container automatically.`
+                `Replace preview build ${currentVersion} with published ${release.tag_name}? Your application data will be preserved.`
             );
             if (!confirmed) return;
         }
@@ -349,8 +349,7 @@ const ReleaseUpdateDetails = ({
                 <Alert severity="warning">
                     This server is running preview build {currentVersion}. Installing{' '}
                     {state.release.tag_name} will switch this server to the published release.
-                    Application data is preserved, and the managed updater restores the previous
-                    container automatically if verification fails.
+                    Application data is preserved during the update.
                 </Alert>
             )}
 

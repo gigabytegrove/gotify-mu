@@ -90,7 +90,7 @@ Keep this directory when rebuilding, moving, or updating Monita.
 
 ## Updating
 
-Normal updates use published Monita images. Building from source is not part of the standard update path.
+Starting with Monita 1.1.2, normal updates are handled inside the running Monita container. Monita downloads and verifies the published runtime and restarts itself in place. There is no updater sidecar, temporary updater container, or local compilation step.
 
 ### In the Web UI
 
@@ -201,7 +201,7 @@ Confirm the configured port and verify the health endpoint.
 
 ### Update fails
 
-Check the Software Update page and container logs. Your existing persistent data should remain unchanged if the application container is rebuilt.
+Check the Software Update page and container logs. Your existing persistent data remains in place during an in-app update.
 
 ### Data appears missing
 

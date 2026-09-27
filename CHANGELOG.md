@@ -6,12 +6,22 @@
 
 This changelog highlights user-visible changes in Monita. Older releases may use the previous **Gotify MU** name.
 
+## 1.1.2 — 2026-09-27
+
+### Single-container software updates
+
+- Software updates now run entirely inside the main Monita container.
+- Removed the updater worker container and Docker socket requirement.
+- Monita downloads the published runtime for the server architecture, verifies its checksum and version, installs it into persistent Monita data, and restarts itself in place.
+- Updated runtimes survive normal container restarts because the active runtime is stored with Monita's persistent data.
+- Fresh installations and manual upgrades can continue using prebuilt container images; no local compilation is required.
+
 ## 1.1.1 — 2026-09-27
 
 ### Faster installs and updates
 
 - Normal Docker installations now download a prebuilt Monita image instead of compiling Monita on the server.
-- In-app updates now download the published release image, verify it, restart Monita, and confirm the updated service is healthy.
+- Prepared the prebuilt release-image distribution used by later update improvements.
 - Local source builds remain available for development and troubleshooting.
 - Improved container publishing for common 64-bit Intel/AMD and ARM systems.
 

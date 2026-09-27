@@ -102,6 +102,13 @@ jobs:
           echo "LD_FLAGS=-w -s -X main.Version=${VERSION} -X main.BuildDate=$(date "+%F-%T") -X main.Commit=$(git rev-parse --verify HEAD) -X main.Mode=prod" >> "${GITHUB_ENV}"
 
       - if: steps.release.outputs.release == 'true'
+        name: Build self-update runtime binaries
+        run: |
+          mkdir -p build
+          make build-linux-amd64 build-linux-arm64
+          chmod +x build/monita-linux-amd64 build/monita-linux-arm64
+
+      - if: steps.release.outputs.release == 'true'
         name: Build verified source package
         run: |
           set -euo pipefail
@@ -114,7 +121,11 @@ jobs:
             HEAD
           (
             cd build
-            sha256sum "monita-v${VERSION}-source.zip" > SHA256SUMS
+            sha256sum \
+              "monita-v${VERSION}-source.zip" \
+              monita-linux-amd64 \
+              monita-linux-arm64 \
+              > SHA256SUMS
           )
           ls -lath build
 
@@ -151,6 +162,28 @@ jobs:
         name: Publish release container
         run: |
           make VERSION="${{ steps.release.outputs.version }}" DOCKER_BUILD_PUSH=true build-docker
+
+      - if: steps.release.outputs.release == 'true'
+        name: Export public prebuilt image archives
+        run: |
+          set -euo pipefail
+          VERSION="${{ steps.release.outputs.version }}"
+
+          docker pull --platform linux/amd64 "ghcr.io/gigabytegrove/monita:${VERSION}"
+          docker tag "ghcr.io/gigabytegrove/monita:${VERSION}" "monita:${VERSION}-amd64"
+          docker save "monita:${VERSION}-amd64" | gzip -1 > "build/monita-v${VERSION}-linux-amd64.tar.gz"
+
+          docker pull --platform linux/arm64 "ghcr.io/gigabytegrove/monita:${VERSION}"
+          docker tag "ghcr.io/gigabytegrove/monita:${VERSION}" "monita:${VERSION}-arm64"
+          docker save "monita:${VERSION}-arm64" | gzip -1 > "build/monita-v${VERSION}-linux-arm64.tar.gz"
+
+          (
+            cd build
+            sha256sum \
+              "monita-v${VERSION}-linux-amd64.tar.gz" \
+              "monita-v${VERSION}-linux-arm64.tar.gz" \
+              > PREBUILT-SHA256SUMS
+          )
 
       - if: steps.release.outputs.release == 'true'
         name: Ensure release tag points to this commit
