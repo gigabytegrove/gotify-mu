@@ -65,8 +65,8 @@ jobs:
       - name: Download project tools
         run: make download-tools
 
-      - name: Full test suite
-        run: make test
+      - name: Go test suite with coverage
+        run: make test-coverage
 
       - name: Repository checks
         run: make check-ci

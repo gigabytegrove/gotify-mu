@@ -88,7 +88,8 @@ jobs:
           skip-cache: true
       - run: go mod download
       - run: make download-tools
-      - run: make test
+      - name: Go test suite with coverage
+        run: make test-coverage
       - run: make check-ci
       - uses: codecov/codecov-action@303a32d7a59b442fa8d48b6a1cc6825c09c847a5 # v7
         with:
