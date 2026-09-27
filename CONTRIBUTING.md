@@ -1,55 +1,33 @@
 <p align="center">
-  <img src="assets/monita-banner.png" alt="Monita" width="720">
+  <img src="assets/monita-banner.svg" alt="Monita" width="720">
 </p>
 
 # Contributing to Monita
 
 Thanks for your interest in Monita.
 
-Monita is a compatibility-focused fork of [Gotify Server](https://github.com/gotify/server) that adds real multi-user notification channels.
+Contributions are welcome for bug fixes, documentation, integrations, accessibility, user experience, and new features.
 
-## Where to contribute
+## Before opening a pull request
 
-For MU-specific bugs, features, documentation, and Web UI changes, use this repository:
+Please:
 
-https://github.com/gigabytegrove/gotify-mu
-
-If a problem also exists unchanged in upstream Gotify, please say so in the issue. That helps us decide whether the fix belongs only here or should also be proposed upstream.
-
-## Compatibility rules
-
-Changes should preserve normal Gotify clients and integrations whenever practical.
-
-In particular:
-
-- do not casually change the `github.com/gotify/server/v3` Go module path
-- preserve existing Gotify API routes such as `/application`, `/message`, and `/stream`
-- keep existing application-token and client-token behavior compatible
-- treat new MU response fields as additive
-- do not grant publish permission simply because a user can receive/read a channel
-- migrations must preserve existing users, applications, tokens, and messages
-
-Visible UI terminology may use **Channels** even where the compatibility API still uses **Application** internally.
-
-## Pull requests
-
-Use a branch and open a pull request against `master`.
-
-Please include:
-
-- what changed
-- why it changed
-- compatibility impact
-- migration impact, if any
-- tests performed
-- screenshots for meaningful Web UI changes
+- check existing Issues and pull requests
+- keep changes focused
+- explain what problem the change solves
+- preserve Gotify compatibility where practical
+- include screenshots for visible UI changes
+- add or update tests when behavior changes
 
 ## Development
 
-Server code is Go.  
-The Web UI is TypeScript/React.
+Monita uses:
 
-Common checks:
+- Go for the server
+- TypeScript and React for the Web UI
+- Docker for the recommended deployment model
+
+Common checks include:
 
 ```bash
 go test ./...
@@ -60,6 +38,30 @@ yarn test
 yarn build
 ```
 
-## Upstream credit
+## Compatibility
 
-Monita is derived from Gotify and remains under the MIT License. Keep applicable upstream copyright and license notices intact.
+Monita is built from the Gotify Server codebase and continues to support Gotify-compatible clients and integrations.
+
+Changes should avoid breaking existing users unless there is a clear migration path.
+
+## Pull requests
+
+Open pull requests against `master`.
+
+A useful pull request description includes:
+
+- what changed
+- why it changed
+- user-visible impact
+- compatibility impact
+- testing performed
+
+## Security issues
+
+Do not open a public issue for a suspected unpatched vulnerability.
+
+See [SECURITY.md](SECURITY.md) for private reporting instructions.
+
+## License
+
+By contributing, you agree that your contribution may be distributed under the project's MIT License.

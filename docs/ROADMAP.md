@@ -1,199 +1,91 @@
 <p align="center">
-  <img src="../assets/monita-banner.png" alt="Monita" width="720">
+  <img src="../assets/monita-banner.svg" alt="Monita" width="720">
 </p>
 
-# Monita Product Roadmap
+# Monita Roadmap
 
-Monita keeps Gotify REST/WebSocket and token compatibility where practical while extending the server into a multi-user notification and operations platform.
+Monita is focused on becoming a polished self-hosted platform for notifications, messaging, automation, and integrations.
 
-## v0.5 platform
+The roadmap is intentionally high-level. Exact implementation details may change as the project evolves.
 
-The following capabilities are implemented in the v0.5 preview branch.
+## Current priorities
 
-### Identity and security
+### Reliability
 
-- local username/password authentication
-- OIDC
-- LDAP / Active Directory
-- TOTP MFA
-- recovery codes
-- WebAuthn/passkeys
-- administrator MFA policy
-- configurable session/elevation policy
-- login throttling
-- active-session visibility and revocation
-- scoped service accounts/API credentials
-- encrypted server-side secret storage
-- sensitive request/log redaction
-- security/admin Audit Log with export and retention
+- smoother upgrades
+- clearer update progress
+- safer backup and restore workflows
+- better diagnostics
+- continued compatibility with existing Gotify clients
 
-### Channels and permissions
+### User experience
 
-- shared Channels
-- Global Channels
-- ownership transfer
-- Owner / Manager / Publisher / Member / Read Only roles
-- Group-to-Channel assignment
-- per-user notification preference
-- per-user archive/restore
-- Chat Channel posting
-- safe destructive-action rules
+- simpler administration
+- clearer Channel and permission management
+- better mobile and responsive behavior
+- consistent setup flows across integrations
+- improved onboarding for new installations
 
-### Collaboration
+### Notifications and messaging
 
-- replies and threads
-- reactions
-- mentions
-- message acknowledgement and acknowledgement history
-- assignment
-- resolve/reopen
-- read/unread state
-- attachments
-- message templates
-- saved searches
+- richer collaboration in Chat Channels
+- better attachment handling
+- improved message organization
+- expanded search and filtering
+- better acknowledgement and assignment workflows
 
-### Notification intelligence
+### Automation
 
-- Quiet Hours suppression
-- deferred Quiet Hours delivery
-- priority bypass
-- Digests
-- stored Digest summaries
-- one-time/hourly/daily/weekly schedules
-- cron schedules
-- timezone-aware scheduling
-- excluded dates
-- end dates and maximum runs
-- misfire policy
-- schedule run history
-- Channel/user/Group Escalation targets
-- repeat Escalations
-- acknowledgement cancellation
-- structured escalation lineage
-- multi-instance scheduler leases and delivery deduplication
+- improved schedules
+- more flexible escalation workflows
+- better Quiet Hours and Digest controls
+- clearer automation history and status
 
-### Native integrations
+### Integrations
 
-#### Webhook Router
+Monita will continue improving first-party support for:
 
-- generated inbound URLs
-- encrypted secrets and hashed lookup
-- HMAC request signing
-- replay protection
-- source CIDR restrictions
-- per-route/per-source rate limiting
-- JSON title/message/priority extraction
-- array-aware field paths
-- conditional field/value matching
-- title/message templates
-- explicit request-size limit
-- retained delivery history
+- Home Assistant
+- Webhooks
+- MQTT
+- email
+- RSS / Atom
+- Syslog
+- calendars
 
-#### MQTT
+Additional integrations may be added when there is a clear real-world use case.
 
-- MQTT 5
-- MQTT 3.1.1
-- QoS 0/1/2 receive flows
-- bounded packet size
-- username/password authentication
-- custom CA certificates
-- mutual TLS client certificates
-- topic subscriptions
-- reconnect behavior
-- connection testing
-- status/last-connect/last-message/error visibility
+### Security
 
-#### Home Assistant
+Security work remains ongoing, including:
 
-- WebSocket event subscriptions
-- event-type filtering
-- entity filtering
-- event-data field/value filtering
-- Channel routing
-- outbound events
-- test action
-- reconnect and health/error visibility
+- authentication improvements
+- stronger administrative controls
+- safer plugin handling
+- dependency and release maintenance
+- clearer security guidance for self-hosted deployments
 
-### First-party connectors
+## Monita for Android
 
-- Email Delivery
-- SMTP Receiver
-- RSS / Atom Monitor
-- Syslog Receiver
-- Calendar / iCal
+Monita for Android is a separate client project designed to provide a native Monita experience while retaining compatible notification behavior.
 
-These are native first-party connectors rather than optional third-party plugins because they are supported as part of the Monita server.
-
-### Plugin platform
-
-- existing compatible Gotify Go plugin support
-- administrator Web UI install
-- SHA-256 verification
-- Ed25519 signatures and trusted signing keys
-- unsigned installation disabled by default
-- Plugin Catalog
-- catalog install/update
-- verified manual update staging
-- uninstall
-- plugin-created messages routed through Monita delivery policy
-
-Native Go plugins remain trusted in-process extensions. They are not a sandbox boundary.
-
-### Operations
-
-- system/operations dashboard
-- database and storage information
-- queue/automation counters
-- active sessions
-- backup creation/download
-- restore staging
-- configuration export
-- diagnostics
-- audit export/retention
-- message/attachment/automation/connector cleanup policies
-- managed in-app Docker updates with checksum verification, full-test build gate, health verification, and rollback
-
-### Release engineering
-
-- read-only pull-request CI
-- SHA-pinned GitHub Actions
-- Web UI build
-- Go lint
-- full Go tests
-- repository checks
-- production Docker build with tests enabled
-- dependency/filesystem vulnerability scanning
-- container vulnerability scanning
-- SPDX SBOM
-- release SHA-256 checksums
-- build provenance attestation
-
-## After v0.5
-
-The v0.5 goal is to close the server-side audit backlog rather than continuously add unrelated scope. Future work should be driven by real operational feedback.
-
-Potential later work:
-
-- an isolated out-of-process extension protocol for integrations that should not execute as trusted native Go plugins
-- more advanced outbound integration workflow composition if real use cases require it
-- larger-scale performance tuning based on measured installations
-- additional first-party connectors only when there is a demonstrated need
-
-## Monita Android
-
-A dedicated Android client remains a separate client project. The server preserves normal official Gotify Android receive/display compatibility.
-
-A Monita Android client can later expose MU-specific features such as:
+Planned and ongoing areas include:
 
 - Channel management
-- compose/send
-- threads/replies
-- reactions
-- acknowledgements
-- assignment and resolve/reopen
-- attachments
-- Quiet Hours/Digest controls
-- account security/MFA
+- chat
+- media and image notifications
+- mentions
+- replies and reactions
 - multiple-server support
+- account security
+- biometric access controls
 
-The Android client should continue using compatible Gotify REST/WebSocket behavior for existing functions and layer Monita endpoints on top.
+## Home Assistant
+
+Monita for Home Assistant is a separate integration project focused on easy pairing, notification delivery, image support, and automation-friendly workflows.
+
+## Feedback
+
+The roadmap is driven by real usage.
+
+Feature requests and bug reports are welcome through GitHub Issues.

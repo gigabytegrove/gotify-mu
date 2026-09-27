@@ -1,20 +1,23 @@
 ---
 name: Feature request
-about: Suggest an idea for this project
+about: Suggest an improvement for Monita
 title: ''
 labels: a:feature
 assignees: ''
-
 ---
 
-**Is your feature request related to a problem? Please describe.**
-A clear and concise description of what the problem is. Ex. I'm always frustrated when [...]
+## What would you like Monita to do?
 
-**Describe the solution you'd like**
-A clear and concise description of what you want to happen.
+Describe the feature or improvement.
 
-**Describe alternatives you've considered**
-A clear and concise description of any alternative solutions or features you've considered.
+## What problem would it solve?
 
-**Additional context**
-Add any other context or screenshots about the feature request here.
+Explain the user need or workflow this would improve.
+
+## How would you expect it to work?
+
+Describe the experience from a user's point of view.
+
+## Additional context
+
+Add screenshots, examples, or related information if useful.

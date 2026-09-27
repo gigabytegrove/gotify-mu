@@ -2,353 +2,207 @@
   <img src="../assets/monita-banner.svg" alt="Monita" width="720">
 </p>
 
-# Monita Deployment Guide
+# Deploying Monita
 
-This document is the maintained deployment, validation, update, backup, and rollback reference for Monita.
+This guide covers a normal Monita installation, updates, backups, and basic troubleshooting.
 
-## Release state
+## Recommended installation
 
-- **Current published release:** v1.0.0
-- **Previous rollback baseline:** v0.5.0
+Docker Compose is the recommended way to run Monita.
 
-The v1.0.0 release commit is validated through the repository gate before publication. Documentation-only changes are part of the release candidate and pass the same gate.
+### Requirements
 
-## Supported deployment models
+You need:
 
-Monita supports:
+- a Linux system
+- Git
+- Docker
+- Docker Compose
 
-1. Docker Compose with one persistent Monita container and on-demand managed updates.
-2. Manual Docker deployment with a persistent data directory.
-3. Native source builds for development/testing.
-
-Docker is the recommended deployment model.
-
-## Persistent data
-
-The container stores persistent state under:
-
-```text
-/app/data
-```
-
-For the manual deployment used during project validation, that is mounted from:
-
-```text
-/opt/monita-data
-```
-
-Do not replace or delete the persistent data directory during a normal container upgrade.
-
-A release that adds database migrations must have a verified pre-upgrade backup before the old container is replaced.
-
-## Docker Compose deployment
-
-Clone the repository:
+### Install
 
 ```bash
 cd /opt
 git clone https://github.com/gigabytegrove/monita.git
 cd monita
 cp .env.example .env
+nano .env
 ```
 
-Edit `.env` and set at minimum:
+Set at least:
 
 ```env
-MONITA_PORT=8080
-MONITA_DATA_DIR=./data
 GOTIFY_DEFAULTUSER_NAME=admin
 GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
 ```
 
-For an existing installation, set `MONITA_DATA_DIR` to the exact host directory already mounted at `/app/data`. Do not change that path during an upgrade. Compose also loads `.env` into the application container so existing `GOTIFY_*` runtime settings can be preserved instead of silently reverting to defaults.
-
-Build with the full server test suite enabled:
+Then start Monita:
 
 ```bash
-docker compose build --build-arg RUN_TESTS=1
+docker compose up -d --build
 ```
 
-Start the services:
+Open:
+
+```text
+http://SERVER-IP:8080
+```
+
+## Configuration
+
+Monita uses environment variables from `.env`.
+
+Common settings include:
+
+```env
+MONITA_PORT=8080
+MONITA_DATA_DIR=./data
+MONITA_RECEIVER_BIND=127.0.0.1
+MONITA_SMTP_PORT=2525
+MONITA_SYSLOG_PORT=5514
+```
+
+Gotify-compatible `GOTIFY_*` settings remain supported where required for compatibility.
+
+## Persistent data
+
+Monita stores persistent application data in the configured data directory.
+
+For the default Compose setup:
+
+```text
+./data
+```
+
+Keep this directory when rebuilding, moving, or updating Monita.
+
+## Updating
+
+### In the Web UI
+
+Go to:
+
+**Settings → Software Update**
+
+Monita checks for published releases and can install supported updates from the Web UI.
+
+### Manual update
+
+```bash
+cd /opt/monita
+git pull --ff-only origin master
+docker compose build
+docker compose up -d
+```
+
+After an update, verify that the container is healthy:
+
+```bash
+docker ps --filter name=monita
+curl -fsS http://127.0.0.1:8080/health
+```
+
+## Backups
+
+Before major upgrades or configuration changes, back up the Monita data directory.
+
+For the default installation:
+
+```bash
+cd /opt/monita
+tar -czf monita-backup-$(date +%Y%m%d-%H%M%S).tar.gz data
+```
+
+Store important backups somewhere outside the Monita server.
+
+If your installation uses external databases, custom certificates, or external authentication, include the related configuration in your backup plan.
+
+## Restoring
+
+Stop Monita before replacing its persistent data.
+
+```bash
+cd /opt/monita
+docker compose down
+```
+
+Restore your saved data, then start Monita again:
 
 ```bash
 docker compose up -d
 ```
 
-Verify:
+## Logs
+
+View recent logs:
+
+```bash
+docker logs --tail 200 monita
+```
+
+Follow logs live:
+
+```bash
+docker logs -f monita
+```
+
+## Health check
 
 ```bash
 curl -fsS http://127.0.0.1:8080/health
-docker ps --filter name=monita
-docker logs --tail 100 monita
 ```
 
-A healthy server returns:
+A healthy installation should report a healthy application and database.
 
-```json
-{"health":"green","database":"green"}
+## Ports
+
+The default Web UI/API port is:
+
+```text
+8080
 ```
+
+Optional receiver services may use additional ports depending on your configuration.
+
+Only expose ports that your environment actually needs.
+
+## HTTPS
+
+For internet-facing deployments, place Monita behind a trusted HTTPS reverse proxy.
+
+Do not expose administrative interfaces or optional receiver ports publicly unless you specifically need them and have secured them appropriately.
+
+## Troubleshooting
+
+### Container is not running
+
+```bash
+docker ps -a --filter name=monita
+docker logs --tail 200 monita
+```
+
+### Web UI does not load
+
+Confirm the configured port and verify the health endpoint.
+
+### Update fails
+
+Check the Software Update page and container logs. Your existing persistent data should remain unchanged if the application container is rebuilt.
+
+### Data appears missing
+
+Confirm that the same persistent data directory is still mounted into the container.
 
 ## Manual Docker deployment
 
-A manual deployment should always keep application data outside the container.
-
-Example build:
+Compose is recommended, but Monita can also be run directly with Docker.
 
 ```bash
-cd /opt/monita
-
-COMMIT="$(git rev-parse HEAD)"
-SHORT_COMMIT="$(git rev-parse --short HEAD)"
-BUILD_DATE="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
-
-docker build \
-  --build-arg BUILD_JS=1 \
-  --build-arg RUN_TESTS=1 \
-  --build-arg GO_VERSION=1.26.0 \
-  --build-arg MONITA_VERSION="preview-${SHORT_COMMIT}" \
-  --build-arg MONITA_COMMIT="${COMMIT}" \
-  --build-arg MONITA_BUILD_DATE="${BUILD_DATE}" \
-  -f docker/Dockerfile \
-  -t monita:preview \
-  .
+docker build   --build-arg BUILD_JS=1   --build-arg GO_VERSION=1.26.0   -f docker/Dockerfile   -t monita:local   .
 ```
 
-The build must finish successfully before the running server is stopped.
+Then run the image with a persistent `/app/data` mount and the environment variables required by your installation.
 
-## Validation gate
+## Security
 
-Preview and development deployment follows a strict gate:
-
-1. Build the complete Web UI.
-2. Run the full Go test suite with `go test -v ./...`.
-3. Build the final server binary/container.
-4. Only after the complete build passes, stop the running container.
-5. Create and verify a pre-upgrade data backup.
-6. Preserve the previous container as a rollback container.
-7. Start the new container against the persistent data directory.
-8. Wait for both application and database health to become green.
-9. Keep the previous container and pre-upgrade backup until live validation is complete.
-
-The Dockerfile performs the full Go suite when built with:
-
-```text
-RUN_TESTS=1
-```
-
-A failed build or failed test suite must not proceed to the replacement stage.
-
-## Safe backup before an upgrade
-
-For a manual deployment using `/opt/monita-data`:
-
-```bash
-BACKUP_DIR="/opt/monita-backups"
-TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-
-mkdir -p "${BACKUP_DIR}"
-
-docker stop monita
-
-tar \
-  -C /opt \
-  -czf "${BACKUP_DIR}/pre-upgrade-${TIMESTAMP}.tar.gz" \
-  monita-data
-
-tar -tzf "${BACKUP_DIR}/pre-upgrade-${TIMESTAMP}.tar.gz" >/dev/null
-```
-
-If backup creation or verification fails, restart the existing container and do not continue.
-
-## Container replacement
-
-Preserve the old container before starting the new one:
-
-```bash
-TIMESTAMP="$(date +%Y%m%d-%H%M%S)"
-docker rename monita "monita-rollback-${TIMESTAMP}"
-```
-
-The replacement must use the same persistent data mount and required environment configuration.
-
-Example:
-
-```bash
-docker run -d \
-  --name monita \
-  --restart unless-stopped \
-  --network monita-system \
-  -p 8080:80 \
-  --env-file /path/to/preserved.env \
-  -v /opt/monita-data:/app/data \
-  monita:preview
-```
-
-Then verify:
-
-```bash
-curl -fsS http://127.0.0.1:8080/health
-docker logs --tail 150 monita
-```
-
-## Rollback after a migrated preview
-
-Do **not** simply start an older Monita container against a database that has already been migrated by a newer preview.
-
-For a rollback to the pre-upgrade version:
-
-1. Stop and remove the failed/new container.
-2. Preserve the failed preview data directory for investigation.
-3. Restore the pre-upgrade data backup.
-4. Rename the preserved old container back to `monita`.
-5. Start the old container.
-6. Verify health.
-
-Example:
-
-```bash
-docker rm -f monita
-
-mv /opt/monita-data "/opt/monita-data-failed-$(date +%Y%m%d-%H%M%S)"
-
-tar -C /opt -xzf /opt/monita-backups/PRE-UPGRADE-BACKUP.tar.gz
-
-docker rename OLD-ROLLBACK-CONTAINER monita
-docker start monita
-
-curl -fsS http://127.0.0.1:8080/health
-```
-
-Keep the failed preview data until the issue has been understood.
-
-## Managed in-app updates
-
-Published releases can be installed from **Settings → Software Update**.
-
-At rest, Docker Compose runs exactly one persistent container: `monita`. The main container has Docker socket access for managed updates. When an administrator starts an update, Monita launches a short-lived `monita-update-worker`, preserves the existing runtime configuration and `/app/data` mount, verifies the replacement container, rolls back automatically if verification fails, and removes the worker when finished.
-
-There is no persistent updater sidecar and no updater shared token.
-
-Docker socket access is privileged host access. Installations that do not want managed self-updates should omit the Docker socket mount and update manually.
-
-## Preview builds versus published releases
-
-Preview branches are deployed manually and must pass the full validation gate.
-
-The in-app updater is intended for **published numbered releases**. A preview branch should not be presented as a normal downloadable release until it has been accepted, merged, tagged, and published.
-
-## v1.1.0 live validation checklist
-
-Before v1.1.0 is locked as a release:
-
-### Core compatibility
-
-- existing administrator login works
-- existing users, Groups, Channels, messages, archives, and tokens are intact
-- existing application tokens continue to publish
-- existing client-token access works
-- official Gotify Android receive/display behavior remains normal
-- shared and Global Channel delivery remains correct
-- per-user mute, archive/restore, and destructive-action protections remain correct
-
-### Identity and security
-
-- local authentication works
-- configured OIDC authentication remains functional
-- LDAP / Active Directory authentication works when enabled
-- TOTP MFA enrollment, verification, recovery codes, and policy enforcement work
-- WebAuthn/passkey registration and authentication work
-- active-session listing and revocation work
-- service-account/API credentials enforce their configured scopes
-- protected integration and connector secrets are not returned in plaintext
-- login throttling and security-event auditing work
-
-### Channels, permissions, and collaboration
-
-- Channel roles enforce Owner, Manager, Publisher, Member, and Read Only permissions
-- Group-to-Channel assignment grants the intended inherited access
-- replies/threads, reactions, mentions, assignment, resolve/reopen, and read state work
-- attachments can be created, retrieved, and removed under the correct permissions
-- message templates and saved searches persist and execute correctly
-- acknowledgement history is visible and accurate
-
-### Native integrations
-
-- Webhook Router accepts valid requests and rejects invalid signature, replay, CIDR, rate-limit, and oversized-payload cases
-- MQTT connects using configured protocol/TLS settings and routes QoS 0/1/2 messages
-- Home Assistant receives filtered events and can send an outbound test event
-- integration health, last-event/message, reconnect, and error state are accurate
-
-### First-party connectors
-
-- Email Delivery sends qualifying notifications through SMTP
-- SMTP Receiver accepts permitted mail and routes it to the intended Channel
-- RSS / Atom polling applies duplicate, title, and category filters
-- Syslog Receiver applies source/facility/severity filters and duplicate suppression
-- Calendar / iCal polling generates reminders once per intended event/window
-
-### Automation
-
-- one-time, hourly, daily, weekly, and cron Scheduled Notifications run correctly
-- excluded dates, end dates, maximum runs, and misfire behavior are honored
-- schedule execution history records outcomes
-- Quiet Hours suppression and deferred delivery work
-- Digest queues and stored summaries work
-- Escalations honor acknowledgement cancellation, repeat rules, targets, and depth protection
-- multi-instance leases prevent duplicate scheduler/integration execution
-
-### Plugins
-
-- verified plugin upload/install works
-- checksum/signature/trusted-key policy is enforced
-- Plugin Catalog install/update works
-- plugin update and uninstall work
-- plugin-created notifications pass through Monita delivery policy
-
-### Operations and updater
-
-- Operations counters and diagnostics load
-- backup creation/download works
-- restore staging validates an accepted backup without modifying live data until explicitly applied
-- configuration and Audit Log export work
-- retention cleanup runs without removing protected/live records
-- Settings remains stable and does not enter a refresh loop
-- managed update status exposes meaningful progress
-- checksum verification, full-test build, health verification, and automatic container rollback behave correctly
-
-### Final deployment gate
-
-- complete Web UI build passes
-- Go lint passes
-- complete Go test suite passes
-- repository consistency checks pass
-- production Docker build with `RUN_TESTS=1` passes
-- filesystem/dependency and built-container vulnerability gates pass
-- SPDX SBOM is generated
-- database migrations succeed against a verified copy of the existing deployment data
-- application and database health are green after upgrade
-- rollback container and verified pre-upgrade backup are retained until live acceptance is complete
-
-## Release publication
-
-After a preview is accepted:
-
-1. Merge the release PR.
-2. Confirm `VERSION` contains the intended release number.
-3. Create/publish the release tag.
-4. Publish release notes and downloadable assets.
-5. Install the official numbered release build.
-6. Verify health and core compatibility again.
-7. Only then remove the previous rollback container and old backup according to the administrator's retention policy.
-
-## Secrets
-
-Never commit:
-
-- administrator passwords
-- MQTT passwords
-- Home Assistant long-lived access tokens
-- SMTP/mail credentials
-- other integration credentials
-
-Saved integration credentials must remain masked in the Web UI and should not be written into ordinary application logs.
+For deployment security guidance, see [SECURITY.md](../SECURITY.md) and [Security overview](SECURITY_ROADMAP.md).

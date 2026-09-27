@@ -1,48 +1,45 @@
 ---
 name: Bug report
-about: Found a bug? Tell us and help us improve
+about: Report a problem with Monita
 title: ''
 labels: a:bug
 assignees: ''
-
 ---
 
-**Can the issue be reproduced with the latest Gotify MU master/release? (y/n)**
+## What happened?
 
-**Does the same issue also reproduce on upstream Gotify? (yes/no/not tested)**
+Describe the problem in your own words.
 
-**Which one is the environment Gotify MU server is running in?**
-- [ ] Docker
-- [ ] Linux machine
-- [ ] Windows machine
-<details><summary>Docker startup command or config file here (please mask sensitive information)</summary><br>
+## What did you expect?
 
-```
+Tell us what you expected Monita to do.
 
-```
-</details>
+## Monita version
 
-**Do you have an reverse proxy installed in front of Gotify MU? (Please select None if the problem can be reproduced without the presense of a reverse proxy)**
-- [ ] None
-- [ ] Nginx
-- [ ] Apache
-- [ ] Caddy
-<details><summary>Reverse proxy configuration (please mask sensitive information)</summary><br>
+Example: `1.1.0`
 
-```
+## Installation
 
-```
-</details>
+- [ ] Docker / Docker Compose
+- [ ] Linux native
+- [ ] Windows native
+- [ ] Other
 
-**On which client do you experience problems? (Select as many as you can see)**
-- [ ] WebUI
-- [ ] Gotify CLI
-- [ ] Official Gotify Android app
-- [ ] 3rd-party API call (Please include your code)
+## Where did you see the problem?
 
+- [ ] Web UI
+- [ ] Monita for Android
+- [ ] Gotify-compatible client
+- [ ] Home Assistant
+- [ ] API / integration
+- [ ] Other
 
-**What did you do?**
+## Steps to reproduce
 
-**What did you expect to see?**
+Please provide the smallest set of steps that reliably reproduces the issue.
 
-**What did you see instead? (Include screenshots, android logcat/request dumps if possible)**
+## Helpful details
+
+Screenshots and relevant error messages are welcome.
+
+Please remove passwords, tokens, private URLs, personal information, and other sensitive data before posting logs or configuration.
