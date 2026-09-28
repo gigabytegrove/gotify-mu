@@ -6,6 +6,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/server/v3/auth"
@@ -91,6 +92,9 @@ func (s *SessionSuite) Test_Login_Success() {
 	assert.Len(s.T(), clients, 1)
 	assert.Equal(s.T(), "test-browser", clients[0].Name)
 	assert.Equal(s.T(), uint(auth.CookieMaxAge), clients[0].ExpiresAfterInactivitySeconds)
+assert.NotNil(s.T(), clients[0].ElevatedUntil)
+assert.WithinDuration(s.T(), time.Now().Add(4*time.Hour), *clients[0].ElevatedUntil, 5*time.Second)
+assert.Contains(s.T(), body, `"elevationMinutes":240`)
 }
 
 func (s *SessionSuite) Test_Login_LocalAuthDisabled() {
