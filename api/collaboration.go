@@ -550,7 +550,21 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 
 		mentions, err := a.resolveMentions(app.ID, body, nil)
 		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
-	extraValues := map[string]any{}
+
+		extraValues := map[string]any{}
+		if rawExtras := strings.TrimSpace(ctx.PostForm("extras")); rawExtras != "" {
+			if len(rawExtras) > 64<<10 {
+				ctx.AbortWithError(http.StatusBadRequest, errors.New("chat message extras exceed 64 KiB"))
+				return
+			}
+			if err := json.Unmarshal([]byte(rawExtras), &extraValues); err != nil {
+				ctx.AbortWithError(http.StatusBadRequest, errors.New("chat message extras must be a JSON object"))
+				return
+			}
+			if extraValues == nil {
+				extraValues = map[string]any{}
+			}
+		}
 		if len(mentions) > 0 { extraValues["gotify::mu::mentionUserIds"] = mentions }
 	extraBytes, _ := json.Marshal(extraValues)
 		if len(extraValues) == 0 { extraBytes = nil }
