@@ -149,6 +149,8 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 	}
 	policy, policyErr := a.DB.GetSecurityPolicy()
 	if !successOrAbort(ctx, 500, policyErr) { return }
+	elevationMinutes := policy.ElevationMinutes
+	if elevationMinutes <= 0 { elevationMinutes = int(model.DefaultElevationDuration / time.Minute) }
 	mfa, mfaErr := a.DB.GetUserMFA(user.ID)
 	if !successOrAbort(ctx, 500, mfaErr) { return }
 	passkeys, passkeyErr := a.DB.GetPasskeysByUser(user.ID)
@@ -170,7 +172,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		MFARequired: mfaRequired,
 		AuthProvider: provider,
 		PasskeyCount: len(passkeys),
-		ElevationMinutes: policy.ElevationMinutes,
+		ElevationMinutes: elevationMinutes,
 	}
 	client := auth.GetClient(ctx)
 	if client != nil {
