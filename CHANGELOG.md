@@ -4,6 +4,18 @@
 
 # Changelog
 
+## 1.1.7 — 2026-09-27
+
+### Chat image messages
+
+- Chat Channels now support sending image attachments directly from the composer on desktop and mobile web.
+- The Chat composer accepts JPEG, PNG, GIF, and WebP images, supports up to eight images per message, shows previews before sending, supports drag/drop and pasted images, and allows image-only messages.
+- Image attachments are persisted before realtime delivery so recipients receive complete attachment metadata with the original message event.
+- Images render inline in message history and open at full size when selected.
+- Authenticated image attachment downloads are served inline while non-image attachments retain download behavior.
+- Realtime message conversion now preserves extras and collaboration metadata, including attachment information.
+- The MU capability document now advertises `chatImages: true` for companion clients.
+
 ## 1.1.6 — 2026-09-27
 
 ### Channel images on new and existing Channels
