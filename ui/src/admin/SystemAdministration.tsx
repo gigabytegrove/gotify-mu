@@ -144,7 +144,7 @@ const SystemAdministration = () => {
                                     elevationMinutes: Number(event.target.value),
                                 })
                             }
-                            helperText="Minutes before protected administrative actions require identity confirmation again."
+                            helperText="Minutes before sensitive administrative actions require identity confirmation again. Routine viewing and normal automation work do not require elevation."
                             slotProps={{htmlInput: {min: 1, max: 1440}}}
                         />
                         <FormControlLabel
