@@ -36,6 +36,7 @@ type Notifier interface {
 type Database interface {
 	CreateMessage(message *model.Message) error
 	CreateMessageOnce(message *model.Message) (bool, error)
+	DeleteMessageByID(id uint) error
 	GetMessageByID(id uint) (*model.Message, error)
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationRecipientUserIDs(applicationID uint) ([]uint, error)
@@ -172,16 +173,46 @@ func (e *Engine) StoreAndDeliver(msg *model.Message) (*model.MessageExternal, er
 	return e.storeAndDeliver(msg, true)
 }
 
+// StorePreparedAndDeliver stores a message, runs prepare after the message ID is
+// assigned but before realtime delivery, then delivers the fully prepared message.
+// This is used by Chat uploads so recipients never see an incomplete attachment set.
+func (e *Engine) StorePreparedAndDeliver(
+	msg *model.Message,
+	prepare func(*model.Message) error,
+) (*model.MessageExternal, error) {
+	if msg.Date.IsZero() {
+		msg.Date = time.Now()
+	}
+	created, err := e.db.CreateMessageOnce(msg)
+	if err != nil {
+		return nil, err
+	}
+	if !created {
+		return externalMessage(msg), nil
+	}
+	if prepare != nil {
+		if err := prepare(msg); err != nil {
+			_ = e.db.DeleteMessageByID(msg.ID)
+			return nil, err
+		}
+	}
+	return e.deliverStored(msg, true)
+}
+
 func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*model.MessageExternal, error) {
 	if msg.Date.IsZero() {
 		msg.Date = time.Now()
 	}
 	created, err := e.db.CreateMessageOnce(msg)
 	if err != nil { return nil, err }
-	external := externalMessage(msg)
 	if !created {
-		return external, nil
+		return externalMessage(msg), nil
 	}
+	return e.deliverStored(msg, allowEscalation)
+}
+
+func (e *Engine) deliverStored(msg *model.Message, allowEscalation bool) (*model.MessageExternal, error) {
+	external := externalMessage(msg)
 	recipients, err := e.db.GetApplicationRecipientUserIDs(msg.ApplicationID)
 	if err != nil {
 		return nil, err
@@ -1417,7 +1448,7 @@ func lookupMapPath(root map[string]any, path string) (any, bool) {
 
 func externalMessage(msg *model.Message) *model.MessageExternal {
 	priority := msg.Priority
-	return &model.MessageExternal{
+	external := &model.MessageExternal{
 		ID: msg.ID,
 		ApplicationID: msg.ApplicationID,
 		Message: msg.Message,
@@ -1430,12 +1461,18 @@ func externalMessage(msg *model.Message) *model.MessageExternal {
 		RootMessageID: msg.RootMessageID,
 		EscalationRuleID: msg.EscalationRuleID,
 		EscalationDepth: msg.EscalationDepth,
+		Collaboration: msg.Collaboration,
 		Acknowledged: msg.Acknowledged,
 		AcknowledgedByAnyone: msg.AcknowledgedByAnyone,
 		AcknowledgementCount: msg.AcknowledgementCount,
 		LastAcknowledgedBy: msg.LastAcknowledgedBy,
 		LastAcknowledgedAt: msg.LastAcknowledgedAt,
 	}
+	if len(msg.Extras) > 0 {
+		external.Extras = make(map[string]any)
+		_ = json.Unmarshal(msg.Extras, &external.Extras)
+	}
+	return external
 }
 
 func numberAsInt(value any) (int, bool) {
