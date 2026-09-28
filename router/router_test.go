@@ -473,6 +473,47 @@ func (s *IntegrationSuite) TestCreateUser_RequiresElevatedAdmin() {
 	assert.NotNil(s.T(), created)
 }
 
+
+func (s *IntegrationSuite) TestAdminReadOnlyPages_DoNotRequireElevation() {
+	s.db.AdminUser(2).ClientWithToken(1, "Cadminplain")
+
+	for _, path := range []string{
+		"user",
+		"admin/security-policy",
+		"admin/operations",
+		"admin/sessions",
+		"group",
+		"integration/webhook",
+		"integration/mqtt",
+		"integration/home-assistant",
+		"automation/schedule",
+		"automation/escalation",
+		"connector/email",
+		"connector/smtp",
+		"connector/rss",
+		"connector/syslog",
+		"connector/calendar",
+	} {
+		req := s.newRequest("GET", path, "")
+		req.Header.Set("X-Gotify-Key", "Cadminplain")
+		res, err := client.Do(req)
+		assert.NoError(s.T(), err, path)
+		if assert.NotNil(s.T(), res, path) {
+			assert.Equal(s.T(), http.StatusOK, res.StatusCode, path)
+			res.Body.Close()
+		}
+	}
+
+	req := s.newRequest("POST", "group", `{"name":"still-sensitive","description":""}`)
+	req.Header.Set("X-Gotify-Key", "Cadminplain")
+	doRequestAndExpect(
+		s.T(),
+		req,
+		http.StatusForbidden,
+		`{"error":"Forbidden","errorCode":403,"errorDescription":"session not elevated, use basic auth or call /client:elevate"}`,
+	)
+}
+
 func (s *IntegrationSuite) newRequest(method, url, body string) *http.Request {
 	req, err := http.NewRequest(method, fmt.Sprintf("%s/%s", s.server.URL, url), strings.NewReader(body))
 	req.Header.Add("Content-Type", "application/json")
