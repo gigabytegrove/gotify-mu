@@ -124,7 +124,7 @@ func (a *UserAPI) GetUsers(ctx *gin.Context) {
 //
 // Return the current user.
 //
-// Requires elevated authentication.
+// Requires authenticated user access; viewing the current session does not require step-up elevation.
 //
 //	---
 //	produces: [application/json]
@@ -160,6 +160,8 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 	provider := "local"
 	if user.OIDCID != nil { provider = "oidc" }
 	if user.LDAPID != nil { provider = "ldap" }
+	elevationMinutes := policy.ElevationMinutes
+	if elevationMinutes <= 0 { elevationMinutes = model.DefaultElevationMinutes }
 	result := &model.CurrentUserExternal{
 		ID:          user.ID,
 		Name:        user.Name,
@@ -170,7 +172,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		MFARequired: mfaRequired,
 		AuthProvider: provider,
 		PasskeyCount: len(passkeys),
-		ElevationMinutes: policy.ElevationMinutes,
+		ElevationMinutes: elevationMinutes,
 	}
 	client := auth.GetClient(ctx)
 	if client != nil {
