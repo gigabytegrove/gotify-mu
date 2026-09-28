@@ -338,6 +338,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			app.POST("", applicationHandler.CreateApplication)
 			app.POST("/:id/image", applicationHandler.UploadApplicationImage)
 			app.DELETE("/:id/image", applicationHandler.RemoveApplicationImage)
+			app.POST("/:id/chat-message", collaborationHandler.SendChatMessage)
 			app.PUT("/:id", applicationHandler.UpdateApplication)
 			app.PUT("/:id/notifications", applicationMembershipHandler.SetCurrentUserNotifications)
 
