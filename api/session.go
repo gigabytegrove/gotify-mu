@@ -133,7 +133,7 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 	}
 
 	elevationMinutes := policy.ElevationMinutes
-	if elevationMinutes <= 0 { elevationMinutes = 60 }
+	if elevationMinutes <= 0 { elevationMinutes = model.DefaultElevationMinutes }
 	sessionMinutes := policy.SessionInactivityMinutes
 	if sessionMinutes <= 0 { sessionMinutes = auth.CookieMaxAge / 60 }
 	elevatedUntil := time.Now().Add(time.Duration(elevationMinutes) * time.Minute)
@@ -163,6 +163,7 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		CreatedAt:     user.CreatedAt,
 		ClientID:      client.ID,
 		ElevatedUntil: client.ElevatedUntil,
+		ElevationMinutes: elevationMinutes,
 		MFAEnabled:    mfa != nil && mfa.Enabled,
 		MFARequired:   mfaRequired && (mfa == nil || !mfa.Enabled),
 		AuthProvider:  "local",
