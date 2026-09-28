@@ -75,8 +75,11 @@ const SystemAdministration = () => {
         window.location.href = api('audit/export?format=' + format);
     };
 
-    const downloadProtected = async (path: string, filename: string) => {
+    const downloadProtected = async (path: string, fallbackFilename: string) => {
         const response = await axios.get<Blob>(api(path), {responseType: 'blob'});
+        const disposition = String(response.headers['content-disposition'] || '');
+        const filenameMatch = disposition.match(/filename="?([^";]+)"?/i);
+        const filename = filenameMatch?.[1] || fallbackFilename;
         const objectUrl = URL.createObjectURL(response.data);
         const anchor = document.createElement('a');
         anchor.href = objectUrl;
@@ -382,7 +385,7 @@ const SystemAdministration = () => {
                             variant="outlined"
                             startIcon={<BugReport />}
                             onClick={() =>
-                                void downloadProtected('admin/diagnostics', 'monita-diagnostics.zip')
+                                void downloadProtected('admin/diagnostics', 'monita-diagnostics.json')
                             }>
                             Download Diagnostics
                         </Button>
