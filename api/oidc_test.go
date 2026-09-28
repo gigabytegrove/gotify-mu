@@ -593,6 +593,11 @@ func (s *OIDCSuite) Test_CreateClient() {
 	assert.NoError(s.T(), err)
 	assert.Equal(s.T(), uint(1), client.UserID)
 	assert.Equal(s.T(), uint(auth.CookieMaxAge), client.ExpiresAfterInactivitySeconds)
+	if assert.NotNil(s.T(), client.ElevatedUntil) {
+		remaining := time.Until(*client.ElevatedUntil)
+		assert.Greater(s.T(), remaining, 7*time.Hour+50*time.Minute)
+		assert.LessOrEqual(s.T(), remaining, 8*time.Hour)
+	}
 
 	dbClient, err := s.db.GetClientByToken(tokenParsed.PublicForm())
 	assert.NoError(s.T(), err)
