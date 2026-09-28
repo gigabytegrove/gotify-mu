@@ -2954,6 +2954,11 @@
           "x-go-name": "ElevatedUntil",
           "readOnly": true
         },
+        "elevationMinutes": {
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ElevationMinutes"
+        },
         "id": {
           "description": "The user id.",
           "type": "integer",
