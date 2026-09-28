@@ -177,6 +177,18 @@ func (a *OIDCAPI) ElevateHandler(ctx *gin.Context) {
 	if err := ctx.BindQuery(&elevate); err != nil {
 		return
 	}
+	policy, err := a.DB.GetSecurityPolicy()
+	if err != nil {
+		ctx.AbortWithError(http.StatusInternalServerError, err)
+		return
+	}
+	maxSeconds := policy.ElevationMinutes * 60
+	if maxSeconds <= 0 {
+		maxSeconds = int(model.DefaultElevationDuration / time.Second)
+	}
+	if elevate.DurationSeconds <= 0 || elevate.DurationSeconds > maxSeconds {
+		elevate.DurationSeconds = maxSeconds
+	}
 	state, err := a.generateState()
 	if err != nil {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
@@ -526,14 +538,26 @@ func (a *OIDCAPI) registerUser(username, oidcID string, hasAdminGroup bool) (*mo
 }
 
 func (a *OIDCAPI) createClient(name string, userID uint) (*model.Client, error) {
-	elevatedUntil := time.Now().Add(model.DefaultElevationDuration)
+	policy, err := a.DB.GetSecurityPolicy()
+	if err != nil {
+		return nil, err
+	}
+	elevationMinutes := policy.ElevationMinutes
+	if elevationMinutes <= 0 {
+		elevationMinutes = int(model.DefaultElevationDuration / time.Minute)
+	}
+	sessionMinutes := policy.SessionInactivityMinutes
+	if sessionMinutes <= 0 {
+		sessionMinutes = auth.CookieMaxAge / 60
+	}
+	elevatedUntil := time.Now().Add(time.Duration(elevationMinutes) * time.Minute)
 	tokenPublic, tokenPrivate := generateClientToken()
 	client := &model.Client{
 		Name:                          name,
 		Token:                         tokenPublic,
 		UserID:                        userID,
 		ElevatedUntil:                 &elevatedUntil,
-		ExpiresAfterInactivitySeconds: auth.CookieMaxAge,
+		ExpiresAfterInactivitySeconds: uint(sessionMinutes * 60),
 	}
 	if err := a.DB.CreateClient(client); err != nil {
 		return nil, err
