@@ -170,6 +170,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		MFARequired: mfaRequired,
 		AuthProvider: provider,
 		PasskeyCount: len(passkeys),
+		ElevationMinutes: policy.ElevationMinutes,
 	}
 	client := auth.GetClient(ctx)
 	if client != nil {
