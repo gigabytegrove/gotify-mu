@@ -225,8 +225,8 @@ const Messages = observer(() => {
                 <SurfaceCard title="Conversation" subtitle="Two-way Gotify MU Chat Channel">
                     <ChatComposer
                         channelName={app.name}
-                        fOnSubmit={(message) =>
-                            messagesStore.sendMessage(app.id, message, '', app.defaultPriority)
+                        fOnSubmit={(message, images) =>
+                            messagesStore.sendChatMessage(app.id, message, images)
                         }
                         fOnTyping={(typing) => wsStore.setTyping(app.id, typing)}
                     />
