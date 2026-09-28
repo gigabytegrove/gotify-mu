@@ -34,7 +34,11 @@ check-go:
 
 check-js:
 	(cd ui && yarn lint)
-	(cd ui && yarn testformat)
+	@if ! (cd ui && yarn testformat); then \
+		(cd ui && yarn format); \
+		git diff -- ui/src; \
+		exit 1; \
+	fi
 
 download-tools:
 	go install github.com/go-swagger/go-swagger/cmd/swagger@717e3cb29becaaf00e56953556c6d80f8a01b286
