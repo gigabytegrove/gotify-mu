@@ -80,8 +80,6 @@ const Layout = observer(() => {
         </RequireAuth>
     );
 
-    const elevated = (children: React.ReactNode) => <RequireElevation>{children}</RequireElevation>;
-
     return (
         <StyledEngineProvider injectFirst>
             <ThemeProvider theme={theme}>
