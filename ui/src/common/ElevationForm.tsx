@@ -9,8 +9,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Key from '@mui/icons-material/Key';
 import {Box, Divider} from '@mui/material';
 
-const ElevateDuration = 60 * 60;
-
 const ElevationForm = observer(() => {
     const {elevateStore, currentUser} = useStores();
     const [password, setPassword] = useState('');
@@ -26,6 +24,7 @@ const ElevationForm = observer(() => {
         provider === 'local' ? localAuthEnabled : provider === 'ldap' && ldapEnabled;
     const oidcPending = elevateStore.oidcElevatePending;
     const oidcIdpName = config.get('oidcIdpName');
+    const elevateDurationSeconds = (currentUser.user.elevationMinutes || 240) * 60;
 
     const handleLocalElevate = async () => {
         try {
