@@ -494,7 +494,7 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 		user, err := a.DB.GetUserByID(userID)
 		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
 		if app == nil || membership == nil || user == nil {
-			ctx.AbortWithError(http.StatusNotFound, errors.New("Chat Channel not found"))
+			ctx.AbortWithError(http.StatusNotFound, errors.New("chat Channel not found"))
 			return
 		}
 		isChat := app.ChannelType == model.ChannelTypeChat || (app.ChannelType == "" && app.AllowMemberPost)
