@@ -136,8 +136,9 @@ type CurrentUserExternal struct {
 	// The time until which the session is elevated.
 	//
 	// read only: true
-	ElevatedUntil *time.Time `json:"elevatedUntil,omitempty"`
-	MFAEnabled  bool   `json:"mfaEnabled"`
+	ElevatedUntil    *time.Time `json:"elevatedUntil,omitempty"`
+	ElevationMinutes int        `json:"elevationMinutes,omitempty"`
+	MFAEnabled       bool       `json:"mfaEnabled"`
 	MFARequired bool   `json:"mfaRequired"`
 	AuthProvider string `json:"authProvider,omitempty"`
 	PasskeyCount int `json:"passkeyCount"`
