@@ -157,6 +157,8 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 	mfaRequired := user.OIDCID == nil && user.LDAPID == nil &&
 		((policy.RequireMFAForAdmins && user.Admin) || policy.RequireMFAForAllLocalUsers) &&
 		!mfaEnabled
+	elevationMinutes := policy.ElevationMinutes
+	if elevationMinutes <= 0 { elevationMinutes = 240 }
 	provider := "local"
 	if user.OIDCID != nil { provider = "oidc" }
 	if user.LDAPID != nil { provider = "ldap" }
@@ -170,6 +172,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		MFARequired: mfaRequired,
 		AuthProvider: provider,
 		PasskeyCount: len(passkeys),
+		ElevationDurationSeconds: elevationMinutes * 60,
 	}
 	client := auth.GetClient(ctx)
 	if client != nil {

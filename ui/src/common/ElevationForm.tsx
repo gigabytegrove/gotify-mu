@@ -9,8 +9,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Key from '@mui/icons-material/Key';
 import {Box, Divider} from '@mui/material';
 
-const ElevateDuration = 60 * 60;
-
 const ElevationForm = observer(() => {
     const {elevateStore, currentUser} = useStores();
     const [password, setPassword] = useState('');
@@ -26,13 +24,14 @@ const ElevationForm = observer(() => {
         provider === 'local' ? localAuthEnabled : provider === 'ldap' && ldapEnabled;
     const oidcPending = elevateStore.oidcElevatePending;
     const oidcIdpName = config.get('oidcIdpName');
+    const elevationDuration = currentUser.user.elevationDurationSeconds || 4 * 60 * 60;
 
     const handleLocalElevate = async () => {
         try {
             if (provider === 'ldap') {
-                await elevateStore.directoryElevate(password, ElevateDuration);
+                await elevateStore.directoryElevate(password, elevationDuration);
             } else {
-                await elevateStore.localElevate(password, ElevateDuration, mfaCode);
+                await elevateStore.localElevate(password, elevationDuration, mfaCode);
             }
         } catch {
             setError('Elevation failed. Check your password.');
@@ -60,7 +59,10 @@ const ElevationForm = observer(() => {
 
     return (
         <>
-            <Typography>This action requires re-authentication.</Typography>
+            <Typography>This sensitive action requires re-authentication.</Typography>
+            <Typography variant="body2" color="textSecondary" sx={{mb: 1}}>
+                Once confirmed, sensitive actions remain unlocked for the configured administration window.
+            </Typography>
             {usePassword && (
                 <form
                     onSubmit={(e) => {
@@ -144,7 +146,7 @@ const ElevationForm = observer(() => {
                         variant="contained"
                         color="primary"
                         fullWidth
-                        onClick={() => elevateStore.oidcElevate(ElevateDuration)}>
+                        onClick={() => elevateStore.oidcElevate(elevationDuration)}>
                         Elevate via {oidcIdpName}
                     </Button>
                 </>

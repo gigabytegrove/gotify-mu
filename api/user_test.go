@@ -78,6 +78,7 @@ func (s *UserSuite) Test_GetCurrentUser() {
 	test.BodyEquals(s.T(), &model.CurrentUserExternal{
 		ID: user.ID, Name: user.Name, Admin: user.Admin, CreatedAt: user.CreatedAt,
 		MFAEnabled: false, MFARequired: false, AuthProvider: "local", PasskeyCount: 0,
+		ElevationDurationSeconds: 4 * 60 * 60,
 	}, s.recorder)
 }
 

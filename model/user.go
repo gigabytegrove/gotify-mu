@@ -141,6 +141,8 @@ type CurrentUserExternal struct {
 	MFARequired bool   `json:"mfaRequired"`
 	AuthProvider string `json:"authProvider,omitempty"`
 	PasskeyCount int `json:"passkeyCount"`
+	// Maximum duration requested for step-up elevation in this session.
+	ElevationDurationSeconds int `json:"elevationDurationSeconds"`
 }
 
 // UserExternalPass Model

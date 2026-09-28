@@ -293,6 +293,13 @@ func (s *AuthenticationSuite) TestBasicAuthDisabled() {
 	s.assertHeaderRequest("Authorization", "Basic YWRtaW46cHc=", s.auth.OptionalAdmin, 403)
 }
 
+func (s *AuthenticationSuite) TestRequireAdminSessionDoesNotRequireElevation() {
+	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin", s.auth.RequireAdminSession, 200)
+	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin_elevated", s.auth.RequireAdminSession, 200)
+	s.assertHeaderRequest("X-Gotify-Key", "clienttoken", s.auth.RequireAdminSession, 403)
+	s.assertHeaderRequest("Authorization", "Basic YWRtaW46cHc=", s.auth.RequireAdminSession, 200)
+}
+
 func (s *AuthenticationSuite) TestOptionalAdminAuth() {
 	ctx := s.assertQueryRequest("token", "ergerogerg", s.auth.OptionalAdmin, 200)
 	assert.Nil(s.T(), TryGetUserID(ctx))

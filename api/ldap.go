@@ -126,7 +126,7 @@ func (a *LDAPAPI) Login(ctx *gin.Context) {
 	if err:=ctx.Bind(&clientParams);err!=nil{return}
 	policy,err:=a.DB.GetSecurityPolicy()
 	if !successOrAbort(ctx,500,err){return}
-	elevationMinutes:=policy.ElevationMinutes;if elevationMinutes<=0{elevationMinutes=60}
+	elevationMinutes:=policy.ElevationMinutes;if elevationMinutes<=0{elevationMinutes=240}
 	sessionMinutes:=policy.SessionInactivityMinutes;if sessionMinutes<=0{sessionMinutes=auth.CookieMaxAge/60}
 	elevatedUntil:=time.Now().Add(time.Duration(elevationMinutes)*time.Minute)
 	tokenPublic,tokenPrivate:=generateClientToken()
@@ -141,7 +141,7 @@ func (a *LDAPAPI) Login(ctx *gin.Context) {
 	})
 	ctx.JSON(200,&model.CurrentUserExternal{
 		ID:user.ID,Name:user.Name,DisplayName:user.DisplayName,Admin:user.Admin,CreatedAt:user.CreatedAt,
-		ClientID:client.ID,ElevatedUntil:client.ElevatedUntil,AuthProvider:"ldap",
+		ClientID:client.ID,ElevatedUntil:client.ElevatedUntil,AuthProvider:"ldap",ElevationDurationSeconds:elevationMinutes*60,
 	})
 }
 
@@ -168,7 +168,7 @@ func (a *LDAPAPI) Elevate(ctx *gin.Context) {
 	var params model.ElevateRequest
 	if err:=ctx.ShouldBindJSON(&params);err!=nil{return}
 	policy,err:=a.DB.GetSecurityPolicy();if !successOrAbort(ctx,500,err){return}
-	maxSeconds:=policy.ElevationMinutes*60;if maxSeconds<=0{maxSeconds=3600}
+	maxSeconds:=policy.ElevationMinutes*60;if maxSeconds<=0{maxSeconds=14400}
 	duration:=params.DurationSeconds
 	if duration<=0||duration>maxSeconds{duration=maxSeconds}
 	until:=time.Now().Add(time.Duration(duration)*time.Second)

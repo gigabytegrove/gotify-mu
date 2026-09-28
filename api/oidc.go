@@ -264,7 +264,20 @@ func (a *OIDCAPI) handleElevationCallback(w http.ResponseWriter, elevate *pendin
 		http.Error(w, "client not found", http.StatusNotFound)
 		return
 	}
-	elevatedUntil := time.Now().Add(time.Duration(elevate.DurationSeconds) * time.Second)
+	policy, err := a.DB.GetSecurityPolicy()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	maxSeconds := policy.ElevationMinutes * 60
+	if maxSeconds <= 0 {
+		maxSeconds = 4 * 60 * 60
+	}
+	durationSeconds := elevate.DurationSeconds
+	if durationSeconds <= 0 || durationSeconds > maxSeconds {
+		durationSeconds = maxSeconds
+	}
+	elevatedUntil := time.Now().Add(time.Duration(durationSeconds) * time.Second)
 	if err := a.DB.UpdateClientElevatedUntil(client.ID, &elevatedUntil); err != nil {
 		http.Error(w, fmt.Sprintf("failed to elevate session: %v", err), http.StatusInternalServerError)
 		return
@@ -526,14 +539,26 @@ func (a *OIDCAPI) registerUser(username, oidcID string, hasAdminGroup bool) (*mo
 }
 
 func (a *OIDCAPI) createClient(name string, userID uint) (*model.Client, error) {
-	elevatedUntil := time.Now().Add(model.DefaultElevationDuration)
+	policy, err := a.DB.GetSecurityPolicy()
+	if err != nil {
+		return nil, err
+	}
+	elevationMinutes := policy.ElevationMinutes
+	if elevationMinutes <= 0 {
+		elevationMinutes = int(model.DefaultElevationDuration / time.Minute)
+	}
+	sessionMinutes := policy.SessionInactivityMinutes
+	if sessionMinutes <= 0 {
+		sessionMinutes = auth.CookieMaxAge / 60
+	}
+	elevatedUntil := time.Now().Add(time.Duration(elevationMinutes) * time.Minute)
 	tokenPublic, tokenPrivate := generateClientToken()
 	client := &model.Client{
 		Name:                          name,
 		Token:                         tokenPublic,
 		UserID:                        userID,
 		ElevatedUntil:                 &elevatedUntil,
-		ExpiresAfterInactivitySeconds: auth.CookieMaxAge,
+		ExpiresAfterInactivitySeconds: uint(sessionMinutes * 60),
 	}
 	if err := a.DB.CreateClient(client); err != nil {
 		return nil, err
