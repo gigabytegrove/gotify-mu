@@ -55,7 +55,8 @@ const ElevateClientDialog = observer(({clientName, clientId, fClose}: IProps) =>
                 ) : (
                     <>
                         <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
-                            The server security policy caps how long elevated access can remain active.
+                            The server security policy caps how long elevated access can remain
+                            active.
                         </Typography>
                         <FormControl fullWidth style={{marginTop: 8}}>
                             <InputLabel id="elevate-duration-label">Duration</InputLabel>
