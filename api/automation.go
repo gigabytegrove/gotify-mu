@@ -108,8 +108,18 @@ func (a *AutomationAPI) GetWebhookRoutes(ctx *gin.Context) {
 	items, err := a.DB.GetWebhookRoutes()
 	if !successOrAbort(ctx, 500, err) { return }
 	out := make([]model.WebhookRouteView, 0, len(items))
-	for _, item := range items { out = append(out, webhookView(item)) }
+	for _, item := range items { out = append(out, webhookSummaryView(item)) }
 	ctx.JSON(200, out)
+}
+
+
+func (a *AutomationAPI) GetWebhookURL(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetWebhookRouteByID(id)
+		if !successOrAbort(ctx, 500, err) { return }
+		if item == nil { ctx.AbortWithError(404, errors.New("webhook not found")); return }
+		ctx.JSON(200, gin.H{"path": webhookView(item).Path})
+	})
 }
 
 func (a *AutomationAPI) CreateWebhookRoute(ctx *gin.Context) {
@@ -1102,6 +1112,12 @@ func webhookView(item *model.WebhookRoute) model.WebhookRouteView {
 		DefaultTitle:item.DefaultTitle,DefaultPriority:item.DefaultPriority,
 		CreatedAt:item.CreatedAt,UpdatedAt:item.UpdatedAt,
 	}
+}
+
+func webhookSummaryView(item *model.WebhookRoute) model.WebhookRouteView {
+	view := webhookView(item)
+	view.Path = ""
+	return view
 }
 
 func mqttView(item *model.MQTTIntegration) model.MQTTIntegrationView {
