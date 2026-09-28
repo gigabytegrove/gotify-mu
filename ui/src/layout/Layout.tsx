@@ -80,8 +80,6 @@ const Layout = observer(() => {
         </RequireAuth>
     );
 
-    const elevated = (children: React.ReactNode) => <RequireElevation>{children}</RequireElevation>;
-
     return (
         <StyledEngineProvider injectFirst>
             <ThemeProvider theme={theme}>
@@ -136,21 +134,12 @@ const Layout = observer(() => {
                                         element={<Navigate replace to="/channels" />}
                                     />
                                     <Route path="/clients" element={authed(<Clients />)} />
-                                    <Route path="/users" element={authed(elevated(<Users />))} />
-                                    <Route path="/groups" element={authed(elevated(<Groups />))} />
-                                    <Route path="/audit" element={authed(elevated(<Audit />))} />
-                                    <Route
-                                        path="/integrations"
-                                        element={authed(elevated(<Integrations />))}
-                                    />
-                                    <Route
-                                        path="/automation"
-                                        element={authed(elevated(<Automation />))}
-                                    />
-                                    <Route
-                                        path="/system"
-                                        element={authed(elevated(<SystemAdministration />))}
-                                    />
+                                    <Route path="/users" element={authed(<Users />)} />
+                                    <Route path="/groups" element={authed(<Groups />)} />
+                                    <Route path="/audit" element={authed(<Audit />)} />
+                                    <Route path="/integrations" element={authed(<Integrations />)} />
+                                    <Route path="/automation" element={authed(<Automation />)} />
+                                    <Route path="/system" element={authed(<SystemAdministration />)} />
                                     <Route
                                         path="/settings"
                                         element={authed(
