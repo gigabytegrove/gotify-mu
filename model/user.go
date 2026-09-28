@@ -137,6 +137,7 @@ type CurrentUserExternal struct {
 	//
 	// read only: true
 	ElevatedUntil *time.Time `json:"elevatedUntil,omitempty"`
+	ElevationMinutes int `json:"elevationMinutes,omitempty"`
 	MFAEnabled  bool   `json:"mfaEnabled"`
 	MFARequired bool   `json:"mfaRequired"`
 	AuthProvider string `json:"authProvider,omitempty"`
