@@ -1,0 +1,37 @@
+name: regenerate swagger exact
+
+on:
+  push:
+    branches:
+      - fix/monita-1.1.8-swagger-generated
+
+permissions:
+  contents: write
+
+jobs:
+  regenerate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
+        with:
+          go-version: 1.26.x
+      - name: Install swagger generator
+        run: go install github.com/go-swagger/go-swagger/cmd/swagger@717e3cb29becaaf00e56953556c6d80f8a01b286
+      - name: Regenerate docs/spec.json
+        shell: bash
+        run: |
+          set -euo pipefail
+          swagger generate spec --scan-models -o docs/spec.json
+          sed -i 's/"uint64"/"int64"/g' docs/spec.json
+          if git diff --quiet -- docs/spec.json; then
+            echo "Swagger spec already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/spec.json
+          git commit -m "Regenerate Swagger spec exactly for Monita 1.1.8"
+          git push origin HEAD:fix/monita-1.1.8-swagger-generated
