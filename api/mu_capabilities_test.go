@@ -27,7 +27,8 @@ func TestMUCapabilitiesContract(t *testing.T) {
 		t.Fatalf("unexpected capability identity: %#v", payload)
 	}
 	if !payload.Features.SharedChannels || !payload.Features.ChannelTypes ||
-		!payload.Features.ChannelImages || !payload.Features.ChatChannels ||
+		!payload.Features.ChannelImages || !payload.Features.ChatImages ||
+		!payload.Features.ChatChannels ||
 		!payload.Features.TypingPresence ||
 		!payload.Features.ChatNotifications || !payload.Features.Mentions {
 		t.Fatalf("required MU feature flags are not advertised: %#v", payload.Features)
