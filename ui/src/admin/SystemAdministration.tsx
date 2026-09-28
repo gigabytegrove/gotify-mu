@@ -71,9 +71,23 @@ const SystemAdministration = () => {
         }
     };
 
-    const downloadAudit = (format: 'csv' | 'json') => {
-        window.location.href = api('audit/export?format=' + format);
+    const downloadFile = async (path: string, fallbackName: string) => {
+        const response = await axios.get<Blob>(api(path), {responseType: 'blob'});
+        const contentDisposition = response.headers['content-disposition'] || '';
+        const filenameMatch = /filename="?([^";]+)"?/i.exec(contentDisposition);
+        const filename = filenameMatch?.[1] || fallbackName;
+        const url = URL.createObjectURL(response.data);
+        const anchor = document.createElement('a');
+        anchor.href = url;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(url);
     };
+
+    const downloadAudit = (format: 'csv' | 'json') =>
+        downloadFile('audit/export?format=' + format, 'monita-audit.' + format);
 
     const stageRestore = async (file?: File) => {
         if (!file) return;
@@ -144,7 +158,7 @@ const SystemAdministration = () => {
                                     elevationMinutes: Number(event.target.value),
                                 })
                             }
-                            helperText="Minutes before protected administrative actions require identity confirmation again."
+                            helperText="Minutes before sensitive administrative actions require identity confirmation again. Normal admin pages remain viewable without re-authentication."
                             slotProps={{htmlInput: {min: 1, max: 1440}}}
                         />
                         <FormControlLabel
@@ -347,8 +361,9 @@ const SystemAdministration = () => {
                         <Button
                             variant="contained"
                             startIcon={<Download />}
-                            component="a"
-                            href={api('admin/backup')}>
+                            onClick={() =>
+                                void downloadFile('admin/backup', 'monita-backup.zip')
+                            }>
                             Download Full Backup
                         </Button>
                         <input
@@ -368,8 +383,9 @@ const SystemAdministration = () => {
                         <Button
                             variant="outlined"
                             startIcon={<BugReport />}
-                            component="a"
-                            href={api('admin/diagnostics')}>
+                            onClick={() =>
+                                void downloadFile('admin/diagnostics', 'monita-diagnostics.zip')
+                            }>
                             Download Diagnostics
                         </Button>
                     </Stack>
