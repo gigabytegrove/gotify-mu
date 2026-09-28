@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -408,5 +409,22 @@ func TestRevokeNativeHomeAssistantEndpoint(t *testing.T) {
 	}
 	if engine.reloaded != 1 {
 		t.Fatalf("expected integration reload, got %d", engine.reloaded)
+	}
+}
+
+
+func TestWebhookSummaryViewHidesCredentialPath(t *testing.T) {
+	item := &model.WebhookRoute{
+		ID: 7,
+		Name: "Doorbell",
+		Secret: "super-secret-route-token",
+	}
+	full := webhookView(item)
+	summary := webhookSummaryView(item)
+	if full.Path == "" || !strings.Contains(full.Path, item.Secret) {
+		t.Fatalf("expected elevated webhook view to contain generated path, got %q", full.Path)
+	}
+	if summary.Path != "" {
+		t.Fatalf("read-only webhook summary exposed credential path: %q", summary.Path)
 	}
 }
