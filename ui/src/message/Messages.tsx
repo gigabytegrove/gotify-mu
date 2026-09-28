@@ -59,8 +59,14 @@ const Messages = observer(() => {
     >({});
     const expandedState = React.useRef<Record<number, boolean>>({});
 
+    const role = app?.role?.toLowerCase();
     const canPost =
-        app != null && (app.ownerId === currentUser.user.id || Boolean(app.allowMemberPost));
+        app != null &&
+        (app.ownerId === currentUser.user.id ||
+            role === 'owner' ||
+            role === 'manager' ||
+            role === 'publisher' ||
+            (role !== 'readonly' && Boolean(app.allowMemberPost)));
 
     const canDeleteAll =
         !archivedView &&
@@ -225,8 +231,8 @@ const Messages = observer(() => {
                 <SurfaceCard title="Conversation" subtitle="Two-way Gotify MU Chat Channel">
                     <ChatComposer
                         channelName={app.name}
-                        fOnSubmit={(message) =>
-                            messagesStore.sendMessage(app.id, message, '', app.defaultPriority)
+                        fOnSubmit={(message, images) =>
+                            messagesStore.sendChatMessage(app.id, message, images)
                         }
                         fOnTyping={(typing) => wsStore.setTyping(app.id, typing)}
                     />

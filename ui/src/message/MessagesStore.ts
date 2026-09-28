@@ -217,6 +217,25 @@ export class MessagesStore {
         this.snack(acknowledged ? 'Message acknowledged' : 'Acknowledgement removed');
     };
 
+    public sendChatMessage = async (
+        appId: number,
+        message: string,
+        images: File[]
+    ): Promise<void> => {
+        const app = this.appStore.getByID(appId);
+        const form = new FormData();
+        form.append('message', message);
+        form.append('priority', String(app.defaultPriority));
+        images.forEach((image) => form.append('images', image, image.name));
+
+        await axios.post(`${config.get('url')}application/${appId}/chat-message`, form);
+        await this.refreshByApp(appId, false);
+        this.snack(
+            images.length > 0
+                ? `Message with ${images.length} image${images.length === 1 ? '' : 's'} sent to ${app.name}`
+                : `Message sent to ${app.name}`
+        );
+    };
     public sendMessage = async (
         appId: number,
         message: string,

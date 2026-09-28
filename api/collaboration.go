@@ -19,7 +19,11 @@ import (
 	"github.com/gotify/server/v3/model"
 )
 
-const maxAttachmentBytes int64 = 25 << 20
+const (
+	maxAttachmentBytes     int64 = 25 << 20
+	maxChatImageTotalBytes int64 = 50 << 20
+	maxChatImageCount            = 8
+)
 
 type CollaborationDatabase interface {
 	GetMessageByID(id uint) (*model.Message, error)
@@ -51,6 +55,10 @@ type CollaborationDatabase interface {
 
 type CollaborationDispatcher interface {
 	StoreAndDeliver(message *model.Message) (*model.MessageExternal, error)
+	StorePreparedAndDeliver(
+		message *model.Message,
+		prepare func(*model.Message) error,
+	) (*model.MessageExternal, error)
 }
 
 type CollaborationAPI struct {
@@ -408,6 +416,199 @@ func (a *CollaborationAPI) MarkUnread(ctx *gin.Context) {
 	})
 }
 
+func supportedChatImage(contentType string) bool {
+	switch strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0])) {
+	case "image/jpeg", "image/png", "image/gif", "image/webp":
+		return true
+	default:
+		return false
+	}
+}
+
+func (a *CollaborationAPI) persistChatImage(
+	messageID uint,
+	header *multipart.FileHeader,
+) (model.MessageAttachmentView, string, error) {
+	var empty model.MessageAttachmentView
+	if header == nil || header.Size <= 0 {
+		return empty, "", errors.New("image is empty")
+	}
+	if header.Size > maxAttachmentBytes {
+		return empty, "", errors.New("each image must be 25 MiB or smaller")
+	}
+
+	source, err := header.Open()
+	if err != nil { return empty, "", err }
+	defer source.Close()
+
+	sniff := make([]byte, 512)
+	n, readErr := source.Read(sniff)
+	if readErr != nil && !errors.Is(readErr, io.EOF) { return empty, "", readErr }
+	contentType := http.DetectContentType(sniff[:n])
+	if !supportedChatImage(contentType) {
+		return empty, "", errors.New("only JPEG, PNG, GIF, and WebP images are supported")
+	}
+	if _, err := source.Seek(0, io.SeekStart); err != nil { return empty, "", err }
+
+	if err := os.MkdirAll(a.AttachmentDir, 0o700); err != nil { return empty, "", err }
+	storageName, err := randomStorageName()
+	if err != nil { return empty, "", err }
+	targetPath := filepath.Join(a.AttachmentDir, storageName)
+	target, err := os.OpenFile(targetPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
+	if err != nil { return empty, "", err }
+	written, copyErr := io.Copy(target, io.LimitReader(source, maxAttachmentBytes+1))
+	closeErr := target.Close()
+	if copyErr != nil || closeErr != nil || written > maxAttachmentBytes {
+		_ = os.Remove(targetPath)
+		if written > maxAttachmentBytes { return empty, "", errors.New("image exceeds 25 MiB") }
+		return empty, "", errors.New("image could not be saved")
+	}
+
+	item := &model.MessageAttachment{
+		MessageID: messageID,
+		Filename: safeFilename(header),
+		ContentType: contentType,
+		Size: written,
+		StorageName: storageName,
+	}
+	if err := a.DB.CreateMessageAttachment(item); err != nil {
+		_ = os.Remove(targetPath)
+		return empty, "", err
+	}
+	return model.MessageAttachmentView{
+		ID: item.ID, Filename: item.Filename, ContentType: item.ContentType, Size: item.Size,
+		URL: "/message/" + strconv.FormatUint(uint64(messageID), 10) +
+			"/attachment/" + strconv.FormatUint(uint64(item.ID), 10),
+	}, targetPath, nil
+}
+
+// SendChatMessage creates a Chat Channel message with optional inline image attachments.
+// Attachments are persisted before realtime delivery so recipients see a complete message.
+func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
+	withID(ctx, "id", func(id uint) {
+		userID := auth.GetUserID(ctx)
+		app, err := a.DB.GetApplicationByID(id)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		membership, err := a.DB.GetApplicationMembership(id, userID)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		user, err := a.DB.GetUserByID(userID)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if app == nil || membership == nil || user == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("chat Channel not found"))
+			return
+		}
+		isChat := app.ChannelType == model.ChannelTypeChat || (app.ChannelType == "" && app.AllowMemberPost)
+		if !isChat {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("image messages are only available in Chat Channels"))
+			return
+		}
+		if !canPostToChannel(app, membership, user) {
+			ctx.AbortWithError(http.StatusForbidden, errors.New("your Channel role does not allow posting"))
+			return
+		}
+
+		ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, maxChatImageTotalBytes+(2<<20))
+		form, err := ctx.MultipartForm()
+		if err != nil {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid chat message upload"))
+			return
+		}
+		defer form.RemoveAll()
+
+		body := strings.TrimSpace(ctx.PostForm("message"))
+		files := form.File["images"]
+		if len(files) > maxChatImageCount {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("a chat message can include at most 8 images"))
+			return
+		}
+		var total int64
+		for _, header := range files {
+			if header == nil || header.Size <= 0 || header.Size > maxAttachmentBytes {
+				ctx.AbortWithError(http.StatusRequestEntityTooLarge, errors.New("each image must be between 1 byte and 25 MiB"))
+				return
+			}
+			total += header.Size
+		}
+		if total > maxChatImageTotalBytes {
+			ctx.AbortWithError(http.StatusRequestEntityTooLarge, errors.New("images in one chat message may total at most 50 MiB"))
+			return
+		}
+		if body == "" && len(files) == 0 {
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("message text or at least one image is required"))
+			return
+		}
+
+		priority := app.DefaultPriority
+		if raw := strings.TrimSpace(ctx.PostForm("priority")); raw != "" {
+			parsed, parseErr := strconv.Atoi(raw)
+			if parseErr != nil {
+				ctx.AbortWithError(http.StatusBadRequest, errors.New("priority must be an integer"))
+				return
+			}
+			priority = parsed
+		}
+
+		mentions, err := a.resolveMentions(app.ID, body, nil)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+
+		extraValues := map[string]any{}
+		if rawExtras := strings.TrimSpace(ctx.PostForm("extras")); rawExtras != "" {
+			if len(rawExtras) > 64<<10 {
+				ctx.AbortWithError(http.StatusBadRequest, errors.New("chat message extras exceed 64 KiB"))
+				return
+			}
+			if err := json.Unmarshal([]byte(rawExtras), &extraValues); err != nil {
+				ctx.AbortWithError(http.StatusBadRequest, errors.New("chat message extras must be a JSON object"))
+				return
+			}
+			if extraValues == nil {
+				extraValues = map[string]any{}
+			}
+		}
+		if len(mentions) > 0 { extraValues["gotify::mu::mentionUserIds"] = mentions }
+	extraBytes, _ := json.Marshal(extraValues)
+		if len(extraValues) == 0 { extraBytes = nil }
+
+		message := &model.Message{
+			ApplicationID: app.ID,
+			Title: displayUserName(user),
+			Message: body,
+			Priority: priority,
+			Date: time.Now(),
+			SenderUserID: user.ID,
+			SenderName: displayUserName(user),
+			Extras: extraBytes,
+		}
+
+		persistedPaths := make([]string, 0, len(files))
+		prepared := false
+		defer func() {
+			if prepared { return }
+			for _, path := range persistedPaths { _ = os.Remove(path) }
+		}()
+
+		external, err := a.Dispatcher.StorePreparedAndDeliver(
+			message,
+			func(stored *model.Message) error {
+				attachments := make([]model.MessageAttachmentView, 0, len(files))
+				for _, header := range files {
+					view, path, saveErr := a.persistChatImage(stored.ID, header)
+					if saveErr != nil { return saveErr }
+					persistedPaths = append(persistedPaths, path)
+					attachments = append(attachments, view)
+				}
+				stored.Collaboration.Attachments = attachments
+				if len(mentions) > 0 {
+					if err := a.DB.ReplaceMessageMentions(stored.ID, mentions); err != nil { return err }
+				}
+				prepared = true
+				return nil
+			},
+		)
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		ctx.JSON(http.StatusCreated, external)
+	})
+}
 func randomStorageName() (string, error) {
 	raw := make([]byte, 24)
 	if _, err := rand.Read(raw); err != nil {
@@ -500,8 +701,16 @@ func (a *CollaborationAPI) UploadAttachment(ctx *gin.Context) {
 
 func (a *CollaborationAPI) DownloadAttachment(ctx *gin.Context) {
 	withID(ctx, "id", func(messageID uint) {
-		if _, _, _, _, ok := a.messageAccess(ctx, messageID); !ok {
+		message, _, _, _, ok := a.messageAccess(ctx, messageID)
+		if !ok {
 			return
+		}
+		if expectedApp := strings.TrimSpace(ctx.Query("applicationId")); expectedApp != "" {
+			parsed, err := strconv.ParseUint(expectedApp, 10, 64)
+			if err != nil || uint(parsed) != message.ApplicationID {
+				ctx.AbortWithError(http.StatusNotFound, errors.New("attachment not found"))
+				return
+			}
 		}
 		attachmentID64, err := strconv.ParseUint(ctx.Param("attachmentId"), 10, 64)
 		if err != nil {
@@ -517,7 +726,9 @@ func (a *CollaborationAPI) DownloadAttachment(ctx *gin.Context) {
 			return
 		}
 		path := filepath.Join(a.AttachmentDir, filepath.Base(item.StorageName))
-		ctx.Header("Content-Disposition", "attachment; filename*=UTF-8''"+urlEncodeFilename(item.Filename))
+		disposition := "attachment"
+		if strings.HasPrefix(strings.ToLower(item.ContentType), "image/") { disposition = "inline" }
+		ctx.Header("Content-Disposition", disposition+"; filename*=UTF-8''"+urlEncodeFilename(item.Filename))
 		if item.ContentType != "" {
 			ctx.Header("Content-Type", item.ContentType)
 		}
