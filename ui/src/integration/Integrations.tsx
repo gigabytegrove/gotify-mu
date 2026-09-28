@@ -86,9 +86,7 @@ const Integrations = () => {
     const webhookPath = (item: IWebhookRoute): string => webhookUrls[item.id] || item.path || '';
 
     const revealWebhookUrl = async (item: IWebhookRoute): Promise<void> => {
-        const response = await axios.get<{path: string}>(
-            api(`integration/webhook/${item.id}/url`)
-        );
+        const response = await axios.get<{path: string}>(api(`integration/webhook/${item.id}/url`));
         if (response.data.path) {
             setWebhookUrls((current) => ({...current, [item.id]: response.data.path}));
         }
@@ -749,10 +747,7 @@ const WebhookDialog = ({
                 rateLimitPerMinute,
             };
             const response = item
-                ? await axios.put<IWebhookRoute>(
-                      api(`integration/webhook/${item.id}`),
-                      payload
-                  )
+                ? await axios.put<IWebhookRoute>(api(`integration/webhook/${item.id}`), payload)
                 : await axios.post<IWebhookRoute>(api('integration/webhook'), payload);
             await onSaved(response.data);
         } finally {
