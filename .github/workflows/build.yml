@@ -264,7 +264,12 @@ jobs:
           set -euo pipefail
           TAG="v${{ steps.release.outputs.version }}"
           VERSION="${{ steps.release.outputs.version }}"
-          gh release upload "${TAG}"             "build/monita-v${VERSION}-linux-amd64.tar.gz"             "build/monita-v${VERSION}-linux-arm64.tar.gz"             "build/PREBUILT-SHA256SUMS"             --clobber             --repo "${GITHUB_REPOSITORY}"
+          gh release upload "${TAG}" \
+            "build/monita-v${VERSION}-linux-amd64.tar.gz" \
+            "build/monita-v${VERSION}-linux-arm64.tar.gz" \
+            "build/PREBUILT-SHA256SUMS" \
+            --clobber \
+            --repo "${GITHUB_REPOSITORY}"
 
       - if: startsWith(github.ref, 'refs/heads/master')
         name: Publish master container
