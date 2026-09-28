@@ -126,7 +126,7 @@ func (a *LDAPAPI) Login(ctx *gin.Context) {
 	if err:=ctx.Bind(&clientParams);err!=nil{return}
 	policy,err:=a.DB.GetSecurityPolicy()
 	if !successOrAbort(ctx,500,err){return}
-	elevationMinutes:=policy.ElevationMinutes;if elevationMinutes<=0{elevationMinutes=60}
+	elevationMinutes:=policy.ElevationMinutes;if elevationMinutes<=0{elevationMinutes=240}
 	sessionMinutes:=policy.SessionInactivityMinutes;if sessionMinutes<=0{sessionMinutes=auth.CookieMaxAge/60}
 	elevatedUntil:=time.Now().Add(time.Duration(elevationMinutes)*time.Minute)
 	tokenPublic,tokenPrivate:=generateClientToken()
