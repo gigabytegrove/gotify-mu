@@ -1,12 +1,12 @@
 package database
 
 import (
-	"time"
 	"errors"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gotify/server/v3/model"
 	"gorm.io/gorm"
