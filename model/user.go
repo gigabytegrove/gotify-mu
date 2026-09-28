@@ -137,6 +137,10 @@ type CurrentUserExternal struct {
 	//
 	// read only: true
 	ElevatedUntil *time.Time `json:"elevatedUntil,omitempty"`
+	// The configured administrative re-authentication window in minutes.
+	//
+	// read only: true
+	ElevationMinutes int `json:"elevationMinutes"`
 	MFAEnabled  bool   `json:"mfaEnabled"`
 	MFARequired bool   `json:"mfaRequired"`
 	AuthProvider string `json:"authProvider,omitempty"`
