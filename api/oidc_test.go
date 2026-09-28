@@ -599,6 +599,29 @@ func (s *OIDCSuite) Test_CreateClient() {
 	assert.NotNil(s.T(), dbClient)
 }
 
+func (s *OIDCSuite) Test_CreateClient_UsesSecurityPolicyDurations() {
+	s.db.NewUser(1)
+	policy, err := s.db.GetSecurityPolicy()
+	assert.NoError(s.T(), err)
+	policy.ElevationMinutes = 8 * 60
+	policy.SessionInactivityMinutes = 24 * 60
+	assert.NoError(s.T(), s.db.SaveSecurityPolicy(policy))
+
+	before := time.Now()
+	client, err := s.a.createClient("PolicyBrowser", 1)
+	after := time.Now()
+
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), uint(24*60*60), client.ExpiresAfterInactivitySeconds)
+	assert.NotNil(s.T(), client.ElevatedUntil)
+	assert.WithinRange(
+		s.T(),
+		*client.ElevatedUntil,
+		before.Add(8*time.Hour),
+		after.Add(8*time.Hour),
+	)
+}
+
 // --- ExternalAuthorizeHandler ---
 
 func (s *OIDCSuite) Test_ExternalAuthorizeHandler_AuthURL() {
