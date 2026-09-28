@@ -49,7 +49,10 @@ const ElevationForm = observer(() => {
         };
     }, [currentUser.user.admin]);
 
-    const elevationHours = Math.max(1, Math.round((elevationSeconds / 3600) * 10) / 10);
+    const elevationDurationLabel =
+        elevationSeconds < 3600
+            ? `${Math.max(1, Math.round(elevationSeconds / 60))} minutes`
+            : `${Math.round((elevationSeconds / 3600) * 10) / 10} ${elevationSeconds === 3600 ? 'hour' : 'hours'}`;
 
     const handleLocalElevate = async () => {
         try {
@@ -87,8 +90,7 @@ const ElevationForm = observer(() => {
             <Typography>This action requires re-authentication.</Typography>
             <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
                 Once confirmed, sensitive administrative changes stay unlocked for up to{' '}
-                {elevationHours} {elevationHours === 1 ? 'hour' : 'hours'}, based on the server
-                security policy.
+                {elevationDurationLabel}, based on the server security policy.
             </Typography>
             {usePassword && (
                 <form
