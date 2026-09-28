@@ -135,7 +135,7 @@ func (a *PasskeyAPI) LoginVerify(ctx *gin.Context) {
 	if !successOrAbort(ctx,500,a.DB.CreateClient(client)){return}
 	auth.SetCookie(ctx.Writer,privateToken,sessionMinutes*60,a.SecureCookie)
 	_ = a.DB.CreateAuditEvent(&model.AuditEvent{UserID:user.ID,Username:user.Name,Action:"login_success",Target:"passkey",IPAddress:ctx.ClientIP()})
-	ctx.JSON(200,&model.CurrentUserExternal{ID:user.ID,Name:user.Name,DisplayName:user.DisplayName,Admin:user.Admin,CreatedAt:user.CreatedAt,ClientID:client.ID,ElevatedUntil:client.ElevatedUntil,AuthProvider:"passkey"})
+	ctx.JSON(200,&model.CurrentUserExternal{ID:user.ID,Name:user.Name,DisplayName:user.DisplayName,Admin:user.Admin,CreatedAt:user.CreatedAt,ClientID:client.ID,ElevatedUntil:client.ElevatedUntil,ElevationMinutes:elevationMinutes,AuthProvider:"passkey"})
 }
 
 func (a *PasskeyAPI) RegistrationOptions(ctx *gin.Context) {
