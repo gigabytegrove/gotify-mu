@@ -4,6 +4,17 @@
 
 # Changelog
 
+## 1.1.8 — 2026-09-28
+
+### Less intrusive administrative re-authentication
+
+- Read-only administrative pages and data no longer require an elevated session. Administrators can continue viewing Users, Groups, Audit, Integrations, Automation, Security & Operations, update status, Channel membership, and other non-destructive administrative state while normally signed in.
+- Sensitive actions still require step-up authentication, including security-policy changes, user changes, ownership/access changes, secrets and service-account changes, updates, backup/restore, session revocation, and destructive operations.
+- The default administrative elevation working window is now 8 hours instead of 1 hour.
+- Re-authentication now honors the configured **Administrative re-authentication duration** instead of always requesting a hard-coded 1-hour elevation.
+- OIDC, LDAP, passkey, and local authentication now use the same configured elevation policy.
+- Protected backup and diagnostics downloads now flow through authenticated requests so an expired elevation opens Monita's normal re-authentication prompt instead of failing as a raw browser download.
+
 ## 1.1.7 — 2026-09-27
 
 ### Chat image messages
