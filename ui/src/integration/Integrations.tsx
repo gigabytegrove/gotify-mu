@@ -44,6 +44,7 @@ const channelName = (channels: Array<{id: number; name: string}>, id: number): s
 const Integrations = () => {
     const {appStore, snackManager} = useStores();
     const [webhooks, setWebhooks] = React.useState<IWebhookRoute[]>([]);
+    const [webhookUrls, setWebhookUrls] = React.useState<Record<number, string>>({});
     const [mqtt, setMqtt] = React.useState<IMQTTIntegration[]>([]);
     const [homeAssistant, setHomeAssistant] = React.useState<IHomeAssistantIntegration[]>([]);
     const [loading, setLoading] = React.useState(true);
@@ -82,6 +83,17 @@ const Integrations = () => {
 
     const channels = appStore.getItems();
 
+    const webhookPath = (item: IWebhookRoute): string => webhookUrls[item.id] || item.path || '';
+
+    const revealWebhookUrl = async (item: IWebhookRoute): Promise<void> => {
+        const response = await axios.get<{path: string}>(
+            api(`integration/webhook/${item.id}/url`)
+        );
+        if (response.data.path) {
+            setWebhookUrls((current) => ({...current, [item.id]: response.data.path}));
+        }
+    };
+
     return (
         <DefaultPage
             title="Integrations"
@@ -92,8 +104,10 @@ const Integrations = () => {
                 </Button>
             }>
             <Alert severity="info">
-                Integration credentials are never shown again after they are saved. Leave a password
-                or access token blank while editing to keep the current value.
+                Stored passwords and access tokens are never shown after they are saved. Webhook
+                URLs are hidden during normal page viewing and can be revealed after
+                re-authentication. Leave a password or access token blank while editing to keep the
+                current value.
             </Alert>
 
             <SurfaceCard
@@ -117,25 +131,39 @@ const Integrations = () => {
                         enabled: item.enabled,
                         details: (
                             <Stack spacing={0.75}>
-                                <Typography variant="body2" sx={{wordBreak: 'break-all'}}>
-                                    {api(item.path.replace(/^\//, ''))}
-                                </Typography>
+                                {webhookPath(item) ? (
+                                    <Typography variant="body2" sx={{wordBreak: 'break-all'}}>
+                                        {api(webhookPath(item).replace(/^\//, ''))}
+                                    </Typography>
+                                ) : (
+                                    <Typography variant="body2" color="text.secondary">
+                                        Webhook URL hidden until re-authentication.
+                                    </Typography>
+                                )}
                                 <Stack
                                     direction="row"
                                     spacing={1}
                                     useFlexGap
                                     sx={{flexWrap: 'wrap'}}>
-                                    <Button
-                                        size="small"
-                                        startIcon={<ContentCopy />}
-                                        onClick={() => {
-                                            void navigator.clipboard.writeText(
-                                                api(item.path.replace(/^\//, ''))
-                                            );
-                                            snackManager.snack('Webhook URL copied');
-                                        }}>
-                                        Copy URL
-                                    </Button>
+                                    {webhookPath(item) ? (
+                                        <Button
+                                            size="small"
+                                            startIcon={<ContentCopy />}
+                                            onClick={() => {
+                                                void navigator.clipboard.writeText(
+                                                    api(webhookPath(item).replace(/^\//, ''))
+                                                );
+                                                snackManager.snack('Webhook URL copied');
+                                            }}>
+                                            Copy URL
+                                        </Button>
+                                    ) : (
+                                        <Button
+                                            size="small"
+                                            onClick={() => void revealWebhookUrl(item)}>
+                                            Reveal URL
+                                        </Button>
+                                    )}
                                     <Button
                                         size="small"
                                         onClick={async () => {
@@ -167,11 +195,18 @@ const Integrations = () => {
                                                 title: 'Regenerate Webhook URL?',
                                                 text: 'The current webhook URL will stop working immediately. Systems using it must be updated.',
                                                 run: async () => {
-                                                    await axios.post(
-                                                        api(
-                                                            `integration/webhook/${item.id}/regenerate`
-                                                        )
-                                                    );
+                                                    const response =
+                                                        await axios.post<IWebhookRoute>(
+                                                            api(
+                                                                `integration/webhook/${item.id}/regenerate`
+                                                            )
+                                                        );
+                                                    if (response.data.path) {
+                                                        setWebhookUrls((current) => ({
+                                                            ...current,
+                                                            [item.id]: response.data.path,
+                                                        }));
+                                                    }
                                                     await refresh();
                                                     snackManager.snack('Webhook URL regenerated');
                                                 },
