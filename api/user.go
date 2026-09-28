@@ -166,6 +166,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		DisplayName: user.DisplayName,
 		Admin:       user.Admin,
 		CreatedAt: user.CreatedAt,
+		ElevationMinutes: policy.ElevationMinutes,
 		MFAEnabled: mfaEnabled,
 		MFARequired: mfaRequired,
 		AuthProvider: provider,
