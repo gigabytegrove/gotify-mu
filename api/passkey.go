@@ -128,7 +128,7 @@ func (a *PasskeyAPI) LoginVerify(ctx *gin.Context) {
 	_ = a.DB.DeleteWebAuthnChallenge(challenge.Challenge)
 	policy,err:=a.DB.GetSecurityPolicy();if !successOrAbort(ctx,500,err){return}
 	sessionMinutes:=policy.SessionInactivityMinutes;if sessionMinutes<=0{sessionMinutes=auth.CookieMaxAge/60}
-	elevationMinutes:=policy.ElevationMinutes;if elevationMinutes<=0{elevationMinutes=60}
+	elevationMinutes:=policy.ElevationMinutes;if elevationMinutes<=0{elevationMinutes=int(model.DefaultElevationDuration/time.Minute)}
 	elevatedUntil:=time.Now().Add(time.Duration(elevationMinutes)*time.Minute)
 	publicToken,privateToken:=generateClientToken()
 	client:=&model.Client{Name:challenge.ClientName,Token:publicToken,UserID:user.ID,ElevatedUntil:&elevatedUntil,ExpiresAfterInactivitySeconds:uint(sessionMinutes*60),MFAAuthenticated:true}
@@ -207,7 +207,7 @@ func (a *PasskeyAPI) ElevationVerify(ctx *gin.Context) {
 	user,credential,challenge,signCount,err:=a.verifyAssertion(ctx,params,"elevate")
 	if err!=nil{ctx.AbortWithError(401,err);return}
 	client:=auth.GetClient(ctx);if client==nil||client.ID!=challenge.ClientID||client.UserID!=user.ID{ctx.AbortWithError(403,errors.New("passkey challenge does not match current session"));return}
-	policy,err:=a.DB.GetSecurityPolicy();if !successOrAbort(ctx,500,err){return};minutes:=policy.ElevationMinutes;if minutes<=0{minutes=60}
+	policy,err:=a.DB.GetSecurityPolicy();if !successOrAbort(ctx,500,err){return};minutes:=policy.ElevationMinutes;if minutes<=0{minutes=int(model.DefaultElevationDuration/time.Minute)}
 	until:=time.Now().Add(time.Duration(minutes)*time.Minute)
 	if !successOrAbort(ctx,500,a.DB.UpdateClientElevatedUntil(client.ID,&until)){return}
 	credential.SignCount=signCount;now:=time.Now();credential.LastUsedAt=&now;_ = a.DB.SavePasskey(credential);_ = a.DB.DeleteWebAuthnChallenge(challenge.Challenge)
