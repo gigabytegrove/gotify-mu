@@ -264,7 +264,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 
 	{
 		g.GET("/plugin", authentication.RequireClient, pluginHandler.GetPlugins)
-		g.GET("/plugin/catalog", authentication.RequireAdminClient, pluginHandler.GetCatalog)
+		g.GET("/plugin/catalog", authentication.RequireAdminSession, pluginHandler.GetCatalog)
 		g.POST("/plugin/catalog/install", authentication.RequireAdmin, pluginHandler.InstallCatalogPlugin)
 		g.POST("/plugin/install", authentication.RequireAdmin, pluginHandler.InstallPlugin)
 		g.POST("/plugin/:id/update", authentication.RequireAdmin, pluginHandler.StagePluginUpdate)
@@ -445,7 +445,7 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	// remain behind RequireAdmin elevation below.
 	adminSession := g.Group("")
 	{
-		adminSession.Use(authentication.RequireAdminClient)
+		adminSession.Use(authentication.RequireAdminSession)
 		adminSession.GET("/update/status", updateHandler.Status)
 		adminSession.GET("/user", userHandler.GetUsers)
 		adminSession.GET("/user/:id", userHandler.GetUserByID)
