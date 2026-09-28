@@ -57,15 +57,21 @@ func (a *Auth) RequireAdmin(ctx *gin.Context) {
 	a.evaluateOr401(ctx, a.adminHandlers()...)
 }
 
-// RequireAdminClient requires an authenticated admin client or admin basic auth,
-// but does not require the client session to be elevated. Use this only for
-// read-only administrative state that is safe to expose without re-authentication.
-func (a *Auth) RequireAdminClient(ctx *gin.Context) {
+// RequireAdminSession requires an authenticated administrator session or
+// administrator basic auth, but does not require step-up elevation. Use it for
+// normal administrative reads and routine low-risk administration.
+func (a *Auth) RequireAdminSession(ctx *gin.Context) {
 	a.evaluateOr401(
 		ctx,
 		a.handleUser(a.checkUserAdmin),
 		a.handleClient(a.checkClientAdmin),
 	)
+}
+
+// RequireAdminClient is kept as a compatibility alias for code that previously
+// used the non-elevated administrator middleware for read-only routes.
+func (a *Auth) RequireAdminClient(ctx *gin.Context) {
+	a.RequireAdminSession(ctx)
 }
 
 // OptionalAdmin allows optional authentication. When authentication is present
