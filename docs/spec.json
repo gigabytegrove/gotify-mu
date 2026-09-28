@@ -2954,6 +2954,13 @@
           "x-go-name": "ElevatedUntil",
           "readOnly": true
         },
+        "elevationMinutes": {
+          "description": "The configured administrative re-authentication window in minutes.",
+          "type": "integer",
+          "format": "int64",
+          "x-go-name": "ElevationMinutes",
+          "readOnly": true
+        },
         "id": {
           "description": "The user id.",
           "type": "integer",
