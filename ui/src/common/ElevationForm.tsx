@@ -1,4 +1,4 @@
-import React, {useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import Button from '@mui/material/Button';
 import TextField from '@mui/material/TextField';
 import Typography from '@mui/material/Typography';
@@ -8,14 +8,17 @@ import * as config from '../config';
 import CircularProgress from '@mui/material/CircularProgress';
 import Key from '@mui/icons-material/Key';
 import {Box, Divider} from '@mui/material';
+import axios from 'axios';
+import {ISecurityPolicy} from '../types';
 
-const ElevateDuration = 60 * 60;
+const DefaultElevationSeconds = 4 * 60 * 60;
 
 const ElevationForm = observer(() => {
     const {elevateStore, currentUser} = useStores();
     const [password, setPassword] = useState('');
     const [mfaCode, setMfaCode] = useState('');
     const [error, setError] = useState('');
+    const [elevationSeconds, setElevationSeconds] = useState(DefaultElevationSeconds);
 
     const localAuthEnabled = config.get('localAuth');
     const oidcEnabled = config.get('oidc');
@@ -26,6 +29,27 @@ const ElevationForm = observer(() => {
         provider === 'local' ? localAuthEnabled : provider === 'ldap' && ldapEnabled;
     const oidcPending = elevateStore.oidcElevatePending;
     const oidcIdpName = config.get('oidcIdpName');
+
+    useEffect(() => {
+        if (!currentUser.user.admin) return;
+        let active = true;
+        axios
+            .get<ISecurityPolicy>(config.get('url') + 'admin/security-policy')
+            .then((response) => {
+                const minutes = Number(response.data.elevationMinutes);
+                if (active && Number.isFinite(minutes) && minutes > 0) {
+                    setElevationSeconds(Math.round(minutes * 60));
+                }
+            })
+            .catch(() => {
+                // Keep the safe default if policy discovery is temporarily unavailable.
+            });
+        return () => {
+            active = false;
+        };
+    }, [currentUser.user.admin]);
+
+    const elevationHours = Math.max(1, Math.round((elevationSeconds / 3600) * 10) / 10);
 
     const handleLocalElevate = async () => {
         try {
@@ -61,6 +85,11 @@ const ElevationForm = observer(() => {
     return (
         <>
             <Typography>This action requires re-authentication.</Typography>
+            <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
+                Once confirmed, sensitive administrative changes stay unlocked for up to{' '}
+                {elevationHours} {elevationHours === 1 ? 'hour' : 'hours'}, based on the server
+                security policy.
+            </Typography>
             {usePassword && (
                 <form
                     onSubmit={(e) => {
