@@ -70,6 +70,14 @@ describe('Elevation', () => {
             await waitForExists(page, selector.heading(), 'Users');
             expect(await page.$('.elevation-password input')).toBeNull();
         });
+        it('can re-elevate the current client for later sensitive-action tests', async () => {
+            await page.goto(gotify.url + '/#/clients');
+            await waitForExists(page, selector.heading(), 'Clients');
+            await page.click($clientTable.cell(1, ClientCol.Actions, '.elevate'));
+            await page.waitForSelector('.elevate-client-dialog .elevation-password input');
+            await elevateViaForm('admin');
+            await waitToDisappear(page, '.elevate-client-dialog');
+        });
     });
 
     describe('Expired server elevation prompts globally', () => {
