@@ -4,6 +4,18 @@
 
 # Changelog
 
+## 1.1.8 — 2026-09-28
+
+### Less intrusive administrator elevation
+
+- Normal administrator pages now use the signed-in admin session instead of requiring repeated step-up elevation just to view routine administrative state.
+- Viewing users, audit history, security policy, operations, sessions, service accounts, Groups, integrations, schedules, escalations, connectors, update status, and the Plugin Catalog no longer requires elevation.
+- Routine non-destructive administration such as creating or editing Groups, integrations, schedules, escalations, connectors, and Channel membership/assignment settings no longer requires repeated password confirmation.
+- Step-up elevation remains required for destructive or high-impact actions including user changes/deletion, Channel ownership/security changes, member/group removal, password/MFA/passkey changes, security-policy changes, backup/restore/diagnostics, session revocation, service-account credential changes, secret regeneration, software installation, and destructive deletions.
+- The default administrator elevation window is now four hours instead of one hour when no explicit policy has been saved.
+- The Web UI now uses the configured administration elevation duration instead of always requesting a hard-coded one-hour window.
+- Local, LDAP, passkey, and OIDC elevation paths now honor the configured policy consistently, and password/OIDC requests are capped by that policy.
+
 ## 1.1.7 — 2026-09-27
 
 ### Chat image messages
