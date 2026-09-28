@@ -687,8 +687,16 @@ func (a *CollaborationAPI) UploadAttachment(ctx *gin.Context) {
 
 func (a *CollaborationAPI) DownloadAttachment(ctx *gin.Context) {
 	withID(ctx, "id", func(messageID uint) {
-		if _, _, _, _, ok := a.messageAccess(ctx, messageID); !ok {
+		message, _, _, _, ok := a.messageAccess(ctx, messageID)
+		if !ok {
 			return
+		}
+		if expectedApp := strings.TrimSpace(ctx.Query("applicationId")); expectedApp != "" {
+			parsed, err := strconv.ParseUint(expectedApp, 10, 64)
+			if err != nil || uint(parsed) != message.ApplicationID {
+				ctx.AbortWithError(http.StatusNotFound, errors.New("attachment not found"))
+				return
+			}
 		}
 		attachmentID64, err := strconv.ParseUint(ctx.Param("attachmentId"), 10, 64)
 		if err != nil {
