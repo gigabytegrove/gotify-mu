@@ -567,9 +567,9 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 		}
 
 		persistedPaths := make([]string, 0, len(files))
-		succeeded := false
+		prepared := false
 		defer func() {
-			if succeeded { return }
+			if prepared { return }
 			for _, path := range persistedPaths { _ = os.Remove(path) }
 		}()
 
@@ -587,11 +587,11 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 				if len(mentions) > 0 {
 					if err := a.DB.ReplaceMessageMentions(stored.ID, mentions); err != nil { return err }
 				}
+				prepared = true
 				return nil
 			},
 		)
 		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
-		succeeded = true
 		ctx.JSON(http.StatusCreated, external)
 	})
 }
