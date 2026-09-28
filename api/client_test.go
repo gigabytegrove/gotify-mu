@@ -291,6 +291,24 @@ func (s *ClientSuite) Test_ElevateClient_expectSuccess() {
 	assert.WithinRange(s.T(), *client.ElevatedUntil, before.Add(15*time.Minute), after.Add(15*time.Minute))
 }
 
+func (s *ClientSuite) Test_ElevateClient_capsRequestedDurationToPolicy() {
+	s.db.User(5).Client(8)
+	assert.NoError(s.T(), s.db.SaveSecurityPolicy(model.SecurityPolicy{ElevationMinutes: 2}))
+
+	test.WithUser(s.ctx, 5)
+	s.withElevateRequest(8, 3600)
+
+	before := time.Now()
+	s.a.ElevateClient(s.ctx)
+	after := time.Now()
+
+	assert.Equal(s.T(), 204, s.ctx.Writer.Status())
+	client, err := s.db.GetClientByID(8)
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), client.ElevatedUntil)
+	assert.WithinRange(s.T(), *client.ElevatedUntil, before.Add(2*time.Minute), after.Add(2*time.Minute))
+}
+
 func (s *ClientSuite) Test_ElevateClient_expectNotFoundOnMissingClient() {
 	s.db.User(5)
 
