@@ -86,7 +86,7 @@ func (a *UserAPI) validatePassword(value string) error {
 //
 // Return all users.
 //
-// Requires elevated authentication.
+// Requires an authenticated administrator. Read-only access does not require elevation.
 //
 //	---
 //	produces: [application/json]
@@ -274,7 +274,7 @@ func (a *UserAPI) CreateUser(ctx *gin.Context) {
 //
 // Get a user.
 //
-// Requires elevated authentication.
+// Requires an authenticated administrator. Read-only access does not require elevation.
 //
 //	---
 //	consumes: [application/json]
