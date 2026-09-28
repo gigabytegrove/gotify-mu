@@ -4,6 +4,17 @@
 
 # Changelog
 
+## 1.1.8 — 2026-09-28
+
+### Less intrusive administrative elevation
+
+- Read-only administration no longer requires repeated step-up authentication. Administrators can view users, audit history, security policy, operations, sessions, service accounts, Groups, integrations, schedules, escalations, connectors, the Plugin Catalog, and Software Update status with their normal authenticated admin session.
+- Channel managers and administrators can view Channel members, assignable users/Groups, and Group assignments without elevating first.
+- Security-sensitive actions remain protected by elevation, including user/access changes, ownership/security changes, token or secret changes, session revocation, backup/restore, diagnostics, audit export/retention deletion, plugin installation, updates, and destructive operations.
+- The default administrative re-authentication window is now four hours instead of one hour for installations that have not explicitly saved another value.
+- The Web UI now uses the server's configured elevation duration instead of always requesting one hour.
+- OIDC sessions now honor the same configured session-inactivity and elevation policy used by local, LDAP, and passkey sign-ins.
+
 ## 1.1.7 — 2026-09-27
 
 ### Chat image messages
