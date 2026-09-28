@@ -86,7 +86,7 @@ func (a *UserAPI) validatePassword(value string) error {
 //
 // Return all users.
 //
-// Requires elevated authentication.
+// Requires administrator authentication. Viewing users does not require step-up elevation.
 //
 //	---
 //	produces: [application/json]
@@ -170,6 +170,7 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		MFARequired: mfaRequired,
 		AuthProvider: provider,
 		PasskeyCount: len(passkeys),
+		ElevationMinutes: policy.ElevationMinutes,
 	}
 	client := auth.GetClient(ctx)
 	if client != nil {
@@ -273,7 +274,7 @@ func (a *UserAPI) CreateUser(ctx *gin.Context) {
 //
 // Get a user.
 //
-// Requires elevated authentication.
+// Requires administrator authentication. Viewing a user does not require step-up elevation.
 //
 //	---
 //	consumes: [application/json]
