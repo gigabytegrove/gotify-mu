@@ -48,6 +48,7 @@ check-swagger: update-swagger
 	git add docs
 	if [ -n "$(shell git status --porcelain | grep docs)" ]; then \
         echo Swagger Spec is not up-to-date; \
+        git diff --cached -- docs/spec.json; \
         exit 1; \
     fi
 
