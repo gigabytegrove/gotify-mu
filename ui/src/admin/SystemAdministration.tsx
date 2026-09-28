@@ -405,13 +405,13 @@ const SystemAdministration = () => {
                     <Button
                         variant="outlined"
                         startIcon={<Download />}
-                        onClick={() => downloadAudit('csv')}>
+                        onClick={() => void downloadAudit('csv')}>
                         Export CSV
                     </Button>
                     <Button
                         variant="outlined"
                         startIcon={<Download />}
-                        onClick={() => downloadAudit('json')}>
+                        onClick={() => void downloadAudit('json')}>
                         Export JSON
                     </Button>
                 </Stack>
