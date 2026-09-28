@@ -264,7 +264,20 @@ func (a *OIDCAPI) handleElevationCallback(w http.ResponseWriter, elevate *pendin
 		http.Error(w, "client not found", http.StatusNotFound)
 		return
 	}
-	elevatedUntil := time.Now().Add(time.Duration(elevate.DurationSeconds) * time.Second)
+	policy, err := a.DB.GetSecurityPolicy()
+	if err != nil {
+		http.Error(w, fmt.Sprintf("database error: %v", err), http.StatusInternalServerError)
+		return
+	}
+	maxSeconds := policy.ElevationMinutes * 60
+	if maxSeconds <= 0 {
+		maxSeconds = 4 * 60 * 60
+	}
+	durationSeconds := elevate.DurationSeconds
+	if durationSeconds <= 0 || durationSeconds > maxSeconds {
+		durationSeconds = maxSeconds
+	}
+	elevatedUntil := time.Now().Add(time.Duration(durationSeconds) * time.Second)
 	if err := a.DB.UpdateClientElevatedUntil(client.ID, &elevatedUntil); err != nil {
 		http.Error(w, fmt.Sprintf("failed to elevate session: %v", err), http.StatusInternalServerError)
 		return
