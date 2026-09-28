@@ -4,6 +4,28 @@
 
 # Changelog
 
+## 1.1.8 — 2026-09-28
+
+### Less intrusive administrative elevation
+
+- Normal authenticated administrators can now open and refresh read-only administration pages without repeatedly re-entering credentials.
+- Read-only access no longer requires step-up elevation for user lists, audit views, security-policy viewing, operational status, active sessions, service-account metadata, Groups, integrations, schedules, escalations, connectors, and plugin catalog browsing.
+- Channel owners/managers can view Channel members, assignable users/groups, and Group assignments without step-up elevation.
+- Security-sensitive changes remain protected by elevation, including account/role changes, Channel membership changes, token/secret operations, security-policy changes, session revocation, update installation, integration/connector changes, backups, restores, diagnostics, and destructive actions.
+
+### Re-authentication window
+
+- New/default installations now use an eight-hour administrative elevation window instead of one hour.
+- Existing explicitly saved security-policy values are preserved.
+- The Web UI now requests the server-configured elevation duration instead of hard-coding one hour.
+- Local password, LDAP, passkey, and OIDC elevation all honor the same server-side policy limit.
+- The elevation prompt now tells the administrator how long sensitive actions will remain unlocked.
+
+### Release visibility
+
+- Core GitHub release assets and the release tag are now published before the slower container archive/export work.
+- Monita's in-app updater can discover a validated release as soon as the self-update runtime and checksums are available; Docker/prebuilt archives are attached afterward.
+
 ## 1.1.7 — 2026-09-27
 
 ### Chat image messages
