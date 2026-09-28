@@ -4,6 +4,19 @@
 
 # Changelog
 
+## 1.1.8 — 2026-09-28
+
+### Less intrusive administrator re-authentication
+
+- Normal authenticated administrator sessions can now view administrative pages, status, users, audit history, sessions, groups, integrations, connectors, service-account metadata, and automation state without repeated elevation prompts.
+- Channel membership and assignment views no longer require elevation just to inspect them.
+- Routine schedule and escalation-rule management no longer requires step-up authentication.
+- Destructive and security-sensitive operations still require elevation, including user/access-control changes, secrets and integration configuration, service-account token changes, server updates, backup/recovery operations, security-policy changes, and session revocation.
+- The default elevation window is now four hours instead of one hour for new/default policies.
+- Re-authentication now uses the server's configured elevation duration instead of a hard-coded one-hour Web UI value.
+- Local, LDAP, passkey, and OIDC authentication now use the same elevation policy consistently; requested elevation durations are capped by the server policy.
+- Existing installations that explicitly saved a custom elevation duration keep that value.
+
 ## 1.1.7 — 2026-09-27
 
 ### Chat image messages
