@@ -13,4 +13,6 @@ type ElevateRequest struct {
 	DurationSeconds int `form:"durationSeconds" query:"durationSeconds" json:"durationSeconds" binding:"required"`
 }
 
-var DefaultElevationDuration = time.Hour
+const DefaultElevationMinutes = 8 * 60
+
+var DefaultElevationDuration = time.Duration(DefaultElevationMinutes) * time.Minute
