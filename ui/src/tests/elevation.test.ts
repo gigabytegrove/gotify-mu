@@ -63,17 +63,12 @@ describe('Elevation', () => {
         });
     });
 
-    describe('Users page requires elevation', () => {
+    describe('Read-only admin pages do not require elevation', () => {
         it('de-elevates the current client via UI', () => cancelElevationViaUI(1));
-        it('navigates to users and sees elevation form', async () => {
+        it('can still view the Users page', async () => {
             await page.goto(gotify.url + '/#/users');
-            await waitForExists(page, selector.heading(), 'Authentication Required');
-            await page.waitForSelector('.elevation-password input');
-        });
-        it('elevates via password and sees users page', async () => {
-            await elevateViaForm('admin');
             await waitForExists(page, selector.heading(), 'Users');
-            expect(page.url()).toContain('/users');
+            expect(await page.$('.elevation-password input')).toBeNull();
         });
     });
 
