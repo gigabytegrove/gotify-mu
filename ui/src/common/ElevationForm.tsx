@@ -29,9 +29,9 @@ const ElevationForm = observer(() => {
     const handleLocalElevate = async () => {
         try {
             if (provider === 'ldap') {
-                await elevateStore.directoryElevate(password, ElevateDuration);
+                await elevateStore.directoryElevate(password, elevateDurationSeconds);
             } else {
-                await elevateStore.localElevate(password, ElevateDuration, mfaCode);
+                await elevateStore.localElevate(password, elevateDurationSeconds, mfaCode);
             }
         } catch {
             setError('Elevation failed. Check your password.');
@@ -143,7 +143,7 @@ const ElevationForm = observer(() => {
                         variant="contained"
                         color="primary"
                         fullWidth
-                        onClick={() => elevateStore.oidcElevate(ElevateDuration)}>
+                        onClick={() => elevateStore.oidcElevate(elevateDurationSeconds)}>
                         Elevate via {oidcIdpName}
                     </Button>
                 </>
