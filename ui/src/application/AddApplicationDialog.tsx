@@ -3,6 +3,7 @@ import {
     Accordion,
     AccordionDetails,
     AccordionSummary,
+    Avatar,
     Button,
     Chip,
     Dialog,
@@ -32,7 +33,8 @@ interface IProps {
         defaultPriority: number,
         autoAssign?: boolean,
         allowMemberPost?: boolean,
-        channelType?: 'notification' | 'chat'
+        channelType?: 'notification' | 'chat',
+        image?: File
     ) => Promise<string>;
 }
 
@@ -43,9 +45,34 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
     const [autoAssign, setAutoAssign] = useState(false);
     const [allowMemberPost, setAllowMemberPost] = useState(false);
     const [chatChannel, setChatChannel] = useState(false);
+    const [imageFile, setImageFile] = useState<File>();
+    const [imagePreview, setImagePreview] = useState('');
     const {currentUser} = useStores();
 
     const submitEnabled = name.trim().length !== 0;
+
+    React.useEffect(
+        () => () => {
+            if (imagePreview) URL.revokeObjectURL(imagePreview);
+        },
+        [imagePreview]
+    );
+
+    const selectImage = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        event.target.value = '';
+        if (!file) return;
+
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImageFile(file);
+        setImagePreview(URL.createObjectURL(file));
+    };
+
+    const clearImage = () => {
+        if (imagePreview) URL.revokeObjectURL(imagePreview);
+        setImageFile(undefined);
+        setImagePreview('');
+    };
 
     const submitAndNext = async () => {
         const token = await fOnSubmit(
@@ -54,7 +81,8 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
             defaultPriority,
             autoAssign,
             allowMemberPost,
-            chatChannel ? 'chat' : 'notification'
+            chatChannel ? 'chat' : 'notification',
+            imageFile
         );
         fClose(token);
     };
@@ -75,6 +103,46 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                 </DialogContentText>
 
                 <Stack spacing={2}>
+                    <Stack
+                        direction={{xs: 'column', sm: 'row'}}
+                        spacing={2}
+                        sx={{alignItems: {xs: 'flex-start', sm: 'center'}}}>
+                        <Avatar
+                            src={imagePreview || undefined}
+                            variant="rounded"
+                            sx={{width: 72, height: 72, flexShrink: 0}}>
+                            {name.trim().slice(0, 2).toUpperCase()}
+                        </Avatar>
+                        <Stack spacing={0.75}>
+                            <Typography variant="subtitle2">Channel image</Typography>
+                            <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
+                                <Button
+                                    className="channel-image-upload"
+                                    component="label"
+                                    variant="outlined"
+                                    size="small">
+                                    {imageFile ? 'Change image' : 'Choose image'}
+                                    <input
+                                        hidden
+                                        type="file"
+                                        accept=".gif,.png,.jpg,.jpeg"
+                                        onChange={selectImage}
+                                    />
+                                </Button>
+                                <Button
+                                    className="channel-image-remove"
+                                    size="small"
+                                    disabled={!imageFile}
+                                    onClick={clearImage}>
+                                    Remove image
+                                </Button>
+                            </Stack>
+                            <Typography variant="caption" color="text.secondary">
+                                Optional. PNG, JPG, JPEG, or GIF.
+                            </Typography>
+                        </Stack>
+                    </Stack>
+
                     <TextField
                         autoFocus
                         className="name"
