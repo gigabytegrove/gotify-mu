@@ -141,7 +141,7 @@ func (a *LDAPAPI) Login(ctx *gin.Context) {
 	})
 	ctx.JSON(200,&model.CurrentUserExternal{
 		ID:user.ID,Name:user.Name,DisplayName:user.DisplayName,Admin:user.Admin,CreatedAt:user.CreatedAt,
-		ClientID:client.ID,ElevatedUntil:client.ElevatedUntil,AuthProvider:"ldap",
+		ClientID:client.ID,ElevatedUntil:client.ElevatedUntil,ElevationMinutes:elevationMinutes,AuthProvider:"ldap",
 	})
 }
 
