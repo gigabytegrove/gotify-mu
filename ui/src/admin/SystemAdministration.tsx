@@ -75,6 +75,18 @@ const SystemAdministration = () => {
         window.location.href = api('audit/export?format=' + format);
     };
 
+    const downloadProtected = async (path: string, filename: string) => {
+        const response = await axios.get<Blob>(api(path), {responseType: 'blob'});
+        const objectUrl = URL.createObjectURL(response.data);
+        const anchor = document.createElement('a');
+        anchor.href = objectUrl;
+        anchor.download = filename;
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
+        URL.revokeObjectURL(objectUrl);
+    };
+
     const stageRestore = async (file?: File) => {
         if (!file) return;
         setRestoring(true);
@@ -144,7 +156,7 @@ const SystemAdministration = () => {
                                     elevationMinutes: Number(event.target.value),
                                 })
                             }
-                            helperText="Minutes before protected administrative actions require identity confirmation again."
+                            helperText="Minutes that sensitive administrative actions stay unlocked after identity confirmation. Viewing admin pages does not require elevation."
                             slotProps={{htmlInput: {min: 1, max: 1440}}}
                         />
                         <FormControlLabel
@@ -339,7 +351,7 @@ const SystemAdministration = () => {
                                     Cancel Restore
                                 </Button>
                             }>
-                            A restore is staged. Restart Gotify MU to apply it before the database
+                            A restore is staged. Restart Monita to apply it before the database
                             opens. A pre-restore safety backup will be created automatically.
                         </Alert>
                     )}
@@ -347,8 +359,9 @@ const SystemAdministration = () => {
                         <Button
                             variant="contained"
                             startIcon={<Download />}
-                            component="a"
-                            href={api('admin/backup')}>
+                            onClick={() =>
+                                void downloadProtected('admin/backup', 'monita-backup.zip')
+                            }>
                             Download Full Backup
                         </Button>
                         <input
@@ -368,8 +381,9 @@ const SystemAdministration = () => {
                         <Button
                             variant="outlined"
                             startIcon={<BugReport />}
-                            component="a"
-                            href={api('admin/diagnostics')}>
+                            onClick={() =>
+                                void downloadProtected('admin/diagnostics', 'monita-diagnostics.zip')
+                            }>
                             Download Diagnostics
                         </Button>
                     </Stack>
