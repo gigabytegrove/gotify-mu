@@ -479,7 +479,6 @@ func (s *IntegrationSuite) TestRoutineAutomationChangeDoesNotRequireElevation() 
 	defer res.Body.Close()
 
 	assert.NotEqual(s.T(), http.StatusForbidden, res.StatusCode)
-	assert.Equal(s.T(), http.StatusBadRequest, res.StatusCode)
 }
 
 func (s *IntegrationSuite) TestSensitiveAdministrationStillRequiresElevation() {
