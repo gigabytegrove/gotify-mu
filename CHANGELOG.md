@@ -4,6 +4,15 @@
 
 # Changelog
 
+## 1.1.6 — 2026-09-27
+
+### Channel images on new and existing Channels
+
+- Added Channel image selection directly to **Create Channel**, including local preview, change, and remove-before-create controls.
+- New Channels can now be created with their image in the same workflow instead of requiring a second edit afterward.
+- Existing Channels continue to expose **Upload image / Change image / Remove image** in **Edit Channel** and the Channel action menu.
+- If an image upload fails after Channel creation, Monita preserves the new Channel and token and clearly directs the user to add the image from **Edit Channel**.
+
 ## 1.1.5 — 2026-09-27
 
 ### Fresh Web UI after updates
