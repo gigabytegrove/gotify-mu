@@ -414,7 +414,7 @@ func (s *IntegrationSuite) TestPluginLoadFail_expectPanic() {
 func (s *IntegrationSuite) TestAuthentication() {
 	req := s.newRequest("GET", "current/user", "")
 	req.SetBasicAuth("admin", "pw")
-	doRequestAndExpect(s.T(), req, 200, `{"id": 1, "name": "admin", "admin": true, "createdAt":"2020-01-01T00:00:00Z", "mfaEnabled":false, "mfaRequired":false, "authProvider":"local", "passkeyCount":0}`)
+	doRequestAndExpect(s.T(), req, 200, `{"id": 1, "name": "admin", "admin": true, "createdAt":"2020-01-01T00:00:00Z", "elevationMinutes":480, "mfaEnabled":false, "mfaRequired":false, "authProvider":"local", "passkeyCount":0}`)
 
 	req = s.newRequest("GET", "current/user", "")
 	req.SetBasicAuth("jmattheis", "pw")
@@ -434,7 +434,7 @@ func (s *IntegrationSuite) TestAuthentication() {
 
 	req = s.newRequest("GET", "current/user", "")
 	req.SetBasicAuth("normal", "secret-password-123")
-	doRequestAndExpect(s.T(), req, 200, `{"id": 2, "name": "normal", "admin": false, "createdAt":"2020-01-01T00:00:00Z", "mfaEnabled":false, "mfaRequired":false, "authProvider":"local", "passkeyCount":0}`)
+	doRequestAndExpect(s.T(), req, 200, `{"id": 2, "name": "normal", "admin": false, "createdAt":"2020-01-01T00:00:00Z", "elevationMinutes":480, "mfaEnabled":false, "mfaRequired":false, "authProvider":"local", "passkeyCount":0}`)
 
 	req = s.newRequest("POST", "client", `{"name": "android-client"}`)
 	req.SetBasicAuth("normal", "secret-password-123")
@@ -444,6 +444,38 @@ func (s *IntegrationSuite) TestAuthentication() {
 	token := &model.Application{}
 	json.NewDecoder(res.Body).Decode(token)
 	assert.Equal(s.T(), "android-client", token.Name)
+}
+
+func (s *IntegrationSuite) TestAdminReadOnlyDoesNotRequireElevation() {
+	s.db.AdminUser(2).ClientWithToken(1, "Cadminplain").ElevatedClientWithToken(2, "Cadminelevated")
+
+	// Read-only administrative pages work with a normal authenticated admin session.
+	req := s.newRequest("GET", "admin/operations", "")
+	req.Header.Set("X-Gotify-Key", "Cadminplain")
+	res, err := client.Do(req)
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), http.StatusOK, res.StatusCode)
+	res.Body.Close()
+
+	req = s.newRequest("GET", "user", "")
+	req.Header.Set("X-Gotify-Key", "Cadminplain")
+	res, err = client.Do(req)
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), http.StatusOK, res.StatusCode)
+	res.Body.Close()
+
+	// Security-sensitive mutations still require step-up elevation.
+	policy := `{"minimumPasswordLength":12,"sessionInactivityMinutes":10080,"elevationMinutes":480,"requireMfaForAdmins":false,"requireMfaForAllLocalUsers":false,"auditRetentionDays":90}`
+	req = s.newRequest("PUT", "admin/security-policy", policy)
+	req.Header.Set("X-Gotify-Key", "Cadminplain")
+	doRequestAndExpect(s.T(), req, 403, `{"error":"Forbidden","errorCode":403,"errorDescription":"session not elevated, use basic auth or call /client:elevate"}`)
+
+	req = s.newRequest("PUT", "admin/security-policy", policy)
+	req.Header.Set("X-Gotify-Key", "Cadminelevated")
+	res, err = client.Do(req)
+	assert.NoError(s.T(), err)
+	assert.Equal(s.T(), http.StatusOK, res.StatusCode)
+	res.Body.Close()
 }
 
 func (s *IntegrationSuite) TestCreateUser_RequiresElevatedAdmin() {
