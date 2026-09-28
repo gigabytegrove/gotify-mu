@@ -84,6 +84,17 @@ describe('Channels', () => {
         expect(await count(page, '.channel-card')).toBe(0);
     });
 
+    it('shows Channel image controls when creating a Channel', async () => {
+        await page.click('#create-app');
+        await page.waitForSelector($dialog.selector(), {visible: true});
+
+        expect(await page.$('.channel-image-upload')).not.toBeNull();
+        expect(await page.$('.channel-image-remove')).not.toBeNull();
+
+        await page.keyboard.press('Escape');
+        await waitToDisappear(page, $dialog.selector());
+    });
+
     describe('create Channels', () => {
         it('server', createChannel('server', '#1'));
         it('desktop', createChannel('desktop', '#2'));
