@@ -25,7 +25,7 @@ func defaultSecurityPolicy() model.SecurityPolicy {
 	return model.SecurityPolicy{
 		MinimumPasswordLength:      12,
 		SessionInactivityMinutes:   10080,
-		ElevationMinutes:           60,
+		ElevationMinutes:           480,
 		RequireMFAForAdmins:        false,
 		RequireMFAForAllLocalUsers: false,
 		AuditRetentionDays:         90,
