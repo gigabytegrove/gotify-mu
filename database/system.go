@@ -1,6 +1,7 @@
 package database
 
 import (
+	"time"
 	"errors"
 	"os"
 	"path/filepath"
@@ -25,7 +26,7 @@ func defaultSecurityPolicy() model.SecurityPolicy {
 	return model.SecurityPolicy{
 		MinimumPasswordLength:      12,
 		SessionInactivityMinutes:   10080,
-		ElevationMinutes:           60,
+		ElevationMinutes:           int(model.DefaultElevationDuration / time.Minute),
 		RequireMFAForAdmins:        false,
 		RequireMFAForAllLocalUsers: false,
 		AuditRetentionDays:         90,
