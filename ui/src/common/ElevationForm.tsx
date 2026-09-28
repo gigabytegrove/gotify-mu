@@ -9,7 +9,6 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Key from '@mui/icons-material/Key';
 import {Box, Divider} from '@mui/material';
 
-
 const ElevationForm = observer(() => {
     const {elevateStore, currentUser} = useStores();
     const [password, setPassword] = useState('');
