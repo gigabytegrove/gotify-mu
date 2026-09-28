@@ -136,20 +136,20 @@ const Layout = observer(() => {
                                         element={<Navigate replace to="/channels" />}
                                     />
                                     <Route path="/clients" element={authed(<Clients />)} />
-                                    <Route path="/users" element={authed(elevated(<Users />))} />
-                                    <Route path="/groups" element={authed(elevated(<Groups />))} />
-                                    <Route path="/audit" element={authed(elevated(<Audit />))} />
+                                    <Route path="/users" element={authed(<Users />)} />
+                                    <Route path="/groups" element={authed(<Groups />)} />
+                                    <Route path="/audit" element={authed(<Audit />)} />
                                     <Route
                                         path="/integrations"
-                                        element={authed(elevated(<Integrations />))}
+                                        element={authed(<Integrations />)}
                                     />
                                     <Route
                                         path="/automation"
-                                        element={authed(elevated(<Automation />))}
+                                        element={authed(<Automation />)}
                                     />
                                     <Route
                                         path="/system"
-                                        element={authed(elevated(<SystemAdministration />))}
+                                        element={authed(<SystemAdministration />)}
                                     />
                                     <Route
                                         path="/settings"
