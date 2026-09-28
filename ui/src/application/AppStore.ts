@@ -121,9 +121,10 @@ export class AppStore extends BaseStore<IApplication> {
         defaultPriority: number,
         autoAssign = false,
         allowMemberPost = false,
-        channelType: 'notification' | 'chat' = allowMemberPost ? 'chat' : 'notification'
+        channelType: 'notification' | 'chat' = allowMemberPost ? 'chat' : 'notification',
+        image?: Blob
     ): Promise<string> => {
-        const response = await axios.post(`${config.get('url')}application`, {
+        const response = await axios.post<IApplication>(`${config.get('url')}application`, {
             name,
             description,
             defaultPriority,
@@ -131,6 +132,27 @@ export class AppStore extends BaseStore<IApplication> {
             allowMemberPost,
             channelType,
         });
+        if (image) {
+            try {
+                const formData = new FormData();
+                formData.append('file', image);
+                await axios.post<IApplication>(
+                    `${config.get('url')}application/${response.data.id}/image`,
+                    formData,
+                    {
+                        headers: {'content-type': 'multipart/form-data'},
+                    }
+                );
+            } catch (error) {
+                console.error('Error uploading new Channel image:', error);
+                await this.refresh();
+                this.snack(
+                    'Channel created, but its image could not be uploaded. You can add it from Edit Channel.'
+                );
+                return response.data.token;
+            }
+        }
+
         await this.refresh();
         this.snack('Channel created');
         return response.data.token;
