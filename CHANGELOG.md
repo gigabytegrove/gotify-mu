@@ -4,6 +4,24 @@
 
 # Changelog
 
+## 1.1.8 — 2026-09-28
+
+### Less intrusive administrative re-authentication
+
+- Normal signed-in browser sessions still use the configured inactivity policy (seven days by default); the short-lived state users were repeatedly losing was the separate elevated/re-authenticated state.
+- The default elevation window is now four hours instead of one hour.
+- Re-authentication now honors the configured **Security Policy → Elevation duration** consistently for local passwords, LDAP, OIDC, and passkeys.
+- OIDC sessions now honor the configured session inactivity and elevation policies instead of using separate hard-coded lifetimes.
+- Manual client elevation is capped by the server security policy; obsolete 30-day and one-year elevation choices were removed.
+
+### Read-only administration without elevation
+
+- Administrators can open and inspect Users, Groups, Audit, Operations, Sessions, Service Accounts, Integrations, Automation, Connector, Plugin Catalog, and Security Policy pages without repeatedly re-entering credentials.
+- Channel owners, managers, and administrators can inspect Channel membership and group assignment screens without elevation.
+- Mutating or destructive administrative actions still require elevation, including account changes, membership changes, policy changes, restores, session revocation, integration changes, and update installation.
+- Backups, diagnostics, audit exports, token creation, and other high-impact or credential-bearing actions remain elevation-protected.
+- Webhook URLs are now hidden on normal read-only page loads and require explicit elevated **Reveal URL** access, so reducing page-view prompts does not expose webhook credentials.
+
 ## 1.1.7 — 2026-09-27
 
 ### Chat image messages
