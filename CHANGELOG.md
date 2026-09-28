@@ -4,6 +4,14 @@
 
 # Changelog
 
+## 1.1.5 — 2026-09-27
+
+### Fresh Web UI after updates
+
+- Monita now serves the Web UI entry document with explicit no-cache headers so a completed in-app update cannot leave the browser on an older frontend bundle.
+- This ensures UI changes such as the restored Channel image controls appear immediately after updating instead of requiring a hard refresh.
+- Existing hashed static assets remain compatible with normal browser caching.
+
 ## 1.1.4 — 2026-09-27
 
 ### Software update status cleanup
