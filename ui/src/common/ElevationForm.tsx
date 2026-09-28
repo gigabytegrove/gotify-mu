@@ -61,7 +61,8 @@ const ElevationForm = observer(() => {
         <>
             <Typography>This sensitive action requires re-authentication.</Typography>
             <Typography variant="body2" color="textSecondary" sx={{mb: 1}}>
-                Once confirmed, sensitive actions remain unlocked for the configured administration window.
+                Once confirmed, sensitive actions remain unlocked for the configured administration
+                window.
             </Typography>
             {usePassword && (
                 <form
