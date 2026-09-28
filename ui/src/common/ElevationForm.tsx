@@ -9,10 +9,9 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Key from '@mui/icons-material/Key';
 import {Box, Divider} from '@mui/material';
 
-const ElevateDuration = 60 * 60;
-
 const ElevationForm = observer(() => {
     const {elevateStore, currentUser} = useStores();
+    const elevateDurationSeconds = Math.max(60, (currentUser.user.elevationMinutes ?? 240) * 60);
     const [password, setPassword] = useState('');
     const [mfaCode, setMfaCode] = useState('');
     const [error, setError] = useState('');
@@ -30,9 +29,9 @@ const ElevationForm = observer(() => {
     const handleLocalElevate = async () => {
         try {
             if (provider === 'ldap') {
-                await elevateStore.directoryElevate(password, ElevateDuration);
+                await elevateStore.directoryElevate(password, elevateDurationSeconds);
             } else {
-                await elevateStore.localElevate(password, ElevateDuration, mfaCode);
+                await elevateStore.localElevate(password, elevateDurationSeconds, mfaCode);
             }
         } catch {
             setError('Elevation failed. Check your password.');
@@ -144,7 +143,7 @@ const ElevationForm = observer(() => {
                         variant="contained"
                         color="primary"
                         fullWidth
-                        onClick={() => elevateStore.oidcElevate(ElevateDuration)}>
+                        onClick={() => elevateStore.oidcElevate(elevateDurationSeconds)}>
                         Elevate via {oidcIdpName}
                     </Button>
                 </>
