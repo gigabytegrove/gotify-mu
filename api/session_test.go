@@ -84,6 +84,7 @@ func (s *SessionSuite) Test_Login_Success() {
 
 	body := s.recorder.Body.String()
 	assert.Contains(s.T(), body, "testuser")
+	assert.Contains(s.T(), body, "\"elevationMinutes\":480")
 	assert.NotContains(s.T(), body, "Ctesttoken12345")
 
 	clients, err := s.db.GetClientsByUser(1)
