@@ -14,6 +14,15 @@ const MaxImages = 8;
 const MaxImageBytes = 25 * 1024 * 1024;
 const MaxTotalImageBytes = 50 * 1024 * 1024;
 const AllowedImageTypes = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+const imageType = (file: File): string => {
+    if (file.type) return file.type.toLowerCase();
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    if (extension === 'png') return 'image/png';
+    if (extension === 'gif') return 'image/gif';
+    if (extension === 'webp') return 'image/webp';
+    if (extension === 'jpg' || extension === 'jpeg') return 'image/jpeg';
+    return '';
+};
 
 interface IProps {
     channelName: string;
@@ -84,7 +93,7 @@ const ChatComposer = ({channelName, fOnSubmit, fOnTyping}: IProps) => {
                 error = `A chat message can include at most ${MaxImages} images.`;
                 break;
             }
-            if (!AllowedImageTypes.has(file.type)) {
+            if (!AllowedImageTypes.has(imageType(file))) {
                 error = `${file.name}: only JPEG, PNG, GIF, and WebP images are supported.`;
                 continue;
             }
