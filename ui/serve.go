@@ -79,7 +79,14 @@ func serveFile(name, contentType string, convert func(string) string) gin.Handle
 	}
 	converted := convert(string(content))
 	return func(ctx *gin.Context) {
+		setFreshUIHeaders(ctx)
 		ctx.Header("Content-Type", contentType)
 		ctx.String(200, converted)
 	}
+}
+
+func setFreshUIHeaders(ctx *gin.Context) {
+	ctx.Header("Cache-Control", "no-store, no-cache, must-revalidate, max-age=0")
+	ctx.Header("Pragma", "no-cache")
+	ctx.Header("Expires", "0")
 }
