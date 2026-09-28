@@ -17,6 +17,7 @@ import (
 	"github.com/gotify/server/v3/test"
 	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -291,6 +292,23 @@ func (s *ClientSuite) Test_ElevateClient_expectSuccess() {
 	assert.WithinRange(s.T(), *client.ElevatedUntil, before.Add(15*time.Minute), after.Add(15*time.Minute))
 }
 
+func (s *ClientSuite) Test_ElevateClient_capsDurationToSecurityPolicy() {
+	s.db.User(5).Client(8)
+	require.NoError(s.T(), s.db.SaveSecurityPolicy(model.SecurityPolicy{ElevationMinutes: 30}))
+
+	test.WithUser(s.ctx, 5)
+	s.withElevateRequest(8, 24*60*60)
+
+	before := time.Now()
+	s.a.ElevateClient(s.ctx)
+	after := time.Now()
+
+	assert.Equal(s.T(), 204, s.ctx.Writer.Status())
+	client, err := s.db.GetClientByID(8)
+	assert.NoError(s.T(), err)
+	assert.NotNil(s.T(), client.ElevatedUntil)
+	assert.WithinRange(s.T(), *client.ElevatedUntil, before.Add(30*time.Minute), after.Add(30*time.Minute))
+}
 func (s *ClientSuite) Test_ElevateClient_expectNotFoundOnMissingClient() {
 	s.db.User(5)
 
