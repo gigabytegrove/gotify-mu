@@ -21,6 +21,7 @@ type MUCapabilityFlags struct {
 	GlobalChannels       bool `json:"globalChannels"`
 	ChannelTypes         bool `json:"channelTypes"`
 	ChannelImages        bool `json:"channelImages"`
+	ChatImages           bool `json:"chatImages"`
 	ChatChannels         bool `json:"chatChannels"`
 	MemberPosting        bool `json:"memberPosting"`
 	SenderIdentity       bool `json:"senderIdentity"`
@@ -45,6 +46,7 @@ func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
 			GlobalChannels:       true,
 			ChannelTypes:         true,
 			ChannelImages:        true,
+			ChatImages:           true,
 			ChatChannels:         true,
 			MemberPosting:        true,
 			SenderIdentity:       true,
