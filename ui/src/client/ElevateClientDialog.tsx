@@ -54,24 +54,24 @@ const ElevateClientDialog = observer(({clientName, clientId, fClose}: IProps) =>
                     <ElevationForm />
                 ) : (
                     <>
-                    <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
-                        The server security policy caps how long elevated access can remain active.
-                    </Typography>
-                    <FormControl fullWidth style={{marginTop: 8}}>
-                        <InputLabel id="elevate-duration-label">Duration</InputLabel>
-                        <Select
-                            className="elevate-duration"
-                            labelId="elevate-duration-label"
-                            label="Duration"
-                            value={durationSeconds}
-                            onChange={(e) => setDurationSeconds(e.target.value as number)}>
-                            {durationOptions.map((opt) => (
-                                <MenuItem key={opt.seconds} value={opt.seconds}>
-                                    {opt.label}
-                                </MenuItem>
-                            ))}
-                        </Select>
-                    </FormControl>
+                        <Typography variant="body2" color="text.secondary" sx={{mb: 1}}>
+                            The server security policy caps how long elevated access can remain active.
+                        </Typography>
+                        <FormControl fullWidth style={{marginTop: 8}}>
+                            <InputLabel id="elevate-duration-label">Duration</InputLabel>
+                            <Select
+                                className="elevate-duration"
+                                labelId="elevate-duration-label"
+                                label="Duration"
+                                value={durationSeconds}
+                                onChange={(e) => setDurationSeconds(e.target.value as number)}>
+                                {durationOptions.map((opt) => (
+                                    <MenuItem key={opt.seconds} value={opt.seconds}>
+                                        {opt.label}
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </FormControl>
                     </>
                 )}
             </DialogContent>
