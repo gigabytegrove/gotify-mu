@@ -122,6 +122,7 @@ export interface IAuditEvent {
 export interface ICurrentUser extends IUser {
     clientId?: number;
     elevatedUntil?: string;
+    elevationMinutes?: number;
     mfaEnabled?: boolean;
     mfaRequired?: boolean;
     authProvider?: 'local' | 'oidc' | 'ldap' | 'passkey';
