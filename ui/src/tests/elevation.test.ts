@@ -63,17 +63,35 @@ describe('Elevation', () => {
         });
     });
 
-    describe('Users page requires elevation', () => {
+    describe('Read-only admin pages do not require elevation', () => {
         it('de-elevates the current client via UI', () => cancelElevationViaUI(1));
-        it('navigates to users and sees elevation form', async () => {
+        it('opens Users without re-authentication', async () => {
             await page.goto(gotify.url + '/#/users');
-            await waitForExists(page, selector.heading(), 'Authentication Required');
-            await page.waitForSelector('.elevation-password input');
-        });
-        it('elevates via password and sees users page', async () => {
-            await elevateViaForm('admin');
             await waitForExists(page, selector.heading(), 'Users');
-            expect(page.url()).toContain('/users');
+            expect(await count(page, '.elevation-password input')).toBe(0);
+        });
+        it('opens Integrations without re-authentication', async () => {
+            await page.goto(gotify.url + '/#/integrations');
+            await waitForExists(page, selector.heading(), 'Integrations');
+            expect(await count(page, '.elevation-password input')).toBe(0);
+        });
+        it('re-elevates current session for mutation tests', async () => {
+            const status = await page.evaluate(async () => {
+                const currentResponse = await fetch('/current/user');
+                const current = (await currentResponse.json()) as {clientId: number};
+                const response = await fetch(`/client/${current.clientId}/elevate`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: 'Basic ' + btoa('admin:admin'),
+                    },
+                    body: JSON.stringify({durationSeconds: 4 * 60 * 60}),
+                });
+                return response.status;
+            });
+            expect(status).toBe(204);
+            await page.reload();
+            await waitForExists(page, selector.heading(), 'Integrations');
         });
     });
 
