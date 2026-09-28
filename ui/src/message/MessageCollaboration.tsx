@@ -94,6 +94,12 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
 
     const status = collaboration.status || 'open';
     const assignedToMe = collaboration.assignedUserId === currentUser.user.id;
+    const imageAttachments = (collaboration.attachments || []).filter((attachment) =>
+        attachment.contentType.toLowerCase().startsWith('image/')
+    );
+    const fileAttachments = (collaboration.attachments || []).filter(
+        (attachment) => !attachment.contentType.toLowerCase().startsWith('image/')
+    );
 
     return (
         <>
@@ -191,9 +197,56 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
                     })}
                 </Stack>
 
-                {collaboration.attachments && collaboration.attachments.length > 0 && (
+                {imageAttachments.length > 0 && (
+                    <Box
+                        sx={{
+                            display: 'grid',
+                            gridTemplateColumns: {
+                                xs: 'repeat(2, minmax(0, 1fr))',
+                                sm: 'repeat(3, minmax(0, 1fr))',
+                            },
+                            gap: 1,
+                            maxWidth: 720,
+                        }}>
+                        {imageAttachments.map((attachment) => {
+                            const src = api(attachment.url.replace(/^\//, ''));
+                            return (
+                                <Box
+                                    key={attachment.id}
+                                    component="a"
+                                    href={src}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    aria-label={`Open ${attachment.filename}`}
+                                    sx={{
+                                        display: 'block',
+                                        overflow: 'hidden',
+                                        borderRadius: 1.5,
+                                        border: 1,
+                                        borderColor: 'divider',
+                                        bgcolor: 'action.hover',
+                                    }}>
+                                    <Box
+                                        component="img"
+                                        src={src}
+                                        alt={attachment.filename}
+                                        loading="lazy"
+                                        sx={{
+                                            display: 'block',
+                                            width: '100%',
+                                            maxHeight: 360,
+                                            objectFit: 'contain',
+                                        }}
+                                    />
+                                </Box>
+                            );
+                        })}
+                    </Box>
+                )}
+
+                {fileAttachments.length > 0 && (
                     <Stack direction="row" spacing={0.75} useFlexGap sx={{flexWrap: 'wrap'}}>
-                        {collaboration.attachments.map((attachment) => (
+                        {fileAttachments.map((attachment) => (
                             <Chip
                                 key={attachment.id}
                                 icon={<AttachFile fontSize="small" />}
