@@ -162,8 +162,9 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		Admin:         user.Admin,
 		CreatedAt:     user.CreatedAt,
 		ClientID:      client.ID,
-		ElevatedUntil: client.ElevatedUntil,
-		MFAEnabled:    mfa != nil && mfa.Enabled,
+		ElevatedUntil:    client.ElevatedUntil,
+		ElevationMinutes: elevationMinutes,
+		MFAEnabled:       mfa != nil && mfa.Enabled,
 		MFARequired:   mfaRequired && (mfa == nil || !mfa.Enabled),
 		AuthProvider:  "local",
 	})
