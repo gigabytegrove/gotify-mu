@@ -242,3 +242,29 @@ func TestMUDeliverySuppressesSenderAndIncludesMutedMention(t *testing.T) {
 		t.Fatalf("muted mentioned member should receive one notification: %v", notifier.userIDs)
 	}
 }
+
+func TestExternalMessagePreservesExtrasAndAttachments(t *testing.T) {
+	extras := []byte(`{"client::notification":{"click":{"url":"https://example.com"}}}`)
+	msg := &model.Message{
+		ID: 44,
+		ApplicationID: 7,
+		Message: "photo",
+		Title: "Brad",
+		Priority: 1,
+		Date: time.Date(2026, 9, 27, 20, 45, 0, 0, time.UTC),
+		Extras: extras,
+		Collaboration: model.MessageCollaboration{
+			Attachments: []model.MessageAttachmentView{{
+				ID: 9, Filename: "photo.jpg", ContentType: "image/jpeg", Size: 1234,
+				URL: "/message/44/attachment/9",
+			}},
+		},
+	}
+	external := externalMessage(msg)
+	if external.Extras == nil {
+		t.Fatal("expected extras to survive realtime conversion")
+	}
+	if len(external.Collaboration.Attachments) != 1 || external.Collaboration.Attachments[0].Filename != "photo.jpg" {
+		t.Fatalf("expected attachment metadata in realtime message: %#v", external.Collaboration)
+	}
+}
