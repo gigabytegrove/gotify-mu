@@ -19,6 +19,7 @@ type ClientDatabase interface {
 	DeleteClientByID(id uint) error
 	UpdateClient(client *model.Client) error
 	UpdateClientElevatedUntil(id uint, t *time.Time) error
+	GetSecurityPolicy() (model.SecurityPolicy, error)
 }
 
 // The ClientAPI provides handlers for managing clients and applications.
@@ -315,7 +316,20 @@ func (a *ClientAPI) ElevateClient(ctx *gin.Context) {
 			return
 		}
 
-		elevatedUntil := time.Now().Add(time.Duration(params.DurationSeconds) * time.Second)
+		policy, err := a.DB.GetSecurityPolicy()
+		if err != nil {
+			ctx.AbortWithError(500, err)
+			return
+		}
+		maxSeconds := policy.ElevationMinutes * 60
+		if maxSeconds <= 0 {
+			maxSeconds = int(model.DefaultElevationDuration / time.Second)
+		}
+		durationSeconds := params.DurationSeconds
+		if durationSeconds <= 0 || durationSeconds > maxSeconds {
+			durationSeconds = maxSeconds
+		}
+		elevatedUntil := time.Now().Add(time.Duration(durationSeconds) * time.Second)
 		if err := a.DB.UpdateClientElevatedUntil(client.ID, &elevatedUntil); err != nil {
 			ctx.AbortWithError(500, err)
 			return
