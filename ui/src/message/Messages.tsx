@@ -59,8 +59,14 @@ const Messages = observer(() => {
     >({});
     const expandedState = React.useRef<Record<number, boolean>>({});
 
+    const role = app?.role?.toLowerCase();
     const canPost =
-        app != null && (app.ownerId === currentUser.user.id || Boolean(app.allowMemberPost));
+        app != null &&
+        (app.ownerId === currentUser.user.id ||
+            role === 'owner' ||
+            role === 'manager' ||
+            role === 'publisher' ||
+            (role !== 'readonly' && Boolean(app.allowMemberPost)));
 
     const canDeleteAll =
         !archivedView &&
