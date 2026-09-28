@@ -504,7 +504,10 @@ const Integrations = () => {
                     item={webhookEdit}
                     channels={channels}
                     onClose={() => setWebhookEdit(undefined)}
-                    onSaved={async () => {
+                    onSaved={async (saved) => {
+                        if (saved.path) {
+                            setWebhookUrls((current) => ({...current, [saved.id]: saved.path}));
+                        }
                         setWebhookEdit(undefined);
                         await refresh();
                     }}
@@ -704,7 +707,7 @@ const WebhookDialog = ({
     item: IWebhookRoute | null;
     channels: Array<{id: number; name: string}>;
     onClose: VoidFunction;
-    onSaved: () => Promise<void>;
+    onSaved: (saved: IWebhookRoute) => Promise<void>;
 }) => {
     const [name, setName] = React.useState(item?.name || '');
     const [applicationId, setApplicationId] = React.useState(item?.applicationId || 0);
@@ -745,12 +748,13 @@ const WebhookDialog = ({
                 allowedCidrs,
                 rateLimitPerMinute,
             };
-            if (item) {
-                await axios.put(api(`integration/webhook/${item.id}`), payload);
-            } else {
-                await axios.post(api('integration/webhook'), payload);
-            }
-            await onSaved();
+            const response = item
+                ? await axios.put<IWebhookRoute>(
+                      api(`integration/webhook/${item.id}`),
+                      payload
+                  )
+                : await axios.post<IWebhookRoute>(api('integration/webhook'), payload);
+            await onSaved(response.data);
         } finally {
             setSaving(false);
         }
