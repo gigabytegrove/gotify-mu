@@ -24,6 +24,7 @@ export interface IClient {
     name: string;
     lastUsed: string | null;
     elevatedUntil?: string;
+    elevationMinutes?: number;
     createdAt: string;
     expiresAfterInactivitySeconds: number;
     expiresAt: string | null;
