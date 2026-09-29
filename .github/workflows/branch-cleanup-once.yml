@@ -1,0 +1,45 @@
+name: One-time merged branch cleanup
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/branch-cleanup-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Delete branches already merged into master
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete fully merged remote branches
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin --prune
+
+          mapfile -t merged < <(
+            git branch -r --merged origin/master |
+              sed 's#^[[:space:]]*origin/##' |
+              grep -vE '^(master|HEAD -> master)$' || true
+          )
+
+          if [ "${#merged[@]}" -eq 0 ]; then
+            echo "No merged branches to delete."
+            exit 0
+          fi
+
+          printf 'Deleting merged branches:\n'
+          printf ' - %s\n' "${merged[@]}"
+
+          for branch in "${merged[@]}"; do
+            git push origin --delete "${branch}"
+          done
