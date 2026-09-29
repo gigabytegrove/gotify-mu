@@ -1,4 +1,4 @@
-name: One-time merged PR branch cleanup
+name: One-time retired branch cleanup
 
 on:
   push:
@@ -9,50 +9,78 @@ on:
 
 permissions:
   contents: write
-  pull-requests: read
 
 jobs:
   cleanup:
-    name: Delete branches whose PRs are already merged
+    name: Delete explicitly retired historical branches
     runs-on: ubuntu-latest
-    env:
-      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Delete branches with a merged pull request
+      - name: Delete retired branches
         shell: bash
         run: |
           set -euo pipefail
-          git fetch origin --prune
-
-          mapfile -t branches < <(
-            git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin |
-              grep -vE '^(master|HEAD)$' || true
+          branches=(
+          'ci/android-v0.1.0-test-build'
+          'feat/single-container-updater'
+          'feature/home-assistant-native-pairing'
+          'feature/mobile-chat-capabilities'
+          'feature/mobile-chat-presence-v0.5'
+          'feature/v0.5-audit-closure'
+          'feature/v0.5-hardening'
+          'feature/v0.5-hardening-completeness'
+          'feature/v0.5-hardening-platform'
+          'fix/admin-elevation-1.1.8'
+          'fix/admin-elevation-friction-1.1.8'
+          'fix/admin-elevation-ux-1.1.8'
+          'fix/admin-elevation-v1.1.8'
+          'fix/admin-step-up-auth-1.1.8'
+          'fix/single-container-updater'
+          'fix/swagger-spec-sync'
+          'fix/ui-software-update-readiness'
+          'fix/v1-bootstrap-release-metadata'
+          'gotify-mu-branding'
+          'gotify-mu-deployment-docs'
+          'gotify-mu-foundation'
+          'ha-integration-identity'
+          'maintenance/repo-docs-2026-09-29'
+          'maintenance/safe-branch-cleanup-2026-09-29'
+          'mu-channel-lifecycle'
+          'ops/public-prebuilt-1.1.0-assets'
+          'ops/publish-1.1.0-container'
+          'perf/prebuilt-image-installs'
+          'platform-foundation-audit-groups'
+          'readme-compose-example'
+          'rebrand/monita-aggressive'
+          'rebrand/monita-full'
+          'rebrand/monita-transition'
+          'release/v0.2.0-finalize'
+          'release/v0.5-now'
+          'release/v0.5.0-audit-closure'
+          'release/v0.5.0-audit-hardening'
+          'release/v1.0-format-source'
+          'release/v1.0-tag-guard'
+          'release/v1.0.0-hardening'
+          'release/v1.0.0-rc1'
+          'release/v1.0.0-rc2'
+          'release-v0.2.0'
+          'ui-polish-pass'
+          'ui-rewrite-phase-2'
+          'ui-v1-completion'
+          'ui-v1-foundation'
+          'v0.2.0'
+          'maintenance/final-retired-branch-cleanup-2026-09-29'
           )
 
-          if [ "${#branches[@]}" -eq 0 ]; then
-            echo "No non-default branches exist."
-            exit 0
-          fi
-
-          deleted=0
-          kept=0
-
           for branch in "${branches[@]}"; do
-            merged_pr="$(gh pr list --state merged --head "${branch}" --json number --jq '.[0].number // empty' --limit 1)"
-            if [ -n "${merged_pr}" ]; then
-              echo "Deleting ${branch} (merged PR #${merged_pr})"
+            if git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1; then
+              echo "Deleting retired branch: ${branch}"
               git push origin --delete "${branch}"
-              deleted=$((deleted + 1))
             else
-              echo "Keeping ${branch}: no merged PR proves it is retired."
-              kept=$((kept + 1))
+              echo "Already absent: ${branch}"
             fi
           done
-
-          echo "Deleted: ${deleted}"
-          echo "Preserved: ${kept}"
