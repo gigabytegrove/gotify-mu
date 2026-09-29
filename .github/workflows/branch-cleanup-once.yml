@@ -1,0 +1,138 @@
+name: One-time stale branch cleanup
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - ".github/workflows/branch-cleanup-once.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    name: Delete retired branches
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Delete explicitly retired branches
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          branches=(
+          'automation/v1.0-prettier'
+          'branding/canonical-gotify-mu'
+          'ci/android-v0.1.0-test-build'
+          'docs/approved-plugin-roadmap'
+          'docs/prebuilt-release-archive-install'
+          'docs/public-facing-cleanup'
+          'feat/monita-rebrand'
+          'feat/single-container-updater'
+          'feature/channel-images-create-1.1.6'
+          'feature/chat-images-1.1.7'
+          'feature/home-assistant-native-pairing'
+          'feature/in-app-updates-v0.2.0'
+          'feature/managed-self-updater'
+          'feature/manual-update-check'
+          'feature/mobile-chat-capabilities'
+          'feature/mobile-chat-current'
+          'feature/mobile-chat-presence-v0.5'
+          'feature/native-integrations-automation'
+          'feature/v0.5-audit-closure'
+          'feature/v0.5-hardening'
+          'feature/v0.5-hardening-completeness'
+          'feature/v0.5-hardening-completion'
+          'feature/v0.5-hardening-platform'
+          'fix/admin-elevation-1.1.8'
+          'fix/admin-elevation-friction-1.1.8'
+          'fix/admin-elevation-ux-1.1.8'
+          'fix/admin-elevation-v1.1.8'
+          'fix/admin-step-up-1.1.8'
+          'fix/admin-step-up-auth-1.1.8'
+          'fix/channel-image-editor-1.1.3'
+          'fix/chat-self-notifications'
+          'fix/chat-self-notifications-v2'
+          'fix/fresh-ui-after-updates-1.1.5'
+          'fix/mobile-mentions-capability'
+          'fix/monita-1.1.8-prettier'
+          'fix/monita-1.1.8-swagger'
+          'fix/monita-1.1.8-swagger-generated'
+          'fix/monita-post-rename'
+          'fix/preview-to-release-install'
+          'fix/single-container-updater'
+          'fix/software-update-manual-refresh'
+          'fix/swagger-spec-sync'
+          'fix/ui-software-update-readiness'
+          'fix/update-status-transient-1.1.4'
+          'fix/updater-progress-and-refresh'
+          'fix/updater-status-elevation'
+          'fix/v1-bootstrap-release-metadata'
+          'fix/v1-release-publication-path'
+          'fix/v1.0-active-menu-selection'
+          'fix/v1.0-browser-helper-build'
+          'fix/v1.0-browser-release-tests'
+          'fix/v1.0-browser-tests'
+          'fix/v1.0-browser-tests-final'
+          'fix/v1.0-final-message-test'
+          'fix/v1.0-final-release-tests'
+          'fix/v1.0-password-test-race'
+          'fix/v1.0-release-browser-gate'
+          'fix/v1.0-release-gate'
+          'fix/v1.0-release-go-version'
+          'fix/v1.0-release-heading-test'
+          'fix/v1.0-release-lint'
+          'fix/v1.0-release-ui-tests-final'
+          'fix/v1.0-sqlite-membership-migration'
+          'fix/v1.0-swagger-spec'
+          'fix/v1.0-unused-test-import'
+          'fix/1.1.2-release-runtime-assets'
+          'fix/1.1.2-single-container-self-update'
+          'fix-elevation-session-ux'
+          'fix-light-surfaces-plugin-install'
+          'fix-mui9-ui-build'
+          'fix-version-metadata'
+          'gotify-mu-branding'
+          'gotify-mu-deployment-docs'
+          'gotify-mu-foundation'
+          'ha-integration-identity'
+          'maintenance/repo-docs-2026-09-29'
+          'mu-channel-lifecycle'
+          'ops/public-prebuilt-1.1.0-assets'
+          'ops/publish-1.1.0-container'
+          'perf/prebuilt-image-installs'
+          'platform-foundation-audit-groups'
+          'readme-compose-example'
+          'rebrand/monita-aggressive'
+          'rebrand/monita-full'
+          'rebrand/monita-transition'
+          'release/v0.2.0-finalize'
+          'release/v0.5-now'
+          'release/v0.5.0-audit-closure'
+          'release/v0.5.0-audit-hardening'
+          'release/v1.0-format-source'
+          'release/v1.0-tag-guard'
+          'release/v1.0.0-hardening'
+          'release/v1.0.0-rc1'
+          'release/v1.0.0-rc2'
+          'release-v0.2.0'
+          'ui-polish-pass'
+          'ui-rewrite-phase-2'
+          'ui-v1-completion'
+          'ui-v1-foundation'
+          'v0.2.0'
+          )
+
+          for branch in "${branches[@]}"; do
+            if git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1; then
+              echo "Deleting ${branch}"
+              git push origin --delete "${branch}"
+            else
+              echo "Already absent: ${branch}"
+            fi
+          done
