@@ -8,7 +8,18 @@
 
 Monita is a self-hosted notification and messaging platform for people, teams, home automation, and connected systems. It expands on Gotify compatibility with shared Channels, chat, automation, integrations, and multi-user administration.
 
-> Formerly known as Gotify MU.
+> Formerly known as Gotify MU. Gotify-compatible protocol names remain where required for upgrade and client compatibility.
+
+## Current release
+
+**Monita 1.1.8** is the current server release documented by this repository.
+
+Companion projects:
+
+- [Monita for Android](https://github.com/gigabytegrove/monita-android) — native Android client; current phone-test milestone: **0.3.11**
+- [Monita for Home Assistant](https://github.com/gigabytegrove/monita-ha) — HACS-compatible Home Assistant integration; current release: **1.5.0**
+
+Release-specific changes are tracked in [CHANGELOG.md](CHANGELOG.md). Installation and update instructions are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 ## What Monita does
 
