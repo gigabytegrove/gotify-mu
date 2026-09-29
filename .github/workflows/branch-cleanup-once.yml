@@ -1,4 +1,4 @@
-name: One-time merged branch cleanup
+name: One-time merged PR branch cleanup
 
 on:
   push:
@@ -9,37 +9,50 @@ on:
 
 permissions:
   contents: write
+  pull-requests: read
 
 jobs:
   cleanup:
-    name: Delete branches already merged into master
+    name: Delete branches whose PRs are already merged
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Delete fully merged remote branches
+      - name: Delete branches with a merged pull request
         shell: bash
         run: |
           set -euo pipefail
           git fetch origin --prune
 
-          mapfile -t merged < <(
-            git branch -r --merged origin/master |
-              sed 's#^[[:space:]]*origin/##' |
-              grep -vE '^(master|HEAD -> master)$' || true
+          mapfile -t branches < <(
+            git for-each-ref --format='%(refname:strip=3)' refs/remotes/origin |
+              grep -vE '^(master|HEAD)$' || true
           )
 
-          if [ "${#merged[@]}" -eq 0 ]; then
-            echo "No merged branches to delete."
+          if [ "${#branches[@]}" -eq 0 ]; then
+            echo "No non-default branches exist."
             exit 0
           fi
 
-          printf 'Deleting merged branches:\n'
-          printf ' - %s\n' "${merged[@]}"
+          deleted=0
+          kept=0
 
-          for branch in "${merged[@]}"; do
-            git push origin --delete "${branch}"
+          for branch in "${branches[@]}"; do
+            merged_pr="$(gh pr list --state merged --head "${branch}" --json number --jq '.[0].number // empty' --limit 1)"
+            if [ -n "${merged_pr}" ]; then
+              echo "Deleting ${branch} (merged PR #${merged_pr})"
+              git push origin --delete "${branch}"
+              deleted=$((deleted + 1))
+            else
+              echo "Keeping ${branch}: no merged PR proves it is retired."
+              kept=$((kept + 1))
+            fi
           done
+
+          echo "Deleted: ${deleted}"
+          echo "Preserved: ${kept}"
