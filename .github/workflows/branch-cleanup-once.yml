@@ -12,7 +12,7 @@ permissions:
 
 jobs:
   cleanup:
-    name: Delete explicitly retired historical branches
+    name: Finish retired branch cleanup
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository
@@ -20,67 +20,28 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Delete retired branches
+      - name: Delete remaining retired branches
         shell: bash
         run: |
-          set -euo pipefail
+          set -u
+
           branches=(
-          'ci/android-v0.1.0-test-build'
-          'feat/single-container-updater'
-          'feature/home-assistant-native-pairing'
-          'feature/mobile-chat-capabilities'
-          'feature/mobile-chat-presence-v0.5'
-          'feature/v0.5-audit-closure'
-          'feature/v0.5-hardening'
-          'feature/v0.5-hardening-completeness'
-          'feature/v0.5-hardening-platform'
-          'fix/admin-elevation-1.1.8'
-          'fix/admin-elevation-friction-1.1.8'
-          'fix/admin-elevation-ux-1.1.8'
-          'fix/admin-elevation-v1.1.8'
-          'fix/admin-step-up-auth-1.1.8'
-          'fix/single-container-updater'
-          'fix/swagger-spec-sync'
-          'fix/ui-software-update-readiness'
-          'fix/v1-bootstrap-release-metadata'
-          'gotify-mu-branding'
-          'gotify-mu-deployment-docs'
-          'gotify-mu-foundation'
-          'ha-integration-identity'
-          'maintenance/repo-docs-2026-09-29'
-          'maintenance/safe-branch-cleanup-2026-09-29'
-          'mu-channel-lifecycle'
-          'ops/public-prebuilt-1.1.0-assets'
-          'ops/publish-1.1.0-container'
-          'perf/prebuilt-image-installs'
-          'platform-foundation-audit-groups'
-          'readme-compose-example'
-          'rebrand/monita-aggressive'
-          'rebrand/monita-full'
-          'rebrand/monita-transition'
-          'release/v0.2.0-finalize'
-          'release/v0.5-now'
-          'release/v0.5.0-audit-closure'
-          'release/v0.5.0-audit-hardening'
-          'release/v1.0-format-source'
-          'release/v1.0-tag-guard'
-          'release/v1.0.0-hardening'
-          'release/v1.0.0-rc1'
-          'release/v1.0.0-rc2'
-          'release-v0.2.0'
-          'ui-polish-pass'
-          'ui-rewrite-phase-2'
-          'ui-v1-completion'
-          'ui-v1-foundation'
-          'v0.2.0'
-          'maintenance/final-retired-branch-cleanup-2026-09-29'
+            'maintenance/final-retired-branch-cleanup-2026-09-29'
+            'maintenance/finish-retired-branch-cleanup-2026-09-29'
+            'v0.2.0'
           )
 
+          failures=0
           for branch in "${branches[@]}"; do
             if git ls-remote --exit-code --heads origin "refs/heads/${branch}" >/dev/null 2>&1; then
               echo "Deleting retired branch: ${branch}"
-              git push origin --delete "${branch}"
+              if ! git push origin --delete "${branch}"; then
+                echo "Could not delete ${branch}; leaving it in place."
+                failures=$((failures + 1))
+              fi
             else
               echo "Already absent: ${branch}"
             fi
           done
+
+          echo "Delete failures: ${failures}"
