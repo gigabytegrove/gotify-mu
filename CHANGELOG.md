@@ -4,6 +4,39 @@
 
 # Changelog
 
+## 1.2.0 — 2026-09-30
+
+### Per-message controls
+
+- Messages no longer expose **Assign to Me**, **Resolve / Reopen**, and **Attach** by default.
+- Producers can enable any combination of those controls for an individual message through the Monita-native `monita::messageControls` extra.
+- The server enforces the selected controls; clients cannot invoke a disabled assignment, resolve, or attachment action by calling the endpoint directly.
+- REST and realtime message payloads expose the normalized enabled controls to Monita-aware clients.
+- Capability discovery now advertises `messageControls: true`.
+
+### Notification retention
+
+- Notification Channels now default to **24 hours** of message retention.
+- On the first 1.2.0 startup, all existing non-internal Notification Channels are migrated to 24-hour retention, including legacy Notification Channels created before explicit Channel types.
+- Chat Channels remain indefinite by default.
+- Retention is measured as exact 24-hour periods from each message timestamp.
+- Archiving does not pause or extend retention; an archived Notification expires on the same schedule as an active one.
+- The migration runs once, so later administrator retention changes are preserved across restarts.
+
+### Images and message lifecycle
+
+- Administrator deletion permanently removes the whole message, including its attachment records, even in shared or Global Channels.
+- Deleted attachment files are cleaned immediately after permanent message deletion instead of waiting for the hourly orphan cleanup.
+- Retention deletion removes the whole message and attachment records; the maintenance pass removes the corresponding attachment files in the same cycle.
+- Administrators can archive image-bearing messages just like text-only messages.
+- Chat image attachment support remains JPEG, PNG, GIF, and WebP.
+
+### Companion compatibility
+
+- Designed for Monita for Home Assistant 1.7.0 and Monita for Android 0.3.12.
+- Home Assistant can select optional message controls per notification and send camera/image attachments to Notification or Chat Channels.
+- Existing Gotify-compatible message producers remain supported; messages without Monita control metadata simply expose no optional workflow controls.
+
 ## 1.1.9 — 2026-09-30
 
 ### Notification Channel image delivery
