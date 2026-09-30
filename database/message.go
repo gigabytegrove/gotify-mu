@@ -421,7 +421,7 @@ func (d *GormDatabase) ApplyMessageRetention(now time.Time) (int, error) {
 	}
 	deleted := 0
 	for _, app := range apps {
-		before := now.AddDate(0, 0, -app.RetentionDays)
+		before := now.Add(-time.Duration(app.RetentionDays) * 24 * time.Hour)
 		var ids []uint
 		if err := d.DB.Model(&model.Message{}).
 			Where("application_id = ? AND date < ?", app.ID, before).
