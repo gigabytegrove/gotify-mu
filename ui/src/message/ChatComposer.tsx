@@ -71,9 +71,7 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
     useEffect(() => {
         let active = true;
         void axios
-            .get<MentionableUser[]>(
-                `${config.get('url')}application/${appId}/mentionable-users`
-            )
+            .get<MentionableUser[]>(`${config.get('url')}application/${appId}/mentionable-users`)
             .then((response) => {
                 if (active) setMentionableUsers(response.data || []);
             })
@@ -120,9 +118,7 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
         if (!mentionQuery) return;
         const replacement = `@${user.name} `;
         const next =
-            message.slice(0, mentionQuery.start) +
-            replacement +
-            message.slice(mentionQuery.end);
+            message.slice(0, mentionQuery.start) + replacement + message.slice(mentionQuery.end);
         const caret = mentionQuery.start + replacement.length;
         setMessage(next);
         setMentionQuery(null);
@@ -304,9 +300,7 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
             )}
 
             {mentionMatches.length > 0 && (
-                <Paper
-                    variant="outlined"
-                    sx={{mb: 1, maxHeight: 220, overflowY: 'auto'}}>
+                <Paper variant="outlined" sx={{mb: 1, maxHeight: 220, overflowY: 'auto'}}>
                     {mentionMatches.map((user) => (
                         <Button
                             key={user.userId}
@@ -359,9 +353,7 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                     maxRows={5}
                     label={`Message #${channelName}`}
                     value={message}
-                    onChange={(event) =>
-                        noteInput(event.target.value, event.target.selectionStart)
-                    }
+                    onChange={(event) => noteInput(event.target.value, event.target.selectionStart)}
                     onPaste={(event) => {
                         const pasted = Array.from(event.clipboardData.files);
                         if (pasted.length > 0) addImages(pasted);

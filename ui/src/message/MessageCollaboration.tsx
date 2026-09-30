@@ -35,8 +35,9 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
     const {currentUser, snackManager} = useStores();
     const collaboration = message.collaboration || {};
     const configuredControls = Array.isArray(message.extras?.['monita::controls'])
-        ? (message.extras?.['monita::controls'] as unknown[])
-              .map((value) => String(value).toLowerCase())
+        ? (message.extras?.['monita::controls'] as unknown[]).map((value) =>
+              String(value).toLowerCase()
+          )
         : [];
     const canAssign = configuredControls.includes('assign');
     const canResolve = configuredControls.includes('resolve');
@@ -146,7 +147,7 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
                                   ? 'Assigned: ' + collaboration.assignedUserName
                                   : 'Assign to me'}
                         </Button>
-                        )}
+                    )}
                     {canResolve && (
                         <Button
                             size="small"
@@ -163,7 +164,7 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
                             }>
                             {status === 'resolved' ? 'Resolved' : 'Resolve'}
                         </Button>
-                        )}
+                    )}
                     <Button
                         size="small"
                         startIcon={collaboration.read ? <MarkEmailUnread /> : <MarkEmailRead />}
