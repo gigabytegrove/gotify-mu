@@ -28,7 +28,7 @@ func TestMUCapabilitiesContract(t *testing.T) {
 	}
 	if !payload.Features.SharedChannels || !payload.Features.ChannelTypes ||
 		!payload.Features.ChannelImages || !payload.Features.ChatImages ||
-		!payload.Features.NotificationImages ||
+		!payload.Features.NotificationImages || !payload.Features.MessageControls ||
 		!payload.Features.ChatChannels ||
 		!payload.Features.TypingPresence ||
 		!payload.Features.ChatNotifications || !payload.Features.Mentions {
