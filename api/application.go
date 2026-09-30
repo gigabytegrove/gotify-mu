@@ -64,7 +64,7 @@ type ApplicationParams struct {
 	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
 	// Presentation mode for MU-aware clients. Empty remains accepted for older clients.
 	ChannelType string `form:"channelType" query:"channelType" json:"channelType" binding:"omitempty,oneof=notification chat"`
-	// Number of days to retain message history. Zero keeps messages indefinitely.
+	// Number of 24-hour periods to retain message history. New Notification Channels default to 1; zero keeps Chat history indefinitely.
 	RetentionDays int `form:"retentionDays" query:"retentionDays" json:"retentionDays" binding:"min=0,max=36500"`
 }
 
@@ -126,6 +126,11 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			}
 		}
 
+		retentionDays := applicationParams.RetentionDays
+		if channelType == model.ChannelTypeNotification && retentionDays == 0 {
+			retentionDays = 1
+		}
+
 		tokenPublic, tokenPrivate := generateApplicationToken()
 		app := model.Application{
 			Name:            applicationParams.Name,
@@ -138,7 +143,7 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			AutoAssign:      applicationParams.AutoAssign,
 			AllowMemberPost: applicationParams.AllowMemberPost,
 			ChannelType:     channelType,
-			RetentionDays:   applicationParams.RetentionDays,
+			RetentionDays:   retentionDays,
 		}
 
 		if err := a.DB.CreateApplication(&app); err != nil {
