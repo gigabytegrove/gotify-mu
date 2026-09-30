@@ -200,17 +200,37 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 }
 
 func normalizeChannelRetentionDefaults(db *gorm.DB) error {
-	// Monita notification history is intentionally short-lived by default.
-	// Existing Notification Channels are migrated to 24 hours as part of this
-	// release. Chat Channels retain conversation history indefinitely.
-	if err := db.Model(&model.Application{}).
-		Where("channel_type = ? OR (channel_type = '' AND allow_member_post = ?)", model.ChannelTypeChat, true).
-		Update("retention_days", 0).Error; err != nil {
-		return err
+	const migrationKey = "migration.notification_retention_24h_v1"
+
+	var existing model.SystemSetting
+	result := db.First(&existing, "key = ?", migrationKey)
+	if result.Error == nil {
+		return nil
 	}
-	return db.Model(&model.Application{}).
-		Where("channel_type = ? OR (channel_type = '' AND allow_member_post = ?)", model.ChannelTypeNotification, false).
-		Update("retention_days", 1).Error
+	if result.Error != nil && result.Error != gorm.ErrRecordNotFound {
+		return result.Error
+	}
+
+	// This is intentionally a one-time policy migration. It changes every
+	// existing Notification Channel to 24 hours and every existing Chat
+	// Channel to indefinite retention, but it does not overwrite later admin
+	// changes on subsequent server restarts.
+	return db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&model.Application{}).
+			Where("channel_type = ? OR (channel_type = '' AND allow_member_post = ?)", model.ChannelTypeChat, true).
+			Update("retention_days", 0).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&model.Application{}).
+			Where("channel_type = ? OR (channel_type = '' AND allow_member_post = ?)", model.ChannelTypeNotification, false).
+			Update("retention_days", 1).Error; err != nil {
+			return err
+		}
+		return tx.Create(&model.SystemSetting{
+			Key:   migrationKey,
+			Value: "complete",
+		}).Error
+	})
 }
 
 func fillMissingCreatedAt(db *gorm.DB, now time.Time) error {
