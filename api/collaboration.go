@@ -89,7 +89,11 @@ func (a *CollaborationAPI) messageAccess(ctx *gin.Context, messageID uint) (*mod
 	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
 		return nil, nil, nil, nil, false
 	}
-	if app == nil || membership == nil || user == nil {
+	if app == nil || user == nil {
+		ctx.AbortWithError(http.StatusNotFound, errors.New("message not found"))
+		return nil, nil, nil, nil, false
+	}
+	if membership == nil && !user.Admin && app.UserID != user.ID {
 		ctx.AbortWithError(http.StatusNotFound, errors.New("message not found"))
 		return nil, nil, nil, nil, false
 	}
@@ -97,11 +101,14 @@ func (a *CollaborationAPI) messageAccess(ctx *gin.Context, messageID uint) (*mod
 }
 
 func canPostToChannel(app *model.Application, membership *model.ApplicationMembership, user *model.User) bool {
-	if user == nil || app == nil || membership == nil {
+	if user == nil || app == nil {
 		return false
 	}
 	if user.Admin || app.UserID == user.ID {
 		return true
+	}
+	if membership == nil {
+		return false
 	}
 	role := membership.EffectiveRole
 	return role == model.ChannelRoleManager ||
@@ -482,8 +489,10 @@ func (a *CollaborationAPI) persistChatImage(
 	}, targetPath, nil
 }
 
-// SendChatMessage creates a Chat Channel message with optional inline image attachments.
-// Attachments are persisted before realtime delivery so recipients see a complete message.
+// SendChatMessage creates a Channel message with optional inline image attachments.
+// The route name is retained for API compatibility, but Monita 1.1.9+ supports
+// the same image path for both Notification and Chat Channels. Attachments are
+// persisted before realtime delivery so recipients see a complete message.
 func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		userID := auth.GetUserID(ctx)
@@ -493,15 +502,15 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
 		user, err := a.DB.GetUserByID(userID)
 		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
-		if app == nil || membership == nil || user == nil {
-			ctx.AbortWithError(http.StatusNotFound, errors.New("chat Channel not found"))
+		if app == nil || user == nil {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("Channel not found"))
+			return
+		}
+		if membership == nil && !user.Admin && app.UserID != user.ID {
+			ctx.AbortWithError(http.StatusNotFound, errors.New("Channel not found"))
 			return
 		}
 		isChat := app.ChannelType == model.ChannelTypeChat || (app.ChannelType == "" && app.AllowMemberPost)
-		if !isChat {
-			ctx.AbortWithError(http.StatusBadRequest, errors.New("image messages are only available in Chat Channels"))
-			return
-		}
 		if !canPostToChannel(app, membership, user) {
 			ctx.AbortWithError(http.StatusForbidden, errors.New("your Channel role does not allow posting"))
 			return
@@ -510,7 +519,7 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 		ctx.Request.Body = http.MaxBytesReader(ctx.Writer, ctx.Request.Body, maxChatImageTotalBytes+(2<<20))
 		form, err := ctx.MultipartForm()
 		if err != nil {
-			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid chat message upload"))
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("invalid Channel image message upload"))
 			return
 		}
 		defer form.RemoveAll()
@@ -518,7 +527,7 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 		body := strings.TrimSpace(ctx.PostForm("message"))
 		files := form.File["images"]
 		if len(files) > maxChatImageCount {
-			ctx.AbortWithError(http.StatusBadRequest, errors.New("a chat message can include at most 8 images"))
+			ctx.AbortWithError(http.StatusBadRequest, errors.New("a Channel message can include at most 8 images"))
 			return
 		}
 		var total int64
@@ -548,17 +557,20 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 			priority = parsed
 		}
 
-		mentions, err := a.resolveMentions(app.ID, body, nil)
-		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		mentions := []uint(nil)
+		if isChat {
+			mentions, err = a.resolveMentions(app.ID, body, nil)
+			if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		}
 
 		extraValues := map[string]any{}
 		if rawExtras := strings.TrimSpace(ctx.PostForm("extras")); rawExtras != "" {
 			if len(rawExtras) > 64<<10 {
-				ctx.AbortWithError(http.StatusBadRequest, errors.New("chat message extras exceed 64 KiB"))
+				ctx.AbortWithError(http.StatusBadRequest, errors.New("Channel message extras exceed 64 KiB"))
 				return
 			}
 			if err := json.Unmarshal([]byte(rawExtras), &extraValues); err != nil {
-				ctx.AbortWithError(http.StatusBadRequest, errors.New("chat message extras must be a JSON object"))
+				ctx.AbortWithError(http.StatusBadRequest, errors.New("Channel message extras must be a JSON object"))
 				return
 			}
 			if extraValues == nil {
@@ -569,14 +581,25 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 	extraBytes, _ := json.Marshal(extraValues)
 		if len(extraValues) == 0 { extraBytes = nil }
 
+		title := strings.TrimSpace(ctx.PostForm("title"))
+		senderUserID := uint(0)
+		senderName := ""
+		if isChat {
+			title = displayUserName(user)
+			senderUserID = user.ID
+			senderName = displayUserName(user)
+		} else if title == "" {
+			title = app.Name
+		}
+
 		message := &model.Message{
 			ApplicationID: app.ID,
-			Title: displayUserName(user),
+			Title: title,
 			Message: body,
 			Priority: priority,
 			Date: time.Now(),
-			SenderUserID: user.ID,
-			SenderName: displayUserName(user),
+			SenderUserID: senderUserID,
+			SenderName: senderName,
 			Extras: extraBytes,
 		}
 
