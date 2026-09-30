@@ -252,6 +252,23 @@ func displayUserName(user *model.User) string {
 	return user.Name
 }
 
+func channelImageMessageIdentity(
+	app *model.Application,
+	user *model.User,
+	isChat bool,
+	requestedTitle string,
+) (string, uint, string) {
+	if isChat {
+		name := displayUserName(user)
+		return name, user.ID, name
+	}
+	title := strings.TrimSpace(requestedTitle)
+	if title == "" && app != nil {
+		title = app.Name
+	}
+	return title, 0, ""
+}
+
 func (a *CollaborationAPI) Thread(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		message, _, _, _, ok := a.messageAccess(ctx, id)
@@ -581,16 +598,12 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 	extraBytes, _ := json.Marshal(extraValues)
 		if len(extraValues) == 0 { extraBytes = nil }
 
-		title := strings.TrimSpace(ctx.PostForm("title"))
-		senderUserID := uint(0)
-		senderName := ""
-		if isChat {
-			title = displayUserName(user)
-			senderUserID = user.ID
-			senderName = displayUserName(user)
-		} else if title == "" {
-			title = app.Name
-		}
+		title, senderUserID, senderName := channelImageMessageIdentity(
+			app,
+			user,
+			isChat,
+			ctx.PostForm("title"),
+		)
 
 		message := &model.Message{
 			ApplicationID: app.ID,
