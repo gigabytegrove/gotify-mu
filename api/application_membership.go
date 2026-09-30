@@ -123,15 +123,20 @@ func (a *ApplicationMembershipAPI) GetMentionableUsers(ctx *gin.Context) {
 		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
 			return
 		}
+		currentUser, err := a.DB.GetUserByID(currentUserID)
+		if success := successOrAbort(ctx, http.StatusInternalServerError, err); !success {
+			return
+		}
+		isAdmin := currentUser != nil && currentUser.Admin
 
 		isChat := app.ChannelType == model.ChannelTypeChat ||
 			(app.ChannelType == "" && app.AllowMemberPost)
-		if !isChat || membership == nil {
+		if !isChat || (membership == nil && app.UserID != currentUserID && !isAdmin) {
 			ctx.AbortWithError(http.StatusNotFound, errors.New("chat channel does not exist"))
 			return
 		}
 
-		if app.UserID != currentUserID {
+		if app.UserID != currentUserID && !isAdmin {
 			role := membership.EffectiveRole
 			canPost := role == model.ChannelRoleManager ||
 				role == model.ChannelRolePublisher ||
