@@ -12,12 +12,12 @@ Monita is a self-hosted notification and messaging platform for people, teams, h
 
 ## Current release
 
-**Monita 1.1.8** is the current server release documented by this repository.
+**Monita 1.2.0** is the current server release documented by this repository.
 
 Companion projects:
 
-- [Monita for Android](https://github.com/gigabytegrove/monita-android) — native Android client; current phone-test milestone: **0.3.11**
-- [Monita for Home Assistant](https://github.com/gigabytegrove/monita-ha) — HACS-compatible Home Assistant integration; current release: **1.5.1**
+- [Monita for Android](https://github.com/gigabytegrove/monita-android) — native Android client; current phone-test milestone: **0.3.12**
+- [Monita for Home Assistant](https://github.com/gigabytegrove/monita-ha) — HACS-compatible Home Assistant integration; current release: **1.7.0**
 
 Release-specific changes are tracked in [CHANGELOG.md](CHANGELOG.md). Installation and update instructions are in [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
@@ -32,7 +32,8 @@ You can use it to:
 - use Chat Channels for two-way conversation
 - connect Home Assistant, MQTT, Webhooks, email, RSS/Atom, Syslog, and calendars
 - schedule notifications and escalation workflows
-- use Quiet Hours, Digests, acknowledgements, mentions, replies, reactions, and assignments
+- use Quiet Hours, Digests, acknowledgements, mentions, replies, reactions, and per-message workflow controls
+- keep Notification Channel messages for 24 hours by default while Chat history remains persistent by default
 - manage users, Groups, permissions, integrations, and security settings from the Web UI
 - continue using compatible Gotify clients and integrations
 
