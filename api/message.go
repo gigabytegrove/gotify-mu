@@ -855,6 +855,7 @@ func toExternalMessage(msg *model.Message) *model.MessageExternal {
 		res.Extras = make(map[string]any)
 		json.Unmarshal(msg.Extras, &res.Extras)
 	}
+	res.Collaboration.Controls = model.MessageControlsFromExtras(msg.Extras)
 	return res
 }
 
