@@ -553,6 +553,14 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 			return
 		}
 		if app != nil && membership != nil {
+			user, userErr := a.DB.GetUserByID(userID)
+			if success := successOrAbort(ctx, 500, userErr); !success {
+				return
+			}
+			if user != nil && user.Admin {
+				successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id))
+				return
+			}
 			if app.AutoAssign {
 				user, err := a.DB.GetUserByID(userID)
 				if success := successOrAbort(ctx, 500, err); !success {
