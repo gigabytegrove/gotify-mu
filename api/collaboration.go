@@ -711,7 +711,7 @@ func safeFilename(header *multipart.FileHeader) string {
 
 func (a *CollaborationAPI) UploadAttachment(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		message, app, membership, user, ok := a.messageAccess(ctx, id)
+		message, _, _, _, ok := a.messageAccess(ctx, id)
 		if !ok {
 			return
 		}
