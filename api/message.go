@@ -56,9 +56,16 @@ type MessageDispatcher interface {
 }
 
 type MessageAPI struct {
-	DB         MessageDatabase
-	Notifier   Notifier
-	Dispatcher MessageDispatcher
+	DB                MessageDatabase
+	Notifier          Notifier
+	Dispatcher        MessageDispatcher
+	OnPermanentDelete func()
+}
+
+func (a *MessageAPI) afterPermanentDelete() {
+	if a.OnPermanentDelete != nil {
+		a.OnPermanentDelete()
+	}
 }
 
 type pagingParams struct {
@@ -401,6 +408,7 @@ func (a *MessageAPI) DeleteMessages(ctx *gin.Context) {
 			if success := successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(app.ID)); !success {
 				return
 			}
+			a.afterPermanentDelete()
 			continue
 		}
 
@@ -412,6 +420,7 @@ func (a *MessageAPI) DeleteMessages(ctx *gin.Context) {
 			if success := successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(app.ID)); !success {
 				return
 			}
+			a.afterPermanentDelete()
 		} else if success := successOrAbort(
 			ctx,
 			500,
@@ -480,7 +489,9 @@ func (a *MessageAPI) DeleteMessageWithApplication(ctx *gin.Context) {
 					)
 					return
 				}
-				successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id))
+				if successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id)) {
+					a.afterPermanentDelete()
+				}
 				return
 			}
 
@@ -489,7 +500,9 @@ func (a *MessageAPI) DeleteMessageWithApplication(ctx *gin.Context) {
 				return
 			}
 			if application.UserID == userID && memberCount == 1 {
-				successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id))
+				if successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id)) {
+					a.afterPermanentDelete()
+				}
 			} else {
 				successOrAbort(ctx, 500, a.DB.DismissMessagesByApplicationForUser(userID, id))
 			}
@@ -565,7 +578,9 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 					)
 					return
 				}
-				successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id))
+				if successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id)) {
+					a.afterPermanentDelete()
+				}
 				return
 			}
 
@@ -574,7 +589,9 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 				return
 			}
 			if app.UserID == userID && memberCount == 1 {
-				successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id))
+				if successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id)) {
+					a.afterPermanentDelete()
+				}
 			} else {
 				successOrAbort(ctx, 500, a.DB.DismissMessageForUser(userID, id))
 			}
@@ -628,7 +645,9 @@ func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
 			return
 		}
 
-		successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id))
+		if successOrAbort(ctx, 500, a.DB.DeleteMessagesByApplication(id)) {
+			a.afterPermanentDelete()
+		}
 	})
 }
 
