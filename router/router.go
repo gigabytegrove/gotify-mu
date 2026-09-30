@@ -149,7 +149,16 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	automationEngine := automation.New(db, streamHandler)
 	connectorManager := connectors.New(db, automationEngine)
 	automationEngine.AddPostStoreHook(connectorManager.OnMessage)
-	messageHandler := api.MessageAPI{Notifier: streamHandler, DB: db, Dispatcher: automationEngine}
+	messageHandler := api.MessageAPI{
+		Notifier:   streamHandler,
+		DB:         db,
+		Dispatcher: automationEngine,
+		OnPermanentDelete: func() {
+			if err := cleanupOrphanAttachments(db, attachmentDir); err != nil {
+				log.Error().Err(err).Msg("Could not clean deleted message attachments")
+			}
+		},
+	}
 	healthHandler := api.HealthAPI{DB: db}
 	clientHandler := api.ClientAPI{
 		DB:            db,
