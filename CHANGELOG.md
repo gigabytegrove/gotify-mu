@@ -4,6 +4,21 @@
 
 # Changelog
 
+## 1.1.9 — 2026-09-30
+
+### Notification Channel image delivery
+
+- Notification Channels can now receive inline image attachments through the same authenticated multipart message path used by Chat Channels.
+- Explicit notification titles are preserved for image-bearing Notification Channel messages.
+- Notification image messages remain push-style messages rather than self-authored Chat messages, so the posting account still receives its own Home Assistant alerts on connected Monita clients.
+- Channel owners and administrators can use the image route even when no redundant membership row exists.
+- Capability discovery now advertises `notificationImages: true` for Monita-aware clients.
+
+### Home Assistant compatibility
+
+- Designed for Monita for Home Assistant 1.6.0 and newer.
+- Older Home Assistant integrations continue to use their existing text and Chat-image paths unchanged.
+
 ## 1.1.8 — 2026-09-28
 
 ### Less intrusive administrator elevation
