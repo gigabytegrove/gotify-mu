@@ -4,6 +4,27 @@
 
 # Changelog
 
+## 1.2.0 — 2026-09-30
+
+### Message controls
+
+- Added per-message controls for assignment, resolve/reopen, and post-send attachments.
+- Normal notifications no longer show Assign, Resolve, or Attach unless the sender explicitly enables those controls.
+- The server enforces the same control metadata, so hidden controls cannot be invoked directly through the API.
+
+### Retention
+
+- Notification Channels now default to 24-hour message retention.
+- Existing Notification Channels are migrated once to 24-hour retention.
+- Chat Channels are migrated to indefinite retention by default.
+- Retention uses exact 24-hour periods and applies equally to active and archived messages.
+- Expired messages remove their attachment records; the existing orphan-attachment cleanup removes the corresponding stored files.
+
+### Administration
+
+- Administrators can permanently delete an individual message in any Channel, including its associated attachment records.
+- Archiving keeps the complete message and its attachments together.
+
 ## 1.1.9 — 2026-09-30
 
 ### Notification Channel image delivery
