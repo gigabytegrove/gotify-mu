@@ -386,8 +386,8 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                             void send();
                         }
                     }}
-                    onClick={(event) =>
-                        updateMentionQuery(message, event.currentTarget.selectionStart)
+                    onClick={() =>
+                        updateMentionQuery(message, messageInput.current?.selectionStart)
                     }
                 />
                 <Button
