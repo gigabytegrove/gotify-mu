@@ -719,10 +719,6 @@ func (a *CollaborationAPI) UploadAttachment(ctx *gin.Context) {
 			ctx.AbortWithError(http.StatusForbidden, errors.New("attachments are not enabled for this message"))
 			return
 		}
-		if !canManageMessage(app, membership, user, message) {
-			ctx.AbortWithError(http.StatusForbidden, errors.New("you cannot add attachments to this message"))
-			return
-		}
 		header, err := ctx.FormFile("attachment")
 		if err != nil {
 			ctx.AbortWithError(http.StatusBadRequest, errors.New("attachment is required"))
