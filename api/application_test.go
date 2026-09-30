@@ -694,6 +694,44 @@ func (s *ApplicationSuite) Test_UpdateApplicationDefaultPriority_expectSuccess()
 	}
 }
 
+func (s *ApplicationSuite) Test_UpdateApplication_preservesRetentionWhenOmitted() {
+	app := s.db.User(5).NewAppWithToken(2, "app-2")
+	app.ChannelType = model.ChannelTypeNotification
+	app.RetentionDays = 1
+	assert.Nil(s.T(), s.db.UpdateApplication(app))
+
+	test.WithUser(s.ctx, 5)
+	s.withFormData("name=renamed&description=still-notification")
+	s.ctx.Params = gin.Params{{Key: "id", Value: "2"}}
+
+	s.a.UpdateApplication(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	if app, err := s.db.GetApplicationByID(2); assert.NoError(s.T(), err) {
+		assert.Equal(s.T(), 1, app.RetentionDays)
+	}
+}
+
+func (s *ApplicationSuite) Test_UpdateApplication_channelTypeAppliesDefaultRetentionWhenOmitted() {
+	app := s.db.User(5).NewAppWithToken(2, "app-2")
+	app.ChannelType = model.ChannelTypeChat
+	app.AllowMemberPost = true
+	app.RetentionDays = 0
+	assert.Nil(s.T(), s.db.UpdateApplication(app))
+
+	test.WithUser(s.ctx, 5)
+	s.withFormData("name=alerts&channelType=notification")
+	s.ctx.Params = gin.Params{{Key: "id", Value: "2"}}
+
+	s.a.UpdateApplication(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	if app, err := s.db.GetApplicationByID(2); assert.NoError(s.T(), err) {
+		assert.Equal(s.T(), model.ChannelTypeNotification, app.ChannelType)
+		assert.Equal(s.T(), 1, app.RetentionDays)
+	}
+}
+
 func (s *ApplicationSuite) Test_UpdateApplication_preservesImageAndSortKey() {
 	app := s.db.User(5).NewAppWithToken(2, "app-2")
 	app.Image = "existing.png"
