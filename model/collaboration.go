@@ -80,6 +80,7 @@ type MessageTemplateView struct {
 
 type MessageCollaboration struct {
 	Attachments      []MessageAttachmentView  `json:"attachments,omitempty"`
+	Controls         []string                 `json:"controls,omitempty"`
 	Reactions        []MessageReactionSummary `json:"reactions,omitempty"`
 	AssignedUserID   uint                     `json:"assignedUserId,omitempty"`
 	AssignedUserName string                   `json:"assignedUserName,omitempty"`
