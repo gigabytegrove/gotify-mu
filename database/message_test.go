@@ -147,7 +147,8 @@ func (s *DatabaseSuite) TestMessage() {
 	assert.Empty(s.T(), msgs)
 }
 
-func (s *DatabaseSuite) TestApplyMessageRetentionUsesExact24HoursAndIncludesArchived(t *testing.T) {
+func (s *DatabaseSuite) TestApplyMessageRetentionUsesExact24HoursAndIncludesArchived() {
+	t := s.T()
 	now := time.Date(2026, 9, 30, 17, 0, 0, 0, time.UTC)
 	user := &model.User{Name: "retention-user", Pass: []byte{1}}
 	require.NoError(t, s.db.CreateUser(user))
