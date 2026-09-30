@@ -1472,6 +1472,7 @@ func externalMessage(msg *model.Message) *model.MessageExternal {
 		external.Extras = make(map[string]any)
 		_ = json.Unmarshal(msg.Extras, &external.Extras)
 	}
+	external.Collaboration.Controls = model.MessageControlsFromExtras(msg.Extras)
 	return external
 }
 
