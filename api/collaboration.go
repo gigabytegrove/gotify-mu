@@ -520,11 +520,11 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 		user, err := a.DB.GetUserByID(userID)
 		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
 		if app == nil || user == nil {
-			ctx.AbortWithError(http.StatusNotFound, errors.New("Channel not found"))
+			ctx.AbortWithError(http.StatusNotFound, errors.New("channel not found"))
 			return
 		}
 		if membership == nil && !user.Admin && app.UserID != user.ID {
-			ctx.AbortWithError(http.StatusNotFound, errors.New("Channel not found"))
+			ctx.AbortWithError(http.StatusNotFound, errors.New("channel not found"))
 			return
 		}
 		isChat := app.ChannelType == model.ChannelTypeChat || (app.ChannelType == "" && app.AllowMemberPost)
@@ -583,11 +583,11 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 		extraValues := map[string]any{}
 		if rawExtras := strings.TrimSpace(ctx.PostForm("extras")); rawExtras != "" {
 			if len(rawExtras) > 64<<10 {
-				ctx.AbortWithError(http.StatusBadRequest, errors.New("Channel message extras exceed 64 KiB"))
+				ctx.AbortWithError(http.StatusBadRequest, errors.New("channel message extras exceed 64 KiB"))
 				return
 			}
 			if err := json.Unmarshal([]byte(rawExtras), &extraValues); err != nil {
-				ctx.AbortWithError(http.StatusBadRequest, errors.New("Channel message extras must be a JSON object"))
+				ctx.AbortWithError(http.StatusBadRequest, errors.New("channel message extras must be a JSON object"))
 				return
 			}
 			if extraValues == nil {
