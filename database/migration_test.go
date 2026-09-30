@@ -113,8 +113,6 @@ func (s *MigrationSuite) TestNotificationRetentionMigrationAppliesOnce() {
 	if err != nil {
 		return
 	}
-	defer migrated.Close()
-
 	for _, id := range []uint{notification.ID, legacyNotification.ID} {
 		app, err := migrated.GetApplicationByID(id)
 		assert.NoError(s.T(), err)
@@ -132,9 +130,13 @@ func (s *MigrationSuite) TestNotificationRetentionMigrationAppliesOnce() {
 	// overwritten every time Monita restarts.
 	notificationAfter, err := migrated.GetApplicationByID(notification.ID)
 	assert.NoError(s.T(), err)
+	if !assert.NotNil(s.T(), notificationAfter) {
+		migrated.Close()
+		return
+	}
 	notificationAfter.RetentionDays = 7
 	assert.NoError(s.T(), migrated.UpdateApplication(notificationAfter))
-	migrated.Close()
+	assert.NoError(s.T(), closeDatabase(migrated))
 
 	reopened, err := New("sqlite3", path, "admin", "admin", 6, false, fixedNow)
 	assert.NoError(s.T(), err)
@@ -203,4 +205,13 @@ func (s *MigrationSuite) TestMigrationFromPreviewApplicationMembershipSchema() {
 	assert.False(s.T(), membership.GroupAssigned)
 	assert.False(s.T(), membership.GroupReceiveNotifications)
 	assert.Equal(s.T(), model.ChannelRoleMember, membership.Role)
+}
+
+
+func closeDatabase(db *GormDatabase) error {
+	sqlDB, err := db.DB.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
 }
