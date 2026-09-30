@@ -23,18 +23,18 @@ type MUCapabilityFlags struct {
 	ChannelImages         bool `json:"channelImages"`
 	ChatImages            bool `json:"chatImages"`
 	NotificationImages    bool `json:"notificationImages"`
-	MessageControls      bool `json:"messageControls"`
+	MessageControls       bool `json:"messageControls"`
 	ChatChannels          bool `json:"chatChannels"`
 	MemberPosting         bool `json:"memberPosting"`
 	SenderIdentity        bool `json:"senderIdentity"`
 	PerUserArchive        bool `json:"perUserArchive"`
 	PerChannelMute        bool `json:"perChannelMute"`
 	MembershipManagement bool `json:"membershipManagement"`
-	OwnershipTransfer     bool `json:"ownershipTransfer"`
+	OwnershipTransfer    bool `json:"ownershipTransfer"`
 	UserGroups            bool `json:"userGroups"`
 	AuditLog              bool `json:"auditLog"`
 	TypingPresence        bool `json:"typingPresence"`
-	ChatNotifications     bool `json:"chatNotifications"`
+	ChatNotifications    bool `json:"chatNotifications"`
 	Mentions              bool `json:"mentions"`
 }
 
@@ -50,18 +50,18 @@ func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
 			ChannelImages:         true,
 			ChatImages:            true,
 			NotificationImages:    true,
-			MessageControls:      true,
+			MessageControls:       true,
 			ChatChannels:          true,
 			MemberPosting:         true,
 			SenderIdentity:        true,
 			PerUserArchive:        true,
 			PerChannelMute:        true,
 			MembershipManagement: true,
-			OwnershipTransfer:     true,
+			OwnershipTransfer:    true,
 			UserGroups:            true,
 			AuditLog:              true,
 			TypingPresence:        true,
-			ChatNotifications:     true,
+			ChatNotifications:    true,
 			Mentions:              true,
 		},
 	})
