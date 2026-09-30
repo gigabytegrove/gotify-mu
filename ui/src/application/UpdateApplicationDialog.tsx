@@ -171,7 +171,7 @@ export const UpdateApplicationDialog = ({
                                     } else if (nextType === 'notification' && retentionDays === 0) {
                                         setRetentionDays(1);
                                     }
-                                }
+                                }}
                             />
                         }
                         label="Present this Channel as a two-way Chat Channel"
