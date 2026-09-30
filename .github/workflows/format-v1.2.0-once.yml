@@ -1,0 +1,58 @@
+name: format-v1.2.0-once
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - '.github/workflows/format-v1.2.0-once.yml'
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  format:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
+        with:
+          node-version: '24'
+      - name: Install UI dependencies
+        run: cd ui && yarn --frozen-lockfile
+      - name: Format release UI sources
+        run: |
+          cd ui
+          ./node_modules/.bin/prettier \
+            src/message/ChatComposer.tsx \
+            src/message/MessageCollaboration.tsx \
+            --write
+      - name: Open formatting PR
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          if git diff --quiet -- ui/src/message/ChatComposer.tsx ui/src/message/MessageCollaboration.tsx; then
+            echo "Files already formatted."
+            exit 0
+          fi
+
+          BRANCH="release/format-v1.2.0"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git switch -C "${BRANCH}"
+          git add ui/src/message/ChatComposer.tsx ui/src/message/MessageCollaboration.tsx
+          git commit -m "Format Monita 1.2.0 UI"
+          git push --force-with-lease origin "${BRANCH}"
+
+          gh pr create \
+            --repo "${GITHUB_REPOSITORY}" \
+            --base master \
+            --head "${BRANCH}" \
+            --title "Format Monita 1.2.0 UI for release" \
+            --body "Applies the repository's configured Prettier formatting to the two UI files blocking the v1.2.0 release pipeline." \
+            || true
