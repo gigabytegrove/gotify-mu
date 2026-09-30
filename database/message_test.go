@@ -147,6 +147,49 @@ func (s *DatabaseSuite) TestMessage() {
 	assert.Empty(s.T(), msgs)
 }
 
+func (s *DatabaseSuite) TestApplyMessageRetentionUsesExact24HoursAndIncludesArchived() {
+	t := s.T()
+	now := time.Date(2026, 9, 30, 17, 0, 0, 0, time.UTC)
+	user := &model.User{Name: "retention-user", Pass: []byte{1}}
+	require.NoError(t, s.db.CreateUser(user))
+
+	app := &model.Application{
+		UserID:        user.ID,
+		Token:         "A-retention",
+		Name:          "Important Notices",
+		ChannelType:   model.ChannelTypeNotification,
+		RetentionDays: 1,
+	}
+	require.NoError(t, s.db.CreateApplication(app))
+
+	expired := &model.Message{
+		ApplicationID: app.ID,
+		Message:       "expired",
+		Date:          now.Add(-24*time.Hour - time.Second),
+	}
+	active := &model.Message{
+		ApplicationID: app.ID,
+		Message:       "active",
+		Date:          now.Add(-24*time.Hour + time.Second),
+	}
+	require.NoError(t, s.db.CreateMessage(expired))
+	require.NoError(t, s.db.CreateMessage(active))
+	require.NoError(t, s.db.ArchiveMessageForUser(user.ID, expired.ID))
+
+	deleted, err := s.db.ApplyMessageRetention(now)
+	require.NoError(t, err)
+	assert.Equal(t, 1, deleted)
+
+	gotExpired, err := s.db.GetMessageByID(expired.ID)
+	require.NoError(t, err)
+	assert.Nil(t, gotExpired)
+
+	gotActive, err := s.db.GetMessageByID(active.ID)
+	require.NoError(t, err)
+	assert.NotNil(t, gotActive)
+}
+
+
 func (s *DatabaseSuite) TestGetMessagesSince() {
 	user := &model.User{Name: "test", Pass: []byte{1}}
 	require.NoError(s.T(), s.db.CreateUser(user))

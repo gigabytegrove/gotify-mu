@@ -65,8 +65,9 @@ func (s *ApplicationSuite) Test_CreateApplication_mapAllParameters() {
 		Name:        "custom_name",
 		Description: "description_text",
 		SortKey:     "a5",
-		ChannelType: "notification",
-		CreatedAt:   testdb.Now,
+		ChannelType:   "notification",
+		RetentionDays: 1,
+		CreatedAt:     testdb.Now,
 	}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	if app, err := s.db.GetApplicationByID(1); assert.NoError(s.T(), err) {
@@ -141,8 +142,9 @@ func (s *ApplicationSuite) Test_CreateApplication_ignoresReadOnlyPropertiesInPar
 		Internal:    false,
 		Image:       "static/defaultapp.png",
 		SortKey:     "a5",
-		ChannelType: "notification",
-		CreatedAt:   testdb.Now,
+		ChannelType:   "notification",
+		RetentionDays: 1,
+		CreatedAt:     testdb.Now,
 	}
 
 	assert.Equal(s.T(), 200, s.recorder.Code)
@@ -241,7 +243,7 @@ func (s *ApplicationSuite) Test_CreateApplication_onlyRequiredParameters() {
 	s.withFormData("name=custom_name")
 	s.a.CreateApplication(s.ctx)
 
-	expected := &model.Application{ID: 1, UserID: 5, Name: "custom_name", SortKey: "a0", ChannelType: "notification", CreatedAt: testdb.Now, Image: "static/defaultapp.png"}
+	expected := &model.Application{ID: 1, UserID: 5, Name: "custom_name", SortKey: "a0", ChannelType: "notification", RetentionDays: 1, CreatedAt: testdb.Now, Image: "static/defaultapp.png"}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	bodyBytes, err := io.ReadAll(s.recorder.Body)
 	assert.Nil(s.T(), err)
@@ -270,8 +272,9 @@ func (s *ApplicationSuite) Test_CreateApplication_returnsApplicationWithID() {
 		Name:      "custom_name",
 		Image:     "static/defaultapp.png",
 		SortKey:   "a0",
-		ChannelType: "notification",
-		CreatedAt: testdb.Now,
+		ChannelType:   "notification",
+		RetentionDays: 1,
+		CreatedAt:     testdb.Now,
 	}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	bodyBytes, err := io.ReadAll(s.recorder.Body)
@@ -296,7 +299,7 @@ func (s *ApplicationSuite) Test_CreateApplication_withExistingToken() {
 
 	s.a.CreateApplication(s.ctx)
 
-	expected := &model.Application{ID: 2, Name: "custom_name", UserID: 5, SortKey: "a0", ChannelType: "notification", CreatedAt: testdb.Now}
+	expected := &model.Application{ID: 2, Name: "custom_name", UserID: 5, SortKey: "a0", ChannelType: "notification", RetentionDays: 1, CreatedAt: testdb.Now}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	if app, err := s.db.GetApplicationByID(2); assert.NoError(s.T(), err) {
 		expected.Token = app.Token
@@ -688,6 +691,44 @@ func (s *ApplicationSuite) Test_UpdateApplicationDefaultPriority_expectSuccess()
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	if app, err := s.db.GetApplicationByID(2); assert.NoError(s.T(), err) {
 		assert.Equal(s.T(), expected, app)
+	}
+}
+
+func (s *ApplicationSuite) Test_UpdateApplication_preservesRetentionWhenOmitted() {
+	app := s.db.User(5).NewAppWithToken(2, "app-2")
+	app.ChannelType = model.ChannelTypeNotification
+	app.RetentionDays = 1
+	assert.Nil(s.T(), s.db.UpdateApplication(app))
+
+	test.WithUser(s.ctx, 5)
+	s.withFormData("name=renamed&description=still-notification")
+	s.ctx.Params = gin.Params{{Key: "id", Value: "2"}}
+
+	s.a.UpdateApplication(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	if app, err := s.db.GetApplicationByID(2); assert.NoError(s.T(), err) {
+		assert.Equal(s.T(), 1, app.RetentionDays)
+	}
+}
+
+func (s *ApplicationSuite) Test_UpdateApplication_channelTypeAppliesDefaultRetentionWhenOmitted() {
+	app := s.db.User(5).NewAppWithToken(2, "app-2")
+	app.ChannelType = model.ChannelTypeChat
+	app.AllowMemberPost = true
+	app.RetentionDays = 0
+	assert.Nil(s.T(), s.db.UpdateApplication(app))
+
+	test.WithUser(s.ctx, 5)
+	s.withFormData("name=alerts&channelType=notification")
+	s.ctx.Params = gin.Params{{Key: "id", Value: "2"}}
+
+	s.a.UpdateApplication(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	if app, err := s.db.GetApplicationByID(2); assert.NoError(s.T(), err) {
+		assert.Equal(s.T(), model.ChannelTypeNotification, app.ChannelType)
+		assert.Equal(s.T(), 1, app.RetentionDays)
 	}
 }
 

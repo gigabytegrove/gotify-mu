@@ -483,6 +483,7 @@ export interface IMessageReactionSummary {
 
 export interface IMessageCollaboration {
     attachments?: IMessageAttachment[];
+    controls?: Array<'assign' | 'resolve' | 'attach'>;
     reactions?: IMessageReactionSummary[];
     assignedUserId?: number;
     assignedUserName?: string;

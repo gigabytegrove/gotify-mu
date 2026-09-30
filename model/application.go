@@ -74,7 +74,8 @@ type Application struct {
 	// required: false
 	// example: 4
 	DefaultPriority int `form:"defaultPriority" query:"defaultPriority" json:"defaultPriority"`
-	// Number of days to retain Channel message history. Zero keeps messages indefinitely.
+	// Number of 24-hour periods to retain Channel message history. Notification
+	// Channels default to 1; zero keeps messages indefinitely.
 	RetentionDays int `form:"retentionDays" query:"retentionDays" json:"retentionDays"`
 	// The date the application was created.
 	//

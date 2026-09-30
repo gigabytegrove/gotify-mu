@@ -139,6 +139,10 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
+	if err := migrateNotificationRetentionDefaults(db); err != nil {
+		return nil, err
+	}
+
 	var secretStore *security.SecretStore
 	if dialect == "sqlite3" && strings.Contains(connection, "mode=memory") {
 		secretStore = security.NewTestSecretStore()
@@ -193,6 +197,41 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 	}
 
 	return wrapper, nil
+}
+
+const notificationRetention24hMigrationKey = "migration.notification_retention_24h_v1"
+
+func migrateNotificationRetentionDefaults(db *gorm.DB) error {
+	var setting model.SystemSetting
+	result := db.First(&setting, "key = ?", notificationRetention24hMigrationKey)
+	if result.Error == nil {
+		return nil
+	}
+	if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+		return result.Error
+	}
+
+	return db.Transaction(func(tx *gorm.DB) error {
+		// Notification Channels now default to exactly 24 hours. Apply that
+		// default once to every existing user-facing Notification Channel,
+		// including legacy Channels whose channel_type predates the explicit
+		// notification/chat distinction. Chat Channels remain indefinite.
+		if err := tx.Model(&model.Application{}).
+			Where(
+				"internal = ? AND (channel_type = ? OR ((channel_type IS NULL OR channel_type = '') AND allow_member_post = ?))",
+				false,
+				model.ChannelTypeNotification,
+				false,
+			).
+			Update("retention_days", 1).Error; err != nil {
+			return err
+		}
+
+		return tx.Create(&model.SystemSetting{
+			Key:   notificationRetention24hMigrationKey,
+			Value: "applied",
+		}).Error
+	})
 }
 
 func fillMissingCreatedAt(db *gorm.DB, now time.Time) error {

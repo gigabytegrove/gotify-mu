@@ -64,8 +64,9 @@ type ApplicationParams struct {
 	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
 	// Presentation mode for MU-aware clients. Empty remains accepted for older clients.
 	ChannelType string `form:"channelType" query:"channelType" json:"channelType" binding:"omitempty,oneof=notification chat"`
-	// Number of days to retain message history. Zero keeps messages indefinitely.
-	RetentionDays int `form:"retentionDays" query:"retentionDays" json:"retentionDays" binding:"min=0,max=36500"`
+	// Number of 24-hour periods to retain message history. New Notification Channels default to 1; zero keeps Chat history indefinitely.
+	// A nil value means "not supplied" on update.
+	RetentionDays *int `form:"retentionDays" query:"retentionDays" json:"retentionDays" binding:"omitempty,min=0,max=36500"`
 }
 
 // CreateApplication creates an application and returns the access token.
@@ -126,6 +127,13 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			}
 		}
 
+		retentionDays := 0
+		if applicationParams.RetentionDays != nil {
+			retentionDays = *applicationParams.RetentionDays
+		} else if channelType == model.ChannelTypeNotification {
+			retentionDays = 1
+		}
+
 		tokenPublic, tokenPrivate := generateApplicationToken()
 		app := model.Application{
 			Name:            applicationParams.Name,
@@ -138,7 +146,7 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			AutoAssign:      applicationParams.AutoAssign,
 			AllowMemberPost: applicationParams.AllowMemberPost,
 			ChannelType:     channelType,
-			RetentionDays:   applicationParams.RetentionDays,
+			RetentionDays:   retentionDays,
 		}
 
 		if err := a.DB.CreateApplication(&app); err != nil {
@@ -349,9 +357,19 @@ func (a *ApplicationAPI) UpdateApplication(ctx *gin.Context) {
 				app.Description = applicationParams.Description
 				app.Name = applicationParams.Name
 				app.DefaultPriority = applicationParams.DefaultPriority
-				app.RetentionDays = applicationParams.RetentionDays
+				if applicationParams.RetentionDays != nil {
+					app.RetentionDays = *applicationParams.RetentionDays
+				}
 				if applicationParams.ChannelType != "" {
+					previousType := app.ChannelType
 					app.ChannelType = applicationParams.ChannelType
+					if applicationParams.RetentionDays == nil && previousType != app.ChannelType {
+						if app.ChannelType == model.ChannelTypeNotification && app.RetentionDays == 0 {
+							app.RetentionDays = 1
+						} else if app.ChannelType == model.ChannelTypeChat && app.RetentionDays == 1 {
+							app.RetentionDays = 0
+						}
+					}
 				}
 				if applicationParams.SortKey != "" {
 					app.SortKey = applicationParams.SortKey

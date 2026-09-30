@@ -163,9 +163,15 @@ export const UpdateApplicationDialog = ({
                         control={
                             <Switch
                                 checked={channelType === 'chat'}
-                                onChange={(event) =>
-                                    setChannelType(event.target.checked ? 'chat' : 'notification')
-                                }
+                                onChange={(event) => {
+                                    const nextType = event.target.checked ? 'chat' : 'notification';
+                                    setChannelType(nextType);
+                                    if (nextType === 'chat' && retentionDays === 1) {
+                                        setRetentionDays(0);
+                                    } else if (nextType === 'notification' && retentionDays === 0) {
+                                        setRetentionDays(1);
+                                    }
+                                }}
                             />
                         }
                         label="Present this Channel as a two-way Chat Channel"
@@ -177,7 +183,11 @@ export const UpdateApplicationDialog = ({
                         onChange={(event) =>
                             setRetentionDays(Math.max(0, Number(event.target.value)))
                         }
-                        helperText="Days to keep Channel message history. Use 0 to keep messages indefinitely."
+                        helperText={
+                            channelType === 'chat'
+                                ? 'Chat Channels keep history indefinitely by default. Use 0 for no automatic expiration.'
+                                : 'Notification Channels default to 1 day (24 hours). Archived messages expire on the same schedule.'
+                        }
                         slotProps={{htmlInput: {min: 0, max: 36500}}}
                         fullWidth
                     />

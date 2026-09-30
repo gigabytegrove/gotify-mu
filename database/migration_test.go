@@ -74,6 +74,84 @@ func (s *MigrationSuite) TestMigration() {
 }
 
 
+func (s *MigrationSuite) TestNotificationRetentionMigrationAppliesOnce() {
+	path := s.tmpDir.Path("test_notification_retention.db")
+	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
+	assert.NoError(s.T(), err)
+
+	assert.NoError(s.T(), db.AutoMigrate(
+		new(model.Application),
+		new(model.SystemSetting),
+	))
+
+	notification := &model.Application{
+		Name:          "Important Notices",
+		ChannelType:   model.ChannelTypeNotification,
+		RetentionDays: 30,
+	}
+	legacyNotification := &model.Application{
+		Name:            "Legacy Notifications",
+		AllowMemberPost: false,
+		RetentionDays:   0,
+	}
+	chat := &model.Application{
+		Name:            "Family Chat",
+		ChannelType:     model.ChannelTypeChat,
+		AllowMemberPost: true,
+		RetentionDays:   0,
+	}
+	assert.NoError(s.T(), db.Create(notification).Error)
+	assert.NoError(s.T(), db.Create(legacyNotification).Error)
+	assert.NoError(s.T(), db.Create(chat).Error)
+
+	sqlDB, err := db.DB()
+	assert.NoError(s.T(), err)
+	assert.NoError(s.T(), sqlDB.Close())
+
+	migrated, err := New("sqlite3", path, "admin", "admin", 6, false, fixedNow)
+	assert.NoError(s.T(), err)
+	if err != nil {
+		return
+	}
+	for _, id := range []uint{notification.ID, legacyNotification.ID} {
+		app, err := migrated.GetApplicationByID(id)
+		assert.NoError(s.T(), err)
+		if app != nil {
+			assert.Equal(s.T(), 1, app.RetentionDays)
+		}
+	}
+	chatAfter, err := migrated.GetApplicationByID(chat.ID)
+	assert.NoError(s.T(), err)
+	if chatAfter != nil {
+		assert.Equal(s.T(), 0, chatAfter.RetentionDays)
+	}
+
+	// The migration marker prevents later administrator changes from being
+	// overwritten every time Monita restarts.
+	notificationAfter, err := migrated.GetApplicationByID(notification.ID)
+	assert.NoError(s.T(), err)
+	if !assert.NotNil(s.T(), notificationAfter) {
+		migrated.Close()
+		return
+	}
+	notificationAfter.RetentionDays = 7
+	assert.NoError(s.T(), migrated.UpdateApplication(notificationAfter))
+	assert.NoError(s.T(), closeDatabase(migrated))
+
+	reopened, err := New("sqlite3", path, "admin", "admin", 6, false, fixedNow)
+	assert.NoError(s.T(), err)
+	if err != nil {
+		return
+	}
+	defer reopened.Close()
+	notificationAfter, err = reopened.GetApplicationByID(notification.ID)
+	assert.NoError(s.T(), err)
+	if notificationAfter != nil {
+		assert.Equal(s.T(), 7, notificationAfter.RetentionDays)
+	}
+}
+
+
 func (s *MigrationSuite) TestMigrationFromPreviewApplicationMembershipSchema() {
 	path := s.tmpDir.Path("test_preview_membership.db")
 	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
@@ -127,4 +205,13 @@ func (s *MigrationSuite) TestMigrationFromPreviewApplicationMembershipSchema() {
 	assert.False(s.T(), membership.GroupAssigned)
 	assert.False(s.T(), membership.GroupReceiveNotifications)
 	assert.Equal(s.T(), model.ChannelRoleMember, membership.Role)
+}
+
+
+func closeDatabase(db *GormDatabase) error {
+	sqlDB, err := db.DB.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
 }

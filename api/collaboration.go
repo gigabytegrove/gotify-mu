@@ -339,6 +339,10 @@ func (a *CollaborationAPI) Assign(ctx *gin.Context) {
 		if !ok {
 			return
 		}
+		if !model.MessageControlEnabled(message, model.MessageControlAssign) {
+			ctx.AbortWithError(http.StatusForbidden, errors.New("assignment is not enabled for this message"))
+			return
+		}
 		var params assignmentParams
 		if err := ctx.ShouldBindJSON(&params); err != nil {
 			return
@@ -379,8 +383,12 @@ type statusParams struct {
 
 func (a *CollaborationAPI) SetStatus(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		_, _, _, user, ok := a.messageAccess(ctx, id)
+		message, _, _, user, ok := a.messageAccess(ctx, id)
 		if !ok {
+			return
+		}
+		if !model.MessageControlEnabled(message, model.MessageControlResolve) {
+			ctx.AbortWithError(http.StatusForbidden, errors.New("resolve is not enabled for this message"))
 			return
 		}
 		var params statusParams
@@ -671,12 +679,12 @@ func safeFilename(header *multipart.FileHeader) string {
 
 func (a *CollaborationAPI) UploadAttachment(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		message, app, membership, user, ok := a.messageAccess(ctx, id)
+		message, _, _, _, ok := a.messageAccess(ctx, id)
 		if !ok {
 			return
 		}
-		if !canManageMessage(app, membership, user, message) {
-			ctx.AbortWithError(http.StatusForbidden, errors.New("you cannot add attachments to this message"))
+		if !model.MessageControlEnabled(message, model.MessageControlAttach) {
+			ctx.AbortWithError(http.StatusForbidden, errors.New("attachments are not enabled for this message"))
 			return
 		}
 		header, err := ctx.FormFile("attachment")
