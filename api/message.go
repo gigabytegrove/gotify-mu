@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 	"net/url"
+	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -56,9 +58,39 @@ type MessageDispatcher interface {
 }
 
 type MessageAPI struct {
-	DB         MessageDatabase
-	Notifier   Notifier
-	Dispatcher MessageDispatcher
+	DB            MessageDatabase
+	Notifier      Notifier
+	Dispatcher    MessageDispatcher
+	AttachmentDir string
+}
+
+type messageAttachmentStorageLookup interface {
+	GetMessageAttachmentStorageNamesForDelete(id uint) ([]string, error)
+}
+
+func (a *MessageAPI) deleteMessageCompletely(id uint) error {
+	var storageNames []string
+	if lookup, ok := a.DB.(messageAttachmentStorageLookup); ok {
+		names, err := lookup.GetMessageAttachmentStorageNamesForDelete(id)
+		if err != nil {
+			return err
+		}
+		storageNames = names
+	}
+
+	if err := a.DB.DeleteMessageByID(id); err != nil {
+		return err
+	}
+	if a.AttachmentDir == "" {
+		return nil
+	}
+	for _, storageName := range storageNames {
+		if storageName == "" {
+			continue
+		}
+		_ = os.Remove(filepath.Join(a.AttachmentDir, filepath.Base(storageName)))
+	}
+	return nil
 }
 
 type pagingParams struct {
@@ -558,7 +590,7 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 				return
 			}
 			if user != nil && user.Admin {
-				successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id))
+				successOrAbort(ctx, 500, a.deleteMessageCompletely(id))
 				return
 			}
 			if app.AutoAssign {
@@ -573,7 +605,7 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 					)
 					return
 				}
-				successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id))
+				successOrAbort(ctx, 500, a.deleteMessageCompletely(id))
 				return
 			}
 
@@ -582,7 +614,7 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 				return
 			}
 			if app.UserID == userID && memberCount == 1 {
-				successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id))
+				successOrAbort(ctx, 500, a.deleteMessageCompletely(id))
 			} else {
 				successOrAbort(ctx, 500, a.DB.DismissMessageForUser(userID, id))
 			}
