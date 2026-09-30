@@ -327,7 +327,11 @@ func (a *MessageAPI) ArchiveMessage(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
-		if membership == nil {
+		user, err := a.DB.GetUserByID(userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if membership == nil && (user == nil || !user.Admin) {
 			ctx.AbortWithError(404, errors.New("message does not exist"))
 			return
 		}
@@ -565,22 +569,22 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 		if success := successOrAbort(ctx, 500, err); !success {
 			return
 		}
+		user, err := a.DB.GetUserByID(userID)
+		if success := successOrAbort(ctx, 500, err); !success {
+			return
+		}
+		if user != nil && user.Admin {
+			if successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id)) {
+				a.afterPermanentDelete()
+			}
+			return
+		}
 		if app != nil && membership != nil {
 			if app.AutoAssign {
-				user, err := a.DB.GetUserByID(userID)
-				if success := successOrAbort(ctx, 500, err); !success {
-					return
-				}
-				if user == nil || !user.Admin {
-					ctx.AbortWithError(
-						403,
-						errors.New("global channel messages can only be deleted by an administrator; archive them instead"),
-					)
-					return
-				}
-				if successOrAbort(ctx, 500, a.DB.DeleteMessageByID(id)) {
-					a.afterPermanentDelete()
-				}
+				ctx.AbortWithError(
+					403,
+					errors.New("global channel messages can only be deleted by an administrator; archive them instead"),
+				)
 				return
 			}
 
