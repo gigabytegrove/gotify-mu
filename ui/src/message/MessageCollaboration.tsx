@@ -34,6 +34,13 @@ interface Props {
 const MessageCollaboration = ({message, onChanged}: Props) => {
     const {currentUser, snackManager} = useStores();
     const collaboration = message.collaboration || {};
+    const configuredControls = Array.isArray(message.extras?.['monita::controls'])
+        ? (message.extras?.['monita::controls'] as unknown[])
+              .map((value) => String(value).toLowerCase())
+        : [];
+    const canAssign = configuredControls.includes('assign');
+    const canResolve = configuredControls.includes('resolve');
+    const canAttach = configuredControls.includes('attach');
     const [replyOpen, setReplyOpen] = React.useState(false);
     const [replyText, setReplyText] = React.useState('');
     const [thread, setThread] = React.useState<IMessage[]>();
@@ -119,40 +126,44 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
                             {collaboration.replyCount ? ' (' + collaboration.replyCount + ')' : ''}
                         </Button>
                     )}
-                    <Button
-                        size="small"
-                        startIcon={<AssignmentInd />}
-                        variant={assignedToMe ? 'contained' : 'text'}
-                        onClick={() =>
-                            void mutate(
-                                () =>
-                                    axios.put(api('message/' + message.id + '/assignment'), {
-                                        userId: assignedToMe ? 0 : currentUser.user.id,
-                                    }),
-                                assignedToMe ? 'Assignment cleared' : 'Assigned to you'
-                            )
-                        }>
-                        {assignedToMe
-                            ? 'Assigned to me'
-                            : collaboration.assignedUserName
-                              ? 'Assigned: ' + collaboration.assignedUserName
-                              : 'Assign to me'}
-                    </Button>
-                    <Button
-                        size="small"
-                        color={status === 'resolved' ? 'success' : 'inherit'}
-                        startIcon={<TaskAlt />}
-                        onClick={() =>
-                            void mutate(
-                                () =>
-                                    axios.put(api('message/' + message.id + '/status'), {
-                                        status: status === 'resolved' ? 'open' : 'resolved',
-                                    }),
-                                status === 'resolved' ? 'Message reopened' : 'Message resolved'
-                            )
-                        }>
-                        {status === 'resolved' ? 'Resolved' : 'Resolve'}
-                    </Button>
+                    {canAssign && (
+                        <Button
+                            size="small"
+                            startIcon={<AssignmentInd />}
+                            variant={assignedToMe ? 'contained' : 'text'}
+                            onClick={() =>
+                                void mutate(
+                                    () =>
+                                        axios.put(api('message/' + message.id + '/assignment'), {
+                                            userId: assignedToMe ? 0 : currentUser.user.id,
+                                        }),
+                                    assignedToMe ? 'Assignment cleared' : 'Assigned to you'
+                                )
+                            }>
+                            {assignedToMe
+                                ? 'Assigned to me'
+                                : collaboration.assignedUserName
+                                  ? 'Assigned: ' + collaboration.assignedUserName
+                                  : 'Assign to me'}
+                        </Button>
+                        )}
+                    {canResolve && (
+                        <Button
+                            size="small"
+                            color={status === 'resolved' ? 'success' : 'inherit'}
+                            startIcon={<TaskAlt />}
+                            onClick={() =>
+                                void mutate(
+                                    () =>
+                                        axios.put(api('message/' + message.id + '/status'), {
+                                            status: status === 'resolved' ? 'open' : 'resolved',
+                                        }),
+                                    status === 'resolved' ? 'Message reopened' : 'Message resolved'
+                                )
+                            }>
+                            {status === 'resolved' ? 'Resolved' : 'Resolve'}
+                        </Button>
+                        )}
                     <Button
                         size="small"
                         startIcon={collaboration.read ? <MarkEmailUnread /> : <MarkEmailRead />}
@@ -165,18 +176,22 @@ const MessageCollaboration = ({message, onChanged}: Props) => {
                         }>
                         {collaboration.read ? 'Mark unread' : 'Mark read'}
                     </Button>
-                    <input
-                        ref={uploadRef}
-                        type="file"
-                        hidden
-                        onChange={(event) => void upload(event.target.files?.[0])}
-                    />
-                    <Button
-                        size="small"
-                        startIcon={<AttachFile />}
-                        onClick={() => uploadRef.current?.click()}>
-                        Attach
-                    </Button>
+                    {canAttach && (
+                        <>
+                            <input
+                                ref={uploadRef}
+                                type="file"
+                                hidden
+                                onChange={(event) => void upload(event.target.files?.[0])}
+                            />
+                            <Button
+                                size="small"
+                                startIcon={<AttachFile />}
+                                onClick={() => uploadRef.current?.click()}>
+                                Attach
+                            </Button>
+                        </>
+                    )}
                 </Stack>
 
                 <Stack direction="row" spacing={0.5} useFlexGap sx={{flexWrap: 'wrap'}}>
