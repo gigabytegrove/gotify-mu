@@ -103,13 +103,40 @@ const Message = ({
         }
     });
 
+    const renderMentionedPlainText = () => {
+        const parts = content.split(/(@[A-Za-z0-9._-]+)/g);
+        return (
+            <Box sx={{whiteSpace: 'pre-wrap'}}>
+                {parts.map((part, index) =>
+                    /^@[A-Za-z0-9._-]+$/.test(part) ? (
+                        <Box
+                            component="span"
+                            key={`${part}-${index}`}
+                            sx={{
+                                display: 'inline',
+                                fontWeight: 700,
+                                color: 'primary.main',
+                                bgcolor: 'action.hover',
+                                borderRadius: 0.75,
+                                px: 0.35,
+                            }}>
+                            {part}
+                        </Box>
+                    ) : (
+                        <React.Fragment key={index}>{part}</React.Fragment>
+                    )
+                )}
+            </Box>
+        );
+    };
+
     const renderContent = () => {
         switch (contentType(extras)) {
             case RenderMode.Markdown:
                 return <Markdown onImageLoaded={refreshOverflowing}>{content}</Markdown>;
             case RenderMode.Plain:
             default:
-                return <Box sx={{whiteSpace: 'pre-wrap'}}>{content}</Box>;
+                return renderMentionedPlainText();
         }
     };
 

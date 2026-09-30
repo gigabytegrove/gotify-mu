@@ -230,6 +230,7 @@ const Messages = observer(() => {
             {isChat && !archivedView && canPost && app && (
                 <SurfaceCard title="Conversation" subtitle="Two-way Gotify MU Chat Channel">
                     <ChatComposer
+                        appId={app.id}
                         channelName={app.name}
                         fOnSubmit={(message, images) =>
                             messagesStore.sendChatMessage(app.id, message, images)

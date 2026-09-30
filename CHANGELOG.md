@@ -4,6 +4,36 @@
 
 # Changelog
 
+## 1.2.0 — 2026-09-30
+
+### Message controls
+
+- Added per-message controls for assignment, resolve/reopen, and post-send attachments.
+- Normal notifications no longer show Assign, Resolve, or Attach unless the sender explicitly enables those controls.
+- The server enforces the same control metadata, so hidden controls cannot be invoked directly through the API.
+- Enabled Attach permits recipients of that message to add a file/image; it is no longer restricted to message managers after the sender explicitly opts the message into attachment workflow.
+- Capability discovery advertises `messageControls: true`.
+
+### Retention
+
+- Notification Channels now default to 24-hour message retention.
+- Existing Notification Channels are migrated once to 24-hour retention.
+- Chat Channels are migrated to indefinite retention by default.
+- Retention uses exact 24-hour periods and applies equally to active and archived messages.
+- Expired messages remove their attachment records; the existing orphan-attachment cleanup removes the corresponding stored files.
+
+### Administration
+
+- Administrators can permanently delete an individual message in any Channel, including its associated attachment records and stored attachment files.
+- Archiving keeps the complete message and its attachments together.
+
+### Chat mentions
+
+- Added `@username` member autocomplete to the Monita Web Chat composer.
+- `@username` tokens are visually highlighted in Web Chat messages.
+- Channel owners and administrators can retrieve mention candidates even when they do not have a redundant direct membership row.
+- Existing mention persistence and targeted mention delivery remain in place.
+
 ## 1.1.9 — 2026-09-30
 
 ### Notification Channel image delivery

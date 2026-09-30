@@ -361,6 +361,18 @@ func (d *GormDatabase) DismissMessagesByApplicationForUser(userID, applicationID
 }
 
 // DeleteMessageByID deletes a message by its id.
+func (d *GormDatabase) GetMessageAttachmentStorageNamesForDelete(id uint) ([]string, error) {
+	var names []string
+	messageIDs := d.DB.Model(&model.Message{}).
+		Select("id").
+		Where("id = ? OR reply_to_message_id = ? OR thread_root_message_id = ?", id, id, id)
+	err := d.DB.Model(&model.MessageAttachment{}).
+		Where("message_id IN (?)", messageIDs).
+		Where("storage_name <> ''").
+		Pluck("storage_name", &names).Error
+	return names, err
+}
+
 func (d *GormDatabase) DeleteMessageByID(id uint) error {
 	return d.DB.Transaction(func(tx *gorm.DB) error {
 		var ids []uint
@@ -421,7 +433,7 @@ func (d *GormDatabase) ApplyMessageRetention(now time.Time) (int, error) {
 	}
 	deleted := 0
 	for _, app := range apps {
-		before := now.AddDate(0, 0, -app.RetentionDays)
+		before := now.Add(-time.Duration(app.RetentionDays) * 24 * time.Hour)
 		var ids []uint
 		if err := d.DB.Model(&model.Message{}).
 			Where("application_id = ? AND date < ?", app.ID, before).

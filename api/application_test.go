@@ -64,9 +64,10 @@ func (s *ApplicationSuite) Test_CreateApplication_mapAllParameters() {
 		UserID:      5,
 		Name:        "custom_name",
 		Description: "description_text",
-		SortKey:     "a5",
-		ChannelType: "notification",
-		CreatedAt:   testdb.Now,
+		SortKey:       "a5",
+		ChannelType:   "notification",
+		RetentionDays: 1,
+		CreatedAt:     testdb.Now,
 	}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	if app, err := s.db.GetApplicationByID(1); assert.NoError(s.T(), err) {
@@ -102,6 +103,25 @@ func (s *ApplicationSuite) Test_CreateApplication_nonAdminCannotCreateChatChanne
 	apps, err := s.db.GetApplicationsByUser(5)
 	require.NoError(s.T(), err)
 	assert.Empty(s.T(), apps)
+}
+
+func (s *ApplicationSuite) Test_CreateApplication_chatDefaultsToNoRetention() {
+	s.db.AdminUser(5)
+
+	test.WithUser(s.ctx, 5)
+	s.withJSON(&ApplicationParams{
+		Name:            "family chat",
+		AllowMemberPost: true,
+		ChannelType:     model.ChannelTypeChat,
+	})
+	s.a.CreateApplication(s.ctx)
+
+	assert.Equal(s.T(), 200, s.recorder.Code)
+	app, err := s.db.GetApplicationByID(1)
+	require.NoError(s.T(), err)
+	require.NotNil(s.T(), app)
+	assert.Equal(s.T(), model.ChannelTypeChat, app.ChannelType)
+	assert.Zero(s.T(), app.RetentionDays)
 }
 
 func (s *ApplicationSuite) Test_CreateApplication_expectBadRequestOnEmptyName() {
@@ -140,9 +160,10 @@ func (s *ApplicationSuite) Test_CreateApplication_ignoresReadOnlyPropertiesInPar
 		Description: "description",
 		Internal:    false,
 		Image:       "static/defaultapp.png",
-		SortKey:     "a5",
-		ChannelType: "notification",
-		CreatedAt:   testdb.Now,
+		SortKey:       "a5",
+		ChannelType:   "notification",
+		RetentionDays: 1,
+		CreatedAt:     testdb.Now,
 	}
 
 	assert.Equal(s.T(), 200, s.recorder.Code)
@@ -241,7 +262,7 @@ func (s *ApplicationSuite) Test_CreateApplication_onlyRequiredParameters() {
 	s.withFormData("name=custom_name")
 	s.a.CreateApplication(s.ctx)
 
-	expected := &model.Application{ID: 1, UserID: 5, Name: "custom_name", SortKey: "a0", ChannelType: "notification", CreatedAt: testdb.Now, Image: "static/defaultapp.png"}
+	expected := &model.Application{ID: 1, UserID: 5, Name: "custom_name", SortKey: "a0", ChannelType: "notification", RetentionDays: 1, CreatedAt: testdb.Now, Image: "static/defaultapp.png"}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	bodyBytes, err := io.ReadAll(s.recorder.Body)
 	assert.Nil(s.T(), err)
@@ -269,9 +290,10 @@ func (s *ApplicationSuite) Test_CreateApplication_returnsApplicationWithID() {
 		UserID:    5,
 		Name:      "custom_name",
 		Image:     "static/defaultapp.png",
-		SortKey:   "a0",
-		ChannelType: "notification",
-		CreatedAt: testdb.Now,
+		SortKey:       "a0",
+		ChannelType:   "notification",
+		RetentionDays: 1,
+		CreatedAt:     testdb.Now,
 	}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	bodyBytes, err := io.ReadAll(s.recorder.Body)
@@ -296,7 +318,7 @@ func (s *ApplicationSuite) Test_CreateApplication_withExistingToken() {
 
 	s.a.CreateApplication(s.ctx)
 
-	expected := &model.Application{ID: 2, Name: "custom_name", UserID: 5, SortKey: "a0", ChannelType: "notification", CreatedAt: testdb.Now}
+	expected := &model.Application{ID: 2, Name: "custom_name", UserID: 5, SortKey: "a0", ChannelType: "notification", RetentionDays: 1, CreatedAt: testdb.Now}
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	if app, err := s.db.GetApplicationByID(2); assert.NoError(s.T(), err) {
 		expected.Token = app.Token

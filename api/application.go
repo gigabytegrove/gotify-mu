@@ -126,6 +126,11 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			}
 		}
 
+		retentionDays := applicationParams.RetentionDays
+		if channelType != model.ChannelTypeChat && retentionDays == 0 {
+			retentionDays = 1
+		}
+
 		tokenPublic, tokenPrivate := generateApplicationToken()
 		app := model.Application{
 			Name:            applicationParams.Name,
@@ -138,7 +143,7 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			AutoAssign:      applicationParams.AutoAssign,
 			AllowMemberPost: applicationParams.AllowMemberPost,
 			ChannelType:     channelType,
-			RetentionDays:   applicationParams.RetentionDays,
+			RetentionDays:   retentionDays,
 		}
 
 		if err := a.DB.CreateApplication(&app); err != nil {

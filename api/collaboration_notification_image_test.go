@@ -81,3 +81,29 @@ func TestChannelImageMessageIdentityChat(t *testing.T) {
 		)
 	}
 }
+
+
+func TestMessageControlEnabled(t *testing.T) {
+	message := &model.Message{
+		Extras: []byte(`{"monita::controls":["assign","attach"]}`),
+	}
+
+	if !messageControlEnabled(message, "assign") {
+		t.Fatal("assign control should be enabled")
+	}
+	if !messageControlEnabled(message, "attach") {
+		t.Fatal("attach control should be enabled")
+	}
+	if messageControlEnabled(message, "resolve") {
+		t.Fatal("resolve control should not be enabled")
+	}
+}
+
+func TestMessageControlEnabledDefaultsOff(t *testing.T) {
+	if messageControlEnabled(&model.Message{}, "assign") {
+		t.Fatal("messages without control metadata must not expose assignment")
+	}
+	if messageControlEnabled(&model.Message{Extras: []byte(`{"monita::controls":"assign"}`)}, "assign") {
+		t.Fatal("malformed control metadata must fail closed")
+	}
+}

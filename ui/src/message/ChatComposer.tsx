@@ -8,7 +8,10 @@ import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
+import axios from 'axios';
+
+import * as config from '../config';
 
 const MaxImages = 8;
 const MaxImageBytes = 25 * 1024 * 1024;
@@ -24,7 +27,20 @@ const imageType = (file: File): string => {
     return '';
 };
 
+interface MentionableUser {
+    userId: number;
+    name: string;
+    displayName?: string;
+}
+
+interface MentionQuery {
+    query: string;
+    start: number;
+    end: number;
+}
+
 interface IProps {
+    appId: number;
     channelName: string;
     fOnSubmit: (message: string, images: File[]) => Promise<void>;
     fOnTyping?: (typing: boolean) => Promise<void> | void;
@@ -35,19 +51,88 @@ interface SelectedImage {
     preview: string;
 }
 
-const ChatComposer = ({channelName, fOnSubmit, fOnTyping}: IProps) => {
+const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
     const [message, setMessage] = useState('');
+    const [mentionableUsers, setMentionableUsers] = useState<MentionableUser[]>([]);
+    const [mentionQuery, setMentionQuery] = useState<MentionQuery | null>(null);
     const [images, setImages] = useState<SelectedImage[]>([]);
     const [imageError, setImageError] = useState('');
     const [sending, setSending] = useState(false);
     const stopTimer = useRef<number | null>(null);
     const lastTypingSentAt = useRef(0);
     const imageInput = useRef<HTMLInputElement | null>(null);
+    const messageInput = useRef<HTMLInputElement | HTMLTextAreaElement | null>(null);
     const imagesRef = useRef<SelectedImage[]>([]);
 
     useEffect(() => {
         imagesRef.current = images;
     }, [images]);
+
+    useEffect(() => {
+        let active = true;
+        void axios
+            .get<MentionableUser[]>(
+                `${config.get('url')}application/${appId}/mentionable-users`
+            )
+            .then((response) => {
+                if (active) setMentionableUsers(response.data || []);
+            })
+            .catch(() => {
+                if (active) setMentionableUsers([]);
+            });
+
+        return () => {
+            active = false;
+        };
+    }, [appId]);
+
+    const updateMentionQuery = (value: string, caret: number | null | undefined) => {
+        const end = caret == null ? value.length : caret;
+        const before = value.slice(0, end);
+        const match = before.match(/(?:^|\s|[([{,;:!?])@([A-Za-z0-9._-]*)$/);
+        if (!match) {
+            setMentionQuery(null);
+            return;
+        }
+        setMentionQuery({
+            query: match[1].toLowerCase(),
+            start: before.length - match[1].length - 1,
+            end,
+        });
+    };
+
+    const mentionMatches = useMemo(() => {
+        if (!mentionQuery) return [];
+        return mentionableUsers
+            .filter((user) => {
+                const name = user.name.toLowerCase();
+                const display = (user.displayName || '').toLowerCase();
+                return (
+                    !mentionQuery.query ||
+                    name.startsWith(mentionQuery.query) ||
+                    display.startsWith(mentionQuery.query)
+                );
+            })
+            .slice(0, 8);
+    }, [mentionQuery, mentionableUsers]);
+
+    const insertMention = (user: MentionableUser) => {
+        if (!mentionQuery) return;
+        const replacement = `@${user.name} `;
+        const next =
+            message.slice(0, mentionQuery.start) +
+            replacement +
+            message.slice(mentionQuery.end);
+        const caret = mentionQuery.start + replacement.length;
+        setMessage(next);
+        setMentionQuery(null);
+        window.setTimeout(() => {
+            const input = messageInput.current;
+            if (!input) return;
+            input.focus();
+            input.setSelectionRange(caret, caret);
+        }, 0);
+    };
 
     const clearStopTimer = () => {
         if (stopTimer.current != null) {
@@ -62,8 +147,9 @@ const ChatComposer = ({channelName, fOnSubmit, fOnTyping}: IProps) => {
         if (!typing) lastTypingSentAt.current = 0;
     };
 
-    const noteInput = (value: string) => {
+    const noteInput = (value: string, caret?: number | null) => {
         setMessage(value);
+        updateMentionQuery(value, caret);
         clearStopTimer();
 
         if (value.trim().length === 0) {
@@ -217,6 +303,35 @@ const ChatComposer = ({channelName, fOnSubmit, fOnTyping}: IProps) => {
                 </Typography>
             )}
 
+            {mentionMatches.length > 0 && (
+                <Paper
+                    variant="outlined"
+                    sx={{mb: 1, maxHeight: 220, overflowY: 'auto'}}>
+                    {mentionMatches.map((user) => (
+                        <Button
+                            key={user.userId}
+                            fullWidth
+                            onMouseDown={(event) => event.preventDefault()}
+                            onClick={() => insertMention(user)}
+                            sx={{
+                                justifyContent: 'flex-start',
+                                textTransform: 'none',
+                                px: 1.5,
+                                py: 1,
+                            }}>
+                            <Box sx={{textAlign: 'left'}}>
+                                <Typography variant="body2" sx={{fontWeight: 700}}>
+                                    {user.displayName || user.name}
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                    @{user.name}
+                                </Typography>
+                            </Box>
+                        </Button>
+                    ))}
+                </Paper>
+            )}
+
             <Stack direction="row" spacing={1} sx={{alignItems: 'flex-end'}}>
                 <input
                     ref={imageInput}
@@ -238,12 +353,15 @@ const ChatComposer = ({channelName, fOnSubmit, fOnTyping}: IProps) => {
                 </Tooltip>
                 <TextField
                     autoFocus
+                    inputRef={messageInput}
                     fullWidth
                     multiline
                     maxRows={5}
                     label={`Message #${channelName}`}
                     value={message}
-                    onChange={(event) => noteInput(event.target.value)}
+                    onChange={(event) =>
+                        noteInput(event.target.value, event.target.selectionStart)
+                    }
                     onPaste={(event) => {
                         const pasted = Array.from(event.clipboardData.files);
                         if (pasted.length > 0) addImages(pasted);
@@ -251,13 +369,26 @@ const ChatComposer = ({channelName, fOnSubmit, fOnTyping}: IProps) => {
                     onBlur={() => {
                         clearStopTimer();
                         setTyping(false);
+                        window.setTimeout(() => setMentionQuery(null), 100);
                     }}
                     onKeyDown={(event) => {
+                        if (
+                            mentionMatches.length > 0 &&
+                            mentionQuery &&
+                            (event.key === 'Enter' || event.key === 'Tab')
+                        ) {
+                            event.preventDefault();
+                            insertMention(mentionMatches[0]);
+                            return;
+                        }
                         if (event.key === 'Enter' && !event.shiftKey) {
                             event.preventDefault();
                             void send();
                         }
                     }}
+                    onClick={() =>
+                        updateMentionQuery(message, messageInput.current?.selectionStart)
+                    }
                 />
                 <Button
                     variant="contained"

@@ -216,6 +216,48 @@ func TestApplicationMembershipMentionableUsersPublisherRole(t *testing.T) {
 	assert.Contains(t, recorder.Body.String(), `"name":"jennifer"`)
 }
 
+func TestApplicationMembershipMentionableUsersAdminWithoutMembership(t *testing.T) {
+	db := testdb.NewDB(t)
+	defer db.Close()
+
+	owner := db.NewUser(1)
+	admin := db.NewUser(2)
+	admin.Admin = true
+	require.NoError(t, db.UpdateUser(admin))
+	jennifer := db.NewUser(3)
+	jennifer.Name = "jennifer"
+	jennifer.DisplayName = "Jennifer"
+	require.NoError(t, db.UpdateUser(jennifer))
+
+	app := &model.Application{
+		UserID:          owner.ID,
+		Token:           "MUAPIADMINMENT",
+		Name:            "Admin-visible Chat",
+		ChannelType:     model.ChannelTypeChat,
+		AllowMemberPost: true,
+	}
+	require.NoError(t, db.CreateApplication(app))
+	require.NoError(t, db.UpsertApplicationMembership(&model.ApplicationMembership{
+		ApplicationID:        app.ID,
+		UserID:               jennifer.ID,
+		ReceiveNotifications: true,
+		Role:                 model.ChannelRoleMember,
+	}))
+
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	test.WithUser(ctx, admin.ID)
+	ctx.Params = gin.Params{{Key: "id", Value: "1"}}
+	ctx.Request = httptest.NewRequest("GET", "/application/1/mentionable-users", nil)
+
+	handler := &ApplicationMembershipAPI{DB: db}
+	handler.GetMentionableUsers(ctx)
+
+	assert.Equal(t, 200, recorder.Code)
+	assert.Contains(t, recorder.Body.String(), `"name":"jennifer"`)
+}
+
+
 func TestApplicationMembershipMentionableUsersReadOnlyDenied(t *testing.T) {
 	db := testdb.NewDB(t)
 	defer db.Close()

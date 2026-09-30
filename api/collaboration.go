@@ -126,6 +126,38 @@ func canManageMessage(app *model.Application, membership *model.ApplicationMembe
 	return membership.EffectiveRole == model.ChannelRoleManager
 }
 
+func messageControlEnabled(message *model.Message, control string) bool {
+	if message == nil || len(message.Extras) == 0 {
+		return false
+	}
+	var extras map[string]any
+	if err := json.Unmarshal(message.Extras, &extras); err != nil {
+		return false
+	}
+	raw, ok := extras["monita::controls"]
+	if !ok {
+		return false
+	}
+	values, ok := raw.([]any)
+	if !ok {
+		if stringsList, stringsOK := raw.([]string); stringsOK {
+			for _, value := range stringsList {
+				if strings.EqualFold(strings.TrimSpace(value), control) {
+					return true
+				}
+			}
+		}
+		return false
+	}
+	for _, value := range values {
+		text, ok := value.(string)
+		if ok && strings.EqualFold(strings.TrimSpace(text), control) {
+			return true
+		}
+	}
+	return false
+}
+
 func normalizeMention(value string) string {
 	value = strings.ToLower(strings.TrimSpace(value))
 	value = strings.Trim(value, "@.,:;!?()[]{}<>\"'")
@@ -339,6 +371,10 @@ func (a *CollaborationAPI) Assign(ctx *gin.Context) {
 		if !ok {
 			return
 		}
+		if !messageControlEnabled(message, "assign") {
+			ctx.AbortWithError(http.StatusForbidden, errors.New("assignment is not enabled for this message"))
+			return
+		}
 		var params assignmentParams
 		if err := ctx.ShouldBindJSON(&params); err != nil {
 			return
@@ -379,8 +415,12 @@ type statusParams struct {
 
 func (a *CollaborationAPI) SetStatus(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		_, _, _, user, ok := a.messageAccess(ctx, id)
+		message, _, _, user, ok := a.messageAccess(ctx, id)
 		if !ok {
+			return
+		}
+		if !messageControlEnabled(message, "resolve") {
+			ctx.AbortWithError(http.StatusForbidden, errors.New("resolve is not enabled for this message"))
 			return
 		}
 		var params statusParams
@@ -671,12 +711,12 @@ func safeFilename(header *multipart.FileHeader) string {
 
 func (a *CollaborationAPI) UploadAttachment(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
-		message, app, membership, user, ok := a.messageAccess(ctx, id)
+		message, _, _, _, ok := a.messageAccess(ctx, id)
 		if !ok {
 			return
 		}
-		if !canManageMessage(app, membership, user, message) {
-			ctx.AbortWithError(http.StatusForbidden, errors.New("you cannot add attachments to this message"))
+		if !messageControlEnabled(message, "attach") {
+			ctx.AbortWithError(http.StatusForbidden, errors.New("attachments are not enabled for this message"))
 			return
 		}
 		header, err := ctx.FormFile("attachment")
