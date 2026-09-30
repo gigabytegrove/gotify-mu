@@ -90,7 +90,7 @@ const ChatComposer = ({channelName, fOnSubmit, fOnTyping}: IProps) => {
 
         for (const file of incoming) {
             if (images.length + next.length >= MaxImages) {
-                error = `A chat message can include at most ${MaxImages} images.`;
+                error = `A Chat message can include at most ${MaxImages} images.`;
                 break;
             }
             if (!AllowedImageTypes.has(imageType(file))) {
@@ -102,7 +102,7 @@ const ChatComposer = ({channelName, fOnSubmit, fOnTyping}: IProps) => {
                 continue;
             }
             if (totalBytes + file.size > MaxTotalImageBytes) {
-                error = 'Images in one chat message may total at most 50 MiB.';
+                error = 'Images in one Chat message may total at most 50 MiB.';
                 break;
             }
             totalBytes += file.size;
@@ -226,10 +226,10 @@ const ChatComposer = ({channelName, fOnSubmit, fOnTyping}: IProps) => {
                     multiple
                     onChange={(event) => addImages(event.target.files)}
                 />
-                <Tooltip title="Add photos">
+                <Tooltip title="Add image or GIF">
                     <span>
                         <IconButton
-                            aria-label="Add photos"
+                            aria-label="Add image or GIF"
                             disabled={sending || images.length >= MaxImages}
                             onClick={() => imageInput.current?.click()}>
                             <AttachFile />
