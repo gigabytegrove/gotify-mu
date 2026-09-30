@@ -150,7 +150,8 @@ func messageControlEnabled(message *model.Message, control string) bool {
 		return false
 	}
 	for _, value := range values {
-		if strings.EqualFold(strings.TrimSpace(fmt.Sprint(value)), control) {
+		text, ok := value.(string)
+		if ok && strings.EqualFold(strings.TrimSpace(text), control) {
 			return true
 		}
 	}
