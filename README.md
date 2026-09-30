@@ -115,8 +115,9 @@ See [Deployment](docs/DEPLOYMENT.md) for installation, update, backup, and troub
 - reactions
 - mentions
 - acknowledgements
-- assignment and resolve/reopen workflows
-- attachments
+- per-message assignment, resolve/reopen, and attachment controls
+- image/file attachments on supported messages
+- `@username` Chat mentions with autocomplete and visible mention highlighting
 - message templates
 - saved searches
 
