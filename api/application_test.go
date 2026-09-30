@@ -106,9 +106,7 @@ func (s *ApplicationSuite) Test_CreateApplication_nonAdminCannotCreateChatChanne
 }
 
 func (s *ApplicationSuite) Test_CreateApplication_chatDefaultsToNoRetention() {
-	admin := s.db.User(5)
-	admin.Admin = true
-	require.NoError(s.T(), s.db.UpdateUser(admin))
+	s.db.AdminUser(5)
 
 	test.WithUser(s.ctx, 5)
 	s.withJSON(&ApplicationParams{
