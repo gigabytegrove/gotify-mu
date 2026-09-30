@@ -192,7 +192,25 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 		return nil, err
 	}
 
+	if err := normalizeChannelRetentionDefaults(db); err != nil {
+		return nil, err
+	}
+
 	return wrapper, nil
+}
+
+func normalizeChannelRetentionDefaults(db *gorm.DB) error {
+	// Monita notification history is intentionally short-lived by default.
+	// Existing Notification Channels are migrated to 24 hours as part of this
+	// release. Chat Channels retain conversation history indefinitely.
+	if err := db.Model(&model.Application{}).
+		Where("channel_type = ? OR (channel_type = '' AND allow_member_post = ?)", model.ChannelTypeChat, true).
+		Update("retention_days", 0).Error; err != nil {
+		return err
+	}
+	return db.Model(&model.Application{}).
+		Where("channel_type = ? OR (channel_type = '' AND allow_member_post = ?)", model.ChannelTypeNotification, false).
+		Update("retention_days", 1).Error
 }
 
 func fillMissingCreatedAt(db *gorm.DB, now time.Time) error {
