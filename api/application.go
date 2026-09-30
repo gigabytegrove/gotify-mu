@@ -65,7 +65,8 @@ type ApplicationParams struct {
 	// Presentation mode for MU-aware clients. Empty remains accepted for older clients.
 	ChannelType string `form:"channelType" query:"channelType" json:"channelType" binding:"omitempty,oneof=notification chat"`
 	// Number of 24-hour periods to retain message history. New Notification Channels default to 1; zero keeps Chat history indefinitely.
-	RetentionDays int `form:"retentionDays" query:"retentionDays" json:"retentionDays" binding:"min=0,max=36500"`
+	// A nil value means "not supplied" on update.
+	RetentionDays *int `form:"retentionDays" query:"retentionDays" json:"retentionDays" binding:"omitempty,min=0,max=36500"`
 }
 
 // CreateApplication creates an application and returns the access token.
@@ -126,8 +127,10 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 			}
 		}
 
-		retentionDays := applicationParams.RetentionDays
-		if channelType == model.ChannelTypeNotification && retentionDays == 0 {
+		retentionDays := 0
+		if applicationParams.RetentionDays != nil {
+			retentionDays = *applicationParams.RetentionDays
+		} else if channelType == model.ChannelTypeNotification {
 			retentionDays = 1
 		}
 
@@ -354,9 +357,19 @@ func (a *ApplicationAPI) UpdateApplication(ctx *gin.Context) {
 				app.Description = applicationParams.Description
 				app.Name = applicationParams.Name
 				app.DefaultPriority = applicationParams.DefaultPriority
-				app.RetentionDays = applicationParams.RetentionDays
+				if applicationParams.RetentionDays != nil {
+					app.RetentionDays = *applicationParams.RetentionDays
+				}
 				if applicationParams.ChannelType != "" {
+					previousType := app.ChannelType
 					app.ChannelType = applicationParams.ChannelType
+					if applicationParams.RetentionDays == nil && previousType != app.ChannelType {
+						if app.ChannelType == model.ChannelTypeNotification && app.RetentionDays == 0 {
+							app.RetentionDays = 1
+						} else if app.ChannelType == model.ChannelTypeChat && app.RetentionDays == 1 {
+							app.RetentionDays = 0
+						}
+					}
 				}
 				if applicationParams.SortKey != "" {
 					app.SortKey = applicationParams.SortKey
