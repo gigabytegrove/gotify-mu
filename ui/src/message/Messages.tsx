@@ -171,7 +171,7 @@ const Messages = observer(() => {
             message={message}
             fRefresh={() => messagesStore.refreshByApp(message.appid, archivedView)}
             fDelete={
-                !archivedView && canDeleteMessage(message)
+                (!archivedView || currentUser.user.admin) && canDeleteMessage(message)
                     ? () => deleteMessage(message)
                     : undefined
             }
