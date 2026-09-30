@@ -127,9 +127,7 @@ func (a *ApplicationAPI) CreateApplication(ctx *gin.Context) {
 		}
 
 		retentionDays := applicationParams.RetentionDays
-		if channelType == model.ChannelTypeChat {
-			retentionDays = 0
-		} else if retentionDays == 0 {
+		if channelType != model.ChannelTypeChat && retentionDays == 0 {
 			retentionDays = 1
 		}
 
