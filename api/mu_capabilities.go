@@ -17,25 +17,25 @@ type MUCapabilities struct {
 }
 
 type MUCapabilityFlags struct {
-	SharedChannels       bool `json:"sharedChannels"`
-	GlobalChannels       bool `json:"globalChannels"`
-	ChannelTypes         bool `json:"channelTypes"`
-	ChannelImages        bool `json:"channelImages"`
-	ChatImages           bool `json:"chatImages"`
-	NotificationImages   bool `json:"notificationImages"`
+	SharedChannels        bool `json:"sharedChannels"`
+	GlobalChannels        bool `json:"globalChannels"`
+	ChannelTypes          bool `json:"channelTypes"`
+	ChannelImages         bool `json:"channelImages"`
+	ChatImages            bool `json:"chatImages"`
+	NotificationImages    bool `json:"notificationImages"`
 	MessageControls       bool `json:"messageControls"`
-	ChatChannels         bool `json:"chatChannels"`
-	MemberPosting        bool `json:"memberPosting"`
-	SenderIdentity       bool `json:"senderIdentity"`
-	PerUserArchive       bool `json:"perUserArchive"`
-	PerChannelMute       bool `json:"perChannelMute"`
+	ChatChannels          bool `json:"chatChannels"`
+	MemberPosting         bool `json:"memberPosting"`
+	SenderIdentity        bool `json:"senderIdentity"`
+	PerUserArchive        bool `json:"perUserArchive"`
+	PerChannelMute        bool `json:"perChannelMute"`
 	MembershipManagement bool `json:"membershipManagement"`
-	OwnershipTransfer    bool `json:"ownershipTransfer"`
-	UserGroups           bool `json:"userGroups"`
-	AuditLog             bool `json:"auditLog"`
-	TypingPresence       bool `json:"typingPresence"`
-	ChatNotifications    bool `json:"chatNotifications"`
-	Mentions             bool `json:"mentions"`
+	OwnershipTransfer     bool `json:"ownershipTransfer"`
+	UserGroups            bool `json:"userGroups"`
+	AuditLog              bool `json:"auditLog"`
+	TypingPresence        bool `json:"typingPresence"`
+	ChatNotifications     bool `json:"chatNotifications"`
+	Mentions              bool `json:"mentions"`
 }
 
 func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
@@ -44,25 +44,25 @@ func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
 		Version:    a.Version,
 		APIVersion: 1,
 		Features: MUCapabilityFlags{
-			SharedChannels:       true,
-			GlobalChannels:       true,
-			ChannelTypes:         true,
-			ChannelImages:        true,
-			ChatImages:           true,
-			NotificationImages:   true,
+			SharedChannels:        true,
+			GlobalChannels:        true,
+			ChannelTypes:          true,
+			ChannelImages:         true,
+			ChatImages:            true,
+			NotificationImages:    true,
 			MessageControls:       true,
-			ChatChannels:         true,
-			MemberPosting:        true,
-			SenderIdentity:       true,
-			PerUserArchive:       true,
-			PerChannelMute:       true,
+			ChatChannels:          true,
+			MemberPosting:         true,
+			SenderIdentity:        true,
+			PerUserArchive:        true,
+			PerChannelMute:        true,
 			MembershipManagement: true,
-			OwnershipTransfer:    true,
-			UserGroups:           true,
-			AuditLog:             true,
-			TypingPresence:       true,
-			ChatNotifications:    true,
-			Mentions:             true,
+			OwnershipTransfer:     true,
+			UserGroups:            true,
+			AuditLog:              true,
+			TypingPresence:        true,
+			ChatNotifications:     true,
+			Mentions:              true,
 		},
 	})
 }
