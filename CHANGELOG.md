@@ -4,6 +4,19 @@
 
 # Changelog
 
+## 1.3.4 — 2026-10-01
+
+### Transparent icon background
+
+- Removed only the 512×512 gray canvas rectangle from the canonical Monita icon SVG so the icon background is transparent.
+- Preserved all icon artwork, gradients, embedded image data, geometry, colors, clipping, and the original 512×512 vector canvas unchanged.
+- Updated the active Web/PWA icon aliases to the same transparent canonical artwork.
+
+### Compatibility
+
+- No database, API, protocol, or configuration migration is required.
+- Existing deployments can update in place.
+
 ## 1.3.3 — 2026-10-01
 
 ### Canonical branding refresh
