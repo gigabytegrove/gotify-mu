@@ -58,9 +58,9 @@ type ApplicationParams struct {
 	//
 	// example: a1
 	SortKey string `form:"sortKey" query:"sortKey" json:"sortKey"`
-	// Whether this Monita channel should be automatically assigned to every user.
+	// Whether this Gotify MU channel should be automatically assigned to every user.
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
-	// Whether assigned users may publish messages to this Monita channel.
+	// Whether assigned users may publish messages to this Gotify MU channel.
 	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
 	// Presentation mode for MU-aware clients. Empty remains accepted for older clients.
 	ChannelType string `form:"channelType" query:"channelType" json:"channelType" binding:"omitempty,oneof=notification chat"`
