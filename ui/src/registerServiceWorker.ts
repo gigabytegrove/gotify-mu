@@ -1,5 +1,4 @@
-const serviceWorkerSupported = () =>
-    'serviceWorker' in navigator && window.isSecureContext;
+const serviceWorkerSupported = () => 'serviceWorker' in navigator && window.isSecureContext;
 
 export function register() {
     if (!serviceWorkerSupported()) return;
