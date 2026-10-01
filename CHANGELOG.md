@@ -4,6 +4,28 @@
 
 # Changelog
 
+## 1.3.0 — 2026-10-01
+
+### Desktop and PWA
+
+- Reworked the desktop Web UI around a communication-first workspace instead of treating Chats and Notification Channels as the same message list.
+- Chat Channels now use a full-height conversation view with left/right message bubbles, sender identity, day separators, mention emphasis, typing state, inline collaboration controls, search, and a persistent composer.
+- Desktop navigation separates Chats from Notification Channels so conversation traffic and operational alerts are easier to scan.
+- Added a real installable Monita PWA with a service worker, cached application shell, standalone manifest metadata, install control, and same-origin asset caching while leaving authenticated API responses uncached.
+
+### Mentions
+
+- New Chat messages now use canonical `monita::mentionUserIds` metadata for realtime clients.
+- The Web/PWA client recognizes both canonical and legacy mention metadata for existing deployments.
+- Browser/PWA notifications explicitly state when another user mentioned you and open the correct Channel.
+- Mention alerts also trigger the Web notification sound even when the underlying Chat message priority is below the normal sound threshold.
+
+### Branding cleanup
+
+- Removed remaining user-facing Gotify MU labels from the active Web experience.
+- API descriptions now use Monita terminology while documented Gotify compatibility remains intact where it is technically required.
+- Internal compatibility identifiers are preserved only where changing them would break existing clients, upgrades, or persisted data.
+
 ## 1.2.0 — 2026-09-30
 
 ### Message controls

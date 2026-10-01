@@ -809,6 +809,10 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 			if message.Extras == nil {
 				message.Extras = make(map[string]any)
 			}
+			message.Extras["monita::mentions"] = mentionNames
+			message.Extras["monita::mentionUserIds"] = mentionUserIDs
+			// Legacy wire keys remain during the Monita transition so existing
+			// compatible clients keep receiving mention metadata.
 			message.Extras["gotify::mu::mentions"] = mentionNames
 			message.Extras["gotify::mu::mentionUserIds"] = mentionUserIDs
 		}

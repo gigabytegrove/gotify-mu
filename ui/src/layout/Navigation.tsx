@@ -30,6 +30,7 @@ import AutoMode from '@mui/icons-material/AutoMode';
 import AdminPanelSettings from '@mui/icons-material/AdminPanelSettings';
 import Public from '@mui/icons-material/Public';
 import NotificationsOff from '@mui/icons-material/NotificationsOff';
+import NotificationsActive from '@mui/icons-material/NotificationsActive';
 import {Link, useLocation} from 'react-router';
 import {observer} from 'mobx-react-lite';
 import {mayAllowPermission, requestPermission} from '../snack/browserNotification';
@@ -56,6 +57,17 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
     const location = useLocation();
     const {appStore, currentUser} = useStores();
     const apps = appStore.getItems();
+    const chatApps = apps.filter(
+        (app) =>
+            app.channelType === 'chat' || (app.channelType == null && Boolean(app.allowMemberPost))
+    );
+    const notificationApps = apps.filter(
+        (app) =>
+            !(
+                app.channelType === 'chat' ||
+                (app.channelType == null && Boolean(app.allowMemberPost))
+            )
+    );
     const [showRequestNotification, setShowRequestNotification] =
         React.useState(mayAllowPermission);
 
@@ -81,6 +93,79 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
 
     const selected = (item: NavItem) =>
         item.exact ? location.pathname === item.to : location.pathname.startsWith(item.to);
+
+    const renderChannelSection = (
+        label: string,
+        sectionApps: typeof apps,
+        icon: React.ReactNode
+    ) => (
+        <Box sx={{mb: 1.5}}>
+            <Stack
+                direction="row"
+                sx={{px: 1.25, mb: 0.5, alignItems: 'center', justifyContent: 'space-between'}}>
+                <Stack direction="row" spacing={0.75} sx={{alignItems: 'center'}}>
+                    <Box sx={{display: 'flex', color: 'text.secondary'}}>{icon}</Box>
+                    <Typography variant="overline" color="text.secondary" sx={{letterSpacing: 1}}>
+                        {label}
+                    </Typography>
+                </Stack>
+                <Chip size="small" variant="outlined" label={sectionApps.length} />
+            </Stack>
+            <List disablePadding>
+                {loggedIn && sectionApps.length === 0 && (
+                    <ListItemButton disabled sx={{borderRadius: 2}}>
+                        <ListItemText primary={`No ${label.toLowerCase()}`} />
+                    </ListItemButton>
+                )}
+                {loggedIn &&
+                    sectionApps.map((app) => {
+                        const to = `/channels/${app.id}`;
+                        return (
+                            <ListItemButton
+                                key={app.id}
+                                className="item channel-shortcut"
+                                component={Link}
+                                to={to}
+                                selected={location.pathname === to}
+                                onClick={() => setNavOpen(false)}
+                                sx={{
+                                    borderRadius: 1.75,
+                                    my: 0.15,
+                                    py: 0.55,
+                                    '&.Mui-selected': {bgcolor: 'action.selected'},
+                                }}>
+                                <ListItemAvatar sx={{minWidth: 42}}>
+                                    <Avatar
+                                        src={config.get('url') + app.image}
+                                        variant="rounded"
+                                        sx={{width: 30, height: 30}}
+                                    />
+                                </ListItemAvatar>
+                                <ListItemText
+                                    primary={<Typography noWrap>{app.name}</Typography>}
+                                    secondary={
+                                        app.receiveNotifications === false
+                                            ? 'Notifications muted'
+                                            : undefined
+                                    }
+                                    slotProps={{secondary: {noWrap: true}}}
+                                />
+                                <Stack direction="row" spacing={0.5} sx={{alignItems: 'center'}}>
+                                    {app.receiveNotifications === false && (
+                                        <NotificationsOff
+                                            sx={{fontSize: 15, color: 'text.disabled'}}
+                                        />
+                                    )}
+                                    {app.autoAssign && (
+                                        <Public sx={{fontSize: 15, color: 'text.secondary'}} />
+                                    )}
+                                </Stack>
+                            </ListItemButton>
+                        );
+                    })}
+            </List>
+        </Box>
+    );
 
     const drawerContent = (
         <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
@@ -144,67 +229,18 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
             <Box sx={{px: 1.5, py: 1.5, flex: 1, minHeight: 0, overflowY: 'auto'}}>
                 <Stack
                     direction="row"
-                    sx={{px: 1.25, mb: 0.5, alignItems: 'center', justifyContent: 'space-between'}}>
+                    sx={{px: 1.25, mb: 1, alignItems: 'center', justifyContent: 'space-between'}}>
                     <Typography variant="overline" color="text.secondary" sx={{letterSpacing: 1}}>
-                        Your Channels
+                        Conversations
                     </Typography>
-                    <Chip size="small" variant="outlined" label={apps.length} />
+                    <Chip size="small" color="primary" variant="outlined" label={apps.length} />
                 </Stack>
-                <List disablePadding>
-                    {loggedIn && apps.length === 0 && (
-                        <ListItemButton disabled sx={{borderRadius: 2}}>
-                            <ListItemText
-                                primary="No channels"
-                                secondary="Create or join a Channel to see it here."
-                            />
-                        </ListItemButton>
-                    )}
-                    {loggedIn &&
-                        apps.map((app) => {
-                            const to = `/channels/${app.id}`;
-                            return (
-                                <ListItemButton
-                                    key={app.id}
-                                    className="item channel-shortcut"
-                                    component={Link}
-                                    to={to}
-                                    selected={location.pathname === to}
-                                    onClick={() => setNavOpen(false)}
-                                    sx={{
-                                        borderRadius: 1.75,
-                                        my: 0.15,
-                                        py: 0.55,
-                                        '&.Mui-selected': {
-                                            bgcolor: 'action.selected',
-                                        },
-                                    }}>
-                                    <ListItemAvatar sx={{minWidth: 42}}>
-                                        <Avatar
-                                            src={config.get('url') + app.image}
-                                            variant="rounded"
-                                            sx={{width: 30, height: 30}}
-                                        />
-                                    </ListItemAvatar>
-                                    <ListItemText
-                                        primary={<Typography noWrap>{app.name}</Typography>}
-                                    />
-                                    <Stack
-                                        direction="row"
-                                        spacing={0.5}
-                                        sx={{alignItems: 'center'}}>
-                                        {app.receiveNotifications === false && (
-                                            <NotificationsOff
-                                                sx={{fontSize: 15, color: 'text.disabled'}}
-                                            />
-                                        )}
-                                        {app.autoAssign && (
-                                            <Public sx={{fontSize: 15, color: 'text.secondary'}} />
-                                        )}
-                                    </Stack>
-                                </ListItemButton>
-                            );
-                        })}
-                </List>
+                {renderChannelSection('Chats', chatApps, <Forum sx={{fontSize: 16}} />)}
+                {renderChannelSection(
+                    'Notification Channels',
+                    notificationApps,
+                    <NotificationsActive sx={{fontSize: 16}} />
+                )}
             </Box>
 
             {showRequestNotification && (

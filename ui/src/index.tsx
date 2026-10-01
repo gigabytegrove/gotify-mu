@@ -4,7 +4,7 @@ import '@fontsource/roboto';
 import {initAxios} from './apiAuth';
 import * as config from './config';
 import Layout from './layout/Layout';
-import {unregister} from './registerServiceWorker';
+import {register} from './registerServiceWorker';
 import {CurrentUser} from './CurrentUser';
 import {ElevateStore} from './ElevateStore';
 import {AppStore} from './application/AppStore';
@@ -74,5 +74,5 @@ const initStores = (): StoreMapping => {
             <Layout />
         </StoreContext.Provider>
     );
-    unregister();
+    register();
 })();

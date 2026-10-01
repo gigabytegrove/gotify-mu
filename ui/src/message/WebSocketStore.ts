@@ -66,7 +66,7 @@ export class WebSocketStore {
                     window.clearTimeout(this.muReconnectTimer);
                     this.muReconnectTimer = null;
                 }
-                this.muWs?.close(1000, 'No MU realtime listeners');
+                this.muWs?.close(1000, 'No Monita realtime listeners');
                 this.muWs = null;
                 this.muWsActive = false;
             }
@@ -91,7 +91,7 @@ export class WebSocketStore {
         };
 
         ws.onerror = (error) => {
-            console.log('MU realtime WebSocket connection errored', error);
+            console.log('Monita realtime WebSocket connection errored', error);
         };
 
         ws.onmessage = (data) => {

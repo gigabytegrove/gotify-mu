@@ -1,5 +1,6 @@
 import AttachFile from '@mui/icons-material/AttachFile';
 import Close from '@mui/icons-material/Close';
+import SendRounded from '@mui/icons-material/SendRounded';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
 import IconButton from '@mui/material/IconButton';
@@ -243,7 +244,6 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
     return (
         <Paper
             elevation={0}
-            variant="outlined"
             onDragOver={(event) => {
                 if (event.dataTransfer.types.includes('Files')) event.preventDefault();
             }}
@@ -252,7 +252,15 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                 event.preventDefault();
                 addImages(event.dataTransfer.files);
             }}
-            sx={{padding: 1, marginBottom: 1}}>
+            sx={{
+                p: 1,
+                mb: 1,
+                border: 1,
+                borderColor: 'divider',
+                borderRadius: 3,
+                bgcolor: 'background.paper',
+                boxShadow: '0 10px 30px rgba(15,23,42,0.06)',
+            }}>
             {images.length > 0 && (
                 <Stack direction="row" spacing={1} useFlexGap sx={{mb: 1, flexWrap: 'wrap'}}>
                     {images.map((item, index) => (
@@ -260,9 +268,9 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                             key={item.preview}
                             sx={{
                                 position: 'relative',
-                                width: 92,
-                                height: 92,
-                                borderRadius: 1.5,
+                                width: 86,
+                                height: 86,
+                                borderRadius: 2,
                                 overflow: 'hidden',
                                 border: 1,
                                 borderColor: 'divider',
@@ -284,6 +292,7 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                                     top: 3,
                                     right: 3,
                                     bgcolor: 'background.paper',
+                                    boxShadow: 1,
                                     '&:hover': {bgcolor: 'background.paper'},
                                 }}>
                                 <Close fontSize="small" />
@@ -300,7 +309,15 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
             )}
 
             {mentionMatches.length > 0 && (
-                <Paper variant="outlined" sx={{mb: 1, maxHeight: 220, overflowY: 'auto'}}>
+                <Paper
+                    variant="outlined"
+                    sx={{
+                        mb: 1,
+                        maxHeight: 220,
+                        overflowY: 'auto',
+                        borderRadius: 2,
+                        boxShadow: 4,
+                    }}>
                     {mentionMatches.map((user) => (
                         <Button
                             key={user.userId}
@@ -314,7 +331,7 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                                 py: 1,
                             }}>
                             <Box sx={{textAlign: 'left'}}>
-                                <Typography variant="body2" sx={{fontWeight: 700}}>
+                                <Typography variant="body2" sx={{fontWeight: 750}}>
                                     {user.displayName || user.name}
                                 </Typography>
                                 <Typography variant="caption" color="text.secondary">
@@ -326,7 +343,7 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                 </Paper>
             )}
 
-            <Stack direction="row" spacing={1} sx={{alignItems: 'flex-end'}}>
+            <Stack direction="row" spacing={0.75} sx={{alignItems: 'flex-end'}}>
                 <input
                     ref={imageInput}
                     hidden
@@ -335,12 +352,13 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                     multiple
                     onChange={(event) => addImages(event.target.files)}
                 />
-                <Tooltip title="Add photos">
+                <Tooltip title="Add image or GIF">
                     <span>
                         <IconButton
-                            aria-label="Add photos"
+                            aria-label="Add image or GIF"
                             disabled={sending || images.length >= MaxImages}
-                            onClick={() => imageInput.current?.click()}>
+                            onClick={() => imageInput.current?.click()}
+                            sx={{mb: 0.25}}>
                             <AttachFile />
                         </IconButton>
                     </span>
@@ -350,8 +368,8 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                     inputRef={messageInput}
                     fullWidth
                     multiline
-                    maxRows={5}
-                    label={`Message #${channelName}`}
+                    maxRows={6}
+                    placeholder={`Message #${channelName}`}
                     value={message}
                     onChange={(event) => noteInput(event.target.value, event.target.selectionStart)}
                     onPaste={(event) => {
@@ -381,14 +399,48 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                     onClick={() =>
                         updateMentionQuery(message, messageInput.current?.selectionStart)
                     }
+                    slotProps={{
+                        input: {
+                            sx: {
+                                borderRadius: 2.5,
+                                bgcolor: 'action.hover',
+                                '& fieldset': {borderColor: 'transparent'},
+                                '&:hover fieldset': {borderColor: 'divider'},
+                            },
+                        },
+                    }}
                 />
-                <Button
-                    variant="contained"
-                    disabled={sending || (message.trim().length === 0 && images.length === 0)}
-                    onClick={() => void send()}>
-                    {sending ? 'Sending…' : 'Send'}
-                </Button>
+                <Tooltip title={sending ? 'Sending…' : 'Send message'}>
+                    <span>
+                        <IconButton
+                            color="primary"
+                            aria-label="Send message"
+                            disabled={
+                                sending || (message.trim().length === 0 && images.length === 0)
+                            }
+                            onClick={() => void send()}
+                            sx={{
+                                width: 44,
+                                height: 44,
+                                mb: 0.1,
+                                bgcolor: 'primary.main',
+                                color: 'primary.contrastText',
+                                '&:hover': {bgcolor: 'primary.dark'},
+                                '&.Mui-disabled': {
+                                    bgcolor: 'action.disabledBackground',
+                                },
+                            }}>
+                            <SendRounded />
+                        </IconButton>
+                    </span>
+                </Tooltip>
             </Stack>
+            <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{display: {xs: 'none', sm: 'block'}, pl: 6.5, pt: 0.5}}>
+                Enter to send · Shift+Enter for a new line · @ to mention someone
+            </Typography>
         </Paper>
     );
 };
