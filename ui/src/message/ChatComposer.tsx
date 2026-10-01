@@ -415,7 +415,9 @@ const ChatComposer = ({appId, channelName, fOnSubmit, fOnTyping}: IProps) => {
                         <IconButton
                             color="primary"
                             aria-label="Send message"
-                            disabled={sending || (message.trim().length === 0 && images.length === 0)}
+                            disabled={
+                                sending || (message.trim().length === 0 && images.length === 0)
+                            }
                             onClick={() => void send()}
                             sx={{
                                 width: 44,
