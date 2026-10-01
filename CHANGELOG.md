@@ -4,6 +4,17 @@
 
 # Changelog
 
+## 1.3.3 — 2026-10-01
+
+### Canonical branding refresh
+
+- Replaced the server, Web UI, PWA, documentation, release, and compatibility artwork with the newly supplied Monita vectors.
+- Desktop Web now presents the supplied full Monita logo directly; compact/mobile surfaces use the supplied standalone icon.
+- PWA icon, favicon, release branding assets, repository banner/logo, and legacy static compatibility paths now resolve to the supplied artwork.
+- Added the original supplied SVGs under `assets/source/` and CI checks that active vector aliases remain locked to them.
+- Legacy PNG paths are rendered directly from the canonical vectors at their native dimensions without recoloring, cropping, reshaping, or redrawing.
+- Bumped the PWA cache so installed Monita PWAs receive the new artwork immediately.
+
 ## 1.3.2 — 2026-10-01
 
 ### Web shell
