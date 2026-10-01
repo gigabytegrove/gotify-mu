@@ -4,6 +4,21 @@
 
 # Changelog
 
+## 1.3.3 — 2026-10-01
+
+### Canonical branding refresh
+
+- Replaced the active Monita Web, PWA, documentation, and release artwork with the exact vector masters supplied on 2026-10-01.
+- The full logo and standalone icon are now preserved as canonical SVG source files and reused directly by their active aliases.
+- Removed obsolete Gotify-MU PNG artwork from the active repository tree so stale branding cannot appear through an unused fallback.
+- Branding documentation now explicitly forbids redraws, recolors, traces, substitutions, or silent regenerated variants.
+
+### Compatibility
+
+- No database migration is required.
+- No API or client protocol changes are required.
+- Existing deployments can update in place.
+
 ## 1.3.2 — 2026-10-01
 
 ### Web shell

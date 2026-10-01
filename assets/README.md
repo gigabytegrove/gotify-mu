@@ -1,19 +1,18 @@
 # Monita Brand Assets
 
-This directory contains the official Monita brand files.
+The authoritative Monita artwork is the exact vector artwork supplied on 2026-10-01.
 
-## Included assets
+## Canonical vector masters
 
-- `monita-icon.svg` — application icon
-- `monita-logo.svg` — horizontal logo
-- `monita-banner.svg` — banner lockup
+- `source/Monita_Full-01.svg` — full Monita logo
+- `source/Monita_IconOnly-01.svg` — Monita icon/app icon
 
-## Brand colors
+## Application aliases
 
-- Primary: `#2563EB`
-- Blue: `#3B82F6`
-- Teal: `#06B6D4`
-- Slate: `#0F172A`
-- Gray: `#94A3B8`
+- `monita-logo.svg` — working alias of the supplied full logo
+- `monita-banner.svg` — working alias of the supplied full logo
+- `monita-icon.svg` — working alias of the supplied icon
 
-Please use the official assets as provided and avoid recoloring, stretching, or recreating the mark.
+The Web UI, PWA, documentation, and release packaging use these SVG assets directly so the artwork stays vector-sharp at every supported size.
+
+Do not redraw, recolor, simplify, crop, stretch, trace, or otherwise reinterpret the supplied artwork. Any future brand change must start from newly supplied canonical source artwork.
