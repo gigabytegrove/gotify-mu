@@ -41,7 +41,8 @@ export class SnackManager {
         message,
         mentioned,
     }: IncomingMessageToast): void => {
-        const location = channelType === 'chat' ? `Chat · ${channelName}` : `Channel · ${channelName}`;
+        const location =
+            channelType === 'chat' ? `Chat · ${channelName}` : `Channel · ${channelName}`;
         const sender = senderName?.trim();
         const heading = mentioned
             ? `${sender || 'Someone'} mentioned you in ${channelName}`
