@@ -4,6 +4,14 @@
 
 # Changelog
 
+## 1.3.4 — 2026-10-01
+
+### PWA branding cache refresh
+
+- Bumped the Monita PWA shell cache after the canonical 2026-10-01 branding refresh.
+- Installed PWAs now discard the previous cached logo/icon assets and fetch the exact supplied Monita SVG artwork used by the Web UI.
+- No database, API, or client migration is required.
+
 ## 1.3.3 — 2026-10-01
 
 ### Canonical branding refresh
