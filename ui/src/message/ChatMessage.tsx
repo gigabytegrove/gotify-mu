@@ -26,14 +26,7 @@ interface Props {
 
 const initial = (value: string) => value.trim().slice(0, 1).toUpperCase() || '?';
 
-const ChatMessage = ({
-    message,
-    mine,
-    onRefresh,
-    onArchive,
-    onRestore,
-    onDelete,
-}: Props) => {
+const ChatMessage = ({message, mine, onRefresh, onArchive, onRestore, onDelete}: Props) => {
     const sender = message.senderName || message.title || 'Member';
     const parts = message.message.split(/(@[A-Za-z0-9._-]+)/g);
 
@@ -100,7 +93,9 @@ const ChatMessage = ({
                                             fontWeight: 850,
                                             borderRadius: 0.75,
                                             px: 0.35,
-                                            bgcolor: mine ? 'rgba(255,255,255,0.16)' : 'action.hover',
+                                            bgcolor: mine
+                                                ? 'rgba(255,255,255,0.16)'
+                                                : 'action.hover',
                                             color: mine ? 'inherit' : 'primary.main',
                                         }}>
                                         {part}
