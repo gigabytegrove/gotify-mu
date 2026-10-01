@@ -625,7 +625,7 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 }
 
 // DeleteMessagesForEveryone permanently clears a channel's message history for all members.
-// This is a Monita management action and requires the channel owner or an administrator.
+// This is a Gotify MU management action and requires the channel owner or an administrator.
 func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		app, err := a.DB.GetApplicationByID(id)
@@ -679,7 +679,7 @@ func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
 //
 // __NOTE__: When authenticating with a client token or basic auth, the request body
 // must include "appid" referencing an application owned by the authenticated user,
-// or a Monita Channel where the authenticated user is a member and member posting is enabled.
+// or a Gotify MU channel where the authenticated user is a member and member posting is enabled.
 // When authenticating with an application token, the application is derived from the
 // token and any "appid" in the body is ignored.
 //
