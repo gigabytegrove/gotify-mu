@@ -1545,7 +1545,7 @@
             "basicAuth": []
           }
         ],
-        "description": "__NOTE__: When authenticating with a client token or basic auth, the request body\nmust include \"appid\" referencing an application owned by the authenticated user,\nor a Monita channel where the authenticated user is a member and member posting is enabled.\nWhen authenticating with an application token, the application is derived from the\ntoken and any \"appid\" in the body is ignored.",
+        "description": "__NOTE__: When authenticating with a client token or basic auth, the request body\nmust include \"appid\" referencing an application owned by the authenticated user,\nor a Gotify MU channel where the authenticated user is a member and member posting is enabled.\nWhen authenticating with an application token, the application is derived from the\ntoken and any \"appid\" in the body is ignored.",
         "consumes": [
           "application/json"
         ],
@@ -2554,7 +2554,7 @@
           "readOnly": true
         },
         "autoAssign": {
-          "description": "Whether every user should automatically be a member of this Monita channel.",
+          "description": "Whether every user should automatically be a member of this Gotify MU channel.",
           "type": "boolean",
           "x-go-name": "AutoAssign",
           "readOnly": true,
@@ -2623,14 +2623,14 @@
           "example": "Backup Server"
         },
         "ownerId": {
-          "description": "The canonical owner user id used by Monita while memberships grant access to additional users.",
+          "description": "The canonical owner user id used by Gotify MU while memberships grant access to additional users.",
           "type": "integer",
           "format": "int64",
           "x-go-name": "UserID",
           "readOnly": true
         },
         "receiveNotifications": {
-          "description": "Whether the current requesting user receives realtime notifications from this Monita channel.",
+          "description": "Whether the current requesting user receives realtime notifications from this Gotify MU channel.",
           "type": "boolean",
           "x-go-name": "ReceiveNotifications",
           "readOnly": true
@@ -2671,12 +2671,12 @@
       ],
       "properties": {
         "allowMemberPost": {
-          "description": "Whether assigned users may publish messages to this Monita channel.",
+          "description": "Whether assigned users may publish messages to this Gotify MU channel.",
           "type": "boolean",
           "x-go-name": "AllowMemberPost"
         },
         "autoAssign": {
-          "description": "Whether this Monita channel should be automatically assigned to every user.",
+          "description": "Whether this Gotify MU channel should be automatically assigned to every user.",
           "type": "boolean",
           "x-go-name": "AutoAssign"
         },
@@ -3246,13 +3246,13 @@
           "x-go-name": "RootMessageID"
         },
         "senderName": {
-          "description": "The Monita username that posted this message, when available.",
+          "description": "The Gotify MU username that posted this message, when available.",
           "type": "string",
           "x-go-name": "SenderName",
           "readOnly": true
         },
         "senderUserId": {
-          "description": "The Monita user id that posted this message, when the message was sent by a user.",
+          "description": "The Gotify MU user id that posted this message, when the message was sent by a user.",
           "type": "integer",
           "format": "int64",
           "x-go-name": "SenderUserID",
