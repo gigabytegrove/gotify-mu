@@ -23,6 +23,9 @@ def render(source: Path, destination: Path, width: int, height: int) -> None:
     )
 
 for target in (
+    ROOT / "assets/monita-logo.png",
+    ROOT / "assets/monita-banner.png",
+    ROOT / "ui/public/static/monita-logo.png",
     ROOT / "assets/gotify-mu-banner.png",
     ROOT / "assets/gotify-mu-logo.png",
     ROOT / "ui/public/static/gotify-mu-logo.png",
@@ -30,6 +33,8 @@ for target in (
     render(FULL, target, 1413, 512)
 
 for target in (
+    ROOT / "assets/monita-icon.png",
+    ROOT / "ui/public/static/monita-icon.png",
     ROOT / "assets/gotify-mu-icon.png",
     ROOT / "ui/public/static/gotify-mu-icon.png",
 ):
