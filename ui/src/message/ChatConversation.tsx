@@ -102,7 +102,8 @@ const ChatConversation = ({
         const element = scrollRef.current;
         if (!element || archivedView) return;
         const nearBottom =
-            firstPaint.current || element.scrollHeight - element.scrollTop - element.clientHeight < 180;
+            firstPaint.current ||
+            element.scrollHeight - element.scrollTop - element.clientHeight < 180;
         if (nearBottom) {
             window.requestAnimationFrame(() => {
                 element.scrollTop = element.scrollHeight;
@@ -223,8 +224,7 @@ const ChatConversation = ({
                         minHeight: 0,
                         overflowY: 'auto',
                         py: 1.25,
-                        bgcolor: (theme) =>
-                            theme.palette.mode === 'dark' ? '#0b1220' : '#f8fafc',
+                        bgcolor: (theme) => (theme.palette.mode === 'dark' ? '#0b1220' : '#f8fafc'),
                         backgroundImage: (theme) =>
                             theme.palette.mode === 'dark'
                                 ? 'radial-gradient(circle at 20px 20px, rgba(148,163,184,0.035) 1px, transparent 0)'
@@ -233,7 +233,10 @@ const ChatConversation = ({
                     }}>
                     {hasMore && !normalized && (
                         <Box sx={{display: 'flex', justifyContent: 'center', pb: 1}}>
-                            <Button size="small" variant="outlined" onClick={() => void onLoadEarlier()}>
+                            <Button
+                                size="small"
+                                variant="outlined"
+                                onClick={() => void onLoadEarlier()}>
                                 Load earlier messages
                             </Button>
                         </Box>
@@ -259,7 +262,8 @@ const ChatConversation = ({
                             return (
                                 <React.Fragment key={message.id}>
                                     {showDay && (
-                                        <Box sx={{display: 'flex', justifyContent: 'center', py: 1}}>
+                                        <Box
+                                            sx={{display: 'flex', justifyContent: 'center', py: 1}}>
                                             <Chip
                                                 size="small"
                                                 variant="outlined"
