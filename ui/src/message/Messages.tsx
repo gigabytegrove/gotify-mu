@@ -224,7 +224,8 @@ const Messages = observer(() => {
                     query={query}
                     onQuery={setQuery}
                     onLoadEarlier={async () => {
-                        if (isLoadingMore || !messagesStore.canLoadMore(appId, archivedView)) return;
+                        if (isLoadingMore || !messagesStore.canLoadMore(appId, archivedView))
+                            return;
                         setLoadingMore(true);
                         try {
                             await messagesStore.loadMore(appId, archivedView);
