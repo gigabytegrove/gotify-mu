@@ -69,11 +69,19 @@ jobs:
 
       - name: Verify canonical branding
         run: |
-          test -s assets/monita-banner.svg
-          test -s assets/monita-logo.svg
-          test -s assets/monita-icon.svg
+          test -s assets/source/Monita_Full-01.svg
+          test -s assets/source/Monita_IconOnly-01.svg
+          test "$(git hash-object assets/source/Monita_Full-01.svg)" = "fc0dd563e198031de3844dd5b9d94a100dba025e"
+          test "$(git hash-object assets/source/Monita_IconOnly-01.svg)" = "20ac209f831efc4a983d7e6c762a9163e7074aad"
+          cmp assets/source/Monita_Full-01.svg assets/monita-banner.svg
+          cmp assets/source/Monita_Full-01.svg assets/monita-logo.svg
+          cmp assets/source/Monita_IconOnly-01.svg assets/monita-icon.svg
           cmp assets/monita-logo.svg ui/public/static/monita-logo.svg
           cmp assets/monita-icon.svg ui/public/static/monita-icon.svg
+          test "$(git hash-object assets/gotify-mu-logo.png)" = "91062b11740f63e18a19837b36df9062d56d50cc"
+          test "$(git hash-object assets/gotify-mu-icon.png)" = "b3d3f0cabd982657c6c2c5fab1a6fecb73625345"
+          cmp assets/gotify-mu-logo.png ui/public/static/gotify-mu-logo.png
+          cmp assets/gotify-mu-icon.png ui/public/static/gotify-mu-icon.png
 
       - run: (cd ui && yarn --frozen-lockfile)
       - run: make build-js
