@@ -38,6 +38,12 @@ jobs:
       - name: Install Web UI dependencies
         run: (cd ui && yarn --frozen-lockfile)
 
+      - name: Emit exact Web UI formatting diff
+        run: |
+          cd ui
+          yarn format
+          git diff -- src
+
       - name: Verify canonical branding
         run: |
           test -s assets/monita-banner.svg
