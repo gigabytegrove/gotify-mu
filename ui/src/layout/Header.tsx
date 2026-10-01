@@ -20,9 +20,15 @@ import ExitToApp from '@mui/icons-material/ExitToApp';
 import MenuIcon from '@mui/icons-material/Menu';
 import Settings from '@mui/icons-material/Settings';
 import Security from '@mui/icons-material/Security';
+import InstallDesktop from '@mui/icons-material/InstallDesktop';
 import KeyboardArrowDown from '@mui/icons-material/KeyboardArrowDown';
 import {Link} from 'react-router';
 import * as config from '../config';
+
+interface BeforeInstallPromptEvent extends Event {
+    prompt: () => Promise<void>;
+    userChoice: Promise<{outcome: 'accepted' | 'dismissed'; platform: string}>;
+}
 
 interface IProps {
     loggedIn: boolean;
@@ -36,6 +42,28 @@ interface IProps {
 
 const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IProps) => {
     const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
+    const [installPrompt, setInstallPrompt] = React.useState<BeforeInstallPromptEvent | null>(null);
+
+    React.useEffect(() => {
+        const onInstallPrompt = (event: Event) => {
+            event.preventDefault();
+            setInstallPrompt(event as BeforeInstallPromptEvent);
+        };
+        const onInstalled = () => setInstallPrompt(null);
+        window.addEventListener('beforeinstallprompt', onInstallPrompt);
+        window.addEventListener('appinstalled', onInstalled);
+        return () => {
+            window.removeEventListener('beforeinstallprompt', onInstallPrompt);
+            window.removeEventListener('appinstalled', onInstalled);
+        };
+    }, []);
+
+    const installMonita = async () => {
+        if (!installPrompt) return;
+        await installPrompt.prompt();
+        await installPrompt.userChoice;
+        setInstallPrompt(null);
+    };
 
     return (
         <AppBar
@@ -81,12 +109,25 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                             Monita
                         </Typography>
                         <Typography variant="caption" color="text.secondary">
-                            formerly Gotify MU
+                            Messaging &amp; alerts
                         </Typography>
                     </Box>
                 </Box>
 
                 <Box sx={{flex: 1}} />
+
+                {installPrompt && (
+                    <Tooltip title="Install Monita">
+                        <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={<InstallDesktop />}
+                            onClick={() => void installMonita()}
+                            sx={{display: {xs: 'none', md: 'inline-flex'}}}>
+                            Install
+                        </Button>
+                    </Tooltip>
+                )}
 
                 <Tooltip title="Build version">
                     <Chip
