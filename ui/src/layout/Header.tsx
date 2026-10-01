@@ -102,16 +102,24 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                         component="img"
                         src={config.get('url') + 'static/monita-icon.svg'}
                         alt="Monita"
-                        sx={{width: 34, height: 34, objectFit: 'contain'}}
+                        sx={{
+                            display: {xs: 'block', sm: 'none'},
+                            width: 34,
+                            height: 34,
+                            objectFit: 'contain',
+                        }}
                     />
-                    <Box sx={{display: {xs: 'none', sm: 'block'}}}>
-                        <Typography variant="h6" sx={{fontSize: '1rem', lineHeight: 1.1}}>
-                            Monita
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            Messaging &amp; alerts
-                        </Typography>
-                    </Box>
+                    <Box
+                        component="img"
+                        src={config.get('url') + 'static/monita-logo.svg'}
+                        alt="Monita — Notifications · Messaging · Automation"
+                        sx={{
+                            display: {xs: 'none', sm: 'block'},
+                            height: 42,
+                            width: 'auto',
+                            objectFit: 'contain',
+                        }}
+                    />
                 </Box>
 
                 <Box sx={{flex: 1}} />
