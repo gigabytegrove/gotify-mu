@@ -44,6 +44,7 @@ jobs:
           cd ui
           yarn format
           git diff -- src
+          exit 1
 
       - name: Verify canonical branding
         run: |
