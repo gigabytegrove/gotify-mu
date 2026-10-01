@@ -78,11 +78,11 @@ type MessageExternal struct {
 	// required: true
 	// example: 2018-02-27T19:36:10.5045044+01:00
 	Date                 time.Time            `json:"date"`
-	// The Monita user id that posted this message, when the message was sent by a user.
+	// The Gotify MU user id that posted this message, when the message was sent by a user.
 	//
 	// read only: true
 	SenderUserID         uint                 `json:"senderUserId,omitempty"`
-	// The Monita username that posted this message, when available.
+	// The Gotify MU username that posted this message, when available.
 	//
 	// read only: true
 	SenderName           string               `json:"senderName,omitempty"`
@@ -98,7 +98,7 @@ type MessageExternal struct {
 	ReplyToMessageID     uint                 `json:"replyToMessageId,omitempty"`
 	// Root message of a conversation thread.
 	ThreadRootMessageID  uint                 `json:"threadRootMessageId,omitempty"`
-	// Rich Monita collaboration state. Official Gotify clients may ignore it.
+	// Rich Gotify MU collaboration state. Official Gotify clients may ignore it.
 	Collaboration        MessageCollaboration `json:"collaboration,omitempty"`
 	// Whether the current requesting user has acknowledged this message.
 	Acknowledged         bool                 `json:"acknowledged,omitempty"`
