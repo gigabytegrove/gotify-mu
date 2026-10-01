@@ -38,6 +38,7 @@ jobs:
       - name: Install Web UI dependencies
         run: (cd ui && yarn --frozen-lockfile)
 
+      # formatting capture completed
       - name: Emit exact Web UI formatting diff
         run: |
           cd ui
