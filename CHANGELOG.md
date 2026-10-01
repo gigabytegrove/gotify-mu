@@ -4,6 +4,16 @@
 
 # Changelog
 
+## 1.3.1 — 2026-10-01
+
+### Desktop realtime notifications
+
+- Incoming realtime messages now create an in-app toast in the desktop Web UI and installed PWA even when browser/OS notification permission is unavailable.
+- Toasts identify the originating Chat or Notification Channel, include the sender when available, and show a short message preview.
+- Mention toasts explicitly state that the current user was mentioned and remain visible longer than ordinary message toasts.
+- Every realtime toast includes an **Open** action that jumps directly to the originating Channel or Chat.
+- Desktop toast stacking is capped so bursts of messages remain readable without covering the entire interface.
+
 ## 1.3.0 — 2026-10-01
 
 ### Desktop and PWA

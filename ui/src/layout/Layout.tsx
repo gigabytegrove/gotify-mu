@@ -177,7 +177,12 @@ const Layout = observer(() => {
 
                         {loggedIn && <GlobalReauthenticationDialog />}
                         <ScrollUpButton />
-                        <SnackbarProvider />
+                        <SnackbarProvider
+                            maxSnack={5}
+                            dense={false}
+                            preventDuplicate={false}
+                            anchorOrigin={{vertical: 'top', horizontal: 'right'}}
+                        />
                     </div>
                 </HashRouter>
             </ThemeProvider>

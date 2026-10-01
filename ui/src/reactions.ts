@@ -24,9 +24,24 @@ export const registerReactions = (stores: StoreMapping) => {
     const loadAll = () => {
         stores.wsStore.listen((message) => {
             stores.messagesStore.publishSingleMessage(message);
-            const channelName = stores.appStore.getName(message.appid);
-            Notifications.notifyNewMessage(message, stores.currentUser.user.id, channelName);
+            const channel = stores.appStore.getItems().find((app) => app.id === message.appid);
+            const channelName = channel?.name || stores.appStore.getName(message.appid);
+            const channelType =
+                channel?.channelType === 'chat' ||
+                (channel?.channelType == null && Boolean(channel?.allowMemberPost))
+                    ? 'chat'
+                    : 'notification';
             const mentioned = Notifications.isMentionForUser(message, stores.currentUser.user.id);
+
+            stores.snackManager.incomingMessage({
+                appId: message.appid,
+                channelName,
+                channelType,
+                senderName: message.senderName || message.title,
+                message: message.message,
+                mentioned,
+            });
+            Notifications.notifyNewMessage(message, stores.currentUser.user.id, channelName);
             if (
                 (mentioned || message.priority >= 4) &&
                 Date.now() > lastAudio + AUDIO_REPEAT_DELAY
