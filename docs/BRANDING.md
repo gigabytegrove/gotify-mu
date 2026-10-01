@@ -1,33 +1,29 @@
 # Monita Branding
 
-Monita is the product name for the project formerly known as Gotify MU.
+**Monita** is the current product identity.
 
-## Brand
+The canonical artwork was supplied on **2026-10-01** and is preserved in `assets/source/`.
 
-**Monita**
+## Canonical artwork
 
-**Notifications · Messaging · Automation**
+- `Monita_Full-01.svg` — full Monita logo with the **Notifications · Messaging · Automation** tagline
+- `Monita_IconOnly-01.svg` — standalone Monita/application icon
 
-## Colors
+The supplied SVGs are the source of truth. They must not be redrawn, recolored, flattened into substitute artwork, cropped, stretched, re-proportioned, or recreated from individual shapes.
 
-| Role | Color |
-| --- | --- |
-| Primary | `#2563EB` |
-| Blue | `#3B82F6` |
-| Teal | `#06B6D4` |
-| Slate | `#0F172A` |
-| Gray | `#94A3B8` |
+Active files such as `assets/monita-logo.svg`, `assets/monita-banner.svg`, `assets/monita-icon.svg`, and the Web/PWA copies are direct uses of those supplied vectors.
 
-## Assets
-
-Official brand assets are stored in the repository `assets/` directory.
-
-Use the supplied Monita logo and icon files without changing their proportions, colors, or layout.
+Where a legacy or platform path requires PNG, `scripts/render_branding.py` produces a faithful raster render at the source artwork's native dimensions. The raster files are compatibility derivatives, not separate designs.
 
 ## Naming
 
 Use **Monita** for current product-facing text.
 
-The phrase **formerly Gotify MU** may be used where historical context is useful during the transition.
+Historical Gotify/Gotify MU wording may remain only where it documents project lineage or a compatibility identifier/protocol that cannot be renamed without breaking existing clients.
 
-Gotify may still appear in compatibility documentation where it refers to the Gotify protocol, upstream project, or supported Gotify clients.
+## CI integrity
+
+The build verifies that the active SVG aliases resolve to the locked canonical Git blobs:
+
+- full logo source: `fc0dd563e198031de3844dd5b9d94a100dba025e`
+- icon source: `20ac209f831efc4a983d7e6c762a9163e7074aad`
