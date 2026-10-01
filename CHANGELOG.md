@@ -4,6 +4,15 @@
 
 # Changelog
 
+## 1.3.2 — 2026-10-01
+
+### Web shell
+
+- Fixed literal `\\n` escape sequences being rendered above the Monita header in the desktop Web UI and installed PWA.
+- PWA metadata is now emitted as normal HTML lines instead of escaped text.
+- Bumped the PWA shell cache so installed clients discard the defective cached 1.3.1 shell immediately.
+- No database, protocol, or client migration is required.
+
 ## 1.3.1 — 2026-10-01
 
 ### Desktop realtime notifications
