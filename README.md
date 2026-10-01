@@ -12,7 +12,7 @@ Monita is a self-hosted notification and messaging platform for people, teams, h
 
 ## Current release
 
-**Monita 1.3.3** is the current server release documented by this repository.
+**Monita 1.3.4** is the current server release documented by this repository.
 
 Companion projects:
 
