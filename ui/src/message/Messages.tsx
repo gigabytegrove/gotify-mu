@@ -21,7 +21,7 @@ import Message from './Message';
 import {IMessage} from '../types';
 import {useStores} from '../stores';
 import {PushMessageDialog} from './PushMessageDialog';
-import ChatComposer from './ChatComposer';
+import ChatConversation from './ChatConversation';
 import MessageSearchDialog from './MessageSearchDialog';
 
 const UndoAutoHideMs = 5000;
@@ -209,6 +209,50 @@ const Messages = observer(() => {
             ? 'Messages from every Channel available to your account.'
             : app?.description || 'Review and manage this Channel’s message history.';
 
+    if (isChat && app && appId > 0) {
+        return (
+            <>
+                <ChatConversation
+                    app={app}
+                    currentUserId={currentUser.user.id}
+                    messages={messages}
+                    loaded={messagesStore.loaded(appId, archivedView)}
+                    hasMore={hasMore}
+                    archivedView={archivedView}
+                    canPost={canPost}
+                    typingLabel={typingLabel}
+                    query={query}
+                    onQuery={setQuery}
+                    onLoadEarlier={async () => {
+                        if (isLoadingMore || !messagesStore.canLoadMore(appId, archivedView)) return;
+                        setLoadingMore(true);
+                        try {
+                            await messagesStore.loadMore(appId, archivedView);
+                        } finally {
+                            setLoadingMore(false);
+                        }
+                    }}
+                    onRefresh={() => messagesStore.refreshByApp(appId, archivedView)}
+                    onToggleArchive={() => setArchivedView((current) => !current)}
+                    onAdvancedSearch={() => setAdvancedSearchOpen(true)}
+                    onSend={(message, images) =>
+                        messagesStore.sendChatMessage(app.id, message, images)
+                    }
+                    onTyping={(typing) => wsStore.setTyping(app.id, typing)}
+                    onArchiveMessage={(message) => void messagesStore.archiveSingle(message)}
+                    onRestoreMessage={(message) => void messagesStore.restoreSingle(message)}
+                    onDeleteMessage={deleteMessage}
+                    canDeleteMessage={canDeleteMessage}
+                />
+                <MessageSearchDialog
+                    open={advancedSearchOpen}
+                    onClose={() => setAdvancedSearchOpen(false)}
+                    initialApplicationId={appId}
+                />
+            </>
+        );
+    }
+
     return (
         <DefaultPage
             title={appId === -1 ? 'Messages' : name}
@@ -227,30 +271,6 @@ const Messages = observer(() => {
                     />
                 </Stack>
             }>
-            {isChat && !archivedView && canPost && app && (
-                <SurfaceCard title="Conversation" subtitle="Two-way Gotify MU Chat Channel">
-                    <ChatComposer
-                        appId={app.id}
-                        channelName={app.name}
-                        fOnSubmit={(message, images) =>
-                            messagesStore.sendChatMessage(app.id, message, images)
-                        }
-                        fOnTyping={(typing) => wsStore.setTyping(app.id, typing)}
-                    />
-                    <Typography
-                        variant="caption"
-                        color="text.secondary"
-                        sx={{
-                            display: 'block',
-                            minHeight: 20,
-                            px: 1,
-                            fontStyle: typingLabel ? 'italic' : 'normal',
-                        }}>
-                        {typingLabel}
-                    </Typography>
-                </SurfaceCard>
-            )}
-
             <SurfaceCard
                 title={archivedView ? 'Archived Messages' : 'Message History'}
                 subtitle={
