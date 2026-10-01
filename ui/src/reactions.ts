@@ -24,8 +24,10 @@ export const registerReactions = (stores: StoreMapping) => {
     const loadAll = () => {
         stores.wsStore.listen((message) => {
             stores.messagesStore.publishSingleMessage(message);
-            Notifications.notifyNewMessage(message);
-            if (message.priority >= 4 && Date.now() > lastAudio + AUDIO_REPEAT_DELAY) {
+            const channelName = stores.appStore.getName(message.appid);
+            Notifications.notifyNewMessage(message, stores.currentUser.user.id, channelName);
+            const mentioned = Notifications.isMentionForUser(message, stores.currentUser.user.id);
+            if ((mentioned || message.priority >= 4) && Date.now() > lastAudio + AUDIO_REPEAT_DELAY) {
                 lastAudio = Date.now();
 
                 audio ??= new Audio('static/notification.ogg');
