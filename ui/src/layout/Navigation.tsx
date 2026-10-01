@@ -58,10 +58,15 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
     const {appStore, currentUser} = useStores();
     const apps = appStore.getItems();
     const chatApps = apps.filter(
-        (app) => app.channelType === 'chat' || (app.channelType == null && Boolean(app.allowMemberPost))
+        (app) =>
+            app.channelType === 'chat' || (app.channelType == null && Boolean(app.allowMemberPost))
     );
     const notificationApps = apps.filter(
-        (app) => !(app.channelType === 'chat' || (app.channelType == null && Boolean(app.allowMemberPost)))
+        (app) =>
+            !(
+                app.channelType === 'chat' ||
+                (app.channelType == null && Boolean(app.allowMemberPost))
+            )
     );
     const [showRequestNotification, setShowRequestNotification] =
         React.useState(mayAllowPermission);
@@ -230,11 +235,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                     </Typography>
                     <Chip size="small" color="primary" variant="outlined" label={apps.length} />
                 </Stack>
-                {renderChannelSection(
-                    'Chats',
-                    chatApps,
-                    <Forum sx={{fontSize: 16}} />
-                )}
+                {renderChannelSection('Chats', chatApps, <Forum sx={{fontSize: 16}} />)}
                 {renderChannelSection(
                     'Notification Channels',
                     notificationApps,
