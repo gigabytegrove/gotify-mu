@@ -634,7 +634,7 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 				extraValues = map[string]any{}
 			}
 		}
-		if len(mentions) > 0 { extraValues["gotify::mu::mentionUserIds"] = mentions }
+		if len(mentions) > 0 { extraValues["monita::mentionUserIds"] = mentions }
 	extraBytes, _ := json.Marshal(extraValues)
 		if len(extraValues) == 0 { extraBytes = nil }
 
