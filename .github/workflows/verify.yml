@@ -40,9 +40,14 @@ jobs:
 
       - name: Verify canonical branding
         run: |
-          test -s assets/monita-banner.svg
-          test -s assets/monita-logo.svg
-          test -s assets/monita-icon.svg
+          set -euo pipefail
+          test -s assets/source/Monita_Full-01.svg
+          test -s assets/source/Monita_IconOnly-01.svg
+          test "$(git hash-object assets/source/Monita_Full-01.svg)" = "fc0dd563e198031de3844dd5b9d94a100dba025e"
+          test "$(git hash-object assets/source/Monita_IconOnly-01.svg)" = "20ac209f831efc4a983d7e6c762a9163e7074aad"
+          cmp assets/source/Monita_Full-01.svg assets/monita-logo.svg
+          cmp assets/source/Monita_Full-01.svg assets/monita-banner.svg
+          cmp assets/source/Monita_IconOnly-01.svg assets/monita-icon.svg
           cmp assets/monita-logo.svg ui/public/static/monita-logo.svg
           cmp assets/monita-icon.svg ui/public/static/monita-icon.svg
 
