@@ -1,18 +1,20 @@
-# Monita Brand Assets
+# Monita brand assets
 
-The authoritative Monita artwork is the exact vector artwork supplied on 2026-10-01.
+The supplied SVG files are the authoritative visual source for Monita.
 
-## Canonical vector masters
+## Canonical masters
 
-- `source/Monita_Full-01.svg` — full Monita logo
-- `source/Monita_IconOnly-01.svg` — Monita icon/app icon
+- `Monita_Full-01.svg` — full Monita logo
+- `Monita_IconOnly-01.svg` — Monita icon / application icon
 
-## Application aliases
+## Active aliases
 
-- `monita-logo.svg` — working alias of the supplied full logo
-- `monita-banner.svg` — working alias of the supplied full logo
-- `monita-icon.svg` — working alias of the supplied icon
+The application keeps a few stable filenames because code, PWA metadata, release packaging, and documentation already reference them:
 
-The Web UI, PWA, documentation, and release packaging use these SVG assets directly so the artwork stays vector-sharp at every supported size.
+- `monita-logo.svg` — byte-identical visual artwork to the supplied full logo
+- `monita-banner.svg` — byte-identical visual artwork to the supplied full logo
+- `monita-icon.svg` — byte-identical visual artwork to the supplied icon
 
-Do not redraw, recolor, simplify, crop, stretch, trace, or otherwise reinterpret the supplied artwork. Any future brand change must start from newly supplied canonical source artwork.
+The Web/PWA copies under `ui/public/static/` use the same artwork.
+
+Do not redraw, recolor, crop, remove the icon canvas background, change proportions, trace, simplify, or reinterpret these assets.
