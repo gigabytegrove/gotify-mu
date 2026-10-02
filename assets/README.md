@@ -15,4 +15,4 @@ The authoritative Monita artwork is the exact vector artwork supplied on 2026-10
 
 The Web UI, PWA, documentation, and release packaging use these SVG assets directly so the artwork stays vector-sharp at every supported size.
 
-Do not redraw, recolor, simplify, crop, stretch, trace, or otherwise reinterpret the supplied artwork. Any future brand change must start from newly supplied canonical source artwork.
+Do not redraw, recolor, simplify, crop, stretch, trace, remove the supplied canvas/background, or otherwise reinterpret the supplied artwork. Any future brand change must start from newly supplied canonical source artwork.
