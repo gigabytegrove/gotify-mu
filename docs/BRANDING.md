@@ -1,22 +1,16 @@
-# Monita Branding
-
-Monita is the product name for the project formerly known as Gotify MU.
+# Monita branding
 
 ## Authoritative artwork
 
-The canonical branding source is the exact SVG artwork supplied on **2026-10-01**:
+Monita uses the exact SVG artwork supplied in this repository:
 
-- `assets/source/Monita_Full-01.svg` — full Monita logo
-- `assets/source/Monita_IconOnly-01.svg` — Monita icon/app icon
+- `assets/Monita_Full-01.svg` — full Monita logo
+- `assets/Monita_IconOnly-01.svg` — Monita icon / application icon
 
-The active aliases in `assets/` and `ui/public/static/` use those same vector masters directly.
+These are the source of truth for every current Monita visual surface. Stable alias filenames are retained only so existing application paths and release packaging do not need to change.
 
-No alternate palette, reconstructed mark, traced copy, flattened substitute, or regenerated logo is authoritative. Do not change proportions, colors, typography, spacing, gradients, clipping, or any other visual detail in the supplied files.
+The artwork must not be redrawn, recolored, cropped, have its canvas background removed, have its proportions changed, be traced, simplified, or otherwise reinterpreted.
 
-## Naming
+## Product naming
 
-Use **Monita** for current product-facing text.
-
-The phrase **formerly Gotify MU** may be used where historical context is useful during the transition.
-
-Gotify may still appear in compatibility documentation where it refers to the Gotify protocol, upstream project, or supported Gotify clients.
+Use **Monita** for current product-facing text. Historical Gotify/Gotify-MU terminology may remain only where it documents protocol compatibility, upstream lineage, or a compatibility identifier that cannot be changed without breaking existing deployments.
