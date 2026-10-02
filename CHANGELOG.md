@@ -4,6 +4,16 @@
 
 # Changelog
 
+## 1.3.5 — 2026-10-01
+
+### Canonical application branding
+
+- Replaced the hard-coded **Monita / Messaging & alerts** header treatment with the supplied canonical full Monita logo.
+- Mobile header branding now uses the supplied canonical standalone Monita icon.
+- Added versioned icon/logo URLs and advanced the PWA shell cache so browsers and installed PWAs discard stale branding assets immediately.
+- Updated favicon, Apple touch icon, Microsoft tile icon, and PWA manifest icon references to the canonical standalone icon.
+- No database, API, protocol, or configuration migration is required.
+
 ## 1.3.4 — 2026-10-01
 
 ### Transparent icon background
