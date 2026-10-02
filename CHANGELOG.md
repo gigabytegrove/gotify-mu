@@ -4,6 +4,22 @@
 
 # Changelog
 
+## 1.3.6 — 2026-10-02
+
+### Supplied icon restored without alteration
+
+- Restored the Monita icon directly from the newly supplied `Monita_IconOnly-01.svg` master, including its supplied gray canvas/background.
+- Web, PWA, favicon, Apple touch icon, Microsoft tile icon, and mobile-header branding now use that exact supplied artwork.
+- Preserved the existing full-logo desktop header introduced for 1.3.5.
+- Removed the PWA `maskable` declaration so the application does not ask the platform to reinterpret the supplied icon as maskable artwork.
+- Advanced the PWA shell and branding cache keys so installed clients immediately replace older cached icon variants.
+- CI now pins both supplied SVG masters by Git blob hash and verifies every active Web/PWA alias against them.
+
+### Artwork integrity
+
+- No redraw, recolor, crop, trace, simplification, background removal, or geometry change is performed.
+- No database, API, protocol, or configuration migration is required.
+
 ## 1.3.5 — 2026-10-01
 
 ### Canonical application branding
