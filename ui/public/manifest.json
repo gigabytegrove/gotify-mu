@@ -13,10 +13,10 @@
   "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "static/monita-icon.svg?v=1.3.5",
+      "src": "static/monita-icon.svg?v=1.3.6",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ],
   "shortcuts": [
