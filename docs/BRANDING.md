@@ -11,7 +11,7 @@ The canonical branding source is the exact SVG artwork supplied on **2026-10-01*
 
 The active aliases in `assets/` and `ui/public/static/` use those same vector masters directly.
 
-No alternate palette, reconstructed mark, traced copy, flattened substitute, or regenerated logo is authoritative. Do not change proportions, colors, typography, spacing, gradients, clipping, or any other visual detail in the supplied files.
+No alternate palette, reconstructed mark, traced copy, flattened substitute, or regenerated logo is authoritative. Do not change proportions, colors, typography, spacing, gradients, clipping, canvas/background, or any other visual detail in the supplied files. The icon's supplied gray canvas is part of the authoritative artwork and must not be removed.
 
 ## Naming
 
