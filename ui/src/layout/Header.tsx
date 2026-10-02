@@ -90,28 +90,38 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                 <Box
                     component={Link}
                     to="/"
+                    aria-label="Monita"
                     sx={{
                         display: 'flex',
                         alignItems: 'center',
-                        gap: 1.25,
                         minWidth: 0,
                         color: 'inherit',
                         textDecoration: 'none',
                     }}>
                     <Box
                         component="img"
-                        src={config.get('url') + 'static/monita-icon.svg'}
-                        alt="Monita"
-                        sx={{width: 34, height: 34, objectFit: 'contain'}}
+                        src={config.get('url') + 'static/monita-icon.svg?v=1.3.5'}
+                        alt=""
+                        aria-hidden="true"
+                        sx={{
+                            display: {xs: 'block', sm: 'none'},
+                            width: 36,
+                            height: 36,
+                            objectFit: 'contain',
+                        }}
                     />
-                    <Box sx={{display: {xs: 'none', sm: 'block'}}}>
-                        <Typography variant="h6" sx={{fontSize: '1rem', lineHeight: 1.1}}>
-                            Monita
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                            Messaging &amp; alerts
-                        </Typography>
-                    </Box>
+                    <Box
+                        component="img"
+                        src={config.get('url') + 'static/monita-logo.svg?v=1.3.5'}
+                        alt="Monita"
+                        sx={{
+                            display: {xs: 'none', sm: 'block'},
+                            width: 176,
+                            height: 44,
+                            objectFit: 'contain',
+                            objectPosition: 'left center',
+                        }}
+                    />
                 </Box>
 
                 <Box sx={{flex: 1}} />

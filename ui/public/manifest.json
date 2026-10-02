@@ -13,7 +13,7 @@
   "categories": ["productivity", "utilities"],
   "icons": [
     {
-      "src": "static/monita-icon.svg",
+      "src": "static/monita-icon.svg?v=1.3.5",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any maskable"
