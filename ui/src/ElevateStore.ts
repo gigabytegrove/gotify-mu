@@ -52,7 +52,7 @@ export class ElevateStore {
             Authorization: 'Basic ' + btoa(this.currentUser.user.name + ':' + password),
         };
         if (mfaCode.trim()) {
-            headers['X-Gotify-MFA-Code'] = mfaCode.trim();
+            headers['X-Monita-MFA-Code'] = mfaCode.trim();
         }
         await axios.create().request({
             url: `${config.get('url')}client/${this.currentUser.user.clientId}/elevate`,
@@ -101,7 +101,7 @@ export class ElevateStore {
             '&durationSeconds=' +
             durationSeconds;
 
-        this.oidcPopup = window.open(url, 'gotify-oidc-elevate', 'width=600,height=700');
+        this.oidcPopup = window.open(url, 'monita-oidc-elevate', 'width=600,height=700');
         if (!this.oidcPopup) {
             this.snack('Popup was blocked. Please allow popups for this site and try again.');
             return;
