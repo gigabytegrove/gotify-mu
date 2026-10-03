@@ -15,16 +15,22 @@ const SurfaceCard = ({title, subtitle, action, children}: IProps) => (
     <Paper
         variant="outlined"
         sx={{
-            p: {xs: 1.75, sm: 2},
-            borderRadius: 2.5,
+            p: {xs: 2, sm: 2.5},
+            borderRadius: 3,
             overflowX: 'auto',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+            position: 'relative',
+            boxShadow: 'none',
+            transition: 'border-color 160ms ease, box-shadow 160ms ease, transform 160ms ease',
+            '&:hover': {
+                borderColor: 'primary.light',
+                boxShadow: 1,
+            },
         }}>
         {(title || subtitle || action) && (
             <Stack
                 direction="row"
                 spacing={2}
-                sx={{mb: 1.5, justifyContent: 'space-between', alignItems: 'flex-start'}}>
+                sx={{mb: 2, justifyContent: 'space-between', alignItems: 'flex-start'}}>
                 <Box>
                     {title && <Typography variant="h6">{title}</Typography>}
                     {subtitle && (

@@ -17,8 +17,8 @@ const DefaultPage: FC<React.PropsWithChildren<IProps>> = ({
     maxWidth = 1280,
     children,
 }) => (
-    <Box component="main" sx={{width: '100%', maxWidth, mx: 'auto'}}>
-        <Stack spacing={2.25}>
+    <Box component="main" sx={{width: '100%', maxWidth, mx: 'auto', pb: 4}}>
+        <Stack spacing={2.75}>
             <Stack
                 direction={{xs: 'column', sm: 'row'}}
                 spacing={1.5}
@@ -30,7 +30,7 @@ const DefaultPage: FC<React.PropsWithChildren<IProps>> = ({
                     <Typography
                         variant="h4"
                         component="h1"
-                        sx={{fontSize: {xs: '1.65rem', sm: '2rem'}}}>
+                        sx={{fontSize: {xs: '1.7rem', sm: '2.05rem'}, lineHeight: 1.08}}>
                         {title}
                     </Typography>
                     {description && (

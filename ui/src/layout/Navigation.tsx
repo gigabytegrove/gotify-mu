@@ -168,14 +168,14 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
     );
 
     const drawerContent = (
-        <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
+        <Box sx={{height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper'}}>
             <Box sx={{display: {xs: 'flex', sm: 'none'}, justifyContent: 'flex-end', p: 1}}>
                 <IconButton aria-label="Close navigation" onClick={() => setNavOpen(false)}>
                     <Close />
                 </IconButton>
             </Box>
 
-            <Box sx={{px: 1.5, py: 2}}>
+            <Box sx={{px: 1.25, py: 2}}>
                 <Typography
                     variant="overline"
                     color="text.secondary"
@@ -208,11 +208,13 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                                 disabled={!loggedIn}
                                 onClick={() => setNavOpen(false)}
                                 sx={{
-                                    borderRadius: 1.75,
-                                    my: 0.15,
-                                    py: 0.7,
+                                    borderRadius: 2.25,
+                                    my: 0.35,
+                                    py: 0.85,
                                     '&.Mui-selected': {
                                         bgcolor: 'action.selected',
+                                        boxShadow: 'inset 3px 0 0 currentColor',
+                                        color: 'primary.main',
                                         '& .MuiListItemIcon-root': {color: 'primary.main'},
                                         '& .MuiListItemText-primary': {fontWeight: 700},
                                     },
@@ -287,6 +289,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                         position: 'relative',
                         height: '100%',
                         borderRightStyle: 'solid',
+                        borderRightColor: 'divider',
                     },
                 }}>
                 {drawerContent}

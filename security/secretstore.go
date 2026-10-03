@@ -37,18 +37,24 @@ func NewSecretStore(key []byte) (*SecretStore, error) {
 }
 
 func LoadOrCreateSecretStore(path string) (*SecretStore, error) {
-	if raw := strings.TrimSpace(os.Getenv("GOTIFY_MU_SECRET_KEY")); raw != "" {
+	if raw := strings.TrimSpace(envWithLegacy("MONITA_SECRET_KEY", "GOTIFY_MU_SECRET_KEY")); raw != "" {
 		key, err := decodeSecretKey(raw)
 		if err != nil {
-			return nil, fmt.Errorf("GOTIFY_MU_SECRET_KEY: %w", err)
+			return nil, fmt.Errorf("MONITA_SECRET_KEY: %w", err)
 		}
 		return NewSecretStore(key)
 	}
-	if override := strings.TrimSpace(os.Getenv("GOTIFY_MU_SECRET_KEY_FILE")); override != "" {
+	if override := strings.TrimSpace(envWithLegacy("MONITA_SECRET_KEY_FILE", "GOTIFY_MU_SECRET_KEY_FILE")); override != "" {
 		path = override
 	}
 	if path == "" {
-		path = filepath.Join("data", ".gotify-mu-secrets.key")
+		path = filepath.Join("data", ".monita-secrets.key")
+		legacyPath := filepath.Join("data", ".gotify-mu-secrets.key")
+		if _, err := os.Stat(path); os.IsNotExist(err) {
+			if _, legacyErr := os.Stat(legacyPath); legacyErr == nil {
+				path = legacyPath
+			}
+		}
 	}
 	if content, err := os.ReadFile(path); err == nil {
 		key, err := decodeSecretKey(strings.TrimSpace(string(content)))
@@ -74,7 +80,7 @@ func LoadOrCreateSecretStore(path string) (*SecretStore, error) {
 }
 
 func NewTestSecretStore() *SecretStore {
-	sum := sha256.Sum256([]byte("gotify-mu-test-secret-key"))
+	sum := sha256.Sum256([]byte("monita-test-secret-key"))
 	store, _ := NewSecretStore(sum[:])
 	return store
 }
@@ -127,4 +133,11 @@ func decodeSecretKey(raw string) ([]byte, error) {
 		return decoded, nil
 	}
 	return nil, errors.New("must be 32 bytes encoded as base64 or 64 hex characters")
+}
+
+func envWithLegacy(primary, legacy string) string {
+	if value := os.Getenv(primary); value != "" {
+		return value
+	}
+	return os.Getenv(legacy)
 }

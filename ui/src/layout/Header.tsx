@@ -76,6 +76,7 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                 borderBottom: 1,
                 borderColor: 'divider',
                 backgroundColor: 'background.paper',
+                backdropFilter: 'blur(14px)',
             }}>
             <Toolbar sx={{minHeight: 58, gap: 1.25, px: {xs: 1.25, sm: 2}}}>
                 {loggedIn && (
@@ -116,8 +117,8 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                         alt="Monita"
                         sx={{
                             display: {xs: 'none', sm: 'block'},
-                            width: 176,
-                            height: 44,
+                            width: 164,
+                            height: 40,
                             objectFit: 'contain',
                             objectPosition: 'left center',
                         }}
@@ -167,8 +168,13 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                             sx={{
                                 minWidth: 0,
                                 px: 0.75,
+                                py: 0.45,
                                 color: 'text.primary',
                                 gap: 0.5,
+                                border: 1,
+                                borderColor: 'divider',
+                                borderRadius: 2.5,
+                                bgcolor: 'background.default',
                             }}>
                             <Avatar sx={{width: 30, height: 30, fontSize: '0.85rem'}}>
                                 {name.slice(0, 1).toUpperCase() || <AccountCircle />}

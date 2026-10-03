@@ -15,12 +15,15 @@ const StatCard = ({label, value, icon, helper}: IProps) => (
     <Paper
         variant="outlined"
         sx={{
-            p: 2,
+            p: 2.25,
             height: '100%',
-            borderRadius: 2.5,
-            transition: 'transform 140ms ease, box-shadow 140ms ease',
+            borderRadius: 3,
+            position: 'relative',
+            overflow: 'hidden',
+            transition: 'transform 160ms ease, box-shadow 160ms ease, border-color 160ms ease',
             '&:hover': {
-                transform: 'translateY(-1px)',
+                transform: 'translateY(-2px)',
+                borderColor: 'primary.light',
                 boxShadow: 2,
             },
         }}>
@@ -41,7 +44,20 @@ const StatCard = ({label, value, icon, helper}: IProps) => (
                     </Typography>
                 )}
             </Box>
-            {icon && <Box sx={{color: 'text.secondary'}}>{icon}</Box>}
+            {icon && (
+                <Box
+                    sx={{
+                        color: 'primary.main',
+                        bgcolor: 'action.hover',
+                        width: 42,
+                        height: 42,
+                        borderRadius: 2.5,
+                        display: 'grid',
+                        placeItems: 'center',
+                    }}>
+                    {icon}
+                </Box>
+            )}
         </Stack>
     </Paper>
 );

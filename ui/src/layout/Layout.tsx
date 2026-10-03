@@ -56,7 +56,7 @@ const Layout = observer(() => {
         },
     } = useStores();
 
-    const [currentTheme, setCurrentTheme] = React.useState<ThemeKey>(() => {
+    const [currentTheme] = React.useState<ThemeKey>(() => {
         const stored =
             window.localStorage.getItem(localStorageThemeKey) ??
             window.localStorage.getItem(legacyThemeKey);
@@ -67,12 +67,6 @@ const Layout = observer(() => {
     const theme = React.useMemo(() => createMonitaTheme(paletteMode), [paletteMode]);
     const {version} = config.get('version');
     const [navOpen, setNavOpen] = React.useState(false);
-
-    const setTheme = (next: ThemeKey) => {
-        setCurrentTheme(next);
-        localStorage.setItem(localStorageThemeKey, next);
-        localStorage.removeItem(legacyThemeKey);
-    };
 
     const authed = (children: React.ReactNode) => (
         <RequireAuth loggedIn={loggedIn} authenticating={authenticating}>
@@ -120,8 +114,9 @@ const Layout = observer(() => {
                                 sx={{
                                     flex: 1,
                                     minWidth: 0,
-                                    px: {xs: 1.5, sm: 2.5, lg: 4},
-                                    py: {xs: 2, sm: 3.5},
+                                    px: {xs: 1.5, sm: 2.5, lg: 3.5, xl: 4.5},
+                                    py: {xs: 2, sm: 3, lg: 3.5},
+                                    backgroundColor: 'background.default',
                                     overflowX: 'hidden',
                                 }}>
                                 <Routes>
@@ -154,10 +149,7 @@ const Layout = observer(() => {
                                     <Route
                                         path="/settings"
                                         element={authed(
-                                            <Settings
-                                                themeMode={currentTheme}
-                                                setTheme={setTheme}
-                                            />
+                                            <Settings />
                                         )}
                                     />
                                     <Route path="/plugins" element={authed(<Plugins />)} />

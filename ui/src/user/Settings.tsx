@@ -9,17 +9,13 @@ import {
     DialogActions,
     DialogContent,
     DialogTitle,
-    FormControl,
-    InputLabel,
     MenuItem,
-    Select,
     Stack,
     Switch,
     TextField,
     Tooltip,
     Typography,
 } from '@mui/material';
-import DarkMode from '@mui/icons-material/DarkMode';
 import Security from '@mui/icons-material/Security';
 import Key from '@mui/icons-material/Key';
 import NotificationsNone from '@mui/icons-material/NotificationsNone';
@@ -27,7 +23,6 @@ import Schedule from '@mui/icons-material/Schedule';
 import DefaultPage from '../common/DefaultPage';
 import SurfaceCard from '../common/SurfaceCard';
 import ElevationForm from '../common/ElevationForm';
-import {ThemeKey} from '../layout/theme';
 import {useStores} from '../stores';
 import * as config from '../config';
 import {UpdateStatusCard} from '../update/UpdateStatus';
@@ -36,12 +31,7 @@ import {createPasskey} from '../passkey';
 import ConfirmDialog from '../common/ConfirmDialog';
 import {PriorityField, TimezoneField} from '../common/NotificationFields';
 
-interface IProps {
-    themeMode: ThemeKey;
-    setTheme: (theme: ThemeKey) => void;
-}
-
-const Settings = ({themeMode, setTheme}: IProps) => {
+const Settings = () => {
     const {currentUser} = useStores();
 
     return (
@@ -53,31 +43,12 @@ const Settings = ({themeMode, setTheme}: IProps) => {
 
             <NotificationPreferences />
 
-            <SurfaceCard
-                title="Appearance"
-                subtitle="Choose how Gotify MU looks on this device."
-                action={<DarkMode color="action" />}>
-                <FormControl fullWidth>
-                    <InputLabel id="theme-select-label">Theme</InputLabel>
-                    <Select
-                        labelId="theme-select-label"
-                        className="theme-select"
-                        label="Theme"
-                        value={themeMode}
-                        onChange={(e) => setTheme(e.target.value as ThemeKey)}>
-                        <MenuItem value="light">Light</MenuItem>
-                        <MenuItem value="dark">Dark</MenuItem>
-                        <MenuItem value="system">System</MenuItem>
-                    </Select>
-                </FormControl>
-            </SurfaceCard>
-
             <MFASettings />
             <PasskeySettings />
 
             <SurfaceCard
                 title="Account Security"
-                subtitle="Security controls for your local Gotify MU account."
+                subtitle="Security controls for your local Monita account."
                 action={<Security color="action" />}>
                 <Stack spacing={2}>
                     <Stack
@@ -184,7 +155,7 @@ const NotificationPreferences = () => {
         return (
             <SurfaceCard
                 title="Notification Preferences"
-                subtitle="Choose when and how Gotify MU notifies you."
+                subtitle="Choose when and how Monita notifies you."
                 action={<NotificationsNone color="action" />}>
                 <Typography color="text.secondary">Loading notification preferences…</Typography>
             </SurfaceCard>

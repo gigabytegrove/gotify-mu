@@ -117,8 +117,8 @@ func (m *Manager) TestEmailGateway(id uint) error {
 	if item == nil { return errors.New("email delivery connection not found") }
 	test := &model.Message{
 		ApplicationID:item.SourceApplicationID,
-		Title:"Gotify MU email delivery test",
-		Message:"This message confirms that Gotify MU can deliver email through this connection.",
+		Title:"Monita email delivery test",
+		Message:"This message confirms that Monita can deliver email through this connection.",
 		Priority:item.MinPriority,
 		Date:time.Now(),
 	}
@@ -260,7 +260,7 @@ type feedItem struct {
 func (m *Manager) fetchURL(raw string, etag, modified string) ([]byte, string, string, bool, error) {
 	request, err := http.NewRequestWithContext(m.ctx,http.MethodGet,raw,nil)
 	if err != nil { return nil,"","",false,err }
-	request.Header.Set("User-Agent","Gotify-MU/0.5")
+	request.Header.Set("User-Agent","Monita/0.5")
 	if etag!="" { request.Header.Set("If-None-Match",etag) }
 	if modified!="" { request.Header.Set("If-Modified-Since",modified) }
 	response, err := m.httpClient.Do(request)
@@ -406,7 +406,7 @@ func ipAllowed(ip net.IP, cidrs string) bool {
 
 func (m *Manager) smtpListenerLoop() {
 	defer m.wg.Done()
-	listen:=strings.TrimSpace(os.Getenv("GOTIFY_MU_SMTP_LISTEN"));if listen==""{listen=":2525"}
+	listen:=strings.TrimSpace(connectorEnv("MONITA_SMTP_LISTEN", "GOTIFY_MU_SMTP_LISTEN"));if listen==""{listen=":2525"}
 	for {
 		if m.ctx.Err()!=nil{return}
 		acquired,err:=m.db.TryAcquireAutomationLease("smtp-receiver",m.instanceID,time.Now(),30*time.Second)
@@ -434,7 +434,7 @@ func (m *Manager) handleSMTP(conn net.Conn) {
 	_ = conn.SetDeadline(time.Now().Add(5*time.Minute))
 	reader:=bufio.NewReader(conn);writer:=bufio.NewWriter(conn)
 	reply:=func(code int,text string){fmt.Fprintf(writer,"%d %s\r\n",code,text);_=writer.Flush()}
-	reply(220,"Gotify MU SMTP Receiver")
+	reply(220,"Monita SMTP Receiver")
 	var recipient,user,pass,envelopeSender string
 	authenticated:=false
 	for {
@@ -442,7 +442,7 @@ func (m *Manager) handleSMTP(conn net.Conn) {
 		line=strings.TrimSpace(line);upper:=strings.ToUpper(line)
 		switch {
 		case strings.HasPrefix(upper,"EHLO")||strings.HasPrefix(upper,"HELO"):
-			fmt.Fprint(writer,"250-Gotify MU\r\n250 AUTH PLAIN\r\n");_=writer.Flush()
+			fmt.Fprint(writer,"250-Monita\r\n250 AUTH PLAIN\r\n");_=writer.Flush()
 		case strings.HasPrefix(upper,"AUTH PLAIN"):
 			encoded:=strings.TrimSpace(strings.TrimPrefix(line,"AUTH PLAIN"))
 			raw,decodeErr:=base64.StdEncoding.DecodeString(encoded)
@@ -490,7 +490,7 @@ func (m *Manager) handleSMTP(conn net.Conn) {
 
 func (m *Manager) syslogListenerLoop() {
 	defer m.wg.Done()
-	listen:=strings.TrimSpace(os.Getenv("GOTIFY_MU_SYSLOG_LISTEN"));if listen==""{listen=":5514"}
+	listen:=strings.TrimSpace(connectorEnv("MONITA_SYSLOG_LISTEN", "GOTIFY_MU_SYSLOG_LISTEN"));if listen==""{listen=":5514"}
 	for {
 		if m.ctx.Err()!=nil{return}
 		acquired,err:=m.db.TryAcquireAutomationLease("syslog-receiver",m.instanceID,time.Now(),30*time.Second)
@@ -541,4 +541,11 @@ func ValidateConnectorURL(raw string) error {
 	if parsed.Scheme!="http"&&parsed.Scheme!="https"{return errors.New("URL must use http or https")}
 	if parsed.Host==""{return errors.New("URL must include a host")}
 	return nil
+}
+
+func connectorEnv(primary, legacy string) string {
+	if value := os.Getenv(primary); value != "" {
+		return value
+	}
+	return os.Getenv(legacy)
 }

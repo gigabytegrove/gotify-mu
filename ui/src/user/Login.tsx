@@ -62,7 +62,7 @@ const Login = observer(() => {
     };
 
     return (
-        <DefaultPage title="Sign in" maxWidth={430}>
+        <DefaultPage title="Sign in" description="Access your Monita workspace." maxWidth={520}>
             <SurfaceCard>
                 <Stack spacing={2}>
                     <Box sx={{textAlign: 'center', pt: 0.5}}>
@@ -70,11 +70,11 @@ const Login = observer(() => {
                             component="img"
                             src={config.get('url') + 'static/monita-logo.svg'}
                             alt="Monita"
-                            sx={{width: 150, maxWidth: '65%', mb: 0.75}}
+                            sx={{width: 178, maxWidth: '72%', mb: 1.25}}
                         />
-                        <Typography variant="h5">Welcome to Monita</Typography>
+                        <Typography variant="h5">Welcome back</Typography>
                         <Typography variant="body2" color="text.secondary" sx={{mt: 0.4}}>
-                            Notifications, messaging, and automation for teams and systems.
+                            Your notifications, conversations, and automations in one place.
                         </Typography>
                     </Box>
 

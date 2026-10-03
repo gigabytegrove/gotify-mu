@@ -1,6 +1,7 @@
 package config
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -128,7 +129,7 @@ func Get() (*Configuration, []FutureLog) {
 		},
 		Database: Database{
 			Dialect:    "sqlite3",
-			Connection: "data/gotify.db",
+			Connection: defaultDatabaseConnection(),
 		},
 		DefaultUser: DefaultUser{
 			Name: "admin",
@@ -245,7 +246,7 @@ func Get() (*Configuration, []FutureLog) {
 		logs = append(logs, futureFatal("at least one authentication provider must be enabled"))
 	}
 	if c.LDAP.Enabled && (strings.TrimSpace(c.LDAP.URL) == "" || strings.TrimSpace(c.LDAP.BaseDN) == "") {
-		logs = append(logs, futureFatal("LDAP authentication requires GOTIFY_LDAP_URL and GOTIFY_LDAP_BASE_DN"))
+		logs = append(logs, futureFatal("LDAP authentication requires MONITA_LDAP_URL and MONITA_LDAP_BASE_DN"))
 	}
 	if c.Registration && !c.LocalAuthEnabled {
 		logs = append(logs, futureFatal("registration requires local authentication to be enabled"))
@@ -257,4 +258,16 @@ func addTrailingSlashToPaths(conf *Configuration) {
 	if !strings.HasSuffix(conf.UploadedImagesDir, "/") && !strings.HasSuffix(conf.UploadedImagesDir, "\\") {
 		conf.UploadedImagesDir += string(filepath.Separator)
 	}
+}
+
+func defaultDatabaseConnection() string {
+	primary := filepath.Join("data", "monita.db")
+	legacy := filepath.Join("data", "gotify.db")
+	if _, err := os.Stat(primary); err == nil {
+		return primary
+	}
+	if _, err := os.Stat(legacy); err == nil {
+		return legacy
+	}
+	return primary
 }
