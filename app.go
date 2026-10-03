@@ -23,7 +23,7 @@ import (
 )
 
 var (
-	// Version the version of Gotify MU.
+	// Version the version of Monita.
 	Version = "dev"
 	// Commit the git commit hash of this version.
 	Commit = "unknown"
@@ -39,7 +39,7 @@ func main() {
 
 func run(args []string, stdout, stderr io.Writer) int {
 	vInfo := resolveVersionInfo()
-	fs := flag.NewFlagSet("gotify-mu", flag.ContinueOnError)
+	fs := flag.NewFlagSet("monita", flag.ContinueOnError)
 	fs.SetOutput(stderr)
 	fs.Usage = func() { printUsage(stderr) }
 	if err := fs.Parse(args); err != nil {
@@ -73,7 +73,7 @@ func run(args []string, stdout, stderr io.Writer) int {
 		return 0
 	default:
 		if command != "" {
-			fmt.Fprintf(stderr, "gotify-mu: unknown command %q\n\n", command)
+			fmt.Fprintf(stderr, "monita: unknown command %q\n\n", command)
 		}
 		printUsage(stderr)
 		return 2
@@ -142,7 +142,7 @@ func serve(vInfo *model.VersionInfo) int {
 
 	conf, futureLogs := config.Get()
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stdout, TimeFormat: time.RFC3339, NoColor: noColor(conf.NoColor)}).Level(zerolog.Level(conf.LogLevel))
-	log.Info().Str("version", vInfo.Version).Str("build_date", BuildDate).Msg("Gotify MU")
+	log.Info().Str("version", vInfo.Version).Str("build_date", BuildDate).Msg("Monita")
 
 	exit := false
 	for _, futureLog := range futureLogs {
@@ -194,10 +194,10 @@ func serve(vInfo *model.VersionInfo) int {
 }
 
 func printUsage(w io.Writer) {
-	fmt.Fprint(w, `Usage: gotify-mu [flags] <command> [arguments]
+	fmt.Fprint(w, `Usage: monita [flags] <command> [arguments]
 
 Commands:
-  serve                       Start the Gotify MU server.
+  serve                       Start the Monita server.
   migrate-config <file.yml>   Convert an old YAML config file to the new env
                               format and print it to stdout.
   version                     Show version information
