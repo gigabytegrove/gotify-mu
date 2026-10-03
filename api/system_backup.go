@@ -39,7 +39,7 @@ func (a *SystemAPI) DownloadBackup(ctx *gin.Context) {
 		return
 	}
 
-	tempDir, err := os.MkdirTemp("", "gotify-mu-backup-*")
+	tempDir, err := os.MkdirTemp("", "monita-backup-*")
 	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
 	defer os.RemoveAll(tempDir)
 
@@ -51,7 +51,7 @@ func (a *SystemAPI) DownloadBackup(ctx *gin.Context) {
 		version = a.VersionInfo.Version
 		commit = a.VersionInfo.Commit
 	}
-	filename := "gotify-mu-backup-" + time.Now().UTC().Format("20060102-150405") + ".zip"
+	filename := "monita-backup-" + time.Now().UTC().Format("20060102-150405") + ".zip"
 	bundle := filepath.Join(tempDir, filename)
 	if !successOrAbort(
 		ctx,
@@ -94,7 +94,7 @@ func (a *SystemAPI) StageRestore(ctx *gin.Context) {
 		"staged": true,
 		"restartRequired": true,
 		"manifest": manifest,
-		"message": "Backup validated and staged. Restart Gotify MU to apply the restore before the database opens.",
+		"message": "Backup validated and staged. Restart Monita to apply the restore before the database opens.",
 	})
 }
 
@@ -145,6 +145,6 @@ func (a *SystemAPI) DownloadDiagnostics(ctx *gin.Context) {
 	body, err := json.MarshalIndent(report, "", "  ")
 	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
 	ctx.Header("Cache-Control", "no-store")
-	ctx.Header("Content-Disposition", "attachment; filename=gotify-mu-diagnostics.json")
+	ctx.Header("Content-Disposition", "attachment; filename=monita-diagnostics.json")
 	ctx.Data(http.StatusOK, "application/json", body)
 }
