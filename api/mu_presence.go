@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
 )
 
 type MUPresenceDatabase interface {

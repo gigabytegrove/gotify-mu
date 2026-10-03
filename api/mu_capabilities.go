@@ -2,7 +2,7 @@ package api
 
 import "github.com/gin-gonic/gin"
 
-// MUCapabilitiesAPI exposes a stable discovery contract for Gotify MU-aware
+// MUCapabilitiesAPI exposes a stable discovery contract for Monita-aware
 // clients. A stock Gotify server does not expose this route, allowing clients
 // to fall back cleanly to the upstream feature set on HTTP 404.
 type MUCapabilitiesAPI struct {
@@ -40,7 +40,7 @@ type MUCapabilityFlags struct {
 
 func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
 	ctx.JSON(200, MUCapabilities{
-		Product:    "gotify-mu",
+		Product:    "monita",
 		Version:    a.Version,
 		APIVersion: 1,
 		Features: MUCapabilityFlags{

@@ -23,7 +23,7 @@ func TestMUCapabilitiesContract(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload.Product != "gotify-mu" || payload.Version != "1.0.0" || payload.APIVersion != 1 {
+	if payload.Product != "monita" || payload.Version != "1.0.0" || payload.APIVersion != 1 {
 		t.Fatalf("unexpected capability identity: %#v", payload)
 	}
 	if !payload.Features.SharedChannels || !payload.Features.ChannelTypes ||

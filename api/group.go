@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 )
 
 type UserGroupDatabase interface {

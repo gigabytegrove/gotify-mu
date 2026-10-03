@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/security"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/security"
 )
 
 type MFADatabase interface {
@@ -72,8 +72,8 @@ func (a *MFAAPI) Setup(ctx *gin.Context) {
 	item := &model.UserMFA{UserID:userID, Secret:secret, RecoveryHashes:hashes, Enabled:false}
 	if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.SaveUserMFA(item)) { return }
 
-	label := url.QueryEscape("Gotify MU:" + user.Name)
-	issuer := url.QueryEscape("Gotify MU")
+	label := url.QueryEscape("Monita:" + user.Name)
+	issuer := url.QueryEscape("Monita")
 	uri := "otpauth://totp/" + label + "?secret=" + url.QueryEscape(secret) + "&issuer=" + issuer + "&digits=6&period=30"
 	ctx.JSON(http.StatusOK, model.MFASetupResult{Secret:secret, ProvisioningURI:uri, RecoveryCodes:codes})
 }

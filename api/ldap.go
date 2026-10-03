@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/auth/ldap"
-	"github.com/gotify/server/v3/auth/password"
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/database"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/auth/ldap"
+	"github.com/gigabytegrove/monita/auth/password"
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/database"
+	"github.com/gigabytegrove/monita/model"
 )
 
 type LDAPAPI struct {
@@ -72,9 +72,9 @@ func (a *LDAPAPI) resolveUser(directoryUser *ldapauth.User) (*model.User,error) 
 		}
 	}
 	if user==nil {
-		if !a.Config.AutoRegister{return nil,errors.New("directory account is not registered in Gotify MU")}
+		if !a.Config.AutoRegister{return nil,errors.New("directory account is not registered in Monita")}
 		if existing,findErr:=a.DB.GetUserByName(directoryUser.Username);findErr!=nil{return nil,findErr}else if existing!=nil{
-			return nil,errors.New("a Gotify MU user already uses this directory username")
+			return nil,errors.New("a Monita user already uses this directory username")
 		}
 		pass,passErr:=randomUnusablePassword(a.PasswordStrength);if passErr!=nil{return nil,passErr}
 		user=&model.User{
