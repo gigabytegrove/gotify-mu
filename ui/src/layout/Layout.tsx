@@ -37,11 +37,8 @@ import {ConnectionErrorBanner} from '../common/ConnectionErrorBanner';
 import {useStores} from '../stores';
 import {SnackbarProvider} from 'notistack';
 import LoadingSpinner from '../common/LoadingSpinner';
-import {createMonitaTheme, isThemeKey, ThemeKey} from './theme';
+import {createMonitaTheme} from './theme';
 import DefaultPage from '../common/DefaultPage';
-
-const localStorageThemeKey = 'monita-theme';
-const legacyThemeKey = 'gotify-theme';
 
 const Layout = observer(() => {
     const {
@@ -56,23 +53,13 @@ const Layout = observer(() => {
         },
     } = useStores();
 
-    const [currentTheme, setCurrentTheme] = React.useState<ThemeKey>(() => {
-        const stored =
-            window.localStorage.getItem(localStorageThemeKey) ??
-            window.localStorage.getItem(legacyThemeKey);
-        return isThemeKey(stored) ? stored : 'system';
-    });
     const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
-    const paletteMode = currentTheme === 'system' ? (prefersDark ? 'dark' : 'light') : currentTheme;
-    const theme = React.useMemo(() => createMonitaTheme(paletteMode), [paletteMode]);
+    const theme = React.useMemo(
+        () => createMonitaTheme(prefersDark ? 'dark' : 'light'),
+        [prefersDark]
+    );
     const {version} = config.get('version');
     const [navOpen, setNavOpen] = React.useState(false);
-
-    const setTheme = (next: ThemeKey) => {
-        setCurrentTheme(next);
-        localStorage.setItem(localStorageThemeKey, next);
-        localStorage.removeItem(legacyThemeKey);
-    };
 
     const authed = (children: React.ReactNode) => (
         <RequireAuth loggedIn={loggedIn} authenticating={authenticating}>
@@ -106,7 +93,12 @@ const Layout = observer(() => {
                             setNavOpen={setNavOpen}
                         />
 
-                        <Box sx={{display: 'flex', minHeight: 'calc(100vh - 64px)'}}>
+                        <Box
+                            sx={{
+                                display: 'flex',
+                                minHeight: 'calc(100vh - 66px)',
+                                bgcolor: 'background.default',
+                            }}>
                             {loggedIn && (
                                 <Navigation
                                     loggedIn={loggedIn}
@@ -120,8 +112,8 @@ const Layout = observer(() => {
                                 sx={{
                                     flex: 1,
                                     minWidth: 0,
-                                    px: {xs: 1.5, sm: 2.5, lg: 4},
-                                    py: {xs: 2, sm: 3.5},
+                                    px: {xs: 1.5, sm: 2.5, lg: 3.5, xl: 4.5},
+                                    py: {xs: 2, sm: 3, lg: 3.5},
                                     overflowX: 'hidden',
                                 }}>
                                 <Routes>
@@ -151,15 +143,7 @@ const Layout = observer(() => {
                                         path="/system"
                                         element={authed(elevated(<SystemAdministration />))}
                                     />
-                                    <Route
-                                        path="/settings"
-                                        element={authed(
-                                            <Settings
-                                                themeMode={currentTheme}
-                                                setTheme={setTheme}
-                                            />
-                                        )}
-                                    />
+                                    <Route path="/settings" element={authed(<Settings />)} />
                                     <Route path="/plugins" element={authed(<Plugins />)} />
                                     <Route
                                         path="/plugins/:id"
