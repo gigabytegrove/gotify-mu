@@ -5,7 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/gotify/server/v3/test"
+	"github.com/gigabytegrove/monita/test"
 	"github.com/stretchr/testify/assert"
 )
 

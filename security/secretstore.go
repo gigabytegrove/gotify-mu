@@ -48,7 +48,7 @@ func LoadOrCreateSecretStore(path string) (*SecretStore, error) {
 		path = override
 	}
 	if path == "" {
-		path = filepath.Join("data", ".gotify-mu-secrets.key")
+		path = filepath.Join("data", ".monita-secrets.key")
 	}
 	if content, err := os.ReadFile(path); err == nil {
 		key, err := decodeSecretKey(strings.TrimSpace(string(content)))
@@ -74,7 +74,7 @@ func LoadOrCreateSecretStore(path string) (*SecretStore, error) {
 }
 
 func NewTestSecretStore() *SecretStore {
-	sum := sha256.Sum256([]byte("gotify-mu-test-secret-key"))
+	sum := sha256.Sum256([]byte("monita-test-secret-key"))
 	store, _ := NewSecretStore(sum[:])
 	return store
 }
