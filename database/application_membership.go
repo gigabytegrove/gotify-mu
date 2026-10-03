@@ -174,7 +174,7 @@ func (d *GormDatabase) SetApplicationMembershipNotifications(
 	return nil
 }
 
-// TransferApplicationOwnership changes the canonical Gotify application owner.
+// TransferApplicationOwnership changes the canonical Monita application owner.
 // The new owner is guaranteed to have a manual membership so disabling
 // auto-assignment later cannot remove the owner from the channel.
 func (d *GormDatabase) TransferApplicationOwnership(applicationID, newOwnerID uint) error {
