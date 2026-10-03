@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/gin-contrib/cors"
-	"github.com/gotify/server/v3/config"
+	"github.com/gigabytegrove/monita/config"
 )
 
 // CorsConfig generates a config to use in gin cors middleware based on server configuration.

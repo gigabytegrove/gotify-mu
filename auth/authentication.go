@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth/password"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/security"
+	"github.com/gigabytegrove/monita/auth/password"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/security"
 	"github.com/rs/zerolog/log"
 )
 
