@@ -15,25 +15,36 @@ const SurfaceCard = ({title, subtitle, action, children}: IProps) => (
     <Paper
         variant="outlined"
         sx={{
-            p: {xs: 1.75, sm: 2},
-            borderRadius: 2.5,
+            p: {xs: 1.75, sm: 2.25},
+            borderRadius: 3.25,
             overflowX: 'auto',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.02)',
+            boxShadow: (theme) =>
+                theme.palette.mode === 'dark'
+                    ? '0 14px 34px rgba(0,0,0,.12)'
+                    : '0 12px 30px rgba(37,56,88,.055)',
         }}>
         {(title || subtitle || action) && (
             <Stack
-                direction="row"
-                spacing={2}
-                sx={{mb: 1.5, justifyContent: 'space-between', alignItems: 'flex-start'}}>
-                <Box>
-                    {title && <Typography variant="h6">{title}</Typography>}
+                direction={{xs: 'column', sm: 'row'}}
+                spacing={1.5}
+                sx={{
+                    mb: 1.8,
+                    justifyContent: 'space-between',
+                    alignItems: {xs: 'stretch', sm: 'flex-start'},
+                }}>
+                <Box sx={{minWidth: 0}}>
+                    {title && (
+                        <Typography variant="h6" sx={{lineHeight: 1.2}}>
+                            {title}
+                        </Typography>
+                    )}
                     {subtitle && (
-                        <Typography variant="body2" color="text.secondary">
+                        <Typography variant="body2" color="text.secondary" sx={{mt: 0.35}}>
                             {subtitle}
                         </Typography>
                     )}
                 </Box>
-                {action}
+                {action && <Box sx={{flexShrink: 0}}>{action}</Box>}
             </Stack>
         )}
         {children}
