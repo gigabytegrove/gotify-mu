@@ -22,7 +22,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/robfig/cron"
 	"github.com/rs/zerolog/log"
 )
@@ -143,7 +143,7 @@ func (e *Engine) ReloadIntegrations() {
 	}
 }
 
-// Publish stores a normal Gotify MU message and applies native delivery policies.
+// Publish stores a normal Monita message and applies native delivery policies.
 func (e *Engine) Publish(applicationID uint, title, message string, priority int) (*model.Message, error) {
 	app, err := e.db.GetApplicationByID(applicationID)
 	if err != nil {
@@ -869,7 +869,7 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 	reader := bufio.NewReader(conn)
 	clientID := integration.ClientID
 	if clientID == "" {
-		clientID = "gotify-mu-" + strconv.FormatUint(uint64(integration.ID), 10)
+		clientID = "monita-" + strconv.FormatUint(uint64(integration.ID), 10)
 	}
 	protocol := integration.ProtocolVersion
 	if protocol == 0 { protocol = 5 }
@@ -980,7 +980,7 @@ func (e *Engine) TestMQTTConnection(id uint) error {
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
 	clientID := integration.ClientID
-	if clientID == "" { clientID = fmt.Sprintf("gotify-mu-test-%d", integration.ID) }
+	if clientID == "" { clientID = fmt.Sprintf("monita-test-%d", integration.ID) }
 	protocol := integration.ProtocolVersion
 	if protocol == 0 { protocol = 5 }
 	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password, protocol); err != nil { return err }
