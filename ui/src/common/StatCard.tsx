@@ -15,35 +15,60 @@ const StatCard = ({label, value, icon, helper}: IProps) => (
     <Paper
         variant="outlined"
         sx={{
-            p: 2,
+            p: 2.1,
             height: '100%',
-            borderRadius: 2.5,
-            transition: 'transform 140ms ease, box-shadow 140ms ease',
+            borderRadius: 3.25,
+            position: 'relative',
+            overflow: 'hidden',
+            transition: 'transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease',
             '&:hover': {
-                transform: 'translateY(-1px)',
-                boxShadow: 2,
+                transform: 'translateY(-2px)',
+                borderColor: 'primary.main',
+                boxShadow: (theme) =>
+                    theme.palette.mode === 'dark'
+                        ? '0 14px 30px rgba(0,0,0,.18)'
+                        : '0 14px 30px rgba(37,56,88,.08)',
             },
         }}>
         <Stack
             direction="row"
-            spacing={2}
+            spacing={1.75}
             sx={{justifyContent: 'space-between', alignItems: 'flex-start'}}>
-            <Box>
-                <Typography variant="body2" color="text.secondary">
+            <Box sx={{minWidth: 0}}>
+                <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{fontSize: '0.67rem', lineHeight: 1.4}}>
                     {label}
                 </Typography>
-                <Typography variant="h4" sx={{mt: 0.25, lineHeight: 1.1}}>
+                <Typography variant="h4" sx={{mt: 0.4, lineHeight: 1}}>
                     {value}
                 </Typography>
                 {helper && (
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{display: 'block', mt: 0.65}}>
                         {helper}
                     </Typography>
                 )}
             </Box>
-            {icon && <Box sx={{color: 'text.secondary'}}>{icon}</Box>}
+            {icon && (
+                <Box
+                    sx={{
+                        width: 42,
+                        height: 42,
+                        borderRadius: 2.5,
+                        display: 'grid',
+                        placeItems: 'center',
+                        color: 'primary.main',
+                        bgcolor: 'action.selected',
+                        '& svg': {fontSize: 22},
+                    }}>
+                    {icon}
+                </Box>
+            )}
         </Stack>
     </Paper>
 );
-
 export default StatCard;
