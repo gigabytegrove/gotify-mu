@@ -60,6 +60,10 @@ const Layout = observer(() => {
         const stored =
             window.localStorage.getItem(localStorageThemeKey) ??
             window.localStorage.getItem(legacyThemeKey);
+        if (isThemeKey(stored) && window.localStorage.getItem(localStorageThemeKey) == null) {
+            window.localStorage.setItem(localStorageThemeKey, stored);
+            window.localStorage.removeItem(legacyThemeKey);
+        }
         return isThemeKey(stored) ? stored : 'system';
     });
     const prefersDark = useMediaQuery('(prefers-color-scheme: dark)');
@@ -106,7 +110,7 @@ const Layout = observer(() => {
                             setNavOpen={setNavOpen}
                         />
 
-                        <Box sx={{display: 'flex', minHeight: 'calc(100vh - 64px)'}}>
+                        <Box sx={{display: 'flex', minHeight: 'calc(100vh - 68px)'}}>
                             {loggedIn && (
                                 <Navigation
                                     loggedIn={loggedIn}
@@ -120,8 +124,9 @@ const Layout = observer(() => {
                                 sx={{
                                     flex: 1,
                                     minWidth: 0,
-                                    px: {xs: 1.5, sm: 2.5, lg: 4},
-                                    py: {xs: 2, sm: 3.5},
+                                    px: {xs: 1.5, sm: 2.5, lg: 3.5, xl: 4.5},
+                                    py: {xs: 2, sm: 3, lg: 3.5},
+                                    bgcolor: 'background.default',
                                     overflowX: 'hidden',
                                 }}>
                                 <Routes>
