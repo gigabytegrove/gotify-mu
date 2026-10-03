@@ -15,9 +15,9 @@ import (
 	"sync"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/plugin/compat"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/plugin/compat"
 	"github.com/rs/zerolog/log"
 	"gopkg.in/yaml.v3"
 )
@@ -164,7 +164,7 @@ func (m *Manager) InstallPlugin(filename string, source io.Reader) (compat.Info,
 		return empty, nil, fmt.Errorf("check plugin destination: %w", err)
 	}
 
-	tmp, err := os.CreateTemp(m.directory, ".gotify-mu-plugin-*.so")
+	tmp, err := os.CreateTemp(m.directory, ".monita-plugin-*.so")
 	if err != nil {
 		return empty, nil, fmt.Errorf("create temporary plugin file: %w", err)
 	}
@@ -248,7 +248,7 @@ func (m *Manager) InstallPlugin(filename string, source io.Reader) (compat.Info,
 	return info, warnings, nil
 }
 
-// SetDispatcher routes plugin notifications through Gotify MU's shared delivery policy engine.
+// SetDispatcher routes plugin notifications through Monita's shared delivery policy engine.
 func (m *Manager) SetDispatcher(dispatcher Dispatcher) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
@@ -315,7 +315,7 @@ func (m *Manager) UninstallPlugin(modulePath string) error {
 
 // StagePluginUpdate verifies and stores a replacement plugin binary. Native Go
 // plugins cannot be safely unloaded/reloaded in place, so the replacement takes
-// effect on the next Gotify MU restart.
+// effect on the next Monita restart.
 func (m *Manager) StagePluginUpdate(modulePath, filename string, source io.Reader, verification InstallVerification) (string, error) {
 	modulePath = strings.TrimSpace(modulePath)
 	if modulePath == "" { return "", errors.New("plugin module path is required") }
