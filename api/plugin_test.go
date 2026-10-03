@@ -9,13 +9,13 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/plugin"
-	"github.com/gotify/server/v3/plugin/compat"
-	"github.com/gotify/server/v3/plugin/testing/mock"
-	"github.com/gotify/server/v3/test"
-	"github.com/gotify/server/v3/test/testdb"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/plugin"
+	"github.com/gigabytegrove/monita/plugin/compat"
+	"github.com/gigabytegrove/monita/plugin/testing/mock"
+	"github.com/gigabytegrove/monita/test"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gopkg.in/yaml.v3"
@@ -55,14 +55,14 @@ func (s *PluginSuite) BeforeTest(suiteName, testName string) {
 
 	s.db.CreatePluginConf(&model.PluginConf{
 		UserID:     1,
-		ModulePath: "github.com/gotify/server/v3/plugin/example/removed",
+		ModulePath: "github.com/gigabytegrove/monita/plugin/example/removed",
 		Token:      "P1234",
 		Enabled:    false,
 	})
 }
 
 func (s *PluginSuite) getDanglingConf(uid uint) *model.PluginConf {
-	conf, err := s.db.GetPluginConfByUserAndPath(uid, "github.com/gotify/server/v3/plugin/example/removed")
+	conf, err := s.db.GetPluginConfByUserAndPath(uid, "github.com/gigabytegrove/monita/plugin/example/removed")
 	assert.NoError(s.T(), err)
 	return conf
 }

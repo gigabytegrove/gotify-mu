@@ -14,10 +14,10 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/location"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/plugin"
-	"github.com/gotify/server/v3/plugin/compat"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/plugin"
+	"github.com/gigabytegrove/monita/plugin/compat"
 	"gopkg.in/yaml.v3"
 )
 

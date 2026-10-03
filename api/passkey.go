@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/security"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/security"
 )
 
 type PasskeyDatabase interface {
@@ -147,7 +147,7 @@ func (a *PasskeyAPI) RegistrationOptions(ctx *gin.Context) {
 	exclude:=make([]gin.H,0,len(existing));for _,credential:=range existing{exclude=append(exclude,gin.H{"type":"public-key","id":credential.CredentialID})}
 	display:=user.DisplayName;if display==""{display=user.Name}
 	ctx.JSON(200,gin.H{
-		"challenge":challenge,"rp":gin.H{"name":"Gotify MU","id":rpID},
+		"challenge":challenge,"rp":gin.H{"name":"Monita","id":rpID},
 		"user":gin.H{"id":userHandle(user.ID),"name":user.Name,"displayName":display},
 		"pubKeyCredParams":[]gin.H{{"type":"public-key","alg":-7}},
 		"timeout":60000,"attestation":"none","authenticatorSelection":gin.H{"residentKey":"preferred","userVerification":"preferred"},
