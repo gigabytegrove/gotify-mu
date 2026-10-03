@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/mode"
+	"github.com/gigabytegrove/monita/mode"
 )
 
 func TestNotFound(t *testing.T) {

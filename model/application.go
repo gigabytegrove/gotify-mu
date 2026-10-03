@@ -24,7 +24,7 @@ type Application struct {
 	// read only: true
 	// example: AWH0wZ5r0Mbac.r
 	Token string `gorm:"type:varchar(180);uniqueIndex:uix_applications_token" json:"token,omitempty"`
-	// The canonical owner user id used by Gotify MU while memberships grant access to additional users.
+	// The canonical owner user id used by Monita while memberships grant access to additional users.
 	//
 	// read only: true
 	UserID uint `gorm:"index;uniqueIndex:uix_application_user_id_sort_key,priority:1" json:"ownerId"`
@@ -44,7 +44,7 @@ type Application struct {
 	// required: true
 	// example: false
 	Internal bool `form:"internal" query:"internal" json:"internal"`
-	// Whether every user should automatically be a member of this Gotify MU channel.
+	// Whether every user should automatically be a member of this Monita channel.
 	//
 	// read only: true
 	// example: false
@@ -56,7 +56,7 @@ type Application struct {
 	// ChannelType controls how MU-aware clients present this Channel. Legacy
 	// member-posting Channels remain compatible when this value is empty.
 	ChannelType string `gorm:"type:varchar(32)" form:"channelType" query:"channelType" json:"channelType"`
-	// Whether the current requesting user receives realtime notifications from this Gotify MU channel.
+	// Whether the current requesting user receives realtime notifications from this Monita channel.
 	//
 	// read only: true
 	ReceiveNotifications *bool `gorm:"-" json:"receiveNotifications,omitempty"`
