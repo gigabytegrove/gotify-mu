@@ -292,6 +292,7 @@ func MFACodeFromRequest(ctx *gin.Context) string {
 authp.write_text(auth, encoding="utf-8")
 
 replace("api/session.go", 'code := strings.TrimSpace(ctx.GetHeader("X-Gotify-MFA-Code"))', 'code := auth.MFACodeFromRequest(ctx)')
+replace("api/session.go", '\\t"strings"\\n', '')
 
 service = ROOT / "auth/service.go"
 text = service.read_text(encoding="utf-8")
@@ -469,7 +470,6 @@ for path in ["config/config_test.go", "config/origin_test.go"]:
     text = p.read_text(encoding="utf-8")
     text = text.replace("GOTIFY_", "MONITA_")
     text = text.replace("TestGotify", "TestMonita")
-    text = text.replace("gotify.net", "monita.test")
     text = text.replace("gotify", "monita")
     text = text.replace("Gotify", "Monita")
     p.write_text(text, encoding="utf-8")
@@ -481,10 +481,10 @@ if "TestLegacyGotifyEnvironmentFallback" not in text:
 
 func TestLegacyGotifyEnvironmentFallback(t *testing.T) {
 	mode.Set(mode.TestDev)
-	t.Setenv("GOTIFY_DEFAULTUSER_NAME", "legacy-user")
+	t.Setenv("GOTIFY_SERVER_PORT", "9187")
 
 	conf, _ := Get()
-	assert.Equal(t, "legacy-user", conf.DefaultUser.Name)
+	assert.Equal(t, 9187, conf.Server.Port)
 }
 '''
 config_test.write_text(text, encoding="utf-8")
@@ -497,7 +497,7 @@ text = text.replace("cookieName", "CookieName")
 if "TestLegacyGotifyKeyHeaderCompatibility" not in text:
     text += '''
 
-func (s *AuthenticationTestSuite) TestLegacyGotifyKeyHeaderCompatibility() {
+func (s *AuthenticationSuite) TestLegacyGotifyKeyHeaderCompatibility() {
 	s.assertHeaderRequest("X-Gotify-Key", "clienttoken", s.auth.RequireClient, 200)
 }
 '''
