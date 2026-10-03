@@ -27,7 +27,7 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// Notifier delivers a realtime Gotify-compatible message to one user.
+// Notifier delivers a realtime protocol-compatible message to one user.
 type Notifier interface {
 	Notify(userID uint, message *model.MessageExternal)
 }
@@ -267,7 +267,10 @@ func mentionRecipientUserIDs(msg *model.Message) []uint {
 	if err := json.Unmarshal(msg.Extras, &extras); err != nil {
 		return nil
 	}
-	raw, ok := extras["gotify::mu::mentionUserIds"]
+	raw, ok := extras["monita::mentionUserIds"]
+	if !ok {
+		raw, ok = extras["gotify::mu::mentionUserIds"]
+	}
 	if !ok {
 		return nil
 	}
@@ -958,7 +961,7 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 	reader := bufio.NewReader(conn)
 	clientID := integration.ClientID
 	if clientID == "" {
-		clientID = "gotify-mu-" + strconv.FormatUint(uint64(integration.ID), 10)
+		clientID = "monita-" + strconv.FormatUint(uint64(integration.ID), 10)
 	}
 	protocol := integration.ProtocolVersion
 	if protocol == 0 {
@@ -1078,7 +1081,7 @@ func (e *Engine) TestMQTTConnection(id uint) error {
 	reader := bufio.NewReader(conn)
 	clientID := integration.ClientID
 	if clientID == "" {
-		clientID = fmt.Sprintf("gotify-mu-test-%d", integration.ID)
+		clientID = fmt.Sprintf("monita-test-%d", integration.ID)
 	}
 	protocol := integration.ProtocolVersion
 	if protocol == 0 {
