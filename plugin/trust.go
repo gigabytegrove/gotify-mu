@@ -70,7 +70,7 @@ func verifyPluginStream(directory, filename string, source io.Reader, verificati
 		return nil, errors.New("plugin file must use the .so extension")
 	}
 	if err := os.MkdirAll(directory, 0o755); err != nil { return nil, err }
-	tmp, err := os.CreateTemp(directory, ".gotify-mu-verify-*.so")
+	tmp, err := os.CreateTemp(directory, ".monita-verify-*.so")
 	if err != nil { return nil, err }
 	path := tmp.Name()
 	ok := false

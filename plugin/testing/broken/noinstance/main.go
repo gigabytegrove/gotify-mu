@@ -7,7 +7,7 @@ import (
 // GetGotifyPluginInfo returns gotify plugin info
 func GetGotifyPluginInfo() plugin.Info {
 	return plugin.Info{
-		ModulePath: "github.com/gotify/server/v3/plugin/testing/broken/noinstance",
+		ModulePath: "github.com/gigabytegrove/monita/plugin/testing/broken/noinstance",
 	}
 }
 

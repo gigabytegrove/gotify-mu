@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test/testdb"
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
