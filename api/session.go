@@ -103,7 +103,7 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 	mfaRequired := (policy.RequireMFAForAdmins && user.Admin) || policy.RequireMFAForAllLocalUsers
 	mfaAuthenticated := false
 	if mfa != nil && mfa.Enabled {
-		code := strings.TrimSpace(ctx.GetHeader("X-Gotify-MFA-Code"))
+		code := auth.MFACodeFromRequest(ctx)
 		if code == "" {
 			ctx.AbortWithStatusJSON(http.StatusPreconditionRequired, gin.H{
 				"error":"mfa_required", "mfaRequired":true,
