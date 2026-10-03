@@ -72,8 +72,8 @@ func (a *MFAAPI) Setup(ctx *gin.Context) {
 	item := &model.UserMFA{UserID:userID, Secret:secret, RecoveryHashes:hashes, Enabled:false}
 	if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.SaveUserMFA(item)) { return }
 
-	label := url.QueryEscape("Gotify MU:" + user.Name)
-	issuer := url.QueryEscape("Gotify MU")
+	label := url.QueryEscape("Monita:" + user.Name)
+	issuer := url.QueryEscape("Monita")
 	uri := "otpauth://totp/" + label + "?secret=" + url.QueryEscape(secret) + "&issuer=" + issuer + "&digits=6&period=30"
 	ctx.JSON(http.StatusOK, model.MFASetupResult{Secret:secret, ProvisioningURI:uri, RecoveryCodes:codes})
 }
