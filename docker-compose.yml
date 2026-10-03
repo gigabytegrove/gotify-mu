@@ -10,8 +10,8 @@ services:
     env_file:
       - .env
     environment:
-      GOTIFY_DEFAULTUSER_NAME: "${GOTIFY_DEFAULTUSER_NAME:-admin}"
-      GOTIFY_DEFAULTUSER_PASS: "${GOTIFY_DEFAULTUSER_PASS:?Set GOTIFY_DEFAULTUSER_PASS in .env}"
+      MONITA_DEFAULTUSER_NAME: "${MONITA_DEFAULTUSER_NAME:-admin}"
+      MONITA_DEFAULTUSER_PASS: "${MONITA_DEFAULTUSER_PASS:?Set MONITA_DEFAULTUSER_PASS in .env}"
       MONITA_REPOSITORY: "gigabytegrove/monita"
       MONITA_RUNTIME_DIR: "/app/data/.monita-runtime"
     volumes:
