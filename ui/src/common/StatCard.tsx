@@ -15,33 +15,51 @@ const StatCard = ({label, value, icon, helper}: IProps) => (
     <Paper
         variant="outlined"
         sx={{
-            p: 2,
+            p: 2.25,
             height: '100%',
-            borderRadius: 2.5,
-            transition: 'transform 140ms ease, box-shadow 140ms ease',
-            '&:hover': {
-                transform: 'translateY(-1px)',
-                boxShadow: 2,
-            },
+            borderRadius: 3,
+            boxShadow: (theme) =>
+                theme.palette.mode === 'dark'
+                    ? '0 8px 24px rgba(0,0,0,.12)'
+                    : '0 8px 24px rgba(25,39,62,.045)',
         }}>
-        <Stack
-            direction="row"
-            spacing={2}
-            sx={{justifyContent: 'space-between', alignItems: 'flex-start'}}>
-            <Box>
-                <Typography variant="body2" color="text.secondary">
+        <Stack direction="row" spacing={2} sx={{alignItems: 'center'}}>
+            {icon && (
+                <Box
+                    sx={{
+                        width: 44,
+                        height: 44,
+                        display: 'grid',
+                        placeItems: 'center',
+                        flexShrink: 0,
+                        borderRadius: 2.5,
+                        bgcolor: 'action.selected',
+                        color: 'primary.main',
+                        '& svg': {fontSize: 22},
+                    }}>
+                    {icon}
+                </Box>
+            )}
+            <Box sx={{minWidth: 0}}>
+                <Typography
+                    variant="overline"
+                    color="text.secondary"
+                    sx={{display: 'block', lineHeight: 1.15, fontSize: '0.66rem'}}>
                     {label}
                 </Typography>
-                <Typography variant="h4" sx={{mt: 0.25, lineHeight: 1.1}}>
+                <Typography variant="h4" sx={{mt: 0.3, lineHeight: 1, fontSize: '1.8rem'}}>
                     {value}
                 </Typography>
                 {helper && (
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography
+                        variant="caption"
+                        color="text.secondary"
+                        sx={{display: 'block', mt: 0.45}}
+                        noWrap>
                         {helper}
                     </Typography>
                 )}
             </Box>
-            {icon && <Box sx={{color: 'text.secondary'}}>{icon}</Box>}
         </Stack>
     </Paper>
 );
