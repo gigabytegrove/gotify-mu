@@ -289,12 +289,12 @@ func (a *OIDCAPI) handleElevationCallback(w http.ResponseWriter, elevate *pendin
 	io.WriteString(w, `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Gotify Session Elevation</title>
+  <title>Monita Session Elevation</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 </head>
 <body>
-  <h1 style="text-align:center">Gotify session elevation successful. Close this tab to continue.</h1>
+  <h1 style="text-align:center">Monita session elevation successful. Close this tab to continue.</h1>
   <script>window.close();</script>
 </body>
 </html>`)
@@ -355,12 +355,12 @@ func (a *OIDCAPI) ExternalAuthorizeHandler(ctx *gin.Context) {
 
 // swagger:operation POST /auth/oidc/external/token oidc externalToken
 //
-// Exchange an authorization code for a gotify client token.
+// Exchange an authorization code for a Monita client token.
 //
 // After the user authenticates with the OIDC provider and the app receives
 // the authorization code via redirect, the app calls this endpoint with the
 // code and PKCE code_verifier. The server exchanges the code with the OIDC
-// provider and returns a gotify client token.
+// provider and returns a Monita client token.
 //
 //	---
 //	consumes: [application/json]
