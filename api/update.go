@@ -147,12 +147,12 @@ func (a *UpdateAPI) Install(ctx *gin.Context) {
 
 	started := time.Now().UTC()
 	initial := managedUpdateStatus{
-		Ready:    true,
-		State:    "preparing",
-		Version:  request.Version,
-		Message:  "Preparing update",
-		Step:     "Preparing update",
-		Progress: 2,
+		Ready:     true,
+		State:     "preparing",
+		Version:   request.Version,
+		Message:   "Preparing update",
+		Step:      "Preparing update",
+		Progress:  2,
 		StartedAt: &started,
 		Activity: []updateActivity{{
 			Timestamp: started,

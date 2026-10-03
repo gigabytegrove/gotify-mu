@@ -1,7 +1,7 @@
 package api
 
 import (
-	"github.com/gotify/server/v3/auth"
+	"github.com/gigabytegrove/monita/auth"
 )
 
 var generateApplicationToken = auth.GenerateApplicationToken

@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/database"
+	"github.com/gigabytegrove/monita/decaymap"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/database"
-	"github.com/gotify/server/v3/decaymap"
-	"github.com/gotify/server/v3/model"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/zitadel/oidc/v3/pkg/client/rp"
@@ -198,7 +198,7 @@ func (a *OIDCAPI) promptURLParams() []rp.URLParamOpt {
 // Handle the OIDC provider callback (browser).
 //
 // Exchanges the authorization code for tokens, resolves the user,
-// creates a gotify client, sets a session cookie, and redirects to the UI.
+// creates a Monita client, sets a session cookie, and redirects to the UI.
 //
 //	---
 //	parameters:
@@ -294,7 +294,7 @@ func (a *OIDCAPI) handleElevationCallback(w http.ResponseWriter, elevate *pendin
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 </head>
 <body>
-  <h1 style="text-align:center">Gotify session elevation successful. Close this tab to continue.</h1>
+  <h1 style="text-align:center">Monita session elevation successful. Close this tab to continue.</h1>
   <script>window.close();</script>
 </body>
 </html>`)
@@ -355,12 +355,12 @@ func (a *OIDCAPI) ExternalAuthorizeHandler(ctx *gin.Context) {
 
 // swagger:operation POST /auth/oidc/external/token oidc externalToken
 //
-// Exchange an authorization code for a gotify client token.
+// Exchange an authorization code for a Monita client token.
 //
 // After the user authenticates with the OIDC provider and the app receives
 // the authorization code via redirect, the app calls this endpoint with the
 // code and PKCE code_verifier. The server exchanges the code with the OIDC
-// provider and returns a gotify client token.
+// provider and returns a Monita client token.
 //
 //	---
 //	consumes: [application/json]

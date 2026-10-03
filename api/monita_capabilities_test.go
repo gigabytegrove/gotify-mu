@@ -8,22 +8,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func TestMUCapabilitiesContract(t *testing.T) {
+func TestMonitaCapabilitiesContract(t *testing.T) {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 
-	handler := MUCapabilitiesAPI{Version: "1.0.0"}
+	handler := MonitaCapabilitiesAPI{Version: "1.0.0"}
 	handler.Get(ctx)
 
 	if recorder.Code != 200 {
 		t.Fatalf("expected HTTP 200, got %d", recorder.Code)
 	}
 
-	var payload MUCapabilities
+	var payload MonitaCapabilities
 	if err := json.Unmarshal(recorder.Body.Bytes(), &payload); err != nil {
 		t.Fatal(err)
 	}
-	if payload.Product != "gotify-mu" || payload.Version != "1.0.0" || payload.APIVersion != 1 {
+	if payload.Product != "monita" || payload.Version != "1.0.0" || payload.APIVersion != 1 {
 		t.Fatalf("unexpected capability identity: %#v", payload)
 	}
 	if !payload.Features.SharedChannels || !payload.Features.ChannelTypes ||

@@ -4,7 +4,7 @@ import "time"
 
 // ApplicationMembership grants a user access to an application/channel.
 // Application.UserID remains the canonical owner for upstream compatibility;
-// memberships add the many-to-many access model used by Gotify MU.
+// memberships add the many-to-many access model used by Monita.
 type ApplicationMembership struct {
 	ApplicationID             uint   `gorm:"primaryKey;autoIncrement:false"`
 	UserID                    uint   `gorm:"primaryKey;autoIncrement:false;index"`

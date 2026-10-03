@@ -33,8 +33,8 @@ const dexConfig = (issuerPort: number, redirectURL: string, users: DexUser[]): s
         oauth2: {skipApprovalScreen: true},
         staticClients: [
             {
-                id: 'gotify',
-                name: 'Gotify',
+                id: 'monita',
+                name: 'Monita',
                 secret: 'secret',
                 redirectURIs: [redirectURL],
             },
@@ -62,7 +62,7 @@ const waitForDex = (port: number): Promise<void> =>
 
 export const startDex = async (redirectURL: string, users: DexUser[]): Promise<DexInstance> => {
     const port = await getPort();
-    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gotify-dex-'));
+    const configDir = fs.mkdtempSync(path.join(os.tmpdir(), 'monita-dex-'));
     fs.writeFileSync(path.join(configDir, 'dex.conf'), dexConfig(port, redirectURL, users));
 
     const userArgs =
@@ -70,7 +70,7 @@ export const startDex = async (redirectURL: string, users: DexUser[]): Promise<D
             ? ['--user', `${process.getuid()}:${process.getgid()}`]
             : [];
 
-    const containerName = `gotify-dex-test-${port}`;
+    const containerName = `monita-dex-test-${port}`;
     process.stdout.write(`### Starting dex ${containerName}\n`);
     const dex = spawn('docker', [
         'run',

@@ -14,9 +14,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
 )
 
 const (
@@ -183,7 +183,9 @@ func (a *CollaborationAPI) resolveMentions(applicationID uint, body string, expl
 	}
 	if len(wanted) == 0 {
 		out := make([]uint, 0, len(selected))
-		for id := range selected { out = append(out, id) }
+		for id := range selected {
+			out = append(out, id)
+		}
 		return out, nil
 	}
 	recipientIDs, err := a.DB.GetApplicationRecipientUserIDs(applicationID)
@@ -247,14 +249,14 @@ func (a *CollaborationAPI) Reply(ctx *gin.Context) {
 			root = parent.ID
 		}
 		message := &model.Message{
-			ApplicationID: app.ID,
-			Title: title,
-			Message: params.Message,
-			Priority: priority,
-			Date: time.Now(),
-			SenderUserID: user.ID,
-			SenderName: displayUserName(user),
-			ReplyToMessageID: parent.ID,
+			ApplicationID:       app.ID,
+			Title:               title,
+			Message:             params.Message,
+			Priority:            priority,
+			Date:                time.Now(),
+			SenderUserID:        user.ID,
+			SenderName:          displayUserName(user),
+			ReplyToMessageID:    parent.ID,
 			ThreadRootMessageID: root,
 		}
 		external, err := a.Dispatcher.StoreAndDeliver(message)
@@ -502,37 +504,51 @@ func (a *CollaborationAPI) persistChatImage(
 	}
 
 	source, err := header.Open()
-	if err != nil { return empty, "", err }
+	if err != nil {
+		return empty, "", err
+	}
 	defer source.Close()
 
 	sniff := make([]byte, 512)
 	n, readErr := source.Read(sniff)
-	if readErr != nil && !errors.Is(readErr, io.EOF) { return empty, "", readErr }
+	if readErr != nil && !errors.Is(readErr, io.EOF) {
+		return empty, "", readErr
+	}
 	contentType := http.DetectContentType(sniff[:n])
 	if !supportedChatImage(contentType) {
 		return empty, "", errors.New("only JPEG, PNG, GIF, and WebP images are supported")
 	}
-	if _, err := source.Seek(0, io.SeekStart); err != nil { return empty, "", err }
+	if _, err := source.Seek(0, io.SeekStart); err != nil {
+		return empty, "", err
+	}
 
-	if err := os.MkdirAll(a.AttachmentDir, 0o700); err != nil { return empty, "", err }
+	if err := os.MkdirAll(a.AttachmentDir, 0o700); err != nil {
+		return empty, "", err
+	}
 	storageName, err := randomStorageName()
-	if err != nil { return empty, "", err }
+	if err != nil {
+		return empty, "", err
+	}
 	targetPath := filepath.Join(a.AttachmentDir, storageName)
 	target, err := os.OpenFile(targetPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-	if err != nil { return empty, "", err }
+	if err != nil {
+		return empty, "", err
+	}
 	written, copyErr := io.Copy(target, io.LimitReader(source, maxAttachmentBytes+1))
 	closeErr := target.Close()
 	if copyErr != nil || closeErr != nil || written > maxAttachmentBytes {
 		_ = os.Remove(targetPath)
-		if written > maxAttachmentBytes { return empty, "", errors.New("image exceeds 25 MiB") }
+		if written > maxAttachmentBytes {
+			return empty, "", errors.New("image exceeds 25 MiB")
+		}
 		return empty, "", errors.New("image could not be saved")
 	}
 
 	item := &model.MessageAttachment{
-		MessageID: messageID,
-		Filename: safeFilename(header),
+		MessageID:   messageID,
+		Filename:    safeFilename(header),
 		ContentType: contentType,
-		Size: written,
+		Size:        written,
 		StorageName: storageName,
 	}
 	if err := a.DB.CreateMessageAttachment(item); err != nil {
@@ -554,11 +570,17 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		userID := auth.GetUserID(ctx)
 		app, err := a.DB.GetApplicationByID(id)
-		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+			return
+		}
 		membership, err := a.DB.GetApplicationMembership(id, userID)
-		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+			return
+		}
 		user, err := a.DB.GetUserByID(userID)
-		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+			return
+		}
 		if app == nil || user == nil {
 			ctx.AbortWithError(http.StatusNotFound, errors.New("channel not found"))
 			return
@@ -617,7 +639,9 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 		mentions := []uint(nil)
 		if isChat {
 			mentions, err = a.resolveMentions(app.ID, body, nil)
-			if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+			if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+				return
+			}
 		}
 
 		extraValues := map[string]any{}
@@ -640,7 +664,9 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 			extraValues["gotify::mu::mentionUserIds"] = mentions
 		}
 		extraBytes, _ := json.Marshal(extraValues)
-		if len(extraValues) == 0 { extraBytes = nil }
+		if len(extraValues) == 0 {
+			extraBytes = nil
+		}
 
 		title, senderUserID, senderName := channelImageMessageIdentity(
 			app,
@@ -651,20 +677,24 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 
 		message := &model.Message{
 			ApplicationID: app.ID,
-			Title: title,
-			Message: body,
-			Priority: priority,
-			Date: time.Now(),
-			SenderUserID: senderUserID,
-			SenderName: senderName,
-			Extras: extraBytes,
+			Title:         title,
+			Message:       body,
+			Priority:      priority,
+			Date:          time.Now(),
+			SenderUserID:  senderUserID,
+			SenderName:    senderName,
+			Extras:        extraBytes,
 		}
 
 		persistedPaths := make([]string, 0, len(files))
 		prepared := false
 		defer func() {
-			if prepared { return }
-			for _, path := range persistedPaths { _ = os.Remove(path) }
+			if prepared {
+				return
+			}
+			for _, path := range persistedPaths {
+				_ = os.Remove(path)
+			}
 		}()
 
 		external, err := a.Dispatcher.StorePreparedAndDeliver(
@@ -673,19 +703,25 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 				attachments := make([]model.MessageAttachmentView, 0, len(files))
 				for _, header := range files {
 					view, path, saveErr := a.persistChatImage(stored.ID, header)
-					if saveErr != nil { return saveErr }
+					if saveErr != nil {
+						return saveErr
+					}
 					persistedPaths = append(persistedPaths, path)
 					attachments = append(attachments, view)
 				}
 				stored.Collaboration.Attachments = attachments
 				if len(mentions) > 0 {
-					if err := a.DB.ReplaceMessageMentions(stored.ID, mentions); err != nil { return err }
+					if err := a.DB.ReplaceMessageMentions(stored.ID, mentions); err != nil {
+						return err
+					}
 				}
 				prepared = true
 				return nil
 			},
 		)
-		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+			return
+		}
 		ctx.JSON(http.StatusCreated, external)
 	})
 }
@@ -761,10 +797,10 @@ func (a *CollaborationAPI) UploadAttachment(ctx *gin.Context) {
 			return
 		}
 		item := &model.MessageAttachment{
-			MessageID: id,
-			Filename: safeFilename(header),
+			MessageID:   id,
+			Filename:    safeFilename(header),
 			ContentType: header.Header.Get("Content-Type"),
-			Size: written,
+			Size:        written,
 			StorageName: storageName,
 		}
 		if err := a.DB.CreateMessageAttachment(item); err != nil {
@@ -773,8 +809,8 @@ func (a *CollaborationAPI) UploadAttachment(ctx *gin.Context) {
 			return
 		}
 		ctx.JSON(http.StatusCreated, model.MessageAttachmentView{
-			ID:item.ID, Filename:item.Filename, ContentType:item.ContentType, Size:item.Size,
-			URL:"/message/"+strconv.FormatUint(uint64(id),10)+"/attachment/"+strconv.FormatUint(uint64(item.ID),10),
+			ID: item.ID, Filename: item.Filename, ContentType: item.ContentType, Size: item.Size,
+			URL: "/message/" + strconv.FormatUint(uint64(id), 10) + "/attachment/" + strconv.FormatUint(uint64(item.ID), 10),
 		})
 	})
 }
@@ -807,7 +843,9 @@ func (a *CollaborationAPI) DownloadAttachment(ctx *gin.Context) {
 		}
 		path := filepath.Join(a.AttachmentDir, filepath.Base(item.StorageName))
 		disposition := "attachment"
-		if strings.HasPrefix(strings.ToLower(item.ContentType), "image/") { disposition = "inline" }
+		if strings.HasPrefix(strings.ToLower(item.ContentType), "image/") {
+			disposition = "inline"
+		}
 		ctx.Header("Content-Disposition", disposition+"; filename*=UTF-8''"+urlEncodeFilename(item.Filename))
 		if item.ContentType != "" {
 			ctx.Header("Content-Type", item.ContentType)
@@ -853,18 +891,18 @@ func (a *CollaborationAPI) DeleteAttachment(ctx *gin.Context) {
 }
 
 type templateParams struct {
-	Name string `json:"name" binding:"required"`
-	ApplicationID uint `json:"applicationId"`
-	Title string `json:"title"`
-	Message string `json:"message" binding:"required"`
-	Priority int `json:"priority"`
-	Extras map[string]any `json:"extras"`
+	Name          string         `json:"name" binding:"required"`
+	ApplicationID uint           `json:"applicationId"`
+	Title         string         `json:"title"`
+	Message       string         `json:"message" binding:"required"`
+	Priority      int            `json:"priority"`
+	Extras        map[string]any `json:"extras"`
 }
 
 func templateView(item *model.MessageTemplate) model.MessageTemplateView {
 	view := model.MessageTemplateView{
-		ID:item.ID, Name:item.Name, ApplicationID:item.ApplicationID, Title:item.Title,
-		Message:item.Message, Priority:item.Priority, CreatedAt:item.CreatedAt, UpdatedAt:item.UpdatedAt,
+		ID: item.ID, Name: item.Name, ApplicationID: item.ApplicationID, Title: item.Title,
+		Message: item.Message, Priority: item.Priority, CreatedAt: item.CreatedAt, UpdatedAt: item.UpdatedAt,
 	}
 	if len(item.Extras) > 0 {
 		_ = json.Unmarshal(item.Extras, &view.Extras)
@@ -874,81 +912,158 @@ func templateView(item *model.MessageTemplate) model.MessageTemplateView {
 
 func (a *CollaborationAPI) GetTemplates(ctx *gin.Context) {
 	items, err := a.DB.GetMessageTemplates(auth.GetUserID(ctx))
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
-	out := make([]model.MessageTemplateView,0,len(items))
-	for _, item := range items { out=append(out,templateView(item)) }
-	ctx.JSON(http.StatusOK,out)
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
+	out := make([]model.MessageTemplateView, 0, len(items))
+	for _, item := range items {
+		out = append(out, templateView(item))
+	}
+	ctx.JSON(http.StatusOK, out)
 }
 
 func (a *CollaborationAPI) SaveTemplate(ctx *gin.Context) {
 	var params templateParams
-	if err := ctx.ShouldBindJSON(&params); err != nil { return }
-	extras,_:=json.Marshal(params.Extras)
-	item:=&model.MessageTemplate{UserID:auth.GetUserID(ctx),Name:strings.TrimSpace(params.Name),ApplicationID:params.ApplicationID,Title:params.Title,Message:params.Message,Priority:params.Priority,Extras:extras}
-	if !successOrAbort(ctx,http.StatusInternalServerError,a.DB.SaveMessageTemplate(item)){return}
-	ctx.JSON(http.StatusCreated,templateView(item))
+	if err := ctx.ShouldBindJSON(&params); err != nil {
+		return
+	}
+	extras, _ := json.Marshal(params.Extras)
+	item := &model.MessageTemplate{UserID: auth.GetUserID(ctx), Name: strings.TrimSpace(params.Name), ApplicationID: params.ApplicationID, Title: params.Title, Message: params.Message, Priority: params.Priority, Extras: extras}
+	if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.SaveMessageTemplate(item)) {
+		return
+	}
+	ctx.JSON(http.StatusCreated, templateView(item))
 }
 
 func (a *CollaborationAPI) UpdateTemplate(ctx *gin.Context) {
-	withID(ctx,"id",func(id uint){
-		item,err:=a.DB.GetMessageTemplateByID(auth.GetUserID(ctx),id)
-		if !successOrAbort(ctx,500,err){return}
-		if item==nil{ctx.AbortWithStatus(404);return}
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetMessageTemplateByID(auth.GetUserID(ctx), id)
+		if !successOrAbort(ctx, 500, err) {
+			return
+		}
+		if item == nil {
+			ctx.AbortWithStatus(404)
+			return
+		}
 		var params templateParams
-		if err:=ctx.ShouldBindJSON(&params);err!=nil{return}
-		extras,_:=json.Marshal(params.Extras)
-		item.Name=strings.TrimSpace(params.Name);item.ApplicationID=params.ApplicationID;item.Title=params.Title;item.Message=params.Message;item.Priority=params.Priority;item.Extras=extras
-		if !successOrAbort(ctx,500,a.DB.SaveMessageTemplate(item)){return}
-		ctx.JSON(200,templateView(item))
+		if err := ctx.ShouldBindJSON(&params); err != nil {
+			return
+		}
+		extras, _ := json.Marshal(params.Extras)
+		item.Name = strings.TrimSpace(params.Name)
+		item.ApplicationID = params.ApplicationID
+		item.Title = params.Title
+		item.Message = params.Message
+		item.Priority = params.Priority
+		item.Extras = extras
+		if !successOrAbort(ctx, 500, a.DB.SaveMessageTemplate(item)) {
+			return
+		}
+		ctx.JSON(200, templateView(item))
 	})
 }
 
 func (a *CollaborationAPI) DeleteTemplate(ctx *gin.Context) {
-	withID(ctx,"id",func(id uint){
-		if !successOrAbort(ctx,500,a.DB.DeleteMessageTemplate(auth.GetUserID(ctx),id)){return}
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 500, a.DB.DeleteMessageTemplate(auth.GetUserID(ctx), id)) {
+			return
+		}
 		ctx.Status(http.StatusNoContent)
 	})
 }
 
 func parseOptionalInt(raw string) *int {
-	if strings.TrimSpace(raw)=="" { return nil }
-	value,err:=strconv.Atoi(raw);if err!=nil{return nil}
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	value, err := strconv.Atoi(raw)
+	if err != nil {
+		return nil
+	}
 	return &value
 }
 func parseOptionalTime(raw string) *time.Time {
-	if strings.TrimSpace(raw)=="" {return nil}
-	value,err:=time.Parse(time.RFC3339,raw);if err!=nil{return nil}
+	if strings.TrimSpace(raw) == "" {
+		return nil
+	}
+	value, err := time.Parse(time.RFC3339, raw)
+	if err != nil {
+		return nil
+	}
 	return &value
 }
 
 func (a *CollaborationAPI) Search(ctx *gin.Context) {
-	appID,_:=strconv.ParseUint(ctx.Query("applicationId"),10,64)
-	filter:=model.MessageSearchFilter{
-		Query:ctx.Query("q"), ApplicationID:uint(appID), MinPriority:parseOptionalInt(ctx.Query("minPriority")),
-		MaxPriority:parseOptionalInt(ctx.Query("maxPriority")), Sender:ctx.Query("sender"), Status:ctx.Query("status"),
-		Acknowledged:ctx.Query("acknowledged"), From:parseOptionalTime(ctx.Query("from")), To:parseOptionalTime(ctx.Query("to")),
+	appID, _ := strconv.ParseUint(ctx.Query("applicationId"), 10, 64)
+	filter := model.MessageSearchFilter{
+		Query: ctx.Query("q"), ApplicationID: uint(appID), MinPriority: parseOptionalInt(ctx.Query("minPriority")),
+		MaxPriority: parseOptionalInt(ctx.Query("maxPriority")), Sender: ctx.Query("sender"), Status: ctx.Query("status"),
+		Acknowledged: ctx.Query("acknowledged"), From: parseOptionalTime(ctx.Query("from")), To: parseOptionalTime(ctx.Query("to")),
 	}
-	filter.Limit,_=strconv.Atoi(ctx.Query("limit"))
-	items,err:=a.DB.SearchMessages(auth.GetUserID(ctx),filter)
-	if !successOrAbort(ctx,500,err){return}
-	ctx.JSON(200,toExternalMessages(items))
+	filter.Limit, _ = strconv.Atoi(ctx.Query("limit"))
+	items, err := a.DB.SearchMessages(auth.GetUserID(ctx), filter)
+	if !successOrAbort(ctx, 500, err) {
+		return
+	}
+	ctx.JSON(200, toExternalMessages(items))
 }
 
 func (a *CollaborationAPI) GetSavedSearches(ctx *gin.Context) {
-	items,err:=a.DB.GetSavedMessageSearches(auth.GetUserID(ctx));if !successOrAbort(ctx,500,err){return};ctx.JSON(200,items)
+	items, err := a.DB.GetSavedMessageSearches(auth.GetUserID(ctx))
+	if !successOrAbort(ctx, 500, err) {
+		return
+	}
+	ctx.JSON(200, items)
 }
 func (a *CollaborationAPI) SaveSearch(ctx *gin.Context) {
-	var item model.SavedMessageSearch;if err:=ctx.ShouldBindJSON(&item);err!=nil{return};item.ID=0;item.UserID=auth.GetUserID(ctx)
-	if strings.TrimSpace(item.Name)==""{ctx.AbortWithError(400,errors.New("name is required"));return}
-	if !successOrAbort(ctx,500,a.DB.SaveSavedMessageSearch(&item)){return};ctx.JSON(201,item)
+	var item model.SavedMessageSearch
+	if err := ctx.ShouldBindJSON(&item); err != nil {
+		return
+	}
+	item.ID = 0
+	item.UserID = auth.GetUserID(ctx)
+	if strings.TrimSpace(item.Name) == "" {
+		ctx.AbortWithError(400, errors.New("name is required"))
+		return
+	}
+	if !successOrAbort(ctx, 500, a.DB.SaveSavedMessageSearch(&item)) {
+		return
+	}
+	ctx.JSON(201, item)
 }
 func (a *CollaborationAPI) UpdateSearch(ctx *gin.Context) {
-	withID(ctx,"id",func(id uint){item,err:=a.DB.GetSavedMessageSearchByID(auth.GetUserID(ctx),id);if !successOrAbort(ctx,500,err){return};if item==nil{ctx.AbortWithStatus(404);return}
-		var params model.SavedMessageSearch;if err:=ctx.ShouldBindJSON(&params);err!=nil{return}
-		item.Name=params.Name;item.Query=params.Query;item.ApplicationID=params.ApplicationID;item.MinPriority=params.MinPriority;item.MaxPriority=params.MaxPriority;item.Sender=params.Sender;item.Status=params.Status;item.Acknowledged=params.Acknowledged
-		if !successOrAbort(ctx,500,a.DB.SaveSavedMessageSearch(item)){return};ctx.JSON(200,item)
+	withID(ctx, "id", func(id uint) {
+		item, err := a.DB.GetSavedMessageSearchByID(auth.GetUserID(ctx), id)
+		if !successOrAbort(ctx, 500, err) {
+			return
+		}
+		if item == nil {
+			ctx.AbortWithStatus(404)
+			return
+		}
+		var params model.SavedMessageSearch
+		if err := ctx.ShouldBindJSON(&params); err != nil {
+			return
+		}
+		item.Name = params.Name
+		item.Query = params.Query
+		item.ApplicationID = params.ApplicationID
+		item.MinPriority = params.MinPriority
+		item.MaxPriority = params.MaxPriority
+		item.Sender = params.Sender
+		item.Status = params.Status
+		item.Acknowledged = params.Acknowledged
+		if !successOrAbort(ctx, 500, a.DB.SaveSavedMessageSearch(item)) {
+			return
+		}
+		ctx.JSON(200, item)
 	})
 }
 func (a *CollaborationAPI) DeleteSearch(ctx *gin.Context) {
-	withID(ctx,"id",func(id uint){if !successOrAbort(ctx,500,a.DB.DeleteSavedMessageSearch(auth.GetUserID(ctx),id)){return};ctx.Status(http.StatusNoContent)})
+	withID(ctx, "id", func(id uint) {
+		if !successOrAbort(ctx, 500, a.DB.DeleteSavedMessageSearch(auth.GetUserID(ctx), id)) {
+			return
+		}
+		ctx.Status(http.StatusNoContent)
+	})
 }

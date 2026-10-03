@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test"
-	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -527,7 +527,7 @@ func (s *MessageSuite) Test_CreateMessage_MentionNotifiesMutedChatMember() {
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	assert.ElementsMatch(s.T(), []uint{owner.ID, mentioned.ID}, s.notifiedUserIDs)
 	assert.NotContains(s.T(), s.notifiedUserIDs, sender.ID)
-	
+
 	messages, err := s.db.GetMessagesByApplication(app.ID)
 	require.NoError(s.T(), err)
 	require.Len(s.T(), messages, 1)

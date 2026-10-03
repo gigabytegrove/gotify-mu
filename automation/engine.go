@@ -21,8 +21,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gorilla/websocket"
-	"github.com/gotify/server/v3/model"
 	"github.com/robfig/cron"
 	"github.com/rs/zerolog/log"
 )
@@ -101,11 +101,11 @@ func New(db Database, notifier Notifier) *Engine {
 	instanceBytes := make([]byte, 12)
 	_, _ = rand.Read(instanceBytes)
 	e := &Engine{
-		db: db,
-		notifier: notifier,
-		ctx: ctx,
-		cancel: cancel,
-		reload: make(chan struct{}, 1),
+		db:         db,
+		notifier:   notifier,
+		ctx:        ctx,
+		cancel:     cancel,
+		reload:     make(chan struct{}, 1),
 		instanceID: hex.EncodeToString(instanceBytes),
 	}
 	e.wg.Add(2)
@@ -121,7 +121,9 @@ func (e *Engine) Close() {
 }
 
 func (e *Engine) AddPostStoreHook(hook func(*model.Message)) {
-	if hook == nil { return }
+	if hook == nil {
+		return
+	}
 	e.hookMu.Lock()
 	e.postStoreHooks = append(e.postStoreHooks, hook)
 	e.hookMu.Unlock()
@@ -143,7 +145,7 @@ func (e *Engine) ReloadIntegrations() {
 	}
 }
 
-// Publish stores a normal Gotify MU message and applies native delivery policies.
+// Publish stores a normal Monita message and applies native delivery policies.
 func (e *Engine) Publish(applicationID uint, title, message string, priority int) (*model.Message, error) {
 	app, err := e.db.GetApplicationByID(applicationID)
 	if err != nil {
@@ -157,10 +159,10 @@ func (e *Engine) Publish(applicationID uint, title, message string, priority int
 	}
 	msg := &model.Message{
 		ApplicationID: applicationID,
-		Title: title,
-		Message: message,
-		Priority: priority,
-		Date: time.Now(),
+		Title:         title,
+		Message:       message,
+		Priority:      priority,
+		Date:          time.Now(),
 	}
 	if _, err := e.storeAndDeliver(msg, true); err != nil {
 		return nil, err
@@ -204,7 +206,9 @@ func (e *Engine) storeAndDeliver(msg *model.Message, allowEscalation bool) (*mod
 		msg.Date = time.Now()
 	}
 	created, err := e.db.CreateMessageOnce(msg)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	if !created {
 		return externalMessage(msg), nil
 	}
@@ -281,12 +285,12 @@ func (e *Engine) deliver(userID uint, msg *model.Message, external *model.Messag
 	}
 	if digest != nil && digest.Enabled && msg.Priority < digest.ImmediatePriority {
 		return e.db.QueueDigestItem(&model.DigestItem{
-			UserID: userID,
-			MessageID: msg.ID,
+			UserID:        userID,
+			MessageID:     msg.ID,
 			ApplicationID: msg.ApplicationID,
-			Title: msg.Title,
-			Message: msg.Message,
-			Priority: msg.Priority,
+			Title:         msg.Title,
+			Message:       msg.Message,
+			Priority:      msg.Priority,
 		})
 	}
 
@@ -326,17 +330,25 @@ func quietNow(policy *model.QuietHoursPolicy, now time.Time) bool {
 }
 
 func (e *Engine) queueEscalations(msg *model.Message) error {
-	if msg.EscalationDepth >= 5 { return nil }
+	if msg.EscalationDepth >= 5 {
+		return nil
+	}
 	rules, err := e.db.GetEscalationRulesForMessage(msg.ApplicationID, msg.Priority)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	for _, rule := range rules {
-		if e.escalationWouldCycle(msg, rule) { continue }
+		if e.escalationWouldCycle(msg, rule) {
+			continue
+		}
 		delay := rule.DelayMinutes
-		if delay < 1 { delay = 1 }
+		if delay < 1 {
+			delay = 1
+		}
 		if err := e.db.QueueEscalation(&model.EscalationState{
-			RuleID:rule.ID,
-			MessageID:msg.ID,
-			DueAt:time.Now().Add(time.Duration(delay)*time.Minute),
+			RuleID:    rule.ID,
+			MessageID: msg.ID,
+			DueAt:     time.Now().Add(time.Duration(delay) * time.Minute),
 		}); err != nil {
 			return err
 		}
@@ -346,17 +358,29 @@ func (e *Engine) queueEscalations(msg *model.Message) error {
 
 func (e *Engine) escalationWouldCycle(msg *model.Message, rule *model.EscalationRule) bool {
 	targetType := strings.ToLower(strings.TrimSpace(rule.TargetType))
-	if targetType != "" && targetType != "channel" { return false }
+	if targetType != "" && targetType != "channel" {
+		return false
+	}
 	targetID := rule.TargetApplicationID
-	if targetID == 0 { targetID = rule.TargetID }
-	if targetID == 0 { return true }
+	if targetID == 0 {
+		targetID = rule.TargetID
+	}
+	if targetID == 0 {
+		return true
+	}
 
 	current := msg
 	for depth := 0; current != nil && depth < 8; depth++ {
-		if current.ApplicationID == targetID { return true }
-		if current.ParentMessageID == 0 { break }
+		if current.ApplicationID == targetID {
+			return true
+		}
+		if current.ParentMessageID == 0 {
+			break
+		}
 		parent, err := e.db.GetMessageByID(current.ParentMessageID)
-		if err != nil || parent == nil { break }
+		if err != nil || parent == nil {
+			break
+		}
 		current = parent
 	}
 	return false
@@ -372,7 +396,9 @@ func (e *Engine) schedulerLoop() {
 			log.Error().Err(err).Msg("Could not acquire automation scheduler lease")
 			return
 		}
-		if acquired { e.runDue(now) }
+		if acquired {
+			e.runDue(now)
+		}
 	}
 	run(time.Now())
 	for {
@@ -401,13 +427,15 @@ func (e *Engine) runSchedules(now time.Time) {
 	}
 	for _, item := range items {
 		scheduledFor := now
-		if item.NextRunAt != nil { scheduledFor = *item.NextRunAt }
+		if item.NextRunAt != nil {
+			scheduledFor = *item.NextRunAt
+		}
 
 		run := &model.ScheduledNotificationRun{
-			ScheduleID:item.ID,
-			ScheduledFor:scheduledFor,
-			StartedAt:now,
-			Status:"running",
+			ScheduleID:   item.ID,
+			ScheduledFor: scheduledFor,
+			StartedAt:    now,
+			Status:       "running",
 		}
 		if err := e.db.CreateScheduledNotificationRun(run); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not create schedule run history")
@@ -415,7 +443,9 @@ func (e *Engine) runSchedules(now time.Time) {
 		}
 
 		misfirePolicy := strings.ToLower(strings.TrimSpace(item.MisfirePolicy))
-		if misfirePolicy == "" { misfirePolicy = "send" }
+		if misfirePolicy == "" {
+			misfirePolicy = "send"
+		}
 		if misfirePolicy == "skip" && now.Sub(scheduledFor) > 5*time.Minute {
 			finished := now
 			run.Status = "skipped"
@@ -424,18 +454,20 @@ func (e *Engine) runSchedules(now time.Time) {
 			item.LastStatus = "skipped"
 			item.LastError = ""
 			item.NextRunAt = NextScheduleRun(item, scheduledFor.Add(time.Second))
-			if item.NextRunAt == nil { item.Enabled = false }
+			if item.NextRunAt == nil {
+				item.Enabled = false
+			}
 			_ = e.db.SaveScheduledNotification(item)
 			continue
 		}
 
 		msg := &model.Message{
-			ApplicationID:item.ApplicationID,
-			Title:item.Title,
-			Message:item.Message,
-			Priority:item.Priority,
-			Date:now,
-			DeduplicationKey:fmt.Sprintf("schedule:%d:%d", item.ID, scheduledFor.UnixNano()),
+			ApplicationID:    item.ApplicationID,
+			Title:            item.Title,
+			Message:          item.Message,
+			Priority:         item.Priority,
+			Date:             now,
+			DeduplicationKey: fmt.Sprintf("schedule:%d:%d", item.ID, scheduledFor.UnixNano()),
 		}
 		external, publishErr := e.storeAndDeliver(msg, true)
 		finished := time.Now()
@@ -453,7 +485,9 @@ func (e *Engine) runSchedules(now time.Time) {
 			continue
 		}
 		run.Status = "completed"
-		if external != nil { run.MessageID = external.ID }
+		if external != nil {
+			run.MessageID = external.ID
+		}
 		_ = e.db.SaveScheduledNotificationRun(run)
 
 		runAt := now
@@ -466,7 +500,9 @@ func (e *Engine) runSchedules(now time.Time) {
 			item.NextRunAt = nil
 		} else {
 			item.NextRunAt = NextScheduleRun(item, scheduledFor.Add(time.Second))
-			if item.NextRunAt == nil { item.Enabled = false }
+			if item.NextRunAt == nil {
+				item.Enabled = false
+			}
 		}
 		if err := e.db.SaveScheduledNotification(item); err != nil {
 			log.Error().Err(err).Uint("schedule_id", item.ID).Msg("Could not update schedule")
@@ -477,25 +513,35 @@ func (e *Engine) runSchedules(now time.Time) {
 func scheduleLocation(item *model.ScheduledNotification) *time.Location {
 	loc := time.UTC
 	if item.Timezone != "" {
-		if parsed, err := time.LoadLocation(item.Timezone); err == nil { loc = parsed }
+		if parsed, err := time.LoadLocation(item.Timezone); err == nil {
+			loc = parsed
+		}
 	}
 	return loc
 }
 
 func excludedScheduleDate(item *model.ScheduledNotification, candidate time.Time) bool {
-	if strings.TrimSpace(item.ExcludedDates) == "" { return false }
+	if strings.TrimSpace(item.ExcludedDates) == "" {
+		return false
+	}
 	localDate := candidate.In(scheduleLocation(item)).Format("2006-01-02")
 	for _, raw := range strings.FieldsFunc(item.ExcludedDates, func(r rune) bool {
 		return r == ',' || r == ';' || r == '\n' || r == ' ' || r == '\t'
 	}) {
-		if strings.TrimSpace(raw) == localDate { return true }
+		if strings.TrimSpace(raw) == localDate {
+			return true
+		}
 	}
 	return false
 }
 
 func scheduleWithinLimits(item *model.ScheduledNotification, candidate time.Time) bool {
-	if item.MaxRuns > 0 && item.RunCount >= item.MaxRuns { return false }
-	if item.EndAt != nil && candidate.After(*item.EndAt) { return false }
+	if item.MaxRuns > 0 && item.RunCount >= item.MaxRuns {
+		return false
+	}
+	if item.EndAt != nil && candidate.After(*item.EndAt) {
+		return false
+	}
 	return true
 }
 
@@ -512,24 +558,32 @@ func nextScheduleCandidate(item *model.ScheduledNotification, now time.Time) *ti
 		return nil
 	case "hourly":
 		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), localNow.Hour(), clamp(item.Minute, 0, 59), 0, 0, loc)
-		if !candidate.After(localNow) { candidate = candidate.Add(time.Hour) }
+		if !candidate.After(localNow) {
+			candidate = candidate.Add(time.Hour)
+		}
 		value := candidate.UTC()
 		return &value
 	case "daily":
 		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc)
-		if !candidate.After(localNow) { candidate = candidate.AddDate(0, 0, 1) }
+		if !candidate.After(localNow) {
+			candidate = candidate.AddDate(0, 0, 1)
+		}
 		value := candidate.UTC()
 		return &value
 	case "weekly":
 		weekday := time.Weekday(clamp(item.Weekday, 0, 6))
 		days := (int(weekday) - int(localNow.Weekday()) + 7) % 7
 		candidate := time.Date(localNow.Year(), localNow.Month(), localNow.Day(), clamp(item.Hour, 0, 23), clamp(item.Minute, 0, 59), 0, 0, loc).AddDate(0, 0, days)
-		if !candidate.After(localNow) { candidate = candidate.AddDate(0, 0, 7) }
+		if !candidate.After(localNow) {
+			candidate = candidate.AddDate(0, 0, 7)
+		}
 		value := candidate.UTC()
 		return &value
 	case "cron":
 		schedule, err := cron.Parse(strings.TrimSpace(item.CronExpression))
-		if err != nil { return nil }
+		if err != nil {
+			return nil
+		}
 		candidate := schedule.Next(localNow)
 		value := candidate.UTC()
 		return &value
@@ -542,8 +596,12 @@ func NextScheduleRun(item *model.ScheduledNotification, now time.Time) *time.Tim
 	searchFrom := now
 	for attempts := 0; attempts < 10000; attempts++ {
 		candidate := nextScheduleCandidate(item, searchFrom)
-		if candidate == nil || !scheduleWithinLimits(item, *candidate) { return nil }
-		if !excludedScheduleDate(item, *candidate) { return candidate }
+		if candidate == nil || !scheduleWithinLimits(item, *candidate) {
+			return nil
+		}
+		if !excludedScheduleDate(item, *candidate) {
+			return candidate
+		}
 		searchFrom = candidate.Add(time.Second)
 	}
 	return nil
@@ -565,10 +623,16 @@ func (e *Engine) runDigests(now time.Time) {
 			lines := make([]string, 0, len(items))
 			highest := 0
 			for _, item := range items {
-				if item.Priority > highest { highest = item.Priority }
+				if item.Priority > highest {
+					highest = item.Priority
+				}
 				line := item.Title
-				if strings.TrimSpace(line) == "" { line = item.Message }
-				if len(line) > 120 { line = line[:117] + "..." }
+				if strings.TrimSpace(line) == "" {
+					line = item.Message
+				}
+				if len(line) > 120 {
+					line = line[:117] + "..."
+				}
 				lines = append(lines, "• "+line)
 			}
 			app, appErr := e.db.GetOrCreateDigestApplication(policy.UserID)
@@ -577,14 +641,16 @@ func (e *Engine) runDigests(now time.Time) {
 				continue
 			}
 			runKey := now.UnixNano()
-			if policy.NextRunAt != nil { runKey = policy.NextRunAt.UnixNano() }
+			if policy.NextRunAt != nil {
+				runKey = policy.NextRunAt.UnixNano()
+			}
 			summary := &model.Message{
-				ApplicationID:app.ID,
-				Title:fmt.Sprintf("%d notification digest", len(items)),
-				Message:strings.Join(lines, "\n"),
-				Priority:highest,
-				Date:now,
-				DeduplicationKey:fmt.Sprintf("digest:%d:%d", policy.UserID, runKey),
+				ApplicationID:    app.ID,
+				Title:            fmt.Sprintf("%d notification digest", len(items)),
+				Message:          strings.Join(lines, "\n"),
+				Priority:         highest,
+				Date:             now,
+				DeduplicationKey: fmt.Sprintf("digest:%d:%d", policy.UserID, runKey),
 			}
 			created, storeErr := e.db.CreateMessageOnce(summary)
 			if storeErr != nil {
@@ -609,7 +675,9 @@ func (e *Engine) runDigests(now time.Time) {
 		lastSent := now
 		policy.LastSentAt = &lastSent
 		interval := policy.IntervalMinutes
-		if interval < 15 { interval = 15 }
+		if interval < 15 {
+			interval = 15
+		}
 		next := now.Add(time.Duration(interval) * time.Minute)
 		policy.NextRunAt = &next
 		if err := e.db.SaveDigestPolicy(policy); err != nil {
@@ -630,13 +698,17 @@ func (e *Engine) runDeferred(now time.Time) {
 			log.Error().Err(quietErr).Uint("user_id", item.UserID).Msg("Could not inspect deferred Quiet Hours")
 			continue
 		}
-		if quiet != nil && quiet.Enabled && quietNow(quiet, now) { continue }
+		if quiet != nil && quiet.Enabled && quietNow(quiet, now) {
+			continue
+		}
 		msg, msgErr := e.db.GetMessageByID(item.MessageID)
 		if msgErr != nil {
 			log.Error().Err(msgErr).Uint("message_id", item.MessageID).Msg("Could not load deferred message")
 			continue
 		}
-		if msg != nil { e.notifier.Notify(item.UserID, externalMessage(msg)) }
+		if msg != nil {
+			e.notifier.Notify(item.UserID, externalMessage(msg))
+		}
 		if err := e.db.DeleteDeferredNotification(item.UserID, item.MessageID); err != nil {
 			log.Error().Err(err).Uint("message_id", item.MessageID).Msg("Could not clear deferred notification")
 		}
@@ -660,7 +732,9 @@ func (e *Engine) runEscalations(now time.Time) {
 		}
 
 		rootID := source.RootMessageID
-		if rootID == 0 { rootID = source.ID }
+		if rootID == 0 {
+			rootID = source.ID
+		}
 		acknowledged, ackErr := e.db.IsMessageAcknowledged(source.ID)
 		if ackErr == nil && rootID != source.ID && !acknowledged {
 			acknowledged, ackErr = e.db.IsMessageAcknowledged(rootID)
@@ -688,25 +762,31 @@ func (e *Engine) runEscalations(now time.Time) {
 
 		targetApp, targetErr := e.db.ResolveEscalationTargetApplication(rule)
 		if targetErr != nil || targetApp == nil {
-			if targetErr == nil { targetErr = errors.New("escalation target is unavailable") }
+			if targetErr == nil {
+				targetErr = errors.New("escalation target is unavailable")
+			}
 			log.Error().Err(targetErr).Uint("rule_id", rule.ID).Msg("Escalation target could not be resolved")
 			continue
 		}
 
 		title := source.Title
-		if title == "" { title = "Escalated notification" } else { title = "Escalated: " + title }
+		if title == "" {
+			title = "Escalated notification"
+		} else {
+			title = "Escalated: " + title
+		}
 		body := source.Message + "\n\nThis notification was escalated because it was not acknowledged."
 		child := &model.Message{
-			ApplicationID:targetApp.ID,
-			Title:title,
-			Message:body,
-			Priority:source.Priority,
-			Date:now,
-			ParentMessageID:source.ID,
-			RootMessageID:rootID,
-			EscalationRuleID:rule.ID,
-			EscalationDepth:source.EscalationDepth+1,
-			DeduplicationKey:fmt.Sprintf("escalation:%d:%d", state.ID, state.RepeatCount),
+			ApplicationID:    targetApp.ID,
+			Title:            title,
+			Message:          body,
+			Priority:         source.Priority,
+			Date:             now,
+			ParentMessageID:  source.ID,
+			RootMessageID:    rootID,
+			EscalationRuleID: rule.ID,
+			EscalationDepth:  source.EscalationDepth + 1,
+			DeduplicationKey: fmt.Sprintf("escalation:%d:%d", state.ID, state.RepeatCount),
 		}
 		allowChain := state.RepeatCount == 0
 		external, publishErr := e.storeAndDeliver(child, allowChain)
@@ -714,7 +794,9 @@ func (e *Engine) runEscalations(now time.Time) {
 			log.Error().Err(publishErr).Uint("rule_id", rule.ID).Msg("Escalation delivery failed")
 			continue
 		}
-		if external != nil { state.LastEscalatedMessageID = external.ID }
+		if external != nil {
+			state.LastEscalatedMessageID = external.ID
+		}
 		state.RepeatCount++
 
 		repeatMinutes := rule.RepeatMinutes
@@ -799,7 +881,9 @@ func (e *Engine) restartIntegrations() {
 func (e *Engine) runMQTTLoop(ctx context.Context, integration *model.MQTTIntegration) {
 	leaseName := fmt.Sprintf("mqtt:%d", integration.ID)
 	for {
-		if ctx.Err() != nil { return }
+		if ctx.Err() != nil {
+			return
+		}
 		err := e.runWithLease(ctx, leaseName, func(leaseCtx context.Context) error {
 			return e.runMQTT(leaseCtx, integration)
 		})
@@ -809,7 +893,8 @@ func (e *Engine) runMQTTLoop(ctx context.Context, integration *model.MQTTIntegra
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("MQTT connection interrupted")
 		}
 		select {
-		case <-ctx.Done(): return
+		case <-ctx.Done():
+			return
 		case <-time.After(10 * time.Second):
 		}
 	}
@@ -819,8 +904,12 @@ var errLeaseUnavailable = errors.New("automation lease unavailable")
 
 func (e *Engine) runWithLease(ctx context.Context, name string, work func(context.Context) error) error {
 	acquired, err := e.db.TryAcquireAutomationLease(name, e.instanceID, time.Now(), 30*time.Second)
-	if err != nil { return err }
-	if !acquired { return errLeaseUnavailable }
+	if err != nil {
+		return err
+	}
+	if !acquired {
+		return errLeaseUnavailable
+	}
 
 	leaseCtx, cancel := context.WithCancel(ctx)
 	stop := make(chan struct{})
@@ -872,7 +961,9 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 		clientID = "gotify-mu-" + strconv.FormatUint(uint64(integration.ID), 10)
 	}
 	protocol := integration.ProtocolVersion
-	if protocol == 0 { protocol = 5 }
+	if protocol == 0 {
+		protocol = 5
+	}
 	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password, protocol); err != nil {
 		return err
 	}
@@ -948,7 +1039,7 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 				}
 				if _, duplicate := pendingQoS2[packetID]; !duplicate {
 					pendingQoS2[packetID] = pendingPublish{
-						topic: topic,
+						topic:   topic,
 						payload: append([]byte(nil), payload...),
 					}
 				}
@@ -971,20 +1062,34 @@ func (e *Engine) runMQTT(ctx context.Context, integration *model.MQTTIntegration
 // TestMQTTConnection verifies broker authentication and topic subscription without consuming notifications.
 func (e *Engine) TestMQTTConnection(id uint) error {
 	integration, err := e.db.GetMQTTIntegrationByID(id)
-	if err != nil { return err }
-	if integration == nil { return errors.New("MQTT connection not found") }
+	if err != nil {
+		return err
+	}
+	if integration == nil {
+		return errors.New("MQTT connection not found")
+	}
 	ctx, cancel := context.WithTimeout(e.ctx, 15*time.Second)
 	defer cancel()
 	conn, err := dialMQTT(ctx, integration)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer conn.Close()
 	reader := bufio.NewReader(conn)
 	clientID := integration.ClientID
-	if clientID == "" { clientID = fmt.Sprintf("gotify-mu-test-%d", integration.ID) }
+	if clientID == "" {
+		clientID = fmt.Sprintf("gotify-mu-test-%d", integration.ID)
+	}
 	protocol := integration.ProtocolVersion
-	if protocol == 0 { protocol = 5 }
-	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password, protocol); err != nil { return err }
-	if err := mqttSubscribe(conn, reader, integration.Topic, integration.QoS, protocol); err != nil { return err }
+	if protocol == 0 {
+		protocol = 5
+	}
+	if err := mqttConnect(conn, reader, clientID, integration.Username, integration.Password, protocol); err != nil {
+		return err
+	}
+	if err := mqttSubscribe(conn, reader, integration.Topic, integration.QoS, protocol); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -1009,7 +1114,9 @@ func dialMQTT(ctx context.Context, integration *model.MQTTIntegration) (net.Conn
 		tlsConfig := &tls.Config{MinVersion: tls.VersionTLS12, ServerName: parsed.Hostname()}
 		if strings.TrimSpace(integration.CACertificate) != "" {
 			pool, poolErr := x509.SystemCertPool()
-			if poolErr != nil || pool == nil { pool = x509.NewCertPool() }
+			if poolErr != nil || pool == nil {
+				pool = x509.NewCertPool()
+			}
 			if !pool.AppendCertsFromPEM([]byte(integration.CACertificate)) {
 				return nil, errors.New("MQTT CA certificate is invalid")
 			}
@@ -1020,7 +1127,9 @@ func dialMQTT(ctx context.Context, integration *model.MQTTIntegration) (net.Conn
 				return nil, errors.New("MQTT client certificate and private key must be configured together")
 			}
 			cert, certErr := tls.X509KeyPair([]byte(integration.ClientCertificate), []byte(integration.ClientKey))
-			if certErr != nil { return nil, fmt.Errorf("invalid MQTT client certificate: %w", certErr) }
+			if certErr != nil {
+				return nil, fmt.Errorf("invalid MQTT client certificate: %w", certErr)
+			}
 			tlsConfig.Certificates = []tls.Certificate{cert}
 		}
 		return tls.DialWithDialer(dialer, "tcp", host, tlsConfig)
@@ -1033,8 +1142,12 @@ func dialMQTT(ctx context.Context, integration *model.MQTTIntegration) (net.Conn
 
 func mqttConnect(conn net.Conn, reader *bufio.Reader, clientID, username, password string, protocol int) error {
 	flags := byte(0x02)
-	if username != "" || password != "" { flags |= 0x80 }
-	if password != "" { flags |= 0x40 }
+	if username != "" || password != "" {
+		flags |= 0x80
+	}
+	if password != "" {
+		flags |= 0x40
+	}
 	if protocol != 4 && protocol != 5 {
 		return errors.New("unsupported MQTT protocol version")
 	}
@@ -1046,15 +1159,23 @@ func mqttConnect(conn net.Conn, reader *bufio.Reader, clientID, username, passwo
 	}
 	var payload []byte
 	payload = appendMQTTString(payload, clientID)
-	if username != "" || password != "" { payload = appendMQTTString(payload, username) }
-	if password != "" { payload = appendMQTTString(payload, password) }
+	if username != "" || password != "" {
+		payload = appendMQTTString(payload, username)
+	}
+	if password != "" {
+		payload = appendMQTTString(payload, password)
+	}
 	packet := []byte{0x10}
 	packet = append(packet, encodeRemainingLength(len(variable)+len(payload))...)
 	packet = append(packet, variable...)
 	packet = append(packet, payload...)
-	if _, err := conn.Write(packet); err != nil { return err }
+	if _, err := conn.Write(packet); err != nil {
+		return err
+	}
 	header, body, err := readMQTTPacket(reader)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	if header>>4 != 2 || len(body) < 2 || body[1] != 0 {
 		return errors.New("MQTT broker rejected connection")
 	}
@@ -1062,26 +1183,38 @@ func mqttConnect(conn net.Conn, reader *bufio.Reader, clientID, username, passwo
 }
 
 func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string, qos, protocol int) error {
-	if strings.TrimSpace(topic) == "" { return errors.New("MQTT topic is required") }
-	if qos < 0 || qos > 2 { return errors.New("MQTT QoS must be 0, 1, or 2") }
+	if strings.TrimSpace(topic) == "" {
+		return errors.New("MQTT topic is required")
+	}
+	if qos < 0 || qos > 2 {
+		return errors.New("MQTT QoS must be 0, 1, or 2")
+	}
 	var body []byte
 	body = append(body, 0x00, 0x01)
-	if protocol == 5 { body = append(body, 0x00) }
+	if protocol == 5 {
+		body = append(body, 0x00)
+	}
 	body = appendMQTTString(body, topic)
 	body = append(body, byte(qos))
 	packet := []byte{0x82}
 	packet = append(packet, encodeRemainingLength(len(body))...)
 	packet = append(packet, body...)
-	if _, err := conn.Write(packet); err != nil { return err }
+	if _, err := conn.Write(packet); err != nil {
+		return err
+	}
 	header, response, err := readMQTTPacket(reader)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	if header>>4 != 9 || len(response) < 3 {
 		return errors.New("MQTT subscription was rejected")
 	}
 	offset := 2
 	if protocol == 5 {
 		properties, consumed, propErr := decodeMQTTVarInt(response[offset:])
-		if propErr != nil { return propErr }
+		if propErr != nil {
+			return propErr
+		}
 		offset += consumed + properties
 	}
 	if offset >= len(response) || response[offset] >= 0x80 {
@@ -1092,11 +1225,15 @@ func mqttSubscribe(conn net.Conn, reader *bufio.Reader, topic string, qos, proto
 
 func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 	header, err := reader.ReadByte()
-	if err != nil { return 0, nil, err }
+	if err != nil {
+		return 0, nil, err
+	}
 	multiplier, remaining := 1, 0
 	for i := 0; i < 4; i++ {
 		value, readErr := reader.ReadByte()
-		if readErr != nil { return 0, nil, readErr }
+		if readErr != nil {
+			return 0, nil, readErr
+		}
 		remaining += int(value&127) * multiplier
 		if remaining > maxMQTTPacketBytes {
 			return 0, nil, fmt.Errorf("MQTT packet exceeds %d-byte limit", maxMQTTPacketBytes)
@@ -1114,32 +1251,46 @@ func readMQTTPacket(reader *bufio.Reader) (byte, []byte, error) {
 func decodeMQTTVarInt(data []byte) (int, int, error) {
 	multiplier, value := 1, 0
 	for i := 0; i < 4; i++ {
-		if i >= len(data) { return 0, 0, io.ErrUnexpectedEOF }
+		if i >= len(data) {
+			return 0, 0, io.ErrUnexpectedEOF
+		}
 		current := data[i]
 		value += int(current&127) * multiplier
-		if current&128 == 0 { return value, i+1, nil }
+		if current&128 == 0 {
+			return value, i + 1, nil
+		}
 		multiplier *= 128
 	}
 	return 0, 0, errors.New("invalid MQTT variable integer")
 }
 
 func decodePublish(header byte, body []byte, protocol int) (string, []byte, uint16, byte, error) {
-	if len(body) < 2 { return "", nil, 0, 0, errors.New("invalid MQTT publish packet") }
+	if len(body) < 2 {
+		return "", nil, 0, 0, errors.New("invalid MQTT publish packet")
+	}
 	length := int(binary.BigEndian.Uint16(body[:2]))
-	if len(body) < 2+length { return "", nil, 0, 0, errors.New("invalid MQTT topic length") }
+	if len(body) < 2+length {
+		return "", nil, 0, 0, errors.New("invalid MQTT topic length")
+	}
 	topic := string(body[2 : 2+length])
 	offset := 2 + length
 	qos := (header >> 1) & 0x03
-	if qos == 3 { return "", nil, 0, 0, errors.New("invalid MQTT QoS") }
+	if qos == 3 {
+		return "", nil, 0, 0, errors.New("invalid MQTT QoS")
+	}
 	var packetID uint16
 	if qos > 0 {
-		if len(body) < offset+2 { return "", nil, 0, 0, errors.New("invalid MQTT packet id") }
+		if len(body) < offset+2 {
+			return "", nil, 0, 0, errors.New("invalid MQTT packet id")
+		}
 		packetID = binary.BigEndian.Uint16(body[offset : offset+2])
 		offset += 2
 	}
 	if protocol == 5 {
 		properties, consumed, err := decodeMQTTVarInt(body[offset:])
-		if err != nil { return "", nil, 0, 0, err }
+		if err != nil {
+			return "", nil, 0, 0, err
+		}
 		offset += consumed
 		if properties < 0 || offset+properties > len(body) {
 			return "", nil, 0, 0, errors.New("invalid MQTT property length")
@@ -1160,9 +1311,13 @@ func encodeRemainingLength(length int) []byte {
 	for {
 		value := byte(length % 128)
 		length /= 128
-		if length > 0 { value |= 0x80 }
+		if length > 0 {
+			value |= 0x80
+		}
 		result = append(result, value)
-		if length == 0 { return result }
+		if length == 0 {
+			return result
+		}
 	}
 }
 
@@ -1284,7 +1439,9 @@ func (e *Engine) ReceiveHomeAssistantEvent(id uint, eventType string, data map[s
 func (e *Engine) runHomeAssistantLoop(ctx context.Context, integration *model.HomeAssistantIntegration) {
 	leaseName := fmt.Sprintf("home-assistant:%d", integration.ID)
 	for {
-		if ctx.Err() != nil { return }
+		if ctx.Err() != nil {
+			return
+		}
 		err := e.runWithLease(ctx, leaseName, func(leaseCtx context.Context) error {
 			return e.runHomeAssistant(leaseCtx, integration)
 		})
@@ -1294,7 +1451,8 @@ func (e *Engine) runHomeAssistantLoop(ctx context.Context, integration *model.Ho
 			log.Warn().Err(err).Uint("integration_id", integration.ID).Msg("Home Assistant connection interrupted")
 		}
 		select {
-		case <-ctx.Done(): return
+		case <-ctx.Done():
+			return
 		case <-time.After(10 * time.Second):
 		}
 	}
@@ -1337,7 +1495,7 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 	if hello["type"] != "auth_required" {
 		return errors.New("unexpected Home Assistant authentication response")
 	}
-	if err := conn.WriteJSON(map[string]any{"type":"auth","access_token":integration.Token}); err != nil {
+	if err := conn.WriteJSON(map[string]any{"type": "auth", "access_token": integration.Token}); err != nil {
 		return err
 	}
 	var authResponse map[string]any
@@ -1350,7 +1508,7 @@ func (e *Engine) runHomeAssistant(ctx context.Context, integration *model.HomeAs
 	connectedAt := time.Now()
 	_ = e.db.UpdateHomeAssistantIntegrationStatus(integration.ID, "connected", &connectedAt, nil, "", nil, false)
 
-	subscribe := map[string]any{"id":1,"type":"subscribe_events"}
+	subscribe := map[string]any{"id": 1, "type": "subscribe_events"}
 	if strings.TrimSpace(integration.EventType) != "" {
 		subscribe["event_type"] = integration.EventType
 	}
@@ -1449,24 +1607,24 @@ func lookupMapPath(root map[string]any, path string) (any, bool) {
 func externalMessage(msg *model.Message) *model.MessageExternal {
 	priority := msg.Priority
 	external := &model.MessageExternal{
-		ID: msg.ID,
-		ApplicationID: msg.ApplicationID,
-		Message: msg.Message,
-		Title: msg.Title,
-		Priority: &priority,
-		Date: msg.Date,
-		SenderUserID: msg.SenderUserID,
-		SenderName: msg.SenderName,
-		ParentMessageID: msg.ParentMessageID,
-		RootMessageID: msg.RootMessageID,
-		EscalationRuleID: msg.EscalationRuleID,
-		EscalationDepth: msg.EscalationDepth,
-		Collaboration: msg.Collaboration,
-		Acknowledged: msg.Acknowledged,
+		ID:                   msg.ID,
+		ApplicationID:        msg.ApplicationID,
+		Message:              msg.Message,
+		Title:                msg.Title,
+		Priority:             &priority,
+		Date:                 msg.Date,
+		SenderUserID:         msg.SenderUserID,
+		SenderName:           msg.SenderName,
+		ParentMessageID:      msg.ParentMessageID,
+		RootMessageID:        msg.RootMessageID,
+		EscalationRuleID:     msg.EscalationRuleID,
+		EscalationDepth:      msg.EscalationDepth,
+		Collaboration:        msg.Collaboration,
+		Acknowledged:         msg.Acknowledged,
 		AcknowledgedByAnyone: msg.AcknowledgedByAnyone,
 		AcknowledgementCount: msg.AcknowledgementCount,
-		LastAcknowledgedBy: msg.LastAcknowledgedBy,
-		LastAcknowledgedAt: msg.LastAcknowledgedAt,
+		LastAcknowledgedBy:   msg.LastAcknowledgedBy,
+		LastAcknowledgedAt:   msg.LastAcknowledgedAt,
 	}
 	if len(msg.Extras) > 0 {
 		external.Extras = make(map[string]any)
@@ -1490,7 +1648,11 @@ func numberAsInt(value any) (int, bool) {
 }
 
 func clamp(value, min, max int) int {
-	if value < min { return min }
-	if value > max { return max }
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
 	return value
 }

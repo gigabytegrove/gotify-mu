@@ -6,10 +6,10 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/auth/password"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/auth/password"
-	"github.com/gotify/server/v3/model"
 )
 
 // The UserDatabase interface for encapsulating database access.
@@ -70,11 +70,14 @@ type UserAPI struct {
 	Registration       bool
 }
 
-
 func (a *UserAPI) validatePassword(value string) error {
-	if err := password.ValidateNewPassword(value); err != nil { return err }
+	if err := password.ValidateNewPassword(value); err != nil {
+		return err
+	}
 	policy, err := a.DB.GetSecurityPolicy()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	if len([]rune(value)) < policy.MinimumPasswordLength {
 		return fmt.Errorf("password must be at least %d characters", policy.MinimumPasswordLength)
 	}
@@ -148,30 +151,42 @@ func (a *UserAPI) GetCurrentUser(ctx *gin.Context) {
 		return
 	}
 	policy, policyErr := a.DB.GetSecurityPolicy()
-	if !successOrAbort(ctx, 500, policyErr) { return }
+	if !successOrAbort(ctx, 500, policyErr) {
+		return
+	}
 	mfa, mfaErr := a.DB.GetUserMFA(user.ID)
-	if !successOrAbort(ctx, 500, mfaErr) { return }
+	if !successOrAbort(ctx, 500, mfaErr) {
+		return
+	}
 	passkeys, passkeyErr := a.DB.GetPasskeysByUser(user.ID)
-	if !successOrAbort(ctx, 500, passkeyErr) { return }
+	if !successOrAbort(ctx, 500, passkeyErr) {
+		return
+	}
 	mfaEnabled := mfa != nil && mfa.Enabled
 	mfaRequired := user.OIDCID == nil && user.LDAPID == nil &&
 		((policy.RequireMFAForAdmins && user.Admin) || policy.RequireMFAForAllLocalUsers) &&
 		!mfaEnabled
 	elevationMinutes := policy.ElevationMinutes
-	if elevationMinutes <= 0 { elevationMinutes = 240 }
+	if elevationMinutes <= 0 {
+		elevationMinutes = 240
+	}
 	provider := "local"
-	if user.OIDCID != nil { provider = "oidc" }
-	if user.LDAPID != nil { provider = "ldap" }
+	if user.OIDCID != nil {
+		provider = "oidc"
+	}
+	if user.LDAPID != nil {
+		provider = "ldap"
+	}
 	result := &model.CurrentUserExternal{
-		ID:          user.ID,
-		Name:        user.Name,
-		DisplayName: user.DisplayName,
-		Admin:       user.Admin,
-		CreatedAt: user.CreatedAt,
-		MFAEnabled: mfaEnabled,
-		MFARequired: mfaRequired,
-		AuthProvider: provider,
-		PasskeyCount: len(passkeys),
+		ID:                       user.ID,
+		Name:                     user.Name,
+		DisplayName:              user.DisplayName,
+		Admin:                    user.Admin,
+		CreatedAt:                user.CreatedAt,
+		MFAEnabled:               mfaEnabled,
+		MFARequired:              mfaRequired,
+		AuthProvider:             provider,
+		PasskeyCount:             len(passkeys),
 		ElevationDurationSeconds: elevationMinutes * 60,
 	}
 	client := auth.GetClient(ctx)
@@ -558,6 +573,6 @@ func toExternalUser(internal *model.User) *model.UserExternal {
 		DisplayName: internal.DisplayName,
 		Admin:       internal.Admin,
 		ID:          internal.ID,
-		CreatedAt: internal.CreatedAt,
+		CreatedAt:   internal.CreatedAt,
 	}
 }

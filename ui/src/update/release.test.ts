@@ -53,7 +53,7 @@ describe('release update helpers', () => {
             {
                 tag_name: 'v0.2.0',
                 target_commitish: 'releasesha',
-                name: 'Gotify MU v0.2.0',
+                name: 'Monita v0.2.0',
                 html_url: 'https://example.invalid/release',
                 draft: false,
                 prerelease: true,

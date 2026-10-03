@@ -64,7 +64,7 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
         setTitle(item.title);
         setMessage(item.message);
         setPriority(item.priority);
-        const display = item.extras?.['gotify-mu::display'];
+        const display = item.extras?.['monita::display'] ?? item.extras?.['gotify-mu::display'];
         setActions(Array.isArray(display?.actions) ? display.actions : []);
         setFields(Array.isArray(display?.fields) ? display.fields : []);
     };
@@ -75,7 +75,7 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
         const extras =
             actions.length > 0 || fields.length > 0
                 ? {
-                      'gotify-mu::display': {
+                      'monita::display': {
                           actions: actions.filter((item) => item.label.trim() && item.url.trim()),
                           fields: fields.filter((item) => item.label.trim() && item.value.trim()),
                       },
@@ -102,7 +102,7 @@ export const PushMessageDialog = ({appId, appName, defaultPriority, fClose, fOnS
         const extras: IMessageExtras | undefined =
             cleanActions.length > 0 || cleanFields.length > 0
                 ? {
-                      'gotify-mu::display': {
+                      'monita::display': {
                           actions: cleanActions,
                           fields: cleanFields,
                       },

@@ -25,7 +25,7 @@ export const PriorityField = ({
         value={value}
         onChange={(event) => onChange(Number(event.target.value))}
         helperText={
-            helperText || priorityLabel(value) + ' · Gotify priorities may use any integer value.'
+            helperText || priorityLabel(value) + ' · Monita priorities may use any integer value.'
         }
     />
 );

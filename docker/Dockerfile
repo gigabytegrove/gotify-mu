@@ -13,14 +13,14 @@ FROM --platform=${BUILDPLATFORM} node:24 AS js-builder
 
 ARG BUILD_JS=0
 
-COPY ./Makefile /src/gotify/Makefile
-COPY ./ui /src/gotify/ui
+COPY ./Makefile /src/monita/Makefile
+COPY ./ui /src/monita/ui
 
 RUN if [ "$BUILD_JS" = "1" ]; then \
-    (cd /src/gotify/ui && yarn install) && \
-    (cd /src/gotify && make build-js) \
+    (cd /src/monita/ui && yarn install) && \
+    (cd /src/monita && make build-js) \
     else \
-    mkdir -p /src/gotify/ui/build; \
+    mkdir -p /src/monita/ui/build; \
     fi
 
 # --- Go Builder ---
@@ -44,14 +44,14 @@ RUN apt-get update && apt-get install -yq --no-install-recommends \
     ca-certificates \
     git
 
-COPY . /src/gotify
-COPY --from=js-builder /src/gotify/ui/build /ui-build
+COPY . /src/monita
+COPY --from=js-builder /src/monita/ui/build /ui-build
 
 RUN if [ "$BUILD_JS" = "1" ]; then \
-    cp -r --update /ui-build /src/gotify/ui/build; \
+    cp -r --update /ui-build /src/monita/ui/build; \
     fi
 
-RUN cd /src/gotify && \
+RUN cd /src/monita && \
     if [ "$RUN_TESTS" = "1" ] && [ "$BUILDPLATFORM" = "$TARGETPLATFORM" ]; then \
     go test -v ./...; \
     fi && \
@@ -81,7 +81,8 @@ LABEL org.opencontainers.image.revision=${MONITA_COMMIT}
 LABEL org.opencontainers.image.licenses="MIT"
 
 ARG GOTIFY_SERVER_EXPOSE=80
-ENV GOTIFY_SERVER_PORT=$GOTIFY_SERVER_EXPOSE
+ARG MONITA_SERVER_EXPOSE=$GOTIFY_SERVER_EXPOSE
+ENV MONITA_SERVER_PORT=$MONITA_SERVER_EXPOSE
 
 WORKDIR /app
 
@@ -91,8 +92,8 @@ RUN export DEBIAN_FRONTEND=noninteractive && apt-get update && apt-get install -
     ca-certificates && \
     rm -rf /var/lib/apt/lists/*
 
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD curl --fail http://localhost:$GOTIFY_SERVER_PORT/health || exit 1
-EXPOSE $GOTIFY_SERVER_EXPOSE
+HEALTHCHECK --interval=30s --timeout=5s --start-period=5s CMD curl --fail http://localhost:$MONITA_SERVER_PORT/health || exit 1
+EXPOSE $MONITA_SERVER_EXPOSE
 
 COPY --from=builder /target /
 

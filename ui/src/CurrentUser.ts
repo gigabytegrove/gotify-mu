@@ -64,7 +64,7 @@ export class CurrentUser {
                 Authorization: 'Basic ' + btoa(username + ':' + password),
             };
             if (mfaCode.trim()) {
-                headers['X-Gotify-MFA-Code'] = mfaCode.trim();
+                headers['X-Monita-MFA-Code'] = mfaCode.trim();
             }
             const resp = await axios.create().request<ICurrentUser>({
                 url: config.get('url') + 'auth/local/login',

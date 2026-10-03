@@ -1,6 +1,6 @@
 # Monita Branding
 
-Monita is the product name for the project formerly known as Gotify MU.
+Monita is the product name for the project formerly known as Monita.
 
 ## Authoritative artwork
 
@@ -17,6 +17,6 @@ No alternate palette, reconstructed mark, traced copy, flattened substitute, or 
 
 Use **Monita** for current product-facing text.
 
-The phrase **formerly Gotify MU** may be used where historical context is useful during the transition.
+The phrase **formerly Monita** may be used where historical context is useful during the transition.
 
 Gotify may still appear in compatibility documentation where it refers to the Gotify protocol, upstream project, or supported Gotify clients.

@@ -4,25 +4,25 @@ import (
 	"errors"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
 )
 
-type MUPresenceDatabase interface {
+type MonitaPresenceDatabase interface {
 	GetApplicationByID(id uint) (*model.Application, error)
 	GetApplicationMembership(applicationID, userID uint) (*model.ApplicationMembership, error)
 	GetApplicationMemberships(applicationID uint) ([]*model.ApplicationMembership, error)
 	GetUserByID(id uint) (*model.User, error)
 }
 
-type MUEventNotifier interface {
-	NotifyMUEvent(userID uint, event any)
+type MonitaEventNotifier interface {
+	NotifyMonitaEvent(userID uint, event any)
 }
 
-type MUPresenceAPI struct {
-	DB       MUPresenceDatabase
-	Notifier MUEventNotifier
+type MonitaPresenceAPI struct {
+	DB       MonitaPresenceDatabase
+	Notifier MonitaEventNotifier
 }
 
 type typingRequest struct {
@@ -38,7 +38,7 @@ type TypingEvent struct {
 	ExpiresAt     time.Time `json:"expiresAt"`
 }
 
-func (a *MUPresenceAPI) SetTyping(ctx *gin.Context) {
+func (a *MonitaPresenceAPI) SetTyping(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		req := typingRequest{}
 		if err := ctx.BindJSON(&req); err != nil {
@@ -113,7 +113,7 @@ func (a *MUPresenceAPI) SetTyping(ctx *gin.Context) {
 			if member.UserID == userID {
 				continue
 			}
-			a.Notifier.NotifyMUEvent(member.UserID, event)
+			a.Notifier.NotifyMonitaEvent(member.UserID, event)
 		}
 
 		ctx.JSON(200, event)

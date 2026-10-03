@@ -7,11 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth/password"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth/password"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -145,56 +145,56 @@ func (s *AuthenticationSuite) TestNothingProvided() {
 }
 
 func (s *AuthenticationSuite) TestOrphanedClientToken() {
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_orphan_elevated", s.auth.RequireAdmin, 403)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_orphan_elevated", s.auth.OptionalAdmin, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_orphan_elevated", s.auth.RequireAdmin, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_orphan_elevated", s.auth.OptionalAdmin, 403)
 }
 
 func (s *AuthenticationSuite) TestHeaderApiKeyToken() {
 	// not existing token
-	s.assertHeaderRequest("X-Gotify-Key", "ergerogerg", s.auth.RequireApplicationToken, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "ergerogerg", s.auth.RequireClient, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "ergerogerg", s.auth.RequireAdmin, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "ergerogerg", s.auth.RequireElevatedClient, 401)
+	s.assertHeaderRequest("X-Monita-Key", "ergerogerg", s.auth.RequireApplicationToken, 401)
+	s.assertHeaderRequest("X-Monita-Key", "ergerogerg", s.auth.RequireClient, 401)
+	s.assertHeaderRequest("X-Monita-Key", "ergerogerg", s.auth.RequireAdmin, 401)
+	s.assertHeaderRequest("X-Monita-Key", "ergerogerg", s.auth.RequireElevatedClient, 401)
 
 	// not existing key
-	s.assertHeaderRequest("X-Gotify-Keyx", "clienttoken", s.auth.RequireApplicationToken, 401)
-	s.assertHeaderRequest("X-Gotify-Keyx", "clienttoken", s.auth.RequireClient, 401)
-	s.assertHeaderRequest("X-Gotify-Keyx", "clienttoken", s.auth.RequireAdmin, 401)
-	s.assertHeaderRequest("X-Gotify-Keyx", "clienttoken", s.auth.RequireElevatedClient, 401)
+	s.assertHeaderRequest("X-Monita-Keyx", "clienttoken", s.auth.RequireApplicationToken, 401)
+	s.assertHeaderRequest("X-Monita-Keyx", "clienttoken", s.auth.RequireClient, 401)
+	s.assertHeaderRequest("X-Monita-Keyx", "clienttoken", s.auth.RequireAdmin, 401)
+	s.assertHeaderRequest("X-Monita-Keyx", "clienttoken", s.auth.RequireElevatedClient, 401)
 
 	// apptoken
-	s.assertHeaderRequest("X-Gotify-Key", "apptoken", s.auth.RequireApplicationToken, 200)
-	s.assertHeaderRequest("X-Gotify-Key", "apptoken", s.auth.RequireClient, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "apptoken", s.auth.RequireAdmin, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "apptoken", s.auth.RequireElevatedClient, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "apptoken_admin", s.auth.RequireApplicationToken, 200)
-	s.assertHeaderRequest("X-Gotify-Key", "apptoken_admin", s.auth.RequireClient, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "apptoken_admin", s.auth.RequireAdmin, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "apptoken_admin", s.auth.RequireElevatedClient, 401)
+	s.assertHeaderRequest("X-Monita-Key", "apptoken", s.auth.RequireApplicationToken, 200)
+	s.assertHeaderRequest("X-Monita-Key", "apptoken", s.auth.RequireClient, 401)
+	s.assertHeaderRequest("X-Monita-Key", "apptoken", s.auth.RequireAdmin, 401)
+	s.assertHeaderRequest("X-Monita-Key", "apptoken", s.auth.RequireElevatedClient, 401)
+	s.assertHeaderRequest("X-Monita-Key", "apptoken_admin", s.auth.RequireApplicationToken, 200)
+	s.assertHeaderRequest("X-Monita-Key", "apptoken_admin", s.auth.RequireClient, 401)
+	s.assertHeaderRequest("X-Monita-Key", "apptoken_admin", s.auth.RequireAdmin, 401)
+	s.assertHeaderRequest("X-Monita-Key", "apptoken_admin", s.auth.RequireElevatedClient, 401)
 
 	// clienttoken (non-admin, not elevated)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken", s.auth.RequireApplicationToken, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken", s.auth.RequireClient, 200)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken", s.auth.RequireAdmin, 403)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken", s.auth.RequireElevatedClient, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken", s.auth.RequireApplicationToken, 401)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken", s.auth.RequireClient, 200)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken", s.auth.RequireAdmin, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken", s.auth.RequireElevatedClient, 403)
 
 	// clienttoken_elevated (non-admin, elevated)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_elevated", s.auth.RequireApplicationToken, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_elevated", s.auth.RequireClient, 200)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_elevated", s.auth.RequireAdmin, 403)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_elevated", s.auth.RequireElevatedClient, 200)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_elevated", s.auth.RequireApplicationToken, 401)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_elevated", s.auth.RequireClient, 200)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_elevated", s.auth.RequireAdmin, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_elevated", s.auth.RequireElevatedClient, 200)
 
 	// clienttoken_admin (not elevated)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin", s.auth.RequireApplicationToken, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin", s.auth.RequireClient, 200)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin", s.auth.RequireAdmin, 403)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin", s.auth.RequireElevatedClient, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin", s.auth.RequireApplicationToken, 401)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin", s.auth.RequireClient, 200)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin", s.auth.RequireAdmin, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin", s.auth.RequireElevatedClient, 403)
 
 	// clienttoken_admin_elevated
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin_elevated", s.auth.RequireApplicationToken, 401)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin_elevated", s.auth.RequireClient, 200)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin_elevated", s.auth.RequireAdmin, 200)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin_elevated", s.auth.RequireElevatedClient, 200)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin_elevated", s.auth.RequireApplicationToken, 401)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin_elevated", s.auth.RequireClient, 200)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin_elevated", s.auth.RequireAdmin, 200)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin_elevated", s.auth.RequireElevatedClient, 200)
 }
 
 func (s *AuthenticationSuite) TestAuthorizationHeaderApiKeyToken() {
@@ -294,9 +294,9 @@ func (s *AuthenticationSuite) TestBasicAuthDisabled() {
 }
 
 func (s *AuthenticationSuite) TestRequireAdminSessionDoesNotRequireElevation() {
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin", s.auth.RequireAdminSession, 200)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin_elevated", s.auth.RequireAdminSession, 200)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken", s.auth.RequireAdminSession, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin", s.auth.RequireAdminSession, 200)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin_elevated", s.auth.RequireAdminSession, 200)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken", s.auth.RequireAdminSession, 403)
 	s.assertHeaderRequest("Authorization", "Basic YWRtaW46cHc=", s.auth.RequireAdminSession, 200)
 }
 
@@ -315,12 +315,12 @@ func (s *AuthenticationSuite) TestOptionalAdminAuth() {
 
 	// clienttoken (non-admin, not elevated)
 	s.assertQueryRequest("token", "clienttoken", s.auth.OptionalAdmin, 403)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken", s.auth.OptionalAdmin, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken", s.auth.OptionalAdmin, 403)
 	s.assertHeaderRequest("Authorization", "Bearer clienttoken", s.auth.OptionalAdmin, 403)
 
 	// clienttoken_elevated (non-admin, elevated)
 	s.assertQueryRequest("token", "clienttoken_elevated", s.auth.OptionalAdmin, 403)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_elevated", s.auth.OptionalAdmin, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_elevated", s.auth.OptionalAdmin, 403)
 	s.assertHeaderRequest("Authorization", "Bearer clienttoken_elevated", s.auth.OptionalAdmin, 403)
 
 	// user admin:pw (basic auth counts as elevated)
@@ -329,13 +329,13 @@ func (s *AuthenticationSuite) TestOptionalAdminAuth() {
 
 	// clienttoken_admin (not elevated)
 	s.assertQueryRequest("token", "clienttoken_admin", s.auth.OptionalAdmin, 403)
-	s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin", s.auth.OptionalAdmin, 403)
+	s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin", s.auth.OptionalAdmin, 403)
 	s.assertHeaderRequest("Authorization", "Bearer clienttoken_admin", s.auth.OptionalAdmin, 403)
 
 	// clienttoken_admin_elevated
 	ctx = s.assertQueryRequest("token", "clienttoken_admin_elevated", s.auth.OptionalAdmin, 200)
 	assert.Equal(s.T(), uint(2), *TryGetUserID(ctx))
-	ctx = s.assertHeaderRequest("X-Gotify-Key", "clienttoken_admin_elevated", s.auth.OptionalAdmin, 200)
+	ctx = s.assertHeaderRequest("X-Monita-Key", "clienttoken_admin_elevated", s.auth.OptionalAdmin, 200)
 	assert.Equal(s.T(), uint(2), *TryGetUserID(ctx))
 	ctx = s.assertHeaderRequest("Authorization", "Bearer clienttoken_admin_elevated", s.auth.OptionalAdmin, 200)
 	assert.Equal(s.T(), uint(2), *TryGetUserID(ctx))
@@ -381,7 +381,7 @@ func (s *AuthenticationSuite) assertCookieRequest(token string, f fMiddleware, c
 	recorder := httptest.NewRecorder()
 	ctx, _ = gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest("GET", "/", nil)
-	ctx.Request.AddCookie(&http.Cookie{Name: cookieName, Value: token})
+	ctx.Request.AddCookie(&http.Cookie{Name: CookieName, Value: token})
 	f(ctx)
 	assert.Equal(s.T(), code, recorder.Code)
 	return ctx
@@ -430,7 +430,7 @@ func (s *AuthenticationSuite) TestCrossOriginProtectionIgnoredForTokenAuth() {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest("POST", "/", nil)
-	ctx.Request.Header.Set("X-Gotify-Key", "clienttoken")
+	ctx.Request.Header.Set("X-Monita-Key", "clienttoken")
 	ctx.Request.Header.Set("Sec-Fetch-Site", "cross-site")
 	s.auth.RequireClient(ctx)
 	assert.Equal(s.T(), 200, recorder.Code)
@@ -447,7 +447,7 @@ func (s *AuthenticationSuite) TestCrossOriginProtectionAllowsSafeMethods() {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest("GET", "/", nil)
-	ctx.Request.AddCookie(&http.Cookie{Name: cookieName, Value: "clienttoken"})
+	ctx.Request.AddCookie(&http.Cookie{Name: CookieName, Value: "clienttoken"})
 	ctx.Request.Header.Set("Sec-Fetch-Site", "cross-site")
 	s.auth.RequireClient(ctx)
 	assert.Equal(s.T(), 200, recorder.Code)
@@ -458,7 +458,7 @@ func (s *AuthenticationSuite) assertCsrfRequest(headers map[string]string, cooki
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest("POST", "/", nil)
 	if cookie != "" {
-		ctx.Request.AddCookie(&http.Cookie{Name: cookieName, Value: cookie})
+		ctx.Request.AddCookie(&http.Cookie{Name: CookieName, Value: cookie})
 	}
 	for k, v := range headers {
 		ctx.Request.Header.Set(k, v)
@@ -468,3 +468,7 @@ func (s *AuthenticationSuite) assertCsrfRequest(headers map[string]string, cooki
 }
 
 type fMiddleware gin.HandlerFunc
+
+func (s *AuthenticationSuite) TestLegacyGotifyKeyHeaderCompatibility() {
+	s.assertHeaderRequest("X-Gotify-Key", "clienttoken", s.auth.RequireClient, 200)
+}

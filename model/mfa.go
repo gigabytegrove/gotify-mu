@@ -14,14 +14,14 @@ type UserMFA struct {
 
 // MFAStatus is safe to return to the current user or administrators.
 type MFAStatus struct {
-	Enabled        bool       `json:"enabled"`
-	EnrolledAt     *time.Time `json:"enrolledAt,omitempty"`
-	RecoveryCodes  int        `json:"recoveryCodes"`
+	Enabled       bool       `json:"enabled"`
+	EnrolledAt    *time.Time `json:"enrolledAt,omitempty"`
+	RecoveryCodes int        `json:"recoveryCodes"`
 }
 
 // MFASetupResult is returned only when a new secret is generated.
 type MFASetupResult struct {
-	Secret        string   `json:"secret"`
-	ProvisioningURI string `json:"provisioningUri"`
-	RecoveryCodes []string `json:"recoveryCodes"`
+	Secret          string   `json:"secret"`
+	ProvisioningURI string   `json:"provisioningUri"`
+	RecoveryCodes   []string `json:"recoveryCodes"`
 }

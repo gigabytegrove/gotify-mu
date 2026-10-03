@@ -1,6 +1,6 @@
 // todo before all tests jest start puppeteer
 import {Page} from 'puppeteer';
-import {newTest, GotifyTest} from './setup';
+import {newTest, MonitaTest} from './setup';
 import {
     clearField,
     clickByText,
@@ -17,13 +17,13 @@ import axios from 'axios';
 import {IApplication, IMessage, IMessageExtras} from '../types';
 
 let page: Page;
-let gotify: GotifyTest;
+let monita: MonitaTest;
 beforeAll(async () => {
-    gotify = await newTest();
-    page = gotify.page;
+    monita = await newTest();
+    page = monita.page;
 });
 
-afterAll(async () => await gotify.close());
+afterAll(async () => await monita.close());
 
 const axiosAuth = {auth: {username: 'admin', password: 'admin'}};
 
@@ -55,7 +55,7 @@ describe('Messages', () => {
     });
     const createApp = (name: string) =>
         axios
-            .post<IApplication>(`${gotify.url}/application`, {name}, axiosAuth)
+            .post<IApplication>(`${monita.url}/application`, {name}, axiosAuth)
             .then((resp) => resp.data.token);
     it('shows navigation', async () => {
         await page.waitForSelector(naviId);
@@ -147,11 +147,11 @@ describe('Messages', () => {
 
     const backup1 = m('Backup done', 'Linux Server Backup finished (1.6GB).');
     const backup2 = m('Backup done', 'Windows Server Backup finished (6.2GB).');
-    const backup3 = m('Backup done', 'Gotify Backup finished (0.1MB).');
+    const backup3 = m('Backup done', 'Monita Backup finished (0.1MB).');
 
     const createMessage = (msg: Partial<IMessage>, token: string) =>
-        axios.post<IMessage>(`${gotify.url}/message`, msg, {
-            headers: {'X-Gotify-Key': token},
+        axios.post<IMessage>(`${monita.url}/message`, msg, {
+            headers: {'X-Monita-Key': token},
         });
 
     const expectMessageView = async (expected: Msg[]) => {

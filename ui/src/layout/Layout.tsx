@@ -146,12 +146,7 @@ const Layout = observer(() => {
                                         path="/system"
                                         element={authed(elevated(<SystemAdministration />))}
                                     />
-                                    <Route
-                                        path="/settings"
-                                        element={authed(
-                                            <Settings />
-                                        )}
-                                    />
+                                    <Route path="/settings" element={authed(<Settings />)} />
                                     <Route path="/plugins" element={authed(<Plugins />)} />
                                     <Route
                                         path="/plugins/:id"

@@ -76,7 +76,7 @@ export class PluginStore extends BaseStore<IPlugin> {
         );
         this.snack(
             response.data.restartRequired
-                ? 'Plugin update staged. Restart Gotify MU to load it.'
+                ? 'Plugin update staged. Restart Monita to load it.'
                 : 'Plugin installed from catalog'
         );
         await this.refresh();
@@ -101,7 +101,7 @@ export class PluginStore extends BaseStore<IPlugin> {
         if (verification?.signature) form.append('signature', verification.signature);
         if (verification?.publicKey) form.append('publicKey', verification.publicKey);
         await axios.post(`${config.get('url')}plugin/${id}/update`, form);
-        this.snack('Plugin update staged. Restart Gotify MU to load it.');
+        this.snack('Plugin update staged. Restart Monita to load it.');
     };
 
     @action

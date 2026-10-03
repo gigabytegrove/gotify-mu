@@ -3,7 +3,7 @@ package database
 import (
 	"fmt"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"gorm.io/gorm"
 )
 
@@ -37,8 +37,12 @@ func (d *GormDatabase) GetUserByOIDC(oidcID string) (*model.User, error) {
 func (d *GormDatabase) GetUserByLDAP(ldapID string) (*model.User, error) {
 	user := new(model.User)
 	err := d.DB.Where("ldap_id = ?", ldapID).Find(user).Error
-	if err == gorm.ErrRecordNotFound { err = nil }
-	if user.LDAPID != nil && *user.LDAPID == ldapID { return user, err }
+	if err == gorm.ErrRecordNotFound {
+		err = nil
+	}
+	if user.LDAPID != nil && *user.LDAPID == ldapID {
+		return user, err
+	}
 	return nil, err
 }
 

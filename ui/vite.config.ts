@@ -2,13 +2,16 @@ import {defineConfig} from 'vite';
 import react from '@vitejs/plugin-react';
 import babel from '@rolldown/plugin-babel';
 
-try {
-    process.loadEnvFile('../gotify-server.env');
-} catch {
-    // file is optional
+for (const envFile of ['../monita-server.env', '../gotify-server.env']) {
+    try {
+        process.loadEnvFile(envFile);
+        break;
+    } catch {
+        // file is optional; the legacy name is checked second
+    }
 }
 
-const GOTIFY_SERVER_PORT = process.env.GOTIFY_SERVER_PORT ?? '80';
+const MONITA_SERVER_PORT = process.env.MONITA_SERVER_PORT ?? process.env.GOTIFY_SERVER_PORT ?? '80';
 
 function decoratorPreset(options: Record<string, unknown>) {
     return {
@@ -45,11 +48,11 @@ export default defineConfig({
         host: '0.0.0.0',
         proxy: {
             '^/(application|message|client|current|user|plugin|version|image|auth)': {
-                target: `http://localhost:${GOTIFY_SERVER_PORT}/`,
+                target: `http://localhost:${MONITA_SERVER_PORT}/`,
                 secure: false,
             },
             '/stream': {
-                target: `http://localhost:${GOTIFY_SERVER_PORT}/`,
+                target: `http://localhost:${MONITA_SERVER_PORT}/`,
                 ws: true,
             },
         },

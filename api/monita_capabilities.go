@@ -2,21 +2,21 @@ package api
 
 import "github.com/gin-gonic/gin"
 
-// MUCapabilitiesAPI exposes a stable discovery contract for Gotify MU-aware
-// clients. A stock Gotify server does not expose this route, allowing clients
+// MonitaCapabilitiesAPI exposes a stable discovery contract for Monita-aware
+// clients. A stock Monita server does not expose this route, allowing clients
 // to fall back cleanly to the upstream feature set on HTTP 404.
-type MUCapabilitiesAPI struct {
+type MonitaCapabilitiesAPI struct {
 	Version string
 }
 
-type MUCapabilities struct {
-	Product    string            `json:"product"`
-	Version    string            `json:"version"`
-	APIVersion int               `json:"apiVersion"`
-	Features   MUCapabilityFlags `json:"features"`
+type MonitaCapabilities struct {
+	Product    string                `json:"product"`
+	Version    string                `json:"version"`
+	APIVersion int                   `json:"apiVersion"`
+	Features   MonitaCapabilityFlags `json:"features"`
 }
 
-type MUCapabilityFlags struct {
+type MonitaCapabilityFlags struct {
 	SharedChannels       bool `json:"sharedChannels"`
 	GlobalChannels       bool `json:"globalChannels"`
 	ChannelTypes         bool `json:"channelTypes"`
@@ -38,12 +38,12 @@ type MUCapabilityFlags struct {
 	Mentions             bool `json:"mentions"`
 }
 
-func (a *MUCapabilitiesAPI) Get(ctx *gin.Context) {
-	ctx.JSON(200, MUCapabilities{
-		Product:    "gotify-mu",
+func (a *MonitaCapabilitiesAPI) Get(ctx *gin.Context) {
+	ctx.JSON(200, MonitaCapabilities{
+		Product:    "monita",
 		Version:    a.Version,
 		APIVersion: 1,
-		Features: MUCapabilityFlags{
+		Features: MonitaCapabilityFlags{
 			SharedChannels:       true,
 			GlobalChannels:       true,
 			ChannelTypes:         true,

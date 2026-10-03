@@ -4,9 +4,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/mode"
 	"github.com/gin-contrib/cors"
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/mode"
 	"github.com/stretchr/testify/assert"
 )
 

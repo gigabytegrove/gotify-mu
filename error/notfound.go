@@ -3,8 +3,8 @@ package error
 import (
 	"net/http"
 
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/model"
 )
 
 // NotFound creates a gin middleware for handling page not found.

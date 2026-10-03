@@ -76,7 +76,7 @@ const Plugins = observer(() => {
     return (
         <DefaultPage
             title="Plugins"
-            description="Install, enable, and configure server-side Gotify plugins."
+            description="Install, enable, and configure server-side Monita plugins."
             rightControl={
                 currentUser.user.admin ? (
                     <Button
@@ -254,7 +254,7 @@ const PluginInstallDialog = observer(({fClose}: {fClose: VoidFunction}) => {
                 ) : (
                     <Stack spacing={2} sx={{pt: 0.5}}>
                         <Alert severity="warning">
-                            Plugins execute native code inside Gotify MU with the same access as the
+                            Plugins execute native code inside Monita with the same access as the
                             server. Install binaries only from sources you trust.
                         </Alert>
 
@@ -311,8 +311,8 @@ const PluginInstallDialog = observer(({fClose}: {fClose: VoidFunction}) => {
                             helperText="The key must already be trusted by the server."
                         />
                         <Alert severity="info">
-                            Plugins are native server code. Gotify MU verifies configured checksums
-                            and trusted Ed25519 signatures before loading new uploads. Unsigned
+                            Plugins are native server code. Monita verifies configured checksums and
+                            trusted Ed25519 signatures before loading new uploads. Unsigned
                             installation is disabled unless the server administrator explicitly opts
                             in.
                         </Alert>

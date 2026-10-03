@@ -9,10 +9,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test/testdb"
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -40,13 +40,12 @@ func TestShouldAuditMutation(t *testing.T) {
 	assert.False(t, shouldAuditMutation("/auth/local/login"))
 }
 
-
 func TestAuditSanitization(t *testing.T) {
 	payload := map[string]any{
-		"name": "integration",
+		"name":     "integration",
 		"password": "secret-password",
 		"nested": map[string]any{
-			"clientKey": "private-key",
+			"clientKey":       "private-key",
 			"tokenConfigured": true,
 		},
 	}

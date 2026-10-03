@@ -85,7 +85,7 @@ const SystemAdministration = () => {
                 headers: {'Content-Type': 'multipart/form-data'},
             });
             setRestoreStaged(true);
-            snackManager.snack('Backup staged. Restart Gotify MU to apply it.');
+            snackManager.snack('Backup staged. Restart Monita to apply it.');
         } finally {
             setRestoring(false);
             if (restoreInput.current) restoreInput.current.value = '';
@@ -339,7 +339,7 @@ const SystemAdministration = () => {
                                     Cancel Restore
                                 </Button>
                             }>
-                            A restore is staged. Restart Gotify MU to apply it before the database
+                            A restore is staged. Restart Monita to apply it before the database
                             opens. A pre-restore safety backup will be created automatically.
                         </Alert>
                     )}

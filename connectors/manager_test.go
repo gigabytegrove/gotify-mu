@@ -8,12 +8,16 @@ import (
 
 func TestSplitAddresses(t *testing.T) {
 	got := splitAddresses("one@example.com; two@example.com\nthree@example.com")
-	if len(got) != 3 { t.Fatalf("expected 3 addresses, got %d", len(got)) }
+	if len(got) != 3 {
+		t.Fatalf("expected 3 addresses, got %d", len(got))
+	}
 }
 
 func TestSanitizeHeader(t *testing.T) {
 	got := sanitizeHeader("subject\r\nBcc: victim@example.com")
-	if strings.ContainsAny(got, "\r\n") { t.Fatalf("header injection was not removed: %q", got) }
+	if strings.ContainsAny(got, "\r\n") {
+		t.Fatalf("header injection was not removed: %q", got)
+	}
 }
 
 func TestParseRSSAndAtom(t *testing.T) {
@@ -39,12 +43,22 @@ func TestParseSyslogPRI(t *testing.T) {
 
 func TestIPAllowed(t *testing.T) {
 	ip := net.ParseIP("192.168.10.25")
-	if !ipAllowed(ip, "192.168.10.0/24") { t.Fatal("expected CIDR match") }
-	if ipAllowed(ip, "10.0.0.0/8") { t.Fatal("unexpected CIDR match") }
-	if !ipAllowed(ip, "") { t.Fatal("empty CIDR restriction should allow") }
+	if !ipAllowed(ip, "192.168.10.0/24") {
+		t.Fatal("expected CIDR match")
+	}
+	if ipAllowed(ip, "10.0.0.0/8") {
+		t.Fatal("unexpected CIDR match")
+	}
+	if !ipAllowed(ip, "") {
+		t.Fatal("empty CIDR restriction should allow")
+	}
 }
 
 func TestValidateConnectorURL(t *testing.T) {
-	if err := ValidateConnectorURL("https://example.test/feed"); err != nil { t.Fatal(err) }
-	if err := ValidateConnectorURL("file:///etc/passwd"); err == nil { t.Fatal("file URL should be rejected") }
+	if err := ValidateConnectorURL("https://example.test/feed"); err != nil {
+		t.Fatal(err)
+	}
+	if err := ValidateConnectorURL("file:///etc/passwd"); err == nil {
+		t.Fatal("file URL should be rejected")
+	}
 }

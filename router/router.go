@@ -13,23 +13,23 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gigabytegrove/monita/api"
+	"github.com/gigabytegrove/monita/api/stream"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/automation"
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/connectors"
+	"github.com/gigabytegrove/monita/database"
+	"github.com/gigabytegrove/monita/docs"
+	gerror "github.com/gigabytegrove/monita/error"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/operations"
+	"github.com/gigabytegrove/monita/plugin"
+	"github.com/gigabytegrove/monita/security"
+	"github.com/gigabytegrove/monita/ui"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gotify/location"
-	"github.com/gotify/server/v3/api"
-	"github.com/gotify/server/v3/api/stream"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/automation"
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/connectors"
-	"github.com/gotify/server/v3/database"
-	"github.com/gotify/server/v3/docs"
-	gerror "github.com/gotify/server/v3/error"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/operations"
-	"github.com/gotify/server/v3/plugin"
-	"github.com/gotify/server/v3/security"
-	"github.com/gotify/server/v3/ui"
 	"github.com/rs/zerolog/log"
 )
 
@@ -169,8 +169,8 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	applicationMembershipHandler := api.ApplicationMembershipAPI{
 		DB: db,
 	}
-	muCapabilitiesHandler := api.MUCapabilitiesAPI{Version: vInfo.Version}
-	muPresenceHandler := api.MUPresenceAPI{DB: db, Notifier: streamHandler}
+	monitaCapabilitiesHandler := api.MonitaCapabilitiesAPI{Version: vInfo.Version}
+	monitaPresenceHandler := api.MonitaPresenceAPI{DB: db, Notifier: streamHandler}
 	sessionHandler := api.SessionAPI{DB: db, NotifyDeleted: streamHandler.NotifyDeletedClient, SecureCookie: conf.Server.SecureCookie, LocalAuthEnabled: conf.LocalAuthEnabled}
 	userChangeNotifier := new(api.UserChangeNotifier)
 	userHandler := api.UserAPI{DB: db, PasswordStrength: conf.PassStrength, UserChangeNotifier: userChangeNotifier, Registration: conf.Registration}
@@ -182,25 +182,25 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	}
 	auditHandler := api.AuditAPI{DB: db}
 	systemHandler := api.SystemAPI{
-		DB: db,
-		Dialect: conf.Database.Dialect,
-		DataDir: operations.DataDirectory(conf.Database.Dialect, conf.Database.Connection),
-		DatabaseFile: operations.DatabaseFile(conf.Database.Dialect, conf.Database.Connection),
-		VersionInfo: vInfo,
-		NotifyDeleted: streamHandler.NotifyDeletedClient,
+		DB:               db,
+		Dialect:          conf.Database.Dialect,
+		DataDir:          operations.DataDirectory(conf.Database.Dialect, conf.Database.Connection),
+		DatabaseFile:     operations.DatabaseFile(conf.Database.Dialect, conf.Database.Connection),
+		VersionInfo:      vInfo,
+		NotifyDeleted:    streamHandler.NotifyDeletedClient,
 		ConnectedClients: streamHandler.ConnectedClientCount,
 	}
 	groupHandler := api.UserGroupAPI{DB: db}
 	updateHandler := api.NewUpdateAPIFromEnv()
 	automationHandler := api.AutomationAPI{
-		DB: db,
-		Engine: automationEngine,
+		DB:             db,
+		Engine:         automationEngine,
 		WebhookLimiter: security.NewDynamicLimiter(),
-		WebhookReplay: security.NewReplayCache(),
+		WebhookReplay:  security.NewReplayCache(),
 	}
 	collaborationHandler := api.CollaborationAPI{
-		DB: db,
-		Dispatcher: automationEngine,
+		DB:            db,
+		Dispatcher:    automationEngine,
 		AttachmentDir: attachmentDir,
 	}
 	connectorHandler := api.ConnectorAPI{DB: db, Runtime: connectorManager}
@@ -305,9 +305,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		ctx.JSON(200, vInfo)
 	})
 
-	// swagger:operation GET /gotifyinfo info getInfo
+	// swagger:operation GET /monitainfo info getInfo
 	//
-	// Get gotify information.
+	// Get Monita information.
 	//
 	// ---
 	// produces: [application/json]
@@ -315,9 +315,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	//   200:
 	//     description: Ok
 	//     schema:
-	//         $ref: "#/definitions/GotifyInfo"
-	g.GET("gotifyinfo", func(ctx *gin.Context) {
-		ctx.JSON(200, &model.GotifyInfo{
+	//         $ref: "#/definitions/MonitaInfo"
+	monitaInfoHandler := func(ctx *gin.Context) {
+		ctx.JSON(200, &model.MonitaInfo{
 			Version:          vInfo.Version,
 			Oidc:             conf.OIDC.Enabled,
 			Register:         conf.Registration,
@@ -327,7 +327,10 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			LDAP:             conf.LDAP.Enabled,
 			LDAPIDPName:      conf.LDAP.IDPName,
 		})
-	})
+	}
+	g.GET("monitainfo", monitaInfoHandler)
+	// Legacy Gotify endpoint retained for existing clients.
+	g.GET("gotifyinfo", monitaInfoHandler)
 
 	g.GET("/application/current", authentication.RequireApplicationToken, applicationHandler.GetCurrentApplication)
 
@@ -380,25 +383,28 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			message.DELETE("/:id", messageHandler.DeleteMessage)
 			message.POST("/:id/archive", messageHandler.ArchiveMessage)
 			message.DELETE("/:id/archive", messageHandler.UnarchiveMessage)
-		message.GET("/:id/acknowledgement", automationHandler.GetAcknowledgement)
-		message.POST("/:id/acknowledgement", automationHandler.AcknowledgeMessage)
-		message.DELETE("/:id/acknowledgement", automationHandler.UnacknowledgeMessage)
-		message.GET("/:id/thread", collaborationHandler.Thread)
-		message.POST("/:id/reply", collaborationHandler.Reply)
-		message.POST("/:id/reaction", collaborationHandler.AddReaction)
-		message.DELETE("/:id/reaction", collaborationHandler.DeleteReaction)
-		message.PUT("/:id/assignment", collaborationHandler.Assign)
-		message.PUT("/:id/status", collaborationHandler.SetStatus)
-		message.POST("/:id/read", collaborationHandler.MarkRead)
-		message.DELETE("/:id/read", collaborationHandler.MarkUnread)
-		message.POST("/:id/attachment", collaborationHandler.UploadAttachment)
-		message.GET("/:id/attachment/:attachmentId", collaborationHandler.DownloadAttachment)
-		message.DELETE("/:id/attachment/:attachmentId", collaborationHandler.DeleteAttachment)
+			message.GET("/:id/acknowledgement", automationHandler.GetAcknowledgement)
+			message.POST("/:id/acknowledgement", automationHandler.AcknowledgeMessage)
+			message.DELETE("/:id/acknowledgement", automationHandler.UnacknowledgeMessage)
+			message.GET("/:id/thread", collaborationHandler.Thread)
+			message.POST("/:id/reply", collaborationHandler.Reply)
+			message.POST("/:id/reaction", collaborationHandler.AddReaction)
+			message.DELETE("/:id/reaction", collaborationHandler.DeleteReaction)
+			message.PUT("/:id/assignment", collaborationHandler.Assign)
+			message.PUT("/:id/status", collaborationHandler.SetStatus)
+			message.POST("/:id/read", collaborationHandler.MarkRead)
+			message.DELETE("/:id/read", collaborationHandler.MarkUnread)
+			message.POST("/:id/attachment", collaborationHandler.UploadAttachment)
+			message.GET("/:id/attachment/:attachmentId", collaborationHandler.DownloadAttachment)
+			message.DELETE("/:id/attachment/:attachmentId", collaborationHandler.DeleteAttachment)
 		}
 
-		clientAuth.GET("/api/mu/v1/capabilities", muCapabilitiesHandler.Get)
-		clientAuth.GET("/api/mu/v1/events", streamHandler.HandleMUEvents)
-		clientAuth.POST("/application/:id/typing", muPresenceHandler.SetTyping)
+		clientAuth.GET("/api/monita/v1/capabilities", monitaCapabilitiesHandler.Get)
+		clientAuth.GET("/api/monita/v1/events", streamHandler.HandleMonitaEvents)
+		// Legacy MU discovery/event routes retained for pre-Monita clients.
+		clientAuth.GET("/api/mu/v1/capabilities", monitaCapabilitiesHandler.Get)
+		clientAuth.GET("/api/mu/v1/events", streamHandler.HandleMonitaEvents)
+		clientAuth.POST("/application/:id/typing", monitaPresenceHandler.SetTyping)
 		clientAuth.GET("/stream", streamHandler.Handle)
 		clientAuth.GET("current/user", userHandler.GetCurrentUser)
 		clientAuth.GET("/current/user/mfa/status", mfaHandler.Status)
@@ -684,7 +690,9 @@ func safeAuditRequestDetails(ctx *gin.Context) string {
 		encoded, encodeErr := json.Marshal(payload)
 		if encodeErr == nil {
 			value := string(encoded)
-			if len(value) > 8000 { value = value[:8000] + "…" }
+			if len(value) > 8000 {
+				value = value[:8000] + "…"
+			}
 			return "request=" + value
 		}
 	}
@@ -693,10 +701,14 @@ func safeAuditRequestDetails(ctx *gin.Context) string {
 		values, parseErr := url.ParseQuery(string(body))
 		if parseErr == nil {
 			for key := range values {
-				if auditSensitiveKey(key) { values.Set(key, "[redacted]") }
+				if auditSensitiveKey(key) {
+					values.Set(key, "[redacted]")
+				}
 			}
 			value := values.Encode()
-			if len(value) > 8000 { value = value[:8000] + "…" }
+			if len(value) > 8000 {
+				value = value[:8000] + "…"
+			}
 			return "request=" + value
 		}
 	}
@@ -714,7 +726,9 @@ func sanitizeAuditValue(value any) {
 			sanitizeAuditValue(item)
 		}
 	case []any:
-		for _, item := range typed { sanitizeAuditValue(item) }
+		for _, item := range typed {
+			sanitizeAuditValue(item)
+		}
 	}
 }
 
@@ -856,15 +870,27 @@ func (fs *onlyImageFS) Open(name string) (http.File, error) {
 
 func cleanupOrphanAttachments(db *database.GormDatabase, directory string) error {
 	names, err := db.GetAttachmentStorageNames()
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	keep := make(map[string]struct{}, len(names))
-	for _, name := range names { keep[filepath.Base(name)] = struct{}{} }
+	for _, name := range names {
+		keep[filepath.Base(name)] = struct{}{}
+	}
 	entries, err := os.ReadDir(directory)
-	if errors.Is(err, os.ErrNotExist) { return nil }
-	if err != nil { return err }
+	if errors.Is(err, os.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
 	for _, entry := range entries {
-		if entry.IsDir() { continue }
-		if _, ok := keep[entry.Name()]; ok { continue }
+		if entry.IsDir() {
+			continue
+		}
+		if _, ok := keep[entry.Name()]; ok {
+			continue
+		}
 		if err := os.Remove(filepath.Join(directory, entry.Name())); err != nil && !errors.Is(err, os.ErrNotExist) {
 			return err
 		}

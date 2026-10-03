@@ -7,16 +7,16 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test/testdb"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test/testdb"
 )
 
 func TestQuietHoursCrossMidnight(t *testing.T) {
 	policy := &model.QuietHoursPolicy{
-		Enabled: true,
+		Enabled:     true,
 		StartMinute: 22 * 60,
-		EndMinute: 7 * 60,
-		Timezone: "UTC",
+		EndMinute:   7 * 60,
+		Timezone:    "UTC",
 	}
 
 	if !quietNow(policy, time.Date(2026, 9, 25, 23, 0, 0, 0, time.UTC)) {
@@ -33,9 +33,9 @@ func TestQuietHoursCrossMidnight(t *testing.T) {
 func TestNextScheduleRunDailyTimezone(t *testing.T) {
 	item := &model.ScheduledNotification{
 		ScheduleType: "daily",
-		Hour: 9,
-		Minute: 30,
-		Timezone: "America/New_York",
+		Hour:         9,
+		Minute:       30,
+		Timezone:     "America/New_York",
 	}
 	now := time.Date(2026, 9, 25, 12, 0, 0, 0, time.UTC)
 	next := NextScheduleRun(item, now)
@@ -51,10 +51,10 @@ func TestNextScheduleRunDailyTimezone(t *testing.T) {
 func TestNextScheduleRunWeeklyRollsForward(t *testing.T) {
 	item := &model.ScheduledNotification{
 		ScheduleType: "weekly",
-		Weekday: int(time.Friday),
-		Hour: 8,
-		Minute: 0,
-		Timezone: "UTC",
+		Weekday:      int(time.Friday),
+		Hour:         8,
+		Minute:       0,
+		Timezone:     "UTC",
 	}
 	now := time.Date(2026, 9, 25, 9, 0, 0, 0, time.UTC)
 	next := NextScheduleRun(item, now)
@@ -104,7 +104,6 @@ func TestAppendMQTTString(t *testing.T) {
 	}
 }
 
-
 func TestDecodeMQTTPublishV5QoS1(t *testing.T) {
 	topic := "alerts/critical"
 	payload := []byte("server down")
@@ -140,7 +139,6 @@ func TestReadMQTTPacketRejectsOversize(t *testing.T) {
 		t.Fatal("expected oversized MQTT packet to be rejected")
 	}
 }
-
 
 func TestHomeAssistantEventFilters(t *testing.T) {
 	integration := &model.HomeAssistantIntegration{
@@ -207,7 +205,7 @@ func TestMUDeliverySuppressesSenderAndIncludesMutedMention(t *testing.T) {
 	}
 
 	extras, err := json.Marshal(map[string]any{
-		"gotify::mu::mentions":      []string{"user3"},
+		"gotify::mu::mentions":       []string{"user3"},
 		"gotify::mu::mentionUserIds": []uint{mentioned.ID},
 	})
 	if err != nil {
@@ -246,13 +244,13 @@ func TestMUDeliverySuppressesSenderAndIncludesMutedMention(t *testing.T) {
 func TestExternalMessagePreservesExtrasAndAttachments(t *testing.T) {
 	extras := []byte(`{"client::notification":{"click":{"url":"https://example.com"}}}`)
 	msg := &model.Message{
-		ID: 44,
+		ID:            44,
 		ApplicationID: 7,
-		Message: "photo",
-		Title: "Brad",
-		Priority: 1,
-		Date: time.Date(2026, 9, 27, 20, 45, 0, 0, time.UTC),
-		Extras: extras,
+		Message:       "photo",
+		Title:         "Brad",
+		Priority:      1,
+		Date:          time.Date(2026, 9, 27, 20, 45, 0, 0, time.UTC),
+		Extras:        extras,
 		Collaboration: model.MessageCollaboration{
 			Attachments: []model.MessageAttachmentView{{
 				ID: 9, Filename: "photo.jpg", ContentType: "image/jpeg", Size: 1234,

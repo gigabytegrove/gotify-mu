@@ -13,12 +13,12 @@ import (
 	"time"
 
 	"github.com/fortytw2/leaktest"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
 	"github.com/stretchr/testify/assert"
 )
 

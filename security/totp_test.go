@@ -9,7 +9,9 @@ func TestTOTPAgainstRFC6238SHA1Vector(t *testing.T) {
 	// RFC 6238 SHA-1 seed, encoded as base32. The implementation uses six digits.
 	secret := "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"
 	code, err := TOTPCode(secret, time.Unix(59, 0))
-	if err != nil { t.Fatal(err) }
+	if err != nil {
+		t.Fatal(err)
+	}
 	if code != "287082" {
 		t.Fatalf("expected 287082, got %s", code)
 	}
@@ -24,5 +26,7 @@ func TestTOTPAgainstRFC6238SHA1Vector(t *testing.T) {
 func TestRecoveryCodeNormalization(t *testing.T) {
 	a := HashRecoveryCode("ABCDEF-123456")
 	b := HashRecoveryCode("abcdef123456")
-	if a != b { t.Fatal("recovery-code hash should ignore case and dash formatting") }
+	if a != b {
+		t.Fatal("recovery-code hash should ignore case and dash formatting")
+	}
 }

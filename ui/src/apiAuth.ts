@@ -15,7 +15,7 @@ export const initAxios = (
 ) => {
     axios.interceptors.response.use(undefined, (error) => {
         if (!error.response) {
-            snack('Gotify server is not reachable, try refreshing the page.');
+            snack('Monita server is not reachable, try refreshing the page.');
             return Promise.reject(error);
         }
 

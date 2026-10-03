@@ -3,8 +3,8 @@ package database
 import (
 	"testing"
 
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/driver/sqlite"
@@ -72,7 +72,6 @@ func (s *MigrationSuite) TestMigration() {
 		assert.Equal(s.T(), "test application", app.Name)
 	}
 }
-
 
 func (s *MigrationSuite) TestMigrationFromPreviewApplicationMembershipSchema() {
 	path := s.tmpDir.Path("test_preview_membership.db")

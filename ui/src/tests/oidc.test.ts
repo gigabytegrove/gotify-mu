@@ -1,15 +1,15 @@
 import axios from 'axios';
 import {Browser, Page} from 'puppeteer';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
-import {newTest, GotifyTest} from './setup';
+import {newTest, MonitaTest} from './setup';
 import {DEX_PASSWORD, DexUser} from './dex';
 import {waitForExists} from './utils';
 import * as selector from './selector';
 import * as auth from './authentication';
 
-const linkUser: DexUser = {email: 'link@gotify.net', username: 'linkuser', userID: 'id-link'};
-const dupUser1: DexUser = {email: 'dup1@gotify.net', username: 'dupuser', userID: 'id-dup-1'};
-const dupUser2: DexUser = {email: 'dup2@gotify.net', username: 'dupuser', userID: 'id-dup-2'};
+const linkUser: DexUser = {email: 'link@monita.net', username: 'linkuser', userID: 'id-link'};
+const dupUser1: DexUser = {email: 'dup1@monita.net', username: 'dupuser', userID: 'id-dup-1'};
+const dupUser2: DexUser = {email: 'dup2@monita.net', username: 'dupuser', userID: 'id-dup-2'};
 
 const createLocalUser = async (url: string, name: string, pass: string): Promise<void> =>
     axios.post(
@@ -43,16 +43,16 @@ const clearSession = async (browser: Browser): Promise<void> => {
 };
 
 describe('OIDC login of an existing local user without link-by-username', () => {
-    let gotify: GotifyTest;
+    let monita: MonitaTest;
     let page: Page;
     beforeAll(async () => {
-        gotify = await newTest('', {
+        monita = await newTest('', {
             oidc: {autoRegister: true, linkByUsername: false, users: [linkUser]},
         });
-        page = gotify.page;
-        await createLocalUser(gotify.url, linkUser.username, 'localpass-1234');
+        page = monita.page;
+        await createLocalUser(monita.url, linkUser.username, 'localpass-1234');
     });
-    afterAll(async () => await gotify.close());
+    afterAll(async () => await monita.close());
 
     it('rejects the oidc login because linking is disabled', async () => {
         await loginWithOIDC(page, linkUser);
@@ -62,23 +62,23 @@ describe('OIDC login of an existing local user without link-by-username', () => 
     });
 
     it('still allows the local user to log in with a password', async () => {
-        await page.goto(gotify.url);
+        await page.goto(monita.url);
         await auth.login(page, 'linkuser', 'localpass-1234');
         await auth.logout(page);
     });
 });
 
 describe('OIDC login of an existing local user with link-by-username', () => {
-    let gotify: GotifyTest;
+    let monita: MonitaTest;
     let page: Page;
     beforeAll(async () => {
-        gotify = await newTest('', {
+        monita = await newTest('', {
             oidc: {autoRegister: true, linkByUsername: true, users: [linkUser]},
         });
-        page = gotify.page;
-        await createLocalUser(gotify.url, linkUser.username, 'localpass-1234');
+        page = monita.page;
+        await createLocalUser(monita.url, linkUser.username, 'localpass-1234');
     });
-    afterAll(async () => await gotify.close());
+    afterAll(async () => await monita.close());
 
     it('links the existing local user and logs in', async () => {
         await loginWithOIDC(page, linkUser);
@@ -87,24 +87,24 @@ describe('OIDC login of an existing local user with link-by-username', () => {
 });
 
 describe('OIDC login with two identities sharing the same username', () => {
-    let gotify: GotifyTest;
+    let monita: MonitaTest;
     let page: Page;
     beforeAll(async () => {
-        gotify = await newTest('', {
+        monita = await newTest('', {
             oidc: {autoRegister: true, linkByUsername: true, users: [dupUser1, dupUser2]},
         });
-        page = gotify.page;
+        page = monita.page;
     });
-    afterAll(async () => await gotify.close());
+    afterAll(async () => await monita.close());
 
     it('auto-registers the first identity', async () => {
         await loginWithOIDC(page, dupUser1);
         await expectLoggedIn(page);
     });
 
-    it('clears session', () => clearSession(gotify.browser));
+    it('clears session', () => clearSession(monita.browser));
     it('rejects the second identity with same username', async () => {
-        await page.goto(gotify.url);
+        await page.goto(monita.url);
         await loginWithOIDC(page, dupUser2);
         expect(await oidcError(page)).toContain(
             `the user ${dupUser2.username} is already bound to a different OIDC identity`

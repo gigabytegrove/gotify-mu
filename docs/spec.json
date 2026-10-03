@@ -11,13 +11,13 @@
   ],
   "swagger": "2.0",
   "info": {
-    "description": "This is the documentation of the Gotify REST-API.\n\n# Authentication\nIn Gotify there are two token types:\n__clientToken__: a client is something that receives message and manages stuff like creating new tokens or delete messages. (f.ex this token should be used for an android app)\n__appToken__: an application is something that sends messages (f.ex. this token should be used for a shell script)\n\nThe token can be transmitted in a header named `X-Gotify-Key`, in a query parameter named `token` or\nthrough a header named `Authorization` with the value prefixed with `Bearer` (Ex. `Bearer randomtoken`).\nThere is also the possibility to authenticate through basic auth, this should only be used for creating a clientToken.\n\n\\---\n\nFound a bug or have some questions? [Create an issue on GitHub](https://github.com/gotify/server/issues)",
-    "title": "Gotify REST-API.",
+    "description": "This is the documentation of the Monita REST API.\n\n# Authentication\nMonita uses two primary token types:\n__clientToken__: a client receives messages and manages account resources.\n__appToken__: an application sends messages.\n\nThe token can be transmitted in a header named `X-Monita-Key`, in a query parameter named `token`, or\nthrough an `Authorization` header with the value prefixed with `Bearer` (for example, `Bearer randomtoken`).\nFor Gotify compatibility, `X-Gotify-Key` remains accepted as a legacy alias.\nBasic auth is also available for supported login/elevation flows.\n\n\\---\n\nFound a bug or have some questions? [Create an issue on GitHub](https://github.com/gigabytegrove/monita/issues)",
+    "title": "Monita REST API.",
     "license": {
       "name": "MIT",
-      "url": "https://github.com/gotify/server/blob/master/LICENSE"
+      "url": "https://github.com/gigabytegrove/monita/blob/master/LICENSE"
     },
-    "version": "2.1.0"
+    "version": "1.3.7"
   },
   "host": "localhost",
   "paths": {
@@ -773,7 +773,7 @@
     },
     "/auth/oidc/callback": {
       "get": {
-        "description": "Exchanges the authorization code for tokens, resolves the user,\ncreates a gotify client, sets a session cookie, and redirects to the UI.",
+        "description": "Exchanges the authorization code for tokens, resolves the user,\ncreates a Monita client, sets a session cookie, and redirects to the UI.",
         "tags": [
           "oidc"
         ],
@@ -891,7 +891,7 @@
     },
     "/auth/oidc/external/token": {
       "post": {
-        "description": "After the user authenticates with the OIDC provider and the app receives\nthe authorization code via redirect, the app calls this endpoint with the\ncode and PKCE code_verifier. The server exchanges the code with the OIDC\nprovider and returns a gotify client token.",
+        "description": "After the user authenticates with the OIDC provider and the app receives\nthe authorization code via redirect, the app calls this endpoint with the\ncode and PKCE code_verifier. The server exchanges the code with the OIDC\nprovider and returns a Monita client token.",
         "consumes": [
           "application/json"
         ],
@@ -901,7 +901,7 @@
         "tags": [
           "oidc"
         ],
-        "summary": "Exchange an authorization code for a gotify client token.",
+        "summary": "Exchange an authorization code for a Monita client token.",
         "operationId": "externalToken",
         "parameters": [
           {
@@ -1405,26 +1405,6 @@
         }
       }
     },
-    "/gotifyinfo": {
-      "get": {
-        "produces": [
-          "application/json"
-        ],
-        "tags": [
-          "info"
-        ],
-        "summary": "Get gotify information.",
-        "operationId": "getInfo",
-        "responses": {
-          "200": {
-            "description": "Ok",
-            "schema": {
-              "$ref": "#/definitions/GotifyInfo"
-            }
-          }
-        }
-      }
-    },
     "/health": {
       "get": {
         "produces": [
@@ -1545,7 +1525,7 @@
             "basicAuth": []
           }
         ],
-        "description": "__NOTE__: When authenticating with a client token or basic auth, the request body\nmust include \"appid\" referencing an application owned by the authenticated user,\nor a Gotify MU channel where the authenticated user is a member and member posting is enabled.\nWhen authenticating with an application token, the application is derived from the\ntoken and any \"appid\" in the body is ignored.",
+        "description": "__NOTE__: When authenticating with a client token or basic auth, the request body\nmust include \"appid\" referencing an application owned by the authenticated user,\nor a Monita channel where the authenticated user is a member and member posting is enabled.\nWhen authenticating with an application token, the application is derived from the\ntoken and any \"appid\" in the body is ignored.",
         "consumes": [
           "application/json"
         ],
@@ -1697,6 +1677,26 @@
             "description": "Not Found",
             "schema": {
               "$ref": "#/definitions/Error"
+            }
+          }
+        }
+      }
+    },
+    "/monitainfo": {
+      "get": {
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "info"
+        ],
+        "summary": "Get Monita information.",
+        "operationId": "getInfo",
+        "responses": {
+          "200": {
+            "description": "Ok",
+            "schema": {
+              "$ref": "#/definitions/MonitaInfo"
             }
           }
         }
@@ -2554,7 +2554,7 @@
           "readOnly": true
         },
         "autoAssign": {
-          "description": "Whether every user should automatically be a member of this Gotify MU channel.",
+          "description": "Whether every user should automatically be a member of this Monita channel.",
           "type": "boolean",
           "x-go-name": "AutoAssign",
           "readOnly": true,
@@ -2623,14 +2623,14 @@
           "example": "Backup Server"
         },
         "ownerId": {
-          "description": "The canonical owner user id used by Gotify MU while memberships grant access to additional users.",
+          "description": "The canonical owner user id used by Monita while memberships grant access to additional users.",
           "type": "integer",
           "format": "int64",
           "x-go-name": "UserID",
           "readOnly": true
         },
         "receiveNotifications": {
-          "description": "Whether the current requesting user receives realtime notifications from this Gotify MU channel.",
+          "description": "Whether the current requesting user receives realtime notifications from this Monita channel.",
           "type": "boolean",
           "x-go-name": "ReceiveNotifications",
           "readOnly": true
@@ -2660,7 +2660,7 @@
           "example": "AWH0wZ5r0Mbac.r"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "ApplicationParams": {
       "description": "Params allowed to create or update Applications.",
@@ -2671,12 +2671,12 @@
       ],
       "properties": {
         "allowMemberPost": {
-          "description": "Whether assigned users may publish messages to this Gotify MU channel.",
+          "description": "Whether assigned users may publish messages to this Monita channel.",
           "type": "boolean",
           "x-go-name": "AllowMemberPost"
         },
         "autoAssign": {
-          "description": "Whether this Gotify MU channel should be automatically assigned to every user.",
+          "description": "Whether this Monita channel should be automatically assigned to every user.",
           "type": "boolean",
           "x-go-name": "AutoAssign"
         },
@@ -2717,7 +2717,7 @@
           "example": "a1"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/api"
+      "x-go-package": "github.com/gigabytegrove/monita/api"
     },
     "Client": {
       "description": "The Client holds information about a device which can receive notifications (and other stuff).",
@@ -2793,7 +2793,7 @@
           "example": "CWH0wZ5r0Mbac.r"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "ClientParams": {
       "description": "Params allowed to create or update Clients.",
@@ -2817,7 +2817,7 @@
           "example": "My Client"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/api"
+      "x-go-package": "github.com/gigabytegrove/monita/api"
     },
     "CreateMessage": {
       "description": "The CreateMessage holds information about a message that will be sent.",
@@ -2868,7 +2868,7 @@
           "example": "Backup"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "CreateUserExternal": {
       "description": "Used for user creation.",
@@ -2904,7 +2904,7 @@
           "example": "nrocinu"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "CurrentUser": {
       "description": "CurrentUserExternal Model",
@@ -2989,7 +2989,7 @@
         }
       },
       "x-go-name": "CurrentUserExternal",
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "ElevateRequest": {
       "type": "object",
@@ -3006,7 +3006,7 @@
           "example": 900
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "Error": {
       "description": "The Error contains error relevant information.",
@@ -3038,66 +3038,7 @@
           "example": "you need to provide a valid access token or user credentials to access this api"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
-    },
-    "GotifyInfo": {
-      "description": "GotifyInfo Model",
-      "type": "object",
-      "required": [
-        "version",
-        "register",
-        "localAuth",
-        "oidc",
-        "oidcIdpName",
-        "oidcAutoRedirect"
-      ],
-      "properties": {
-        "ldap": {
-          "type": "boolean",
-          "x-go-name": "LDAP"
-        },
-        "ldapIdpName": {
-          "type": "string",
-          "x-go-name": "LDAPIDPName"
-        },
-        "localAuth": {
-          "description": "If local authentication is enabled.",
-          "type": "boolean",
-          "x-go-name": "LocalAuth",
-          "example": true
-        },
-        "oidc": {
-          "description": "If oidc is enabled.",
-          "type": "boolean",
-          "x-go-name": "Oidc",
-          "example": true
-        },
-        "oidcAutoRedirect": {
-          "description": "If the WebUI should automatically redirect to the OIDC identity\nprovider instead of showing the login page.",
-          "type": "boolean",
-          "x-go-name": "OIDCAutoRedirect",
-          "example": false
-        },
-        "oidcIdpName": {
-          "description": "Name of the OIDC identity provider.",
-          "type": "string",
-          "x-go-name": "OIDCIDPName",
-          "example": "OIDC"
-        },
-        "register": {
-          "description": "If registration is enabled.",
-          "type": "boolean",
-          "x-go-name": "Register",
-          "example": true
-        },
-        "version": {
-          "description": "The current version.",
-          "type": "string",
-          "x-go-name": "Version",
-          "example": "5.2.6"
-        }
-      },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "Health": {
       "description": "Health represents how healthy the application is.",
@@ -3121,7 +3062,7 @@
           "example": "green"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "Message": {
       "description": "The MessageExternal holds information about a message which was sent by an Application.",
@@ -3246,13 +3187,13 @@
           "x-go-name": "RootMessageID"
         },
         "senderName": {
-          "description": "The Gotify MU username that posted this message, when available.",
+          "description": "The Monita username that posted this message, when available.",
           "type": "string",
           "x-go-name": "SenderName",
           "readOnly": true
         },
         "senderUserId": {
-          "description": "The Gotify MU user id that posted this message, when the message was sent by a user.",
+          "description": "The Monita user id that posted this message, when the message was sent by a user.",
           "type": "integer",
           "format": "int64",
           "x-go-name": "SenderUserID",
@@ -3272,7 +3213,7 @@
         }
       },
       "x-go-name": "MessageExternal",
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "MessageAttachmentView": {
       "type": "object",
@@ -3300,7 +3241,7 @@
           "x-go-name": "URL"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "MessageCollaboration": {
       "type": "object",
@@ -3360,7 +3301,7 @@
           "x-go-name": "Status"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "MessageReactionSummary": {
       "type": "object",
@@ -3379,7 +3320,57 @@
           "x-go-name": "ReactedByMe"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
+    },
+    "MonitaInfo": {
+      "description": "MonitaInfo Model",
+      "type": "object",
+      "required": [
+        "version"
+      ],
+      "properties": {
+        "ldap": {
+          "description": "Whether LDAP authentication is enabled.",
+          "type": "boolean",
+          "x-go-name": "LDAP"
+        },
+        "ldapIdpName": {
+          "description": "Configured LDAP provider display name.",
+          "type": "string",
+          "x-go-name": "LDAPIDPName"
+        },
+        "localAuth": {
+          "description": "Whether local username/password authentication is enabled.",
+          "type": "boolean",
+          "x-go-name": "LocalAuth"
+        },
+        "oidc": {
+          "description": "Whether OIDC authentication is enabled.",
+          "type": "boolean",
+          "x-go-name": "Oidc"
+        },
+        "oidcAutoRedirect": {
+          "description": "Whether OIDC login should start automatically.",
+          "type": "boolean",
+          "x-go-name": "OIDCAutoRedirect"
+        },
+        "oidcIdpName": {
+          "description": "Configured OIDC provider display name.",
+          "type": "string",
+          "x-go-name": "OIDCIDPName"
+        },
+        "register": {
+          "description": "Whether user registration is enabled.",
+          "type": "boolean",
+          "x-go-name": "Register"
+        },
+        "version": {
+          "description": "The current version.",
+          "type": "string",
+          "x-go-name": "Version"
+        }
+      },
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "OIDCExternalAuthorizeRequest": {
       "description": "Used to initiate the OIDC authorization flow for an external client.",
@@ -3398,7 +3389,7 @@
           "example": "E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM"
         },
         "name": {
-          "description": "The client name to display in gotify.",
+          "description": "The client name to display in Monita.",
           "type": "string",
           "x-go-name": "Name",
           "example": "Android Phone"
@@ -3407,10 +3398,10 @@
           "description": "The app's redirect URI.",
           "type": "string",
           "x-go-name": "RedirectURI",
-          "example": "gotify://oidc/callback"
+          "example": "monita://oidc/callback"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "OIDCExternalAuthorizeResponse": {
       "description": "Returned after initiating the OIDC authorization flow.",
@@ -3425,7 +3416,7 @@
           "description": "The URL to open in the browser to authenticate with the OIDC provider.",
           "type": "string",
           "x-go-name": "AuthorizeURL",
-          "example": "https://auth.example.com/authorize?client_id=gotify\u0026..."
+          "example": "https://auth.example.com/authorize?client_id=monita\u0026..."
         },
         "state": {
           "description": "The state parameter to send back with the token exchange request.",
@@ -3434,10 +3425,10 @@
           "example": "Android Phone:a1b2c3d4e5f6"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "OIDCExternalTokenRequest": {
-      "description": "Used to exchange an authorization code for a gotify client token.",
+      "description": "Used to exchange an authorization code for a Monita client token.",
       "type": "object",
       "title": "OIDCExternalTokenRequest Model",
       "required": [
@@ -3464,7 +3455,7 @@
           "example": "Android Phone:a1b2c3d4e5f6"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "OIDCExternalTokenResponse": {
       "description": "Returned after a successful token exchange.",
@@ -3476,7 +3467,7 @@
       ],
       "properties": {
         "token": {
-          "description": "The gotify client token for API authentication.",
+          "description": "The Monita client token for API authentication.",
           "type": "string",
           "x-go-name": "Token",
           "example": "CWH0wZ5r0Mbac.r"
@@ -3485,7 +3476,7 @@
           "$ref": "#/definitions/User"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "PagedMessages": {
       "description": "Wrapper for the paging and the messages.",
@@ -3509,7 +3500,7 @@
           "$ref": "#/definitions/Paging"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "Paging": {
       "description": "The Paging holds information about the limit and making requests to the next page.",
@@ -3556,7 +3547,7 @@
           "example": 5
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "PluginConf": {
       "description": "Holds information about a plugin instance for one user.",
@@ -3625,7 +3616,7 @@
           "type": "string",
           "x-go-name": "ModulePath",
           "readOnly": true,
-          "example": "github.com/gotify/server/plugin/example/echo"
+          "example": "github.com/gigabytegrove/monita/plugin/example/echo"
         },
         "name": {
           "description": "The plugin name.",
@@ -3645,11 +3636,11 @@
           "type": "string",
           "x-go-name": "Website",
           "readOnly": true,
-          "example": "gotify.net"
+          "example": "monita.example"
         }
       },
       "x-go-name": "PluginConfExternal",
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "RegenerateTokenResponse": {
       "description": "The RegenerateTokenResponse holds information about the response to the regenerate token action.",
@@ -3667,7 +3658,7 @@
           "example": "gtfya.e2NcJK7AenXBPIRB3S03JsBlmy0V6xP8h0hwSiAJae8"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "SecurityUpdateAction": {
       "description": "The SecurityUpdateAction describes the details of a requested security update.",
@@ -3681,7 +3672,7 @@
           "example": true
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "SecurityUpdateActionResponse": {
       "description": "The SecurityUpdateActionResponse holds information about the response to a security update request.",
@@ -3692,7 +3683,7 @@
           "$ref": "#/definitions/RegenerateTokenResponse"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "UpdateUserExternal": {
       "description": "Used for updating a user.",
@@ -3727,7 +3718,7 @@
           "example": "nrocinu"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "User": {
       "description": "The User holds information about permission and other stuff.",
@@ -3775,7 +3766,7 @@
         }
       },
       "x-go-name": "UserExternal",
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "UserPass": {
       "description": "The Password for updating the user.",
@@ -3793,7 +3784,7 @@
         }
       },
       "x-go-name": "UserExternalPass",
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     },
     "VersionInfo": {
       "description": "VersionInfo Model",
@@ -3823,7 +3814,7 @@
           "example": "5.2.6"
         }
       },
-      "x-go-package": "github.com/gotify/server/v3/model"
+      "x-go-package": "github.com/gigabytegrove/monita/model"
     }
   },
   "securityDefinitions": {
@@ -3835,7 +3826,7 @@
     },
     "appTokenHeader": {
       "type": "apiKey",
-      "name": "X-Gotify-Key",
+      "name": "X-Monita-Key",
       "in": "header"
     },
     "appTokenQuery": {
@@ -3854,7 +3845,7 @@
     },
     "clientTokenHeader": {
       "type": "apiKey",
-      "name": "X-Gotify-Key",
+      "name": "X-Monita-Key",
       "in": "header"
     },
     "clientTokenQuery": {

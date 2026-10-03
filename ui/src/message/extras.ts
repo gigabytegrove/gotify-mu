@@ -29,7 +29,7 @@ const extract = (extras: IMessageExtras | undefined, key: string, path: string):
 };
 
 export const notificationActions = (extras?: IMessageExtras): INotificationAction[] => {
-    const value = extras?.['gotify-mu::display']?.actions;
+    const value = (extras?.['monita::display'] ?? extras?.['gotify-mu::display'])?.actions;
     if (!Array.isArray(value)) return [];
     return value
         .filter((item): item is INotificationAction =>
@@ -44,7 +44,7 @@ export const notificationActions = (extras?: IMessageExtras): INotificationActio
 };
 
 export const notificationFields = (extras?: IMessageExtras): INotificationField[] => {
-    const value = extras?.['gotify-mu::display']?.fields;
+    const value = (extras?.['monita::display'] ?? extras?.['gotify-mu::display'])?.fields;
     if (!Array.isArray(value)) return [];
     return value
         .filter((item): item is INotificationField =>

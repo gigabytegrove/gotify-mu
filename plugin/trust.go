@@ -26,7 +26,9 @@ type VerifiedPluginFile struct {
 
 func decodePublicKey(value string) (ed25519.PublicKey, error) {
 	value = strings.TrimSpace(value)
-	if value == "" { return nil, errors.New("plugin signing public key is required") }
+	if value == "" {
+		return nil, errors.New("plugin signing public key is required")
+	}
 	raw, err := base64.StdEncoding.DecodeString(value)
 	if err != nil {
 		raw, err = hex.DecodeString(value)
@@ -39,8 +41,12 @@ func decodePublicKey(value string) (ed25519.PublicKey, error) {
 
 func decodeSignature(value string) ([]byte, error) {
 	raw, err := base64.StdEncoding.DecodeString(strings.TrimSpace(value))
-	if err != nil { return nil, errors.New("invalid plugin signature") }
-	if len(raw) != ed25519.SignatureSize { return nil, errors.New("invalid plugin signature length") }
+	if err != nil {
+		return nil, errors.New("invalid plugin signature")
+	}
+	if len(raw) != ed25519.SignatureSize {
+		return nil, errors.New("invalid plugin signature length")
+	}
 	return raw, nil
 }
 
@@ -50,7 +56,9 @@ func trustedPluginKeys() map[string]ed25519.PublicKey {
 		return r == ',' || r == ';' || r == '\n' || r == ' '
 	}) {
 		key, err := decodePublicKey(raw)
-		if err != nil { continue }
+		if err != nil {
+			continue
+		}
 		result[base64.StdEncoding.EncodeToString(key)] = key
 	}
 	return result
@@ -69,19 +77,33 @@ func verifyPluginStream(directory, filename string, source io.Reader, verificati
 	if strings.ToLower(filepath.Ext(filename)) != ".so" {
 		return nil, errors.New("plugin file must use the .so extension")
 	}
-	if err := os.MkdirAll(directory, 0o755); err != nil { return nil, err }
+	if err := os.MkdirAll(directory, 0o755); err != nil {
+		return nil, err
+	}
 	tmp, err := os.CreateTemp(directory, ".monita-verify-*.so")
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	path := tmp.Name()
 	ok := false
-	defer func(){ if !ok { _ = os.Remove(path) } }()
+	defer func() {
+		if !ok {
+			_ = os.Remove(path)
+		}
+	}()
 
 	hasher := sha256.New()
 	written, copyErr := io.Copy(io.MultiWriter(tmp, hasher), io.LimitReader(source, MaxPluginUploadBytes+1))
 	closeErr := tmp.Close()
-	if copyErr != nil { return nil, copyErr }
-	if closeErr != nil { return nil, closeErr }
-	if written > MaxPluginUploadBytes { return nil, fmt.Errorf("plugin exceeds the %d MiB upload limit", MaxPluginUploadBytes>>20) }
+	if copyErr != nil {
+		return nil, copyErr
+	}
+	if closeErr != nil {
+		return nil, closeErr
+	}
+	if written > MaxPluginUploadBytes {
+		return nil, fmt.Errorf("plugin exceeds the %d MiB upload limit", MaxPluginUploadBytes>>20)
+	}
 	digest := hasher.Sum(nil)
 	digestHex := hex.EncodeToString(digest)
 
@@ -95,24 +117,28 @@ func verifyPluginStream(directory, filename string, source io.Reader, verificati
 			return nil, errors.New("unsigned plugin installation is disabled; provide a trusted Ed25519 signature or explicitly enable unsigned installs")
 		}
 		ok = true
-		return &VerifiedPluginFile{Path:path,SHA256:digestHex}, nil
+		return &VerifiedPluginFile{Path: path, SHA256: digestHex}, nil
 	}
 
 	publicKey, err := decodePublicKey(verification.PublicKey)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	trusted := trustedPluginKeys()
 	keyID := base64.StdEncoding.EncodeToString(publicKey)
 	if _, exists := trusted[keyID]; !exists {
 		return nil, errors.New("plugin signing key is not trusted by this server")
 	}
 	signature, err := decodeSignature(verification.Signature)
-	if err != nil { return nil, err }
+	if err != nil {
+		return nil, err
+	}
 	if !ed25519.Verify(publicKey, digest, signature) {
 		return nil, errors.New("plugin signature verification failed")
 	}
 
 	ok = true
-	return &VerifiedPluginFile{Path:path,SHA256:digestHex}, nil
+	return &VerifiedPluginFile{Path: path, SHA256: digestHex}, nil
 }
 
 func pluginEnv(primary, legacy string) string {

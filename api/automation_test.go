@@ -7,15 +7,15 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/security"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/security"
 )
 
 func TestLookupPayloadNestedField(t *testing.T) {
 	payload := map[string]any{
 		"alert": map[string]any{
-			"title": "Disk warning",
+			"title":    "Disk warning",
 			"priority": float64(8),
 		},
 	}
@@ -52,8 +52,8 @@ func TestValidateOneTimeSchedule(t *testing.T) {
 	runAt := time.Now().Add(time.Hour)
 	item := &model.ScheduledNotification{
 		ScheduleType: "once",
-		RunAt: &runAt,
-		Timezone: "UTC",
+		RunAt:        &runAt,
+		Timezone:     "UTC",
 	}
 	if err := validateSchedule(item); err != nil {
 		t.Fatal(err)
@@ -72,12 +72,11 @@ func TestURLValidation(t *testing.T) {
 	}
 }
 
-
 func TestLookupPayloadSupportsArrays(t *testing.T) {
 	payload := map[string]any{
 		"items": []any{
-			map[string]any{"name":"first"},
-			map[string]any{"name":"second"},
+			map[string]any{"name": "first"},
+			map[string]any{"name": "second"},
 		},
 	}
 	value, ok := lookupPayload(payload, "items.1.name")
@@ -88,8 +87,8 @@ func TestLookupPayloadSupportsArrays(t *testing.T) {
 
 func TestRenderPayloadTemplate(t *testing.T) {
 	payload := map[string]any{
-		"alert": map[string]any{"title":"Disk full"},
-		"items": []any{map[string]any{"name":"server-1"}},
+		"alert": map[string]any{"title": "Disk full"},
+		"items": []any{map[string]any{"name": "server-1"}},
 	}
 	got := renderPayloadTemplate("{{alert.title}} on {{items.0.name}}", payload, "raw")
 	if got != "Disk full on server-1" {
@@ -99,7 +98,6 @@ func TestRenderPayloadTemplate(t *testing.T) {
 		t.Fatalf("unexpected raw template output %q", raw)
 	}
 }
-
 
 func TestNormalizeHomeAssistantMode(t *testing.T) {
 	cases := map[string]string{
@@ -146,7 +144,6 @@ func TestPrepareHomeAssistantPairingCreatesOneTimeState(t *testing.T) {
 	}
 }
 
-
 func TestPrepareHomeAssistantPairingPreservesActiveNativeBridge(t *testing.T) {
 	item := &model.HomeAssistantIntegration{
 		NativeWebhookURL: "https://ha.example/api/webhook/existing",
@@ -190,13 +187,13 @@ func TestHomeAssistantNativeAuthorization(t *testing.T) {
 func TestClearHomeAssistantNativePairing(t *testing.T) {
 	expires := time.Now().Add(time.Minute)
 	item := &model.HomeAssistantIntegration{
-		NativeWebhookURL:  "https://ha.example/api/webhook/existing",
-		NativeSecret:      "shared-secret",
-		PairingCodeHash:   "hash",
-		PairingExpiresAt:  &expires,
-		Status:            "connected",
-		LastError:         "old error",
-		LastErrorAt:       &expires,
+		NativeWebhookURL: "https://ha.example/api/webhook/existing",
+		NativeSecret:     "shared-secret",
+		PairingCodeHash:  "hash",
+		PairingExpiresAt: &expires,
+		Status:           "connected",
+		LastError:        "old error",
+		LastErrorAt:      &expires,
 	}
 	clearHomeAssistantNativePairing(item)
 	if item.NativeWebhookURL != "" || item.NativeSecret != "" || item.PairingCodeHash != "" {
@@ -212,7 +209,6 @@ func TestClearHomeAssistantNativePairing(t *testing.T) {
 		t.Fatal("stale native bridge errors should be cleared")
 	}
 }
-
 
 type homeAssistantEndpointTestDB struct {
 	AutomationDatabase

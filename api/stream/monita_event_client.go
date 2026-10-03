@@ -6,9 +6,9 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type muEventClient struct {
+type monitaEventClient struct {
 	conn    *websocket.Conn
-	onClose func(*muEventClient)
+	onClose func(*monitaEventClient)
 	write   chan any
 	closed  chan struct{}
 	userID  uint
@@ -16,13 +16,13 @@ type muEventClient struct {
 	once    once
 }
 
-func newMUEventClient(
+func newMonitaEventClient(
 	conn *websocket.Conn,
 	userID uint,
 	token string,
-	onClose func(*muEventClient),
-) *muEventClient {
-	return &muEventClient{
+	onClose func(*monitaEventClient),
+) *monitaEventClient {
+	return &monitaEventClient{
 		conn:    conn,
 		onClose: onClose,
 		write:   make(chan any, 8),
@@ -32,14 +32,14 @@ func newMUEventClient(
 	}
 }
 
-func (c *muEventClient) Close() {
+func (c *monitaEventClient) Close() {
 	c.once.Do(func() {
 		c.conn.Close()
 		close(c.closed)
 	})
 }
 
-func (c *muEventClient) NotifyClose() {
+func (c *monitaEventClient) NotifyClose() {
 	c.once.Do(func() {
 		c.conn.Close()
 		close(c.closed)
@@ -47,7 +47,7 @@ func (c *muEventClient) NotifyClose() {
 	})
 }
 
-func (c *muEventClient) startReading(pongWait time.Duration) {
+func (c *monitaEventClient) startReading(pongWait time.Duration) {
 	defer c.NotifyClose()
 	c.conn.SetReadLimit(256)
 	c.conn.SetReadDeadline(time.Now().Add(pongWait))
@@ -57,13 +57,13 @@ func (c *muEventClient) startReading(pongWait time.Duration) {
 	})
 	for {
 		if _, _, err := c.conn.NextReader(); err != nil {
-			printWebSocketError("MUEventReadError", err)
+			printWebSocketError("MonitaEventReadError", err)
 			return
 		}
 	}
 }
 
-func (c *muEventClient) startWriteHandler(pingPeriod time.Duration) {
+func (c *monitaEventClient) startWriteHandler(pingPeriod time.Duration) {
 	pingTicker := time.NewTicker(pingPeriod)
 	defer func() {
 		c.NotifyClose()
@@ -77,13 +77,13 @@ func (c *muEventClient) startWriteHandler(pingPeriod time.Duration) {
 		case event := <-c.write:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := writeJSON(c.conn, event); err != nil {
-				printWebSocketError("MUEventWriteError", err)
+				printWebSocketError("MonitaEventWriteError", err)
 				return
 			}
 		case <-pingTicker.C:
 			c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 			if err := ping(c.conn); err != nil {
-				printWebSocketError("MUEventPingError", err)
+				printWebSocketError("MonitaEventPingError", err)
 				return
 			}
 		}

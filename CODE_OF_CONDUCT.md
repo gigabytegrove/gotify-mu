@@ -34,7 +34,7 @@ This Code of Conduct applies both within project spaces and in public spaces whe
 
 ## Enforcement
 
-Instances of abusive, harassing, or otherwise unacceptable behavior should be reported to the Gotify MU repository maintainers through GitHub. The project maintainers will review and investigate complaints and respond as appropriate to the circumstances. Reports will be handled as confidentially as the available GitHub communication channel permits.
+Instances of abusive, harassing, or otherwise unacceptable behavior should be reported to the Monita repository maintainers through GitHub. The project maintainers will review and investigate complaints and respond as appropriate to the circumstances. Reports will be handled as confidentially as the available GitHub communication channel permits.
 
 Project maintainers who do not follow or enforce the Code of Conduct in good faith may face temporary or permanent repercussions as determined by other members of the project's leadership.
 

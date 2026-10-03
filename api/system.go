@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/model"
 )
 
 type SystemDatabase interface {
@@ -30,12 +30,12 @@ type SystemDatabase interface {
 }
 
 type SystemAPI struct {
-	DB            SystemDatabase
-	Dialect       string
-	DataDir       string
-	DatabaseFile  string
-	VersionInfo   *model.VersionInfo
-	NotifyDeleted     func(uint, string)
+	DB               SystemDatabase
+	Dialect          string
+	DataDir          string
+	DatabaseFile     string
+	VersionInfo      *model.VersionInfo
+	NotifyDeleted    func(uint, string)
 	ConnectedClients func() int
 }
 
@@ -52,7 +52,9 @@ type sessionView struct {
 
 func (a *SystemAPI) GetSecurityPolicy(ctx *gin.Context) {
 	policy, err := a.DB.GetSecurityPolicy()
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
 	ctx.JSON(http.StatusOK, policy)
 }
 
@@ -74,18 +76,24 @@ func validateSecurityPolicy(policy model.SecurityPolicy) error {
 
 func (a *SystemAPI) SaveSecurityPolicy(ctx *gin.Context) {
 	var policy model.SecurityPolicy
-	if err := ctx.ShouldBindJSON(&policy); err != nil { return }
+	if err := ctx.ShouldBindJSON(&policy); err != nil {
+		return
+	}
 	if err := validateSecurityPolicy(policy); err != nil {
 		ctx.AbortWithError(http.StatusBadRequest, err)
 		return
 	}
-	if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.SaveSecurityPolicy(policy)) { return }
+	if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.SaveSecurityPolicy(policy)) {
+		return
+	}
 	ctx.JSON(http.StatusOK, policy)
 }
 
 func (a *SystemAPI) GetOperations(ctx *gin.Context) {
 	summary, err := a.DB.GetOperationsSummary(a.Dialect)
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
 	if a.ConnectedClients != nil {
 		summary.ConnectedClients = a.ConnectedClients()
 	}
@@ -110,7 +118,9 @@ func (a *SystemAPI) GetOperations(ctx *gin.Context) {
 
 func (a *SystemAPI) GetSessions(ctx *gin.Context) {
 	items, err := a.DB.GetAllClients()
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
 	out := make([]sessionView, 0, len(items))
 	for _, item := range items {
 		username := ""
@@ -118,9 +128,9 @@ func (a *SystemAPI) GetSessions(ctx *gin.Context) {
 			username = user.Name
 		}
 		out = append(out, sessionView{
-			ID:item.ID, UserID:item.UserID, Username:username, Name:item.Name,
-			CreatedAt:item.CreatedAt, LastUsed:item.LastUsed, ElevatedUntil:item.ElevatedUntil,
-			ExpiresAt:item.ExpiresAt,
+			ID: item.ID, UserID: item.UserID, Username: username, Name: item.Name,
+			CreatedAt: item.CreatedAt, LastUsed: item.LastUsed, ElevatedUntil: item.ElevatedUntil,
+			ExpiresAt: item.ExpiresAt,
 		})
 	}
 	ctx.JSON(http.StatusOK, out)
@@ -129,13 +139,19 @@ func (a *SystemAPI) GetSessions(ctx *gin.Context) {
 func (a *SystemAPI) RevokeSession(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		client, err := a.DB.GetClientByID(id)
-		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+			return
+		}
 		if client == nil {
 			ctx.AbortWithError(http.StatusNotFound, errors.New("session not found"))
 			return
 		}
-		if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.DeleteClientByID(id)) { return }
-		if a.NotifyDeleted != nil { a.NotifyDeleted(client.UserID, client.Token) }
+		if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.DeleteClientByID(id)) {
+			return
+		}
+		if a.NotifyDeleted != nil {
+			a.NotifyDeleted(client.UserID, client.Token)
+		}
 		ctx.Status(http.StatusNoContent)
 	})
 }
@@ -148,11 +164,15 @@ func (a *SystemAPI) ExportAudit(ctx *gin.Context) {
 		}
 	}
 	items, err := a.DB.GetAuditEventsForExport(limit)
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
 
 	if ctx.Query("format") == "json" {
 		body, err := json.MarshalIndent(items, "", "  ")
-		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+		if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+			return
+		}
 		ctx.Header("Content-Disposition", "attachment; filename=monita-audit.json")
 		ctx.Data(http.StatusOK, "application/json", body)
 		return
@@ -160,13 +180,13 @@ func (a *SystemAPI) ExportAudit(ctx *gin.Context) {
 
 	var buffer bytes.Buffer
 	writer := csv.NewWriter(&buffer)
-	_ = writer.Write([]string{"id","createdAt","userId","username","action","target","targetId","ipAddress","details"})
+	_ = writer.Write([]string{"id", "createdAt", "userId", "username", "action", "target", "targetId", "ipAddress", "details"})
 	for _, item := range items {
 		_ = writer.Write([]string{
-			strconv.FormatUint(uint64(item.ID),10),
+			strconv.FormatUint(uint64(item.ID), 10),
 			item.CreatedAt.UTC().Format(time.RFC3339Nano),
-			strconv.FormatUint(uint64(item.UserID),10),
-			item.Username,item.Action,item.Target,item.TargetID,item.IPAddress,item.Details,
+			strconv.FormatUint(uint64(item.UserID), 10),
+			item.Username, item.Action, item.Target, item.TargetID, item.IPAddress, item.Details,
 		})
 	}
 	writer.Flush()
@@ -180,8 +200,12 @@ func (a *SystemAPI) ExportAudit(ctx *gin.Context) {
 
 func (a *SystemAPI) ApplyAuditRetention(ctx *gin.Context) {
 	policy, err := a.DB.GetSecurityPolicy()
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
-	before := time.Now().AddDate(0,0,-policy.AuditRetentionDays)
-	if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.DeleteAuditEventsBefore(before)) { return }
-	ctx.JSON(http.StatusOK, gin.H{"deletedBefore":before})
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
+	before := time.Now().AddDate(0, 0, -policy.AuditRetentionDays)
+	if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.DeleteAuditEventsBefore(before)) {
+		return
+	}
+	ctx.JSON(http.StatusOK, gin.H{"deletedBefore": before})
 }

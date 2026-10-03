@@ -3,7 +3,7 @@ package api
 import (
 	"testing"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 )
 
 func TestCanPostToChannelOwnerWithoutMembership(t *testing.T) {
@@ -81,7 +81,6 @@ func TestChannelImageMessageIdentityChat(t *testing.T) {
 		)
 	}
 }
-
 
 func TestMessageControlEnabled(t *testing.T) {
 	message := &model.Message{

@@ -4,6 +4,23 @@
 
 # Changelog
 
+## 1.3.7 — 2026-10-03
+
+### Complete Monita source identity cleanup
+
+- Migrated the internal Go module/import path from the upstream server path to `github.com/gigabytegrove/monita`.
+- Renamed former MU-only source files, types, realtime internals, and capability identity to canonical Monita names.
+- Added canonical `/monitainfo` and `/api/monita/v1/*` endpoints while retaining legacy aliases for existing clients.
+- Added canonical `X-Monita-Key`, `X-Monita-MFA-Code`, and Monita webhook signature headers with legacy Gotify header fallbacks.
+- Moved new session cookies, backup names, message extras, Docker/build paths, test harnesses, and current UI copy to Monita naming.
+- Preserved only deliberate compatibility/legal/history references to Gotify.
+
+### Compatibility
+
+- Existing Gotify-style headers, compatibility routes, legacy environment variables, legacy config/database/secret paths, and legacy backup bundles remain accepted.
+- External `github.com/gotify/plugin-api` and `github.com/gotify/location` dependencies remain because they are upstream compatibility dependencies.
+- Historical changelog/release notes and license attribution are intentionally not rewritten.
+
 ## 1.3.6 — 2026-10-03
 
 ### Monita naming and interface refresh

@@ -12,12 +12,12 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test"
-	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -60,10 +60,10 @@ func (s *ApplicationSuite) Test_CreateApplication_mapAllParameters() {
 	s.a.CreateApplication(s.ctx)
 
 	expected := &model.Application{
-		ID:          1,
-		UserID:      5,
-		Name:        "custom_name",
-		Description: "description_text",
+		ID:            1,
+		UserID:        5,
+		Name:          "custom_name",
+		Description:   "description_text",
 		SortKey:       "a5",
 		ChannelType:   "notification",
 		RetentionDays: 1,
@@ -154,12 +154,12 @@ func (s *ApplicationSuite) Test_CreateApplication_ignoresReadOnlyPropertiesInPar
 	s.a.CreateApplication(s.ctx)
 
 	expected := &model.Application{
-		ID:          1,
-		UserID:      5,
-		Name:        "name",
-		Description: "description",
-		Internal:    false,
-		Image:       "static/defaultapp.png",
+		ID:            1,
+		UserID:        5,
+		Name:          "name",
+		Description:   "description",
+		Internal:      false,
+		Image:         "static/defaultapp.png",
 		SortKey:       "a5",
 		ChannelType:   "notification",
 		RetentionDays: 1,
@@ -286,10 +286,10 @@ func (s *ApplicationSuite) Test_CreateApplication_returnsApplicationWithID() {
 	s.a.CreateApplication(s.ctx)
 
 	expected := &model.Application{
-		ID:        1,
-		UserID:    5,
-		Name:      "custom_name",
-		Image:     "static/defaultapp.png",
+		ID:            1,
+		UserID:        5,
+		Name:          "custom_name",
+		Image:         "static/defaultapp.png",
 		SortKey:       "a0",
 		ChannelType:   "notification",
 		RetentionDays: 1,
