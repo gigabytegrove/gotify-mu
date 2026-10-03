@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/rs/zerolog/log"
 )
 
@@ -117,8 +117,8 @@ func (m *Manager) TestEmailGateway(id uint) error {
 	if item == nil { return errors.New("email delivery connection not found") }
 	test := &model.Message{
 		ApplicationID:item.SourceApplicationID,
-		Title:"Gotify MU email delivery test",
-		Message:"This message confirms that Gotify MU can deliver email through this connection.",
+		Title:"Monita email delivery test",
+		Message:"This message confirms that Monita can deliver email through this connection.",
 		Priority:item.MinPriority,
 		Date:time.Now(),
 	}
@@ -434,7 +434,7 @@ func (m *Manager) handleSMTP(conn net.Conn) {
 	_ = conn.SetDeadline(time.Now().Add(5*time.Minute))
 	reader:=bufio.NewReader(conn);writer:=bufio.NewWriter(conn)
 	reply:=func(code int,text string){fmt.Fprintf(writer,"%d %s\r\n",code,text);_=writer.Flush()}
-	reply(220,"Gotify MU SMTP Receiver")
+	reply(220,"Monita SMTP Receiver")
 	var recipient,user,pass,envelopeSender string
 	authenticated:=false
 	for {
@@ -442,7 +442,7 @@ func (m *Manager) handleSMTP(conn net.Conn) {
 		line=strings.TrimSpace(line);upper:=strings.ToUpper(line)
 		switch {
 		case strings.HasPrefix(upper,"EHLO")||strings.HasPrefix(upper,"HELO"):
-			fmt.Fprint(writer,"250-Gotify MU\r\n250 AUTH PLAIN\r\n");_=writer.Flush()
+			fmt.Fprint(writer,"250-Monita\r\n250 AUTH PLAIN\r\n");_=writer.Flush()
 		case strings.HasPrefix(upper,"AUTH PLAIN"):
 			encoded:=strings.TrimSpace(strings.TrimPrefix(line,"AUTH PLAIN"))
 			raw,decodeErr:=base64.StdEncoding.DecodeString(encoded)

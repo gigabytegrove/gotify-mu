@@ -1,8 +1,8 @@
 package database
 
 import (
-	"github.com/gotify/server/v3/fracdex"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/fracdex"
+	"github.com/gigabytegrove/monita/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

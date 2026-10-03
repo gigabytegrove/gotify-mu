@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/security"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/security"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )

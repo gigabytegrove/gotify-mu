@@ -3,7 +3,7 @@ package database
 import (
 	"testing"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
