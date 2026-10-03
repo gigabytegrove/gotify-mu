@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/connectors"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/connectors"
+	"github.com/gigabytegrove/monita/model"
 )
 
 type ConnectorDatabase interface {

@@ -17,10 +17,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/automation"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/security"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/automation"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/security"
 	"github.com/robfig/cron"
 )
 
@@ -173,7 +173,7 @@ func (a *AutomationAPI) TestWebhookRoute(ctx *gin.Context) {
 		item, err := a.DB.GetWebhookRouteByID(id)
 		if !successOrAbort(ctx, 500, err) { return }
 		if item == nil { ctx.AbortWithError(404, errors.New("webhook not found")); return }
-		msg, err := a.Engine.Publish(item.ApplicationID, "Webhook test", "Gotify MU webhook test completed successfully.", item.DefaultPriority)
+		msg, err := a.Engine.Publish(item.ApplicationID, "Webhook test", "Monita webhook test completed successfully.", item.DefaultPriority)
 		if !successOrAbort(ctx, 500, err) { return }
 		ctx.JSON(200, gin.H{"sent":true, "messageId":msg.ID})
 	})

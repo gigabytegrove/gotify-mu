@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/h2non/filetype"
 	"gorm.io/gorm"
 )
@@ -58,9 +58,9 @@ type ApplicationParams struct {
 	//
 	// example: a1
 	SortKey string `form:"sortKey" query:"sortKey" json:"sortKey"`
-	// Whether this Gotify MU channel should be automatically assigned to every user.
+	// Whether this Monita channel should be automatically assigned to every user.
 	AutoAssign bool `form:"autoAssign" query:"autoAssign" json:"autoAssign"`
-	// Whether assigned users may publish messages to this Gotify MU channel.
+	// Whether assigned users may publish messages to this Monita channel.
 	AllowMemberPost bool `form:"allowMemberPost" query:"allowMemberPost" json:"allowMemberPost"`
 	// Presentation mode for MU-aware clients. Empty remains accepted for older clients.
 	ChannelType string `form:"channelType" query:"channelType" json:"channelType" binding:"omitempty,oneof=notification chat"`
