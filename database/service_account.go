@@ -3,7 +3,7 @@ package database
 import (
 	"time"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"gorm.io/gorm"
 )
 
