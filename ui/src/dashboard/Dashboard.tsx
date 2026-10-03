@@ -7,6 +7,7 @@ import Typography from '@mui/material/Typography';
 import Divider from '@mui/material/Divider';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
+import Paper from '@mui/material/Paper';
 import NotificationsActive from '@mui/icons-material/NotificationsActive';
 import NotificationsOff from '@mui/icons-material/NotificationsOff';
 import Public from '@mui/icons-material/Public';
@@ -20,6 +21,9 @@ import Settings from '@mui/icons-material/Settings';
 import Forum from '@mui/icons-material/Forum';
 import GroupWork from '@mui/icons-material/GroupWork';
 import FactCheck from '@mui/icons-material/FactCheck';
+import Hub from '@mui/icons-material/Hub';
+import AutoMode from '@mui/icons-material/AutoMode';
+import FiberManualRecord from '@mui/icons-material/FiberManualRecord';
 import {Link} from 'react-router';
 import {observer} from 'mobx-react-lite';
 import DefaultPage from '../common/DefaultPage';
@@ -46,6 +50,10 @@ const Dashboard = observer(() => {
     const apps = appStore.getItems();
     const globals = apps.filter((app) => app.autoAssign).length;
     const muted = apps.filter((app) => app.receiveNotifications === false).length;
+    const chats = apps.filter(
+        (app) =>
+            app.channelType === 'chat' || (app.channelType == null && Boolean(app.allowMemberPost))
+    ).length;
     const clients = clientStore.getItems();
     const plugins = pluginStore.getItems();
     const enabledPlugins = plugins.filter((plugin) => plugin.enabled).length;
@@ -62,16 +70,107 @@ const Dashboard = observer(() => {
         })
         .slice(0, 6);
 
+    const displayName = currentUser.user.displayName || currentUser.user.name;
+
     return (
         <DefaultPage
             title="Dashboard"
-            description="Notifications, access, and server status at a glance."
+            description="Your live view of Monita channels, access, integrations, and server health."
             rightControl={
                 <Button component={Link} to="/messages" variant="contained" startIcon={<Inbox />}>
                     Open Messages
                 </Button>
             }>
             {admin && <UpdateAvailableBanner />}
+
+            <Paper
+                variant="outlined"
+                sx={{
+                    position: 'relative',
+                    overflow: 'hidden',
+                    borderRadius: 3,
+                    bgcolor: '#101B31',
+                    color: '#FFFFFF',
+                    borderColor: '#1C2B48',
+                    boxShadow: '0 16px 44px rgba(10,18,32,.16)',
+                }}>
+                <Stack
+                    direction={{xs: 'column', md: 'row'}}
+                    spacing={2.5}
+                    sx={{
+                        p: {xs: 2.5, sm: 3},
+                        alignItems: {md: 'center'},
+                        justifyContent: 'space-between',
+                    }}>
+                    <Box sx={{maxWidth: 690}}>
+                        <Stack
+                            direction="row"
+                            spacing={0.75}
+                            sx={{alignItems: 'center', mb: 1.1}}>
+                            <FiberManualRecord sx={{fontSize: 10, color: '#27D17F'}} />
+                            <Typography
+                                variant="overline"
+                                sx={{color: 'rgba(231,238,248,.7)', fontSize: '0.68rem'}}>
+                                Workspace online
+                            </Typography>
+                        </Stack>
+                        <Typography
+                            variant="h4"
+                            sx={{
+                                fontSize: {xs: '1.65rem', sm: '2rem'},
+                                color: '#FFFFFF',
+                                lineHeight: 1.08,
+                            }}>
+                            Welcome back, {displayName}
+                        </Typography>
+                        <Typography
+                            sx={{
+                                mt: 1,
+                                color: 'rgba(225,234,246,.68)',
+                                maxWidth: 610,
+                                fontSize: '0.92rem',
+                            }}>
+                            {apps.length === 0
+                                ? 'Create your first Channel to start routing notifications and conversations through Monita.'
+                                : `${apps.length} channel${apps.length === 1 ? '' : 's'} are available, including ${chats} chat${chats === 1 ? '' : 's'} and ${globals} global channel${globals === 1 ? '' : 's'}.`}
+                        </Typography>
+                    </Box>
+                    <Stack
+                        direction={{xs: 'column', sm: 'row'}}
+                        spacing={1}
+                        sx={{flexShrink: 0}}>
+                        <Button
+                            component={Link}
+                            to="/channels"
+                            variant="contained"
+                            startIcon={<Forum />}
+                            sx={{
+                                bgcolor: '#FFFFFF',
+                                color: '#101B31',
+                                '&:hover': {bgcolor: '#EEF3FA'},
+                            }}>
+                            Manage Channels
+                        </Button>
+                        {admin && (
+                            <Button
+                                component={Link}
+                                to="/integrations"
+                                variant="outlined"
+                                startIcon={<Hub />}
+                                sx={{
+                                    color: '#E7EEF8',
+                                    borderColor: 'rgba(255,255,255,.22)',
+                                    '&:hover': {
+                                        borderColor: 'rgba(255,255,255,.4)',
+                                        bgcolor: 'rgba(255,255,255,.05)',
+                                    },
+                                }}>
+                                Integrations
+                            </Button>
+                        )}
+                    </Stack>
+                </Stack>
+            </Paper>
 
             <Grid container spacing={1.5}>
                 <Grid size={{xs: 12, sm: 6, lg: 3}}>
@@ -87,7 +186,7 @@ const Dashboard = observer(() => {
                         <StatCard
                             label="Users"
                             value={users.length}
-                            helper={`${groups.length} user group${groups.length === 1 ? '' : 's'}`}
+                            helper={`${groups.length} group${groups.length === 1 ? '' : 's'}`}
                             icon={<People />}
                         />
                     </Grid>
@@ -110,195 +209,186 @@ const Dashboard = observer(() => {
                 </Grid>
             </Grid>
 
-            <SurfaceCard title="Quick Actions" subtitle="Jump straight into common server tasks.">
-                <Stack direction="row" spacing={1} useFlexGap sx={{flexWrap: 'wrap'}}>
-                    <Button
-                        component={Link}
-                        to="/channels"
-                        variant="outlined"
-                        startIcon={<Forum />}>
-                        Manage Channels
-                    </Button>
-                    <Button
-                        component={Link}
-                        to="/messages"
-                        variant="outlined"
-                        startIcon={<Inbox />}>
-                        View Messages
-                    </Button>
-                    {admin && (
-                        <>
-                            <Button
-                                component={Link}
-                                to="/users"
-                                variant="outlined"
-                                startIcon={<People />}>
-                                Manage Users
-                            </Button>
-                            <Button
-                                component={Link}
-                                to="/groups"
-                                variant="outlined"
-                                startIcon={<GroupWork />}>
-                                Manage Groups
-                            </Button>
-                            <Button
-                                component={Link}
-                                to="/audit"
-                                variant="outlined"
-                                startIcon={<FactCheck />}>
-                                Audit Log
-                            </Button>
-                        </>
-                    )}
-                    <Button
-                        component={Link}
-                        to="/settings"
-                        variant="outlined"
-                        startIcon={<Settings />}>
-                        Settings
-                    </Button>
-                </Stack>
-            </SurfaceCard>
-
             <Grid container spacing={1.5}>
-                <Grid size={{xs: 12, lg: 7}}>
+                <Grid size={{xs: 12, lg: 8}}>
                     <SurfaceCard
                         title="Recent Channels"
-                        subtitle="Channels ordered by their most recent activity."
+                        subtitle="Your most recently active notification and chat destinations."
                         action={
-                            <Button component={Link} to="/channels" size="small">
-                                View all
+                            <Button component={Link} to="/channels" size="small" endIcon={<ArrowForward />}>
+                                All Channels
                             </Button>
                         }>
-                        <Stack spacing={0.5}>
+                        <Stack spacing={0.4}>
                             {recentApps.length === 0 && (
-                                <Typography color="text.secondary" sx={{py: 2}}>
-                                    No Channels are available yet.
-                                </Typography>
-                            )}
-                            {recentApps.map((app) => (
-                                <Stack
-                                    key={app.id}
-                                    direction="row"
-                                    spacing={1.25}
-                                    sx={{
-                                        alignItems: 'center',
-                                        py: 0.8,
-                                        px: 0.75,
-                                        borderRadius: 1.5,
-                                        '&:hover': {bgcolor: 'action.hover'},
-                                    }}>
-                                    <Avatar
-                                        src={config.get('url') + app.image}
-                                        variant="rounded"
-                                        sx={{width: 36, height: 36}}
-                                    />
-                                    <Box sx={{minWidth: 0, flex: 1}}>
-                                        <Stack
-                                            direction="row"
-                                            spacing={0.5}
-                                            useFlexGap
-                                            sx={{alignItems: 'center', flexWrap: 'wrap'}}>
-                                            <Typography sx={{fontWeight: 700}} noWrap>
-                                                {app.name}
-                                            </Typography>
-                                            {app.autoAssign && (
-                                                <Chip
-                                                    size="small"
-                                                    icon={<Public fontSize="small" />}
-                                                    label="Global"
-                                                />
-                                            )}
-                                            {app.receiveNotifications === false && (
-                                                <Chip
-                                                    size="small"
-                                                    variant="outlined"
-                                                    icon={<NotificationsOff fontSize="small" />}
-                                                    label="Muted"
-                                                />
-                                            )}
-                                        </Stack>
-                                        <Typography variant="body2" color="text.secondary" noWrap>
-                                            {app.description || 'No description'}
-                                        </Typography>
-                                    </Box>
+                                <Box sx={{py: 4, textAlign: 'center'}}>
+                                    <Typography sx={{fontWeight: 700}}>No Channels yet</Typography>
+                                    <Typography color="text.secondary" variant="body2" sx={{mt: 0.4}}>
+                                        Create a Channel to start receiving notifications or chatting.
+                                    </Typography>
                                     <Button
-                                        size="small"
                                         component={Link}
-                                        to={`/channels/${app.id}`}
-                                        endIcon={<ArrowForward fontSize="small" />}>
-                                        Open
+                                        to="/channels"
+                                        size="small"
+                                        variant="outlined"
+                                        sx={{mt: 1.5}}>
+                                        Create a Channel
                                     </Button>
-                                </Stack>
+                                </Box>
+                            )}
+                            {recentApps.map((app, index) => (
+                                <React.Fragment key={app.id}>
+                                    <Stack
+                                        direction="row"
+                                        spacing={1.4}
+                                        sx={{
+                                            alignItems: 'center',
+                                            py: 1,
+                                            px: 0.5,
+                                            borderRadius: 2,
+                                            '&:hover': {bgcolor: 'action.hover'},
+                                        }}>
+                                        <Avatar
+                                            src={config.get('url') + app.image}
+                                            variant="rounded"
+                                            sx={{width: 40, height: 40, borderRadius: 2}}
+                                        />
+                                        <Box sx={{minWidth: 0, flex: 1}}>
+                                            <Stack
+                                                direction="row"
+                                                spacing={0.6}
+                                                useFlexGap
+                                                sx={{alignItems: 'center', flexWrap: 'wrap'}}>
+                                                <Typography sx={{fontWeight: 700}} noWrap>
+                                                    {app.name}
+                                                </Typography>
+                                                {app.autoAssign && (
+                                                    <Chip
+                                                        size="small"
+                                                        icon={<Public fontSize="small" />}
+                                                        label="Global"
+                                                    />
+                                                )}
+                                                {app.receiveNotifications === false && (
+                                                    <Chip
+                                                        size="small"
+                                                        variant="outlined"
+                                                        icon={<NotificationsOff fontSize="small" />}
+                                                        label="Muted"
+                                                    />
+                                                )}
+                                            </Stack>
+                                            <Typography
+                                                variant="body2"
+                                                color="text.secondary"
+                                                noWrap
+                                                sx={{mt: 0.15}}>
+                                                {app.description || 'No description'}
+                                            </Typography>
+                                        </Box>
+                                        <Button
+                                            size="small"
+                                            component={Link}
+                                            to={`/channels/${app.id}`}
+                                            endIcon={<ArrowForward fontSize="small" />}>
+                                            Open
+                                        </Button>
+                                    </Stack>
+                                    {index < recentApps.length - 1 && <Divider />}
+                                </React.Fragment>
                             ))}
                         </Stack>
                     </SurfaceCard>
                 </Grid>
 
-                <Grid size={{xs: 12, lg: 5}}>
-                    <SurfaceCard
-                        title="Server Status"
-                        subtitle="Current version and sign-in status."
-                        action={
-                            <Chip
-                                size="small"
-                                color={currentUser.connectionErrorMessage ? 'warning' : 'success'}
-                                label={
-                                    currentUser.connectionErrorMessage ? 'Attention' : 'Connected'
-                                }
-                            />
-                        }>
-                        <Stack spacing={1}>
-                            <InfoRow label="Version" value={`@${version.version}`} />
-                            <Divider />
-                            <InfoRow label="Signed in as" value={currentUser.user.name} />
-                            <Divider />
-                            <Stack
-                                direction="row"
-                                spacing={1}
-                                sx={{alignItems: 'center', justifyContent: 'space-between'}}>
-                                <Typography variant="body2" color="text.secondary">
-                                    Role
-                                </Typography>
+                <Grid size={{xs: 12, lg: 4}}>
+                    <Stack spacing={1.5}>
+                        <SurfaceCard
+                            title="Server"
+                            subtitle="Current instance status."
+                            action={
                                 <Chip
                                     size="small"
-                                    label={admin ? 'Administrator' : 'User'}
-                                    icon={admin ? <Security fontSize="small" /> : undefined}
+                                    color={currentUser.connectionErrorMessage ? 'warning' : 'success'}
+                                    label={
+                                        currentUser.connectionErrorMessage ? 'Attention' : 'Healthy'
+                                    }
                                 />
-                            </Stack>
-                            <Divider />
-                            <Stack
-                                direction="row"
-                                spacing={1}
-                                sx={{alignItems: 'center', justifyContent: 'space-between'}}>
-                                <Typography variant="body2" color="text.secondary">
-                                    Sign-in methods
-                                </Typography>
+                            }>
+                            <Stack spacing={1.25}>
+                                <InfoRow label="Version" value={`@${version.version}`} />
+                                <Divider />
+                                <InfoRow label="Signed in as" value={currentUser.user.name} />
+                                <Divider />
                                 <Stack
                                     direction="row"
-                                    spacing={0.5}
-                                    useFlexGap
-                                    sx={{flexWrap: 'wrap'}}>
-                                    {config.get('localAuth') && (
-                                        <Chip size="small" variant="outlined" label="Password" />
-                                    )}
-                                    {config.get('oidc') && (
-                                        <Chip
-                                            size="small"
-                                            variant="outlined"
-                                            label="Single sign-on"
-                                        />
-                                    )}
+                                    spacing={1}
+                                    sx={{alignItems: 'center', justifyContent: 'space-between'}}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Role
+                                    </Typography>
+                                    <Chip
+                                        size="small"
+                                        label={admin ? 'Administrator' : 'User'}
+                                        icon={admin ? <Security fontSize="small" /> : undefined}
+                                    />
                                 </Stack>
                             </Stack>
-                        </Stack>
-                    </SurfaceCard>
+                        </SurfaceCard>
+
+                        <SurfaceCard title="Quick Actions" subtitle="Common workspace tasks.">
+                            <Stack spacing={0.75}>
+                                <QuickAction to="/messages" icon={<Inbox />} label="View Messages" />
+                                <QuickAction to="/channels" icon={<Forum />} label="Manage Channels" />
+                                {admin && (
+                                    <>
+                                        <QuickAction to="/users" icon={<People />} label="Manage Users" />
+                                        <QuickAction
+                                            to="/automation"
+                                            icon={<AutoMode />}
+                                            label="Automation"
+                                        />
+                                        <QuickAction
+                                            to="/audit"
+                                            icon={<FactCheck />}
+                                            label="Audit Log"
+                                        />
+                                    </>
+                                )}
+                                <QuickAction to="/settings" icon={<Settings />} label="Settings" />
+                            </Stack>
+                        </SurfaceCard>
+                    </Stack>
                 </Grid>
             </Grid>
         </DefaultPage>
     );
 });
+
+const QuickAction = ({
+    to,
+    icon,
+    label,
+}: {
+    to: string;
+    icon: React.ReactNode;
+    label: string;
+}) => (
+    <Button
+        component={Link}
+        to={to}
+        variant="text"
+        startIcon={icon}
+        endIcon={<ArrowForward fontSize="small" />}
+        sx={{
+            justifyContent: 'flex-start',
+            color: 'text.primary',
+            px: 1,
+            '& .MuiButton-endIcon': {ml: 'auto'},
+        }}>
+        {label}
+    </Button>
+);
 
 const InfoRow = ({label, value}: {label: string; value: string}) => (
     <Stack direction="row" spacing={2} sx={{alignItems: 'center', justifyContent: 'space-between'}}>
@@ -308,7 +398,7 @@ const InfoRow = ({label, value}: {label: string; value: string}) => (
         <Typography
             variant="body2"
             sx={{
-                fontWeight: 650,
+                fontWeight: 680,
                 maxWidth: '65%',
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
