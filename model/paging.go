@@ -6,7 +6,7 @@ package model
 //
 // swagger:model Paging
 type Paging struct {
-	// The relative path for the next page. Empty/Null when no next page is available. Should be combined with the gotify base url.
+	// The relative path for the next page. Empty/Null when no next page is available. Should be combined with the Monita server base URL.
 	//
 	// read only: true
 	// required: false
