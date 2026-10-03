@@ -25,8 +25,13 @@ const (
 )
 
 const (
-	headerName = "X-Gotify-Key"
-	cookieName = "gotify-client-token"
+	headerName       = "X-Monita-Key"
+	legacyHeaderName = "X-Gotify-Key"
+	cookieName       = "monita-client-token"
+	legacyCookieName = "gotify-client-token"
+
+	mfaHeaderName       = "X-Monita-MFA-Code"
+	legacyMFAHeaderName = "X-Gotify-MFA-Code"
 )
 
 var timeNow = time.Now
@@ -195,7 +200,7 @@ func (a *Auth) handleUser(checks ...func(*model.User) (authState, error)) func(c
 				mfa, mfaErr := a.DB.GetUserMFA(user.ID)
 				if mfaErr != nil { return authStateSkip, mfaErr }
 				if mfa != nil && mfa.Enabled {
-					code := strings.TrimSpace(ctx.GetHeader("X-Gotify-MFA-Code"))
+					code := MFACodeFromRequest(ctx)
 					valid := security.VerifyTOTP(mfa.Secret, code, timeNow())
 					if !valid && code != "" {
 						valid, mfaErr = a.DB.ConsumeRecoveryCode(user.ID, security.HashRecoveryCode(code))
@@ -310,7 +315,7 @@ func (a *Auth) handleApplication(ctx *gin.Context) (authState, error) {
 func (a *Auth) readTokenFromRequest(ctx *gin.Context) (string, bool) {
 	if token := a.tokenFromQuery(ctx); token != "" {
 		return token, false
-	} else if token := a.tokenFromXGotifyHeader(ctx); token != "" {
+	} else if token := a.tokenFromAccessKeyHeader(ctx); token != "" {
 		return token, false
 	} else if token := a.tokenFromAuthorizationHeader(ctx); token != "" {
 		return token, false
@@ -321,7 +326,10 @@ func (a *Auth) readTokenFromRequest(ctx *gin.Context) (string, bool) {
 }
 
 func (a *Auth) tokenFromCookie(ctx *gin.Context) string {
-	token, err := ctx.Cookie(cookieName)
+	if token, err := ctx.Cookie(cookieName); err == nil && token != "" {
+		return token
+	}
+	token, err := ctx.Cookie(legacyCookieName)
 	if err != nil {
 		return ""
 	}
@@ -332,8 +340,20 @@ func (a *Auth) tokenFromQuery(ctx *gin.Context) string {
 	return ctx.Request.URL.Query().Get("token")
 }
 
-func (a *Auth) tokenFromXGotifyHeader(ctx *gin.Context) string {
-	return ctx.Request.Header.Get(headerName)
+func (a *Auth) tokenFromAccessKeyHeader(ctx *gin.Context) string {
+	if token := strings.TrimSpace(ctx.Request.Header.Get(headerName)); token != "" {
+		return token
+	}
+	return strings.TrimSpace(ctx.Request.Header.Get(legacyHeaderName))
+}
+
+// MFACodeFromRequest returns the Monita MFA header value and accepts the
+// historical compatibility header for clients that have not migrated yet.
+func MFACodeFromRequest(ctx *gin.Context) string {
+	if code := strings.TrimSpace(ctx.GetHeader(mfaHeaderName)); code != "" {
+		return code
+	}
+	return strings.TrimSpace(ctx.GetHeader(legacyMFAHeaderName))
 }
 
 func (a *Auth) tokenFromAuthorizationHeader(ctx *gin.Context) string {
