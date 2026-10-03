@@ -41,7 +41,7 @@ func (s *ApplicationSuite) BeforeTest(suiteName, testName string) {
 	s.recorder = httptest.NewRecorder()
 	s.db = testdb.NewDB(s.T())
 	s.ctx, _ = gin.CreateTestContext(s.recorder)
-	tmpDir := test.NewTmpDir("gotify_applicationsuite")
+	tmpDir := test.NewTmpDir("monita_applicationsuite")
 	s.imageDir = &tmpDir
 	withURL(s.ctx, "http", "example.com")
 	s.a = &ApplicationAPI{DB: s.db, ImageDir: s.imageDir.Path() + "/"}
