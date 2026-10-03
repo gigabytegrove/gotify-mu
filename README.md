@@ -8,7 +8,7 @@
 
 Monita is a self-hosted notification and messaging platform for people, teams, home automation, and connected systems. It expands on Gotify compatibility with shared Channels, chat, automation, integrations, and multi-user administration.
 
-> Formerly known as Gotify MU. Gotify-compatible protocol names remain where required for upgrade and client compatibility.
+> Monita retains Gotify-compatible protocol routes where required for existing clients and upgrade compatibility.
 
 ## Current release
 
@@ -61,8 +61,8 @@ docker compose up -d
 At minimum, set a secure administrator password in `.env`:
 
 ```env
-GOTIFY_DEFAULTUSER_NAME=admin
-GOTIFY_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
+MONITA_DEFAULTUSER_NAME=admin
+MONITA_DEFAULTUSER_PASS=CHANGE-THIS-PASSWORD
 ```
 
 By default, the Web UI is available on:
@@ -162,7 +162,7 @@ See [Home Assistant integration](docs/HOME_ASSISTANT_NATIVE_PAIRING.md) for setu
 
 ## Gotify compatibility
 
-Monita is built from the Gotify Server codebase and keeps compatibility with common Gotify clients and integrations wherever practical.
+Monita maintains compatibility with common Gotify clients and integrations wherever practical.
 
 Existing Gotify-style application and client tokens continue to work with supported compatibility routes. Monita-specific features are added on top of that compatibility layer.
 
