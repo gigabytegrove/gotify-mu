@@ -245,7 +245,7 @@ func Get() (*Configuration, []FutureLog) {
 		logs = append(logs, futureFatal("at least one authentication provider must be enabled"))
 	}
 	if c.LDAP.Enabled && (strings.TrimSpace(c.LDAP.URL) == "" || strings.TrimSpace(c.LDAP.BaseDN) == "") {
-		logs = append(logs, futureFatal("LDAP authentication requires GOTIFY_LDAP_URL and GOTIFY_LDAP_BASE_DN"))
+		logs = append(logs, futureFatal("LDAP authentication requires MONITA_LDAP_URL and MONITA_LDAP_BASE_DN"))
 	}
 	if c.Registration && !c.LocalAuthEnabled {
 		logs = append(logs, futureFatal("registration requires local authentication to be enabled"))
