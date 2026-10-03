@@ -79,13 +79,13 @@ func (s *DatabaseSuite) TestUserPlugins() {
 	if geekUser, err := s.db.GetUserByName("geek"); assert.NoError(s.T(), err) {
 		s.db.CreatePluginConf(&model.PluginConf{
 			UserID:     geekUser.ID,
-			ModulePath: "github.com/gotify/example-plugin",
+			ModulePath: "example.com/monita/example-plugin",
 			Token:      "P1234",
 			Enabled:    true,
 		})
 		s.db.CreatePluginConf(&model.PluginConf{
 			UserID:     geekUser.ID,
-			ModulePath: "github.com/gotify/example-plugin/v2",
+			ModulePath: "example.com/monita/example-plugin/v2",
 			Token:      "P5678",
 			Enabled:    true,
 		})
@@ -97,7 +97,7 @@ func (s *DatabaseSuite) TestUserPlugins() {
 		}
 	}
 	if pluginConf, err := s.db.GetPluginConfByToken("P1234"); assert.NoError(s.T(), err) {
-		assert.Equal(s.T(), "github.com/gotify/example-plugin", pluginConf.ModulePath)
+		assert.Equal(s.T(), "example.com/monita/example-plugin", pluginConf.ModulePath)
 	}
 }
 
