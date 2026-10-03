@@ -56,7 +56,7 @@ const Layout = observer(() => {
         },
     } = useStores();
 
-    const [currentTheme, setCurrentTheme] = React.useState<ThemeKey>(() => {
+    const [currentTheme] = React.useState<ThemeKey>(() => {
         const stored =
             window.localStorage.getItem(localStorageThemeKey) ??
             window.localStorage.getItem(legacyThemeKey);
@@ -68,7 +68,7 @@ const Layout = observer(() => {
     const {version} = config.get('version');
     const [navOpen, setNavOpen] = React.useState(false);
 
-        const authed = (children: React.ReactNode) => (
+    const authed = (children: React.ReactNode) => (
         <RequireAuth loggedIn={loggedIn} authenticating={authenticating}>
             {children}
         </RequireAuth>
