@@ -289,7 +289,7 @@ func (a *OIDCAPI) handleElevationCallback(w http.ResponseWriter, elevate *pendin
 	io.WriteString(w, `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Gotify Session Elevation</title>
+  <title>Monita Session Elevation</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 </head>
@@ -433,9 +433,9 @@ func (a *OIDCAPI) generateState() (string, error) {
 //
 //  1. Look up the user by OIDC id (<iss>#<sub>). If found, use it.
 //  2. Otherwise look up a user by the username claim. If one exists, link it to
-//     this OIDC identity, which requires GOTIFY_OIDC_LINK_BY_USERNAME and
+//     this OIDC identity, which requires MONITA_OIDC_LINK_BY_USERNAME and
 //     that the user is not already bound to a different identity.
-//  3. Otherwise auto-register a new user, which requires GOTIFY_OIDC_AUTOREGISTER.
+//  3. Otherwise auto-register a new user, which requires MONITA_OIDC_AUTOREGISTER.
 func (a *OIDCAPI) resolveUser(idToken *oidc.IDTokenClaims, info *oidc.UserInfo) (*model.User, int, error) {
 	issuer := idToken.GetIssuer()
 	if issuer == "" {
