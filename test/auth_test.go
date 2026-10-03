@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/test"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/test"
 	"github.com/stretchr/testify/assert"
 )
 

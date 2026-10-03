@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-contrib/gzip"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 )
 
 //go:embed build/*
