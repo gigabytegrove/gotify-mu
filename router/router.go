@@ -305,9 +305,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 		ctx.JSON(200, vInfo)
 	})
 
-	// swagger:operation GET /gotifyinfo info getInfo
+	// swagger:operation GET /monitainfo info getInfo
 	//
-	// Get gotify information.
+	// Get Monita server information.
 	//
 	// ---
 	// produces: [application/json]
@@ -315,9 +315,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 	//   200:
 	//     description: Ok
 	//     schema:
-	//         $ref: "#/definitions/GotifyInfo"
-	g.GET("gotifyinfo", func(ctx *gin.Context) {
-		ctx.JSON(200, &model.GotifyInfo{
+	//         $ref: "#/definitions/MonitaInfo"
+	infoHandler := func(ctx *gin.Context) {
+		ctx.JSON(200, &model.MonitaInfo{
 			Version:          vInfo.Version,
 			Oidc:             conf.OIDC.Enabled,
 			Register:         conf.Registration,
@@ -327,7 +327,9 @@ func Create(db *database.GormDatabase, vInfo *model.VersionInfo, conf *config.Co
 			LDAP:             conf.LDAP.Enabled,
 			LDAPIDPName:      conf.LDAP.IDPName,
 		})
-	})
+	}
+	g.GET("monitainfo", infoHandler)
+	g.GET("gotifyinfo", infoHandler) // Legacy compatibility route.
 
 	g.GET("/application/current", authentication.RequireApplicationToken, applicationHandler.GetCurrentApplication)
 
