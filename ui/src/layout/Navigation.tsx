@@ -37,7 +37,7 @@ import {mayAllowPermission, requestPermission} from '../snack/browserNotificatio
 import {useStores} from '../stores';
 import * as config from '../config';
 
-export const navigationWidth = 276;
+export const navigationWidth = 288;
 
 interface IProps {
     loggedIn: boolean;
@@ -72,7 +72,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
         React.useState(mayAllowPermission);
 
     const items: NavItem[] = [
-        {label: 'Dashboard', to: '/', icon: <Dashboard />, exact: true},
+        {label: 'Overview', to: '/', icon: <Dashboard />, exact: true},
         {label: 'Messages', to: '/messages', icon: <Inbox />},
         {label: 'Channels', to: '/channels', icon: <Forum />},
         {label: 'Users', to: '/users', icon: <People />, adminOnly: true},
@@ -99,21 +99,42 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
         sectionApps: typeof apps,
         icon: React.ReactNode
     ) => (
-        <Box sx={{mb: 1.5}}>
+        <Box sx={{mb: 1.7}}>
             <Stack
                 direction="row"
-                sx={{px: 1.25, mb: 0.5, alignItems: 'center', justifyContent: 'space-between'}}>
-                <Stack direction="row" spacing={0.75} sx={{alignItems: 'center'}}>
-                    <Box sx={{display: 'flex', color: 'text.secondary'}}>{icon}</Box>
-                    <Typography variant="overline" color="text.secondary" sx={{letterSpacing: 1}}>
+                sx={{px: 1, mb: 0.65, alignItems: 'center', justifyContent: 'space-between'}}>
+                <Stack direction="row" spacing={0.7} sx={{alignItems: 'center'}}>
+                    <Box sx={{display: 'flex', color: 'rgba(219,231,245,.64)'}}>{icon}</Box>
+                    <Typography
+                        variant="overline"
+                        sx={{
+                            color: 'rgba(219,231,245,.58)',
+                            fontSize: '0.64rem',
+                            letterSpacing: '.12em',
+                        }}>
                         {label}
                     </Typography>
                 </Stack>
-                <Chip size="small" variant="outlined" label={sectionApps.length} />
+                <Chip
+                    size="small"
+                    label={sectionApps.length}
+                    sx={{
+                        color: '#cbd9ea',
+                        borderColor: 'rgba(255,255,255,.12)',
+                        bgcolor: 'rgba(255,255,255,.04)',
+                    }}
+                    variant="outlined"
+                />
             </Stack>
             <List disablePadding>
                 {loggedIn && sectionApps.length === 0 && (
-                    <ListItemButton disabled sx={{borderRadius: 2}}>
+                    <ListItemButton
+                        disabled
+                        sx={{
+                            borderRadius: 2,
+                            color: 'rgba(219,231,245,.45)',
+                            '&.Mui-disabled': {opacity: 0.6},
+                        }}>
                         <ListItemText primary={`No ${label.toLowerCase()}`} />
                     </ListItemButton>
                 )}
@@ -129,35 +150,54 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                                 selected={location.pathname === to}
                                 onClick={() => setNavOpen(false)}
                                 sx={{
-                                    borderRadius: 1.75,
-                                    my: 0.15,
+                                    borderRadius: 2.2,
+                                    my: 0.18,
                                     py: 0.55,
-                                    '&.Mui-selected': {bgcolor: 'action.selected'},
+                                    px: 0.8,
+                                    color: '#dbe7f5',
+                                    '&:hover': {bgcolor: 'rgba(255,255,255,.055)'},
+                                    '&.Mui-selected': {
+                                        bgcolor: 'rgba(37,99,235,.24)',
+                                        boxShadow: 'inset 3px 0 0 #60A5FA',
+                                    },
+                                    '&.Mui-selected:hover': {bgcolor: 'rgba(37,99,235,.30)'},
                                 }}>
-                                <ListItemAvatar sx={{minWidth: 42}}>
+                                <ListItemAvatar sx={{minWidth: 40}}>
                                     <Avatar
                                         src={config.get('url') + app.image}
                                         variant="rounded"
-                                        sx={{width: 30, height: 30}}
+                                        sx={{
+                                            width: 31,
+                                            height: 31,
+                                            bgcolor: 'rgba(255,255,255,.07)',
+                                            border: '1px solid rgba(255,255,255,.08)',
+                                        }}
                                     />
                                 </ListItemAvatar>
                                 <ListItemText
-                                    primary={<Typography noWrap>{app.name}</Typography>}
+                                    primary={
+                                        <Typography noWrap sx={{fontSize: '0.84rem', fontWeight: 650}}>
+                                            {app.name}
+                                        </Typography>
+                                    }
                                     secondary={
                                         app.receiveNotifications === false
                                             ? 'Notifications muted'
                                             : undefined
                                     }
-                                    slotProps={{secondary: {noWrap: true}}}
+                                    slotProps={{
+                                        secondary: {
+                                            noWrap: true,
+                                            sx: {color: 'rgba(219,231,245,.48)', fontSize: '0.71rem'},
+                                        },
+                                    }}
                                 />
-                                <Stack direction="row" spacing={0.5} sx={{alignItems: 'center'}}>
+                                <Stack direction="row" spacing={0.45} sx={{alignItems: 'center'}}>
                                     {app.receiveNotifications === false && (
-                                        <NotificationsOff
-                                            sx={{fontSize: 15, color: 'text.disabled'}}
-                                        />
+                                        <NotificationsOff sx={{fontSize: 14, color: '#75869c'}} />
                                     )}
                                     {app.autoAssign && (
-                                        <Public sx={{fontSize: 15, color: 'text.secondary'}} />
+                                        <Public sx={{fontSize: 14, color: '#75869c'}} />
                                     )}
                                 </Stack>
                             </ListItemButton>
@@ -168,21 +208,43 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
     );
 
     const drawerContent = (
-        <Box sx={{height: '100%', display: 'flex', flexDirection: 'column'}}>
-            <Box sx={{display: {xs: 'flex', sm: 'none'}, justifyContent: 'flex-end', p: 1}}>
-                <IconButton aria-label="Close navigation" onClick={() => setNavOpen(false)}>
+        <Box
+            sx={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                bgcolor: '#0B1220',
+                color: '#dbe7f5',
+            }}>
+            <Box
+                sx={{
+                    display: {xs: 'flex', sm: 'none'},
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    px: 1.25,
+                    py: 1.1,
+                }}>
+                <Typography sx={{fontWeight: 800}}>Navigation</Typography>
+                <IconButton
+                    aria-label="Close navigation"
+                    onClick={() => setNavOpen(false)}
+                    sx={{color: '#dbe7f5'}}>
                     <Close />
                 </IconButton>
             </Box>
 
-            <Box sx={{px: 1.5, py: 2}}>
+            <Box sx={{px: 1.4, pt: {xs: 0.5, sm: 1.8}, pb: 1.2}}>
                 <Typography
                     variant="overline"
-                    color="text.secondary"
-                    sx={{px: 1.5, letterSpacing: 1}}>
+                    sx={{
+                        px: 1,
+                        color: 'rgba(219,231,245,.48)',
+                        fontSize: '0.63rem',
+                        letterSpacing: '.12em',
+                    }}>
                     Workspace
                 </Typography>
-                <List disablePadding>
+                <List disablePadding sx={{mt: 0.45}}>
                     {items
                         .filter((item) => !item.adminOnly || currentUser.user.admin)
                         .map((item) => (
@@ -208,50 +270,85 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                                 disabled={!loggedIn}
                                 onClick={() => setNavOpen(false)}
                                 sx={{
-                                    borderRadius: 1.75,
-                                    my: 0.15,
-                                    py: 0.7,
+                                    borderRadius: 2.2,
+                                    my: 0.18,
+                                    py: 0.72,
+                                    px: 1,
+                                    color: '#dbe7f5',
+                                    '&:hover': {bgcolor: 'rgba(255,255,255,.055)'},
                                     '&.Mui-selected': {
-                                        bgcolor: 'action.selected',
-                                        '& .MuiListItemIcon-root': {color: 'primary.main'},
-                                        '& .MuiListItemText-primary': {fontWeight: 700},
+                                        bgcolor: 'rgba(37,99,235,.24)',
+                                        color: '#fff',
+                                        boxShadow: 'inset 3px 0 0 #60A5FA',
+                                        '& .MuiListItemIcon-root': {color: '#7DB3FF'},
+                                        '& .MuiListItemText-primary': {fontWeight: 760},
                                     },
+                                    '&.Mui-selected:hover': {bgcolor: 'rgba(37,99,235,.30)'},
                                 }}>
-                                <ListItemIcon sx={{minWidth: 40}}>{item.icon}</ListItemIcon>
-                                <ListItemText primary={item.label} />
+                                <ListItemIcon sx={{minWidth: 38, color: '#8fa2b9'}}>
+                                    {item.icon}
+                                </ListItemIcon>
+                                <ListItemText
+                                    primary={item.label}
+                                    slotProps={{primary: {sx: {fontSize: '0.87rem'}}}}
+                                />
                             </ListItemButton>
                         ))}
                 </List>
             </Box>
 
-            <Divider />
+            <Divider sx={{borderColor: 'rgba(255,255,255,.075)'}} />
 
-            <Box sx={{px: 1.5, py: 1.5, flex: 1, minHeight: 0, overflowY: 'auto'}}>
+            <Box sx={{px: 1.4, py: 1.45, flex: 1, minHeight: 0, overflowY: 'auto'}}>
                 <Stack
                     direction="row"
-                    sx={{px: 1.25, mb: 1, alignItems: 'center', justifyContent: 'space-between'}}>
-                    <Typography variant="overline" color="text.secondary" sx={{letterSpacing: 1}}>
-                        Conversations
+                    sx={{px: 1, mb: 1, alignItems: 'center', justifyContent: 'space-between'}}>
+                    <Typography
+                        variant="overline"
+                        sx={{
+                            color: 'rgba(219,231,245,.48)',
+                            fontSize: '0.63rem',
+                            letterSpacing: '.12em',
+                        }}>
+                        Live channels
                     </Typography>
-                    <Chip size="small" color="primary" variant="outlined" label={apps.length} />
+                    <Chip
+                        size="small"
+                        label={apps.length}
+                        sx={{
+                            color: '#bfdbfe',
+                            bgcolor: 'rgba(37,99,235,.18)',
+                            borderColor: 'rgba(96,165,250,.28)',
+                        }}
+                        variant="outlined"
+                    />
                 </Stack>
-                {renderChannelSection('Chats', chatApps, <Forum sx={{fontSize: 16}} />)}
+                {renderChannelSection('Chats', chatApps, <Forum sx={{fontSize: 15}} />)}
                 {renderChannelSection(
-                    'Notification Channels',
+                    'Notifications',
                     notificationApps,
-                    <NotificationsActive sx={{fontSize: 16}} />
+                    <NotificationsActive sx={{fontSize: 15}} />
                 )}
             </Box>
 
             {showRequestNotification && (
                 <>
-                    <Divider />
-                    <Stack sx={{p: 1.5}}>
+                    <Divider sx={{borderColor: 'rgba(255,255,255,.075)'}} />
+                    <Stack sx={{p: 1.4}}>
                         <Button
                             variant="outlined"
                             onClick={() => {
                                 requestPermission();
                                 setShowRequestNotification(false);
+                            }}
+                            sx={{
+                                color: '#dbe7f5',
+                                borderColor: 'rgba(255,255,255,.14)',
+                                bgcolor: 'rgba(255,255,255,.025)',
+                                '&:hover': {
+                                    borderColor: '#60A5FA',
+                                    bgcolor: 'rgba(37,99,235,.14)',
+                                },
                             }}>
                             Enable Browser Notifications
                         </Button>
@@ -269,7 +366,10 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                 variant="temporary"
                 sx={{
                     display: {xs: 'block', sm: 'none'},
-                    '& .MuiDrawer-paper': {width: navigationWidth},
+                    '& .MuiDrawer-paper': {
+                        width: navigationWidth,
+                        borderRight: 0,
+                    },
                 }}>
                 {drawerContent}
             </Drawer>
@@ -286,7 +386,7 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
                         boxSizing: 'border-box',
                         position: 'relative',
                         height: '100%',
-                        borderRightStyle: 'solid',
+                        borderRight: '1px solid #19263a',
                     },
                 }}>
                 {drawerContent}
