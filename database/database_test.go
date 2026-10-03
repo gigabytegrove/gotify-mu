@@ -29,7 +29,7 @@ type DatabaseSuite struct {
 }
 
 func (s *DatabaseSuite) BeforeTest(suiteName, testName string) {
-	s.tmpDir = test.NewTmpDir("gotify_databasesuite")
+	s.tmpDir = test.NewTmpDir("monita_databasesuite")
 	db, err := New("sqlite3", s.tmpDir.Path("testdb.db"), "defaultUser", "defaultPass", 5, true, fixedNow)
 	assert.Nil(s.T(), err)
 	s.db = db
@@ -41,14 +41,14 @@ func (s *DatabaseSuite) AfterTest(suiteName, testName string) {
 }
 
 func TestInvalidDialect(t *testing.T) {
-	tmpDir := test.NewTmpDir("gotify_testinvaliddialect")
+	tmpDir := test.NewTmpDir("monita_testinvaliddialect")
 	defer tmpDir.Clean()
 	_, err := New("asdf", tmpDir.Path("testdb.db"), "defaultUser", "defaultPass", 5, true, fixedNow)
 	assert.Error(t, err)
 }
 
 func TestCreateSqliteFolder(t *testing.T) {
-	tmpDir := test.NewTmpDir("gotify_testcreatesqlitefolder")
+	tmpDir := test.NewTmpDir("monita_testcreatesqlitefolder")
 	defer tmpDir.Clean()
 
 	db, err := New("sqlite3", tmpDir.Path("somepath/testdb.db"), "defaultUser", "defaultPass", 5, true, fixedNow)
@@ -58,7 +58,7 @@ func TestCreateSqliteFolder(t *testing.T) {
 }
 
 func TestWithAlreadyExistingSqliteFolder(t *testing.T) {
-	tmpDir := test.NewTmpDir("gotify_testwithexistingfolder")
+	tmpDir := test.NewTmpDir("monita_testwithexistingfolder")
 	defer tmpDir.Clean()
 
 	db, err := New("sqlite3", tmpDir.Path("somepath/testdb.db"), "defaultUser", "defaultPass", 5, true, fixedNow)
@@ -68,7 +68,7 @@ func TestWithAlreadyExistingSqliteFolder(t *testing.T) {
 }
 
 func TestPanicsOnMkdirError(t *testing.T) {
-	tmpDir := test.NewTmpDir("gotify_testpanicsonmkdirerror")
+	tmpDir := test.NewTmpDir("monita_testpanicsonmkdirerror")
 	defer tmpDir.Clean()
 	mkdirAll = func(path string, perm os.FileMode) error {
 		return errors.New("ERROR")
