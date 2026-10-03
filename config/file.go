@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/rs/zerolog"
@@ -12,7 +13,7 @@ import (
 var osStat = os.Stat
 
 func loadFiles() []FutureLog {
-	if configFile := os.Getenv("GOTIFY_CONFIG_FILE"); configFile != "" {
+	if configFile := firstConfigEnv("MONITA_CONFIG_FILE", "GOTIFY_CONFIG_FILE"); configFile != "" {
 		log, _ := loadFile(configFile)
 		return []FutureLog{log}
 	}
@@ -42,11 +43,11 @@ func loadFile(file string) (log FutureLog, found bool) {
 }
 
 func getFiles() []string {
-	result := []string{"gotify-server.env"}
+	result := []string{"monita-server.env", "gotify-server.env"}
 	if configHome := getConfigHome(); configHome != "" {
-		result = append(result, filepath.Join(configHome, "gotify/gotify-server.env"))
+		result = append(result, filepath.Join(configHome, "monita/monita-server.env"), filepath.Join(configHome, "gotify/gotify-server.env"))
 	}
-	return append(result, "/etc/gotify/server.env")
+	return append(result, "/etc/monita/server.env", "/etc/gotify/server.env")
 }
 
 func getConfigHome() string {
@@ -55,6 +56,15 @@ func getConfigHome() string {
 	}
 	if homeDir, err := os.UserHomeDir(); err == nil {
 		return filepath.Join(homeDir, ".config")
+	}
+	return ""
+}
+
+func firstConfigEnv(names ...string) string {
+	for _, name := range names {
+		if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+			return value
+		}
 	}
 	return ""
 }
