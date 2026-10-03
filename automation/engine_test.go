@@ -205,8 +205,8 @@ func TestMUDeliverySuppressesSenderAndIncludesMutedMention(t *testing.T) {
 	}
 
 	extras, err := json.Marshal(map[string]any{
-		"gotify::mu::mentions":       []string{"user3"},
-		"gotify::mu::mentionUserIds": []uint{mentioned.ID},
+		"monita::mentions":       []string{"user3"},
+		"monita::mentionUserIds": []uint{mentioned.ID},
 	})
 	if err != nil {
 		t.Fatal(err)
