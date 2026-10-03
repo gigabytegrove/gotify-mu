@@ -12,6 +12,10 @@ import (
 var osStat = os.Stat
 
 func loadFiles() []FutureLog {
+	if configFile := os.Getenv("MONITA_CONFIG_FILE"); configFile != "" {
+		log, _ := loadFile(configFile)
+		return []FutureLog{log}
+	}
 	if configFile := os.Getenv("GOTIFY_CONFIG_FILE"); configFile != "" {
 		log, _ := loadFile(configFile)
 		return []FutureLog{log}
@@ -42,7 +46,14 @@ func loadFile(file string) (log FutureLog, found bool) {
 }
 
 func getFiles() []string {
-	result := []string{"gotify-server.env"}
+	result := []string{"monita-server.env"}
+	if configHome := getConfigHome(); configHome != "" {
+		result = append(result, filepath.Join(configHome, "monita/monita-server.env"))
+	}
+	result = append(result, "/etc/monita/server.env")
+
+	// Legacy locations remain read-only fallbacks for upgrades from Gotify-based releases.
+	result = append(result, "gotify-server.env")
 	if configHome := getConfigHome(); configHome != "" {
 		result = append(result, filepath.Join(configHome, "gotify/gotify-server.env"))
 	}

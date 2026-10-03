@@ -10,6 +10,18 @@ import (
 )
 
 func lookupEnv(env string) (string, bool, error) {
+	raw, ok, err := lookupOneEnv(env)
+	if ok || err != nil {
+		return raw, ok, err
+	}
+	if strings.HasPrefix(env, "MONITA_") {
+		legacy := "GOTIFY_" + strings.TrimPrefix(env, "MONITA_")
+		return lookupOneEnv(legacy)
+	}
+	return "", false, nil
+}
+
+func lookupOneEnv(env string) (string, bool, error) {
 	if raw, ok := os.LookupEnv(env); ok {
 		return raw, true, nil
 	}
