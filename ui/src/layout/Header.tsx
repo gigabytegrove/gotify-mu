@@ -75,9 +75,11 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                 zIndex: (theme) => theme.zIndex.drawer + 1,
                 borderBottom: 1,
                 borderColor: 'divider',
-                backgroundColor: 'background.paper',
+                backgroundColor: (theme) =>
+                    theme.palette.mode === 'dark' ? 'rgba(11,18,32,.96)' : 'rgba(255,255,255,.96)',
+                backdropFilter: 'blur(14px)',
             }}>
-            <Toolbar sx={{minHeight: 58, gap: 1.25, px: {xs: 1.25, sm: 2}}}>
+            <Toolbar sx={{minHeight: 66, gap: 1.25, px: {xs: 1.25, sm: 2.25}}}>
                 {loggedIn && (
                     <IconButton
                         sx={{display: {xs: 'inline-flex', sm: 'none'}}}
@@ -103,25 +105,19 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                         src={config.get('url') + 'static/monita-icon.svg?v=1.3.5'}
                         alt=""
                         aria-hidden="true"
-                        sx={{
-                            display: {xs: 'block', sm: 'none'},
-                            width: 36,
-                            height: 36,
-                            objectFit: 'contain',
-                        }}
+                        sx={{width: 38, height: 38, objectFit: 'contain'}}
                     />
-                    <Box
-                        component="img"
-                        src={config.get('url') + 'static/monita-logo.svg?v=1.3.5'}
-                        alt="Monita"
-                        sx={{
-                            display: {xs: 'none', sm: 'block'},
-                            width: 176,
-                            height: 44,
-                            objectFit: 'contain',
-                            objectPosition: 'left center',
-                        }}
-                    />
+                    <Box sx={{display: {xs: 'none', sm: 'block'}, ml: 1.1}}>
+                        <Typography sx={{fontWeight: 850, lineHeight: 1, letterSpacing: '-0.03em'}}>
+                            Monita
+                        </Typography>
+                        <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{display: 'block', mt: 0.25, lineHeight: 1}}>
+                            Notifications · Messaging · Automation
+                        </Typography>
+                    </Box>
                 </Box>
 
                 <Box sx={{flex: 1}} />
@@ -145,7 +141,7 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                         clickable
                         size="small"
                         variant="outlined"
-                        label={`@${version}`}
+                        label={version}
                         href={
                             version.startsWith('master-')
                                 ? `https://github.com/gigabytegrove/monita/commit/${version.replace('master-', '')}`
@@ -166,18 +162,29 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                             endIcon={<KeyboardArrowDown fontSize="small" />}
                             sx={{
                                 minWidth: 0,
-                                px: 0.75,
+                                pl: 0.5,
+                                pr: 0.8,
                                 color: 'text.primary',
-                                gap: 0.5,
+                                gap: 0.55,
+                                border: 1,
+                                borderColor: 'divider',
+                                bgcolor: 'background.paper',
                             }}>
-                            <Avatar sx={{width: 30, height: 30, fontSize: '0.85rem'}}>
+                            <Avatar
+                                sx={{
+                                    width: 30,
+                                    height: 30,
+                                    fontSize: '0.82rem',
+                                    bgcolor: 'primary.main',
+                                    color: 'primary.contrastText',
+                                }}>
                                 {name.slice(0, 1).toUpperCase() || <AccountCircle />}
                             </Avatar>
                             <Typography
                                 variant="body2"
                                 sx={{
                                     display: {xs: 'none', md: 'block'},
-                                    fontWeight: 650,
+                                    fontWeight: 720,
                                     maxWidth: 160,
                                 }}
                                 noWrap>
@@ -193,7 +200,7 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                             transformOrigin={{vertical: 'top', horizontal: 'right'}}>
                             <Box sx={{px: 2, py: 1.25}}>
                                 <Stack direction="row" spacing={1} sx={{alignItems: 'center'}}>
-                                    <Typography sx={{fontWeight: 700}}>{name}</Typography>
+                                    <Typography sx={{fontWeight: 750}}>{name}</Typography>
                                     {admin && (
                                         <Chip
                                             icon={<Security fontSize="small" />}
@@ -207,9 +214,7 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                                 component={Link}
                                 to="/settings"
                                 onClick={() => setAnchorEl(null)}>
-                                <ListItemIcon>
-                                    <Settings fontSize="small" />
-                                </ListItemIcon>
+                                <ListItemIcon><Settings fontSize="small" /></ListItemIcon>
                                 <ListItemText>Settings</ListItemText>
                             </MenuItem>
                             <MenuItem
@@ -218,9 +223,7 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
                                     setAnchorEl(null);
                                     logout();
                                 }}>
-                                <ListItemIcon>
-                                    <ExitToApp fontSize="small" />
-                                </ListItemIcon>
+                                <ListItemIcon><ExitToApp fontSize="small" /></ListItemIcon>
                                 <ListItemText>Sign out</ListItemText>
                             </MenuItem>
                         </Menu>
@@ -230,5 +233,4 @@ const Header = ({version, name, loggedIn, admin, logout, style, setNavOpen}: IPr
         </AppBar>
     );
 };
-
 export default Header;
