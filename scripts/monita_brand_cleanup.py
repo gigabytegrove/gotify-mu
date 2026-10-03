@@ -49,7 +49,10 @@ for p in ROOT.rglob("*"):
     rel = p.relative_to(ROOT).as_posix()
     if is_historical(rel):
         continue
-    text = p.read_text(encoding="utf-8")
+    try:
+        text = p.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
     text = text.replace("github.com/gotify/server/v3", "github.com/gigabytegrove/monita")
     p.write_text(text, encoding="utf-8")
 
@@ -60,7 +63,10 @@ for p in ROOT.rglob("*"):
     rel = p.relative_to(ROOT).as_posix()
     if rel in BRANDING_DOC_EXCLUDES or any(rel.startswith(x) for x in HISTORICAL_PREFIXES):
         continue
-    text = p.read_text(encoding="utf-8")
+    try:
+        text = p.read_text(encoding="utf-8")
+    except UnicodeDecodeError:
+        continue
     text = text.replace("Gotify MU", "Monita")
     text = text.replace("Gotify-MU", "Monita")
     text = text.replace("Gotify server", "Monita server")
