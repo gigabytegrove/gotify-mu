@@ -33,7 +33,7 @@ func Run(router http.Handler, conf *config.Configuration) error {
 		if conf.Server.SSL.LetsEncrypt.Enabled {
 			applyLetsEncrypt(s, conf)
 		} else if conf.Server.SSL.CertFile == "" || conf.Server.SSL.CertKey == "" {
-			log.Fatal().Msg("CertFile and CertKey must be set to use HTTPS when LetsEncrypt is disabled, please set GOTIFY_SERVER_SSL_CERTFILE and GOTIFY_SERVER_SSL_CERTKEY")
+			log.Fatal().Msg("CertFile and CertKey must be set to use HTTPS when LetsEncrypt is disabled, please set MONITA_SERVER_SSL_CERTFILE and MONITA_SERVER_SSL_CERTKEY")
 		}
 
 		httpsListener, err := startListening("TLS connection", conf.Server.SSL.ListenAddr, conf.Server.SSL.Port, conf.Server.KeepAlivePeriodSeconds)
@@ -147,7 +147,7 @@ func applyLetsEncrypt(s *http.Server, conf *config.Configuration) {
 		Client: acmeClient,
 		Prompt: func(tosURL string) bool {
 			if !conf.Server.SSL.LetsEncrypt.AcceptTOS {
-				log.Fatal().Str("tos_url", tosURL).Msg("Let's Encrypt TOS must be accepted to use Let's Encrypt, please acknowledge TOS and set GOTIFY_SERVER_SSL_LETSENCRYPT_ACCEPTTOS=true")
+				log.Fatal().Str("tos_url", tosURL).Msg("Let's Encrypt TOS must be accepted to use Let's Encrypt, please acknowledge TOS and set MONITA_SERVER_SSL_LETSENCRYPT_ACCEPTTOS=true")
 			}
 			return true
 		},
