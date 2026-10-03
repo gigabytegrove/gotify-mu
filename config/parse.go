@@ -10,20 +10,27 @@ import (
 )
 
 func lookupEnv(env string) (string, bool, error) {
-	if raw, ok := os.LookupEnv(env); ok {
-		return raw, true, nil
+	candidates := []string{env}
+	if strings.HasPrefix(env, "MONITA_") {
+		candidates = append(candidates, "GOTIFY_"+strings.TrimPrefix(env, "MONITA_"))
 	}
-	path, ok := os.LookupEnv(env + "_FILE")
-	if !ok {
-		return "", false, nil
-	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return "", false, fmt.Errorf("read file for %s_FILE (%s): %w", env, path, err)
-	}
-	return strings.TrimRight(string(data), "\r\n"), true, nil
-}
 
+	for _, candidate := range candidates {
+		if raw, ok := os.LookupEnv(candidate); ok {
+			return raw, true, nil
+		}
+		path, ok := os.LookupEnv(candidate + "_FILE")
+		if !ok {
+			continue
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return "", false, fmt.Errorf("read file for %s_FILE (%s): %w", candidate, path, err)
+		}
+		return strings.TrimRight(string(data), "\r\n"), true, nil
+	}
+	return "", false, nil
+}
 func parseString(target *string, env string) error {
 	raw, ok, err := lookupEnv(env)
 	if err != nil {
