@@ -533,7 +533,7 @@ func (s *MessageSuite) Test_CreateMessage_MentionNotifiesMutedChatMember() {
 	require.Len(s.T(), messages, 1)
 	external := toExternalMessage(messages[0])
 	require.NotNil(s.T(), external.Extras)
-	assert.Equal(s.T(), []any{"jennifer"}, external.Extras["gotify::mu::mentions"])
+	assert.Equal(s.T(), []any{"jennifer"}, external.Extras["monita::mentions"])
 }
 
 func (s *MessageSuite) Test_CreateMessage_MentionIgnoresEmailAndNonMember() {
@@ -701,7 +701,7 @@ func (s *MessageSuite) Test_CreateMessage_WithExtras() {
 	timeNow = func() time.Time { return t }
 	defer func() { timeNow = time.Now }()
 
-	s.ctx.Request = httptest.NewRequest("POST", "/message", strings.NewReader(`{"message": "mymessage", "title": "msg with extras", "extras": {"gotify::test":{"int":1,"float":0.5,"string":"test","array":[1,2,3]}}}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/message", strings.NewReader(`{"message": "mymessage", "title": "msg with extras", "extras": {"monita::test":{"int":1,"float":0.5,"string":"test","array":[1,2,3]}}}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.CreateMessage(s.ctx)
@@ -716,7 +716,7 @@ func (s *MessageSuite) Test_CreateMessage_WithExtras() {
 		Date:          t,
 		Priority:      intPtr(0),
 		Extras: map[string]any{
-			"gotify::test": map[string]any{
+			"monita::test": map[string]any{
 				"string": "test",
 				"array":  []any{float64(1), float64(2), float64(3)},
 				"int":    float64(1),
