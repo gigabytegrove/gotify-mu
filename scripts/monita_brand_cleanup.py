@@ -47,7 +47,7 @@ for p in ROOT.rglob("*"):
     if not is_text(p):
         continue
     rel = p.relative_to(ROOT).as_posix()
-    if is_historical(rel):
+    if is_historical(rel) or rel.startswith(".github/workflows/"):
         continue
     try:
         text = p.read_text(encoding="utf-8")
@@ -61,7 +61,7 @@ for p in ROOT.rglob("*"):
     if not is_text(p):
         continue
     rel = p.relative_to(ROOT).as_posix()
-    if rel in BRANDING_DOC_EXCLUDES or any(rel.startswith(x) for x in HISTORICAL_PREFIXES):
+    if rel in BRANDING_DOC_EXCLUDES or rel.startswith(".github/workflows/") or any(rel.startswith(x) for x in HISTORICAL_PREFIXES):
         continue
     try:
         text = p.read_text(encoding="utf-8")
@@ -641,15 +641,8 @@ replace(
     required=False,
 )
 
-# One-time release workflows should not resurrect the old product name if manually run.
-for path in [".github/workflows/release-v0.5-now.yml", ".github/workflows/v1.0-tag-bootstrap.yml"]:
-    p = ROOT / path
-    if not p.exists():
-        continue
-    text = p.read_text(encoding="utf-8")
-    text = text.replace("gotify-mu", "monita")
-    text = text.replace("Gotify MU", "Monita")
-    p.write_text(text, encoding="utf-8")
+# Workflow definitions are updated separately through the repository API because
+# GitHub Actions tokens cannot rewrite workflow files without workflow permission.
 
 # 13) Release this complete cleanup separately so an already-running 1.3.6 cannot mask it.
 (ROOT / "VERSION").write_text("1.3.7\n", encoding="utf-8")
