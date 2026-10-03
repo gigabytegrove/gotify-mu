@@ -661,7 +661,7 @@ func (a *CollaborationAPI) SendChatMessage(ctx *gin.Context) {
 		if len(mentions) > 0 {
 			extraValues["monita::mentionUserIds"] = mentions
 			// Legacy wire metadata is emitted for existing compatible clients.
-			extraValues["gotify::mu::mentionUserIds"] = mentions
+			extraValues["monita::mentionUserIds"] = mentions
 		}
 		extraBytes, _ := json.Marshal(extraValues)
 		if len(extraValues) == 0 {
