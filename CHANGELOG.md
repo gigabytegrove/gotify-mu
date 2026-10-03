@@ -4,6 +4,24 @@
 
 # Changelog
 
+## 1.3.6 — 2026-10-03
+
+### Monita naming and interface refresh
+
+- Replaced remaining active Gotify MU product branding across runtime, configuration, and user-facing surfaces with Monita naming.
+- Made `MONITA_*` the primary environment-variable namespace while retaining legacy `GOTIFY_*` and `GOTIFY_MU_*` fallbacks where required for upgrade compatibility.
+- Renamed the server environment template to `monita-server.env.example` and updated fresh installs to prefer `data/monita.db` while automatically preserving existing `data/gotify.db` deployments.
+- Updated secret-store, plugin trust, connector, audit-export, CLI, and SMTP/syslog identity strings to Monita equivalents.
+- Introduced a new polished Monita Web UI visual system with refreshed surfaces, navigation, header, login, cards, controls, spacing, and typography.
+- Hid the Appearance/theme selector from Settings while retaining stored/system theme compatibility.
+- Preserved protocol-level compatibility identifiers such as `/gotifyinfo` and required upstream Go dependency/module references to avoid breaking existing clients.
+
+### Compatibility
+
+- Existing deployments using legacy Gotify environment-variable names continue to work through compatibility fallbacks.
+- Existing `data/gotify.db` databases are detected automatically and continue to be used in place.
+- No manual database migration is required.
+
 ## 1.3.5 — 2026-10-01
 
 ### Canonical application branding
