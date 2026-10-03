@@ -237,7 +237,7 @@ export const AddApplicationDialog = ({fClose, fOnSubmit}: IProps) => {
                                             label="Two-way Chat Channel"
                                         />
                                         <Typography variant="body2" color="text.secondary">
-                                            Chat Channels use the conversation interface in Gotify
+                                            Chat Channels use the conversation interface in Monita
                                             MU desktop and mobile clients instead of the
                                             notification feed.
                                         </Typography>
