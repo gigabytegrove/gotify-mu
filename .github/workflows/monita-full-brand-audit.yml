@@ -1,0 +1,27 @@
+name: Monita full branding audit
+
+on:
+  push:
+    branches:
+      - monita-full-brand-audit
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          fetch-depth: 1
+      - name: Audit legacy Gotify references
+        shell: bash
+        run: |
+          set -u
+          echo "=== TEXT REFERENCES: gotify (case-insensitive) ==="
+          git grep -nIi -E 'gotify' -- . || true
+          echo
+          echo "=== FILENAMES/PATHS: gotify or gotify-mu ==="
+          find . -path './.git' -prune -o -type f -print | sed 's#^./##' | grep -iE 'gotify|gotify[-_ ]?mu' || true
+          echo
+          echo "=== FILENAMES/PATHS: legacy mu naming candidates ==="
+          find . -path './.git' -prune -o -type f -print | sed 's#^./##' | grep -Ei '(^|/)(mu_|.*[-_]mu([._/-]|$))' || true
