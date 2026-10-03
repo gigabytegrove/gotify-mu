@@ -94,7 +94,10 @@ type pluginCatalogEntry struct {
 }
 
 func loadPluginCatalog(ctx *gin.Context) ([]pluginCatalogEntry, error) {
-	rawURL := strings.TrimSpace(os.Getenv("GOTIFY_MU_PLUGIN_CATALOG_URL"))
+	rawURL := strings.TrimSpace(os.Getenv("MONITA_PLUGIN_CATALOG_URL"))
+	if rawURL == "" {
+		rawURL = strings.TrimSpace(os.Getenv("GOTIFY_MU_PLUGIN_CATALOG_URL"))
+	}
 	if rawURL == "" {
 		return []pluginCatalogEntry{}, nil
 	}
