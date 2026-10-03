@@ -1,4 +1,4 @@
-name: Apply complete Monita cleanup
+name: Monita post-cleanup audit
 
 on:
   push:
@@ -6,63 +6,22 @@ on:
       - monita-complete-cleanup
   workflow_dispatch:
 
-permissions:
-  contents: write
-
 jobs:
-  apply:
-    if: github.actor != 'github-actions[bot]'
+  audit:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
-          fetch-depth: 0
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e
-        with:
-          go-version: 1.26.x
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
-        with:
-          node-version: '24'
-
-      - name: Apply source cleanup
-        run: python3 scripts/monita_brand_cleanup.py
-
-      - name: Format Go
-        run: gofmt -w $(find . -type f -name '*.go' -not -path './vendor/*')
-
-      - name: Install UI dependencies
-        run: (cd ui && yarn --frozen-lockfile)
-
-      - name: Format UI
-        run: (cd ui && yarn format)
-
-      - name: Build embedded Web UI
-        run: make build-js
-
-      - name: Regenerate Swagger
-        run: |
-          go install github.com/go-swagger/go-swagger/cmd/swagger@717e3cb29becaaf00e56953556c6d80f8a01b286
-          make update-swagger
-
-      - name: Go test suite
-        run: go test ./...
-
-      - name: UI checks
-        run: |
-          (cd ui && yarn lint)
-          (cd ui && yarn testformat)
-          (cd ui && yarn build)
-
-      - name: Commit cleanup
+          fetch-depth: 1
+      - name: Exhaustive remaining-reference audit
         shell: bash
         run: |
-          set -euo pipefail
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add -A
-          if git diff --cached --quiet; then
-            echo "No cleanup changes to commit."
-            exit 0
-          fi
-          git commit -m "Complete Monita source identity cleanup"
-          git push origin HEAD:monita-complete-cleanup
+          set -u
+          echo "=== ACTIVE GOTIFY REFERENCES AFTER CLEANUP ==="
+          git grep -nIi -E 'gotify' -- .             ':!CHANGELOG.md'             ':!LICENSE'             ':!README.md'             ':!docs/releases/**'             ':!scripts/monita_brand_cleanup.py'             || true
+          echo
+          echo "=== GOTIFY/MU-NAMED PATHS AFTER CLEANUP ==="
+          find . -path './.git' -prune -o -type f -print             | sed 's#^./##'             | grep -Ei 'gotify|(^|/)(mu_|.*[-_]mu([._/-]|$))'             | grep -v '^scripts/monita_brand_cleanup.py$'             | sort || true
+          echo
+          echo "=== HISTORICAL/LEGAL/COMPATIBILITY DOC REFERENCES ==="
+          git grep -nIi -E 'gotify' -- README.md LICENSE CHANGELOG.md docs/releases 2>/dev/null || true
