@@ -10,9 +10,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/model"
 )
 
 // The API provides a handler for a WebSocket stream API.

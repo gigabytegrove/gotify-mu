@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 )
 
 type SystemDatabase interface {
@@ -153,7 +153,7 @@ func (a *SystemAPI) ExportAudit(ctx *gin.Context) {
 	if ctx.Query("format") == "json" {
 		body, err := json.MarshalIndent(items, "", "  ")
 		if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
-		ctx.Header("Content-Disposition", "attachment; filename=gotify-mu-audit.json")
+		ctx.Header("Content-Disposition", "attachment; filename=monita-audit.json")
 		ctx.Data(http.StatusOK, "application/json", body)
 		return
 	}
@@ -174,7 +174,7 @@ func (a *SystemAPI) ExportAudit(ctx *gin.Context) {
 		ctx.AbortWithError(http.StatusInternalServerError, err)
 		return
 	}
-	ctx.Header("Content-Disposition", "attachment; filename=gotify-mu-audit.csv")
+	ctx.Header("Content-Disposition", "attachment; filename=monita-audit.csv")
 	ctx.Data(http.StatusOK, "text/csv; charset=utf-8", buffer.Bytes())
 }
 
