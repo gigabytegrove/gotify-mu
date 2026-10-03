@@ -46,7 +46,7 @@ func decodeSignature(value string) ([]byte, error) {
 
 func trustedPluginKeys() map[string]ed25519.PublicKey {
 	result := map[string]ed25519.PublicKey{}
-	for _, raw := range strings.FieldsFunc(os.Getenv("GOTIFY_MU_PLUGIN_TRUSTED_ED25519_KEYS"), func(r rune) bool {
+	for _, raw := range strings.FieldsFunc(pluginEnv("MONITA_PLUGIN_TRUSTED_ED25519_KEYS", "GOTIFY_MU_PLUGIN_TRUSTED_ED25519_KEYS"), func(r rune) bool {
 		return r == ',' || r == ';' || r == '\n' || r == ' '
 	}) {
 		key, err := decodePublicKey(raw)
@@ -57,7 +57,7 @@ func trustedPluginKeys() map[string]ed25519.PublicKey {
 }
 
 func allowUnsignedPluginInstalls() bool {
-	switch strings.ToLower(strings.TrimSpace(os.Getenv("GOTIFY_MU_PLUGIN_ALLOW_UNSIGNED_INSTALLS"))) {
+	switch strings.ToLower(strings.TrimSpace(pluginEnv("MONITA_PLUGIN_ALLOW_UNSIGNED_INSTALLS", "GOTIFY_MU_PLUGIN_ALLOW_UNSIGNED_INSTALLS"))) {
 	case "1", "true", "yes", "on":
 		return true
 	default:
@@ -70,7 +70,7 @@ func verifyPluginStream(directory, filename string, source io.Reader, verificati
 		return nil, errors.New("plugin file must use the .so extension")
 	}
 	if err := os.MkdirAll(directory, 0o755); err != nil { return nil, err }
-	tmp, err := os.CreateTemp(directory, ".gotify-mu-verify-*.so")
+	tmp, err := os.CreateTemp(directory, ".monita-verify-*.so")
 	if err != nil { return nil, err }
 	path := tmp.Name()
 	ok := false
@@ -113,4 +113,11 @@ func verifyPluginStream(directory, filename string, source io.Reader, verificati
 
 	ok = true
 	return &VerifiedPluginFile{Path:path,SHA256:digestHex}, nil
+}
+
+func pluginEnv(primary, legacy string) string {
+	if value := os.Getenv(primary); value != "" {
+		return value
+	}
+	return os.Getenv(legacy)
 }
