@@ -292,7 +292,7 @@ func MFACodeFromRequest(ctx *gin.Context) string {
 authp.write_text(auth, encoding="utf-8")
 
 replace("api/session.go", 'code := strings.TrimSpace(ctx.GetHeader("X-Gotify-MFA-Code"))', 'code := auth.MFACodeFromRequest(ctx)')
-replace("api/session.go", '\\t"strings"\\n', '')
+replace("api/session.go", '\t"strings"\n', '')
 
 service = ROOT / "auth/service.go"
 text = service.read_text(encoding="utf-8")
