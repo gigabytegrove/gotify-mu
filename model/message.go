@@ -68,7 +68,7 @@ type MessageExternal struct {
 	//
 	// The keys should be in the following format: &lt;top-namespace&gt;::[&lt;sub-namespace&gt;::]&lt;action&gt;
 	//
-	// These namespaces are reserved and might be used in the official clients: gotify android ios web server client. Do not use them for other purposes.
+	// These namespaces are reserved for Monita and supported compatibility clients. Do not use them for unrelated purposes.
 	//
 	// example: {"home::appliances::thermostat::change_temperature":{"temperature":23},"home::appliances::lighting::on":{"brightness":15}}
 	Extras map[string]any `form:"-" query:"-" json:"extras,omitempty"`
@@ -98,7 +98,7 @@ type MessageExternal struct {
 	ReplyToMessageID uint `json:"replyToMessageId,omitempty"`
 	// Root message of a conversation thread.
 	ThreadRootMessageID uint `json:"threadRootMessageId,omitempty"`
-	// Rich Monita collaboration state. Official Gotify clients may ignore it.
+	// Rich Monita collaboration state. Compatibility clients may ignore it.
 	Collaboration MessageCollaboration `json:"collaboration,omitempty"`
 	// Whether the current requesting user has acknowledged this message.
 	Acknowledged bool `json:"acknowledged,omitempty"`
@@ -142,7 +142,7 @@ type CreateMessage struct {
 	//
 	// The keys should be in the following format: &lt;top-namespace&gt;::[&lt;sub-namespace&gt;::]&lt;action&gt;
 	//
-	// These namespaces are reserved and might be used in the official clients: gotify android ios web server client. Do not use them for other purposes.
+	// These namespaces are reserved for Monita and supported compatibility clients. Do not use them for unrelated purposes.
 	//
 	// example: {"home::appliances::thermostat::change_temperature":{"temperature":23},"home::appliances::lighting::on":{"brightness":15}}
 	Extras map[string]any `form:"-" query:"-" json:"extras,omitempty"`
