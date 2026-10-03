@@ -57,7 +57,7 @@ server:
   securecookie: true
 database:
   dialect: postgres
-  connection: postgres://localhost/gotify
+  connection: postgres://localhost/monita
 defaultuser:
   name: root
   pass: secret
@@ -71,13 +71,13 @@ oidc:
   clientid: client
   clientsecret: topsecret
   usernameclaim: email
-  redirecturl: https://gotify.example/callback
+  redirecturl: https://monita.example/callback
   autoregister: false
   scopes:
     - openid
     - custom
 `
-	assert.Equal(t, `MONITA_DATABASE_CONNECTION="postgres://localhost/gotify"
+	assert.Equal(t, `MONITA_DATABASE_CONNECTION="postgres://localhost/monita"
 MONITA_DATABASE_DIALECT="postgres"
 MONITA_DEFAULTUSER_NAME="root"
 MONITA_DEFAULTUSER_PASS="secret"
@@ -86,7 +86,7 @@ MONITA_OIDC_CLIENTID="client"
 MONITA_OIDC_CLIENTSECRET="topsecret"
 MONITA_OIDC_ENABLED="true"
 MONITA_OIDC_ISSUER="https://issuer.example"
-MONITA_OIDC_REDIRECTURL="https://gotify.example/callback"
+MONITA_OIDC_REDIRECTURL="https://monita.example/callback"
 MONITA_OIDC_SCOPES="openid,custom"
 MONITA_OIDC_USERNAMECLAIM="email"
 MONITA_PASSSTRENGTH=12
