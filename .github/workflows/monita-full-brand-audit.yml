@@ -17,11 +17,22 @@ jobs:
         shell: bash
         run: |
           set -u
-          echo "=== TEXT REFERENCES: gotify (case-insensitive) ==="
-          git grep -nIi -E 'gotify' -- . || true
+          echo "=== FILES CONTAINING GOTIFY REFERENCES ==="
+          git grep -Il -E 'gotify' -- . | sort || true
           echo
-          echo "=== FILENAMES/PATHS: gotify or gotify-mu ==="
-          find . -path './.git' -prune -o -type f -print | sed 's#^./##' | grep -iE 'gotify|gotify[-_ ]?mu' || true
+          echo "=== COUNT BY FILE ==="
+          while IFS= read -r f; do
+            c="$(git grep -ni -E 'gotify' -- "$f" 2>/dev/null | wc -l | tr -d ' ')"
+            printf '%5s  %s\n' "$c" "$f"
+          done < <(git grep -Il -E 'gotify' -- . | sort)
           echo
-          echo "=== FILENAMES/PATHS: legacy mu naming candidates ==="
-          find . -path './.git' -prune -o -type f -print | sed 's#^./##' | grep -Ei '(^|/)(mu_|.*[-_]mu([._/-]|$))' || true
+          echo "=== NON-IMPORT/NON-MODULE GOTIFY LINES ==="
+          git grep -nIi -E 'gotify' -- . \
+            ':!go.mod' ':!go.sum' \
+            | grep -v 'github.com/gotify/' \
+            | grep -v '^CHANGELOG.md:' \
+            | grep -v '^docs/releases/' \
+            || true
+          echo
+          echo "=== FILENAMES/PATHS ==="
+          find . -path './.git' -prune -o -type f -print | sed 's#^./##' | grep -Ei 'gotify|(^|/)(mu_|.*[-_]mu([._/-]|$))' | sort || true
