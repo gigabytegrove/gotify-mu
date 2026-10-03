@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	ManifestName = "gotify-mu-backup.json"
-	PendingRestoreName = ".gotify-mu-restore-pending.zip"
+	ManifestName = "monita-backup.json"
+	PendingRestoreName = ".monita-restore-pending.zip"
 )
 
 func DataDirectory(dialect, connection string) string {
@@ -59,7 +59,7 @@ func CreateBackupBundle(dataDir, databasePath, snapshotPath, destination, versio
 	databasePath = filepath.Clean(databasePath)
 	databaseRel, err := filepath.Rel(dataDir, databasePath)
 	if err != nil || strings.HasPrefix(databaseRel, "..") {
-		return errors.New("database must be inside the Gotify MU data directory")
+		return errors.New("database must be inside the Monita data directory")
 	}
 
 	out, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
@@ -77,7 +77,7 @@ func CreateBackupBundle(dataDir, databasePath, snapshotPath, destination, versio
 
 	manifest := BackupManifest{
 		FormatVersion: 1,
-		Product: "Gotify MU",
+		Product: "Monita",
 		Version: version,
 		Commit: commit,
 		CreatedAt: time.Now().UTC(),
@@ -174,8 +174,8 @@ func ValidateBackupBundle(path string) (BackupManifest, error) {
 			foundManifest = true
 		}
 	}
-	if !foundManifest || manifest.Product != "Gotify MU" || manifest.FormatVersion != 1 {
-		return manifest, errors.New("file is not a supported Gotify MU backup")
+	if !foundManifest || manifest.Product != "Monita" || manifest.FormatVersion != 1 {
+		return manifest, errors.New("file is not a supported Monita backup")
 	}
 	for _, entry := range reader.File {
 		if filepath.ToSlash(filepath.Clean(entry.Name)) == filepath.ToSlash(manifest.DatabasePath) {
