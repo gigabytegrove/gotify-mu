@@ -482,22 +482,22 @@ func Test_isAllowedOrigin_withoutAllowedOrigins_failsWhenNotSameOrigin(t *testin
 
 func Test_isAllowedOriginMatching(t *testing.T) {
 	mode.Set(mode.Prod)
-	compiledAllowedOrigins := config.CompileAllowedOrigins([]string{"gotify\\.net|push\\.gotify\\.net", "other\\.gotify\\.net"})
+	compiledAllowedOrigins := config.CompileAllowedOrigins([]string{"monita\\.test|push\\.monita\\.test", "other\\.monita\\.test"})
 
 	req := httptest.NewRequest("GET", "http://example.me/stream", nil)
-	req.Header.Set("Origin", "http://gotify.net")
+	req.Header.Set("Origin", "http://monita.test")
 	assert.True(t, isAllowedOrigin(req, compiledAllowedOrigins))
 
-	req.Header.Set("Origin", "http://push.gotify.net")
+	req.Header.Set("Origin", "http://push.monita.test")
 	assert.True(t, isAllowedOrigin(req, compiledAllowedOrigins))
 
-	req.Header.Set("Origin", "http://other.gotify.net")
+	req.Header.Set("Origin", "http://other.monita.test")
 	assert.True(t, isAllowedOrigin(req, compiledAllowedOrigins))
 
-	req.Header.Set("Origin", "http://gotify.net.evil.net")
+	req.Header.Set("Origin", "http://monita.test.evil.net")
 	assert.False(t, isAllowedOrigin(req, compiledAllowedOrigins))
 
-	req.Header.Set("Origin", "http://evil-gotify.net")
+	req.Header.Set("Origin", "http://evil-monita.test")
 	assert.False(t, isAllowedOrigin(req, compiledAllowedOrigins))
 }
 
