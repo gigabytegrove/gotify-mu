@@ -243,7 +243,7 @@ const ChannelMembersDialog = observer(({app, fClose}: IProps) => {
                                             label="Allow assigned members to post"
                                         />
                                         <Typography variant="body2" color="text.secondary">
-                                            Experimental. Official Gotify Android clients receive
+                                            Experimental. Android clients receive
                                             these messages but do not provide a compose interface.
                                         </Typography>
                                     </AccordionDetails>
