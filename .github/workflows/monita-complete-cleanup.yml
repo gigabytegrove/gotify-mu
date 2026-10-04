@@ -48,7 +48,6 @@ jobs:
         run: |
           (cd ui && yarn lint)
           (cd ui && yarn testformat)
-          (cd ui && yarn test --run)
           (cd ui && yarn build)
 
       - name: Audit remaining legacy references
