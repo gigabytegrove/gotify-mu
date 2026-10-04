@@ -10,7 +10,7 @@ import (
 	"github.com/gotify/plugin-api"
 )
 
-// GetGotifyPluginInfo returns gotify plugin info.
+// GetGotifyPluginInfo returns the legacy plugin ABI information.
 func GetGotifyPluginInfo() plugin.Info {
 	return plugin.Info{
 		ModulePath: "github.com/gigabytegrove/monita/plugin/example/echo",
@@ -18,7 +18,7 @@ func GetGotifyPluginInfo() plugin.Info {
 	}
 }
 
-// EchoPlugin is the gotify plugin instance.
+// EchoPlugin is the Monita plugin instance.
 type EchoPlugin struct {
 	msgHandler     plugin.MessageHandler
 	storageHandler plugin.StorageHandler
@@ -109,7 +109,7 @@ func (c *EchoPlugin) GetDisplay(location *url.URL) string {
 	return "Echo plugin running at: " + loc.String()
 }
 
-// NewGotifyPluginInstance creates a plugin instance for a user context.
+// NewGotifyPluginInstance is the legacy ABI entrypoint for creating a plugin instance.
 func NewGotifyPluginInstance(ctx plugin.UserContext) plugin.Plugin {
 	return &EchoPlugin{}
 }
