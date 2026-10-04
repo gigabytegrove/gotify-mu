@@ -1,0 +1,54 @@
+name: Monita branding audit
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  branding:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Reject stale internal server identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -nI -E 'github\.com/gotify/server' -- .             ':!CHANGELOG.md' ':!README.md' ':!docs/releases/**'; then
+            echo "::error::Internal code still imports the former upstream server module."
+            exit 1
+          fi
+
+      - name: Reject stale current product branding
+        shell: bash
+        run: |
+          set -euo pipefail
+          matches="$(git grep -nIi -E 'Gotify[ -]?MU' -- .             ':!CHANGELOG.md' ':!LICENSE' ':!README.md' ':!docs/releases/**'             ':!operations/backup.go' || true)"
+          if [ -n "$matches" ]; then
+            printf '%s\n' "$matches"
+            echo "::error::Stale Gotify MU product branding remains outside approved history/compatibility locations."
+            exit 1
+          fi
+
+      - name: Reject legacy-named active source paths
+        shell: bash
+        run: |
+          set -euo pipefail
+          matches="$(find . -path './.git' -prune -o -type f -print             | sed 's#^./##'             | grep -Ei '(^|/)(gotify[-_ ]?mu|mu_)[^/]*$'             | grep -v '^docs/releases/' || true)"
+          if [ -n "$matches" ]; then
+            printf '%s\n' "$matches"
+            echo "::error::Legacy product naming remains in active file paths."
+            exit 1
+          fi
+
+      - name: Reject stale Web UI branding
+        shell: bash
+        run: |
+          set -euo pipefail
+          matches="$(git grep -nIi -E 'gotify' -- ui/src             ':!ui/src/layout/Layout.tsx'             ':!ui/src/message/PushMessageDialog.tsx'             ':!ui/src/message/extras.ts'             ':!ui/src/snack/browserNotification.ts' || true)"
+          if [ -n "$matches" ]; then
+            printf '%s\n' "$matches"
+            echo "::error::Unexpected legacy branding remains in the active Web UI."
+            exit 1
+          fi
