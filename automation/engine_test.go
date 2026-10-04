@@ -172,7 +172,7 @@ func (n *captureNotifier) Notify(userID uint, _ *model.MessageExternal) {
 	n.userIDs = append(n.userIDs, userID)
 }
 
-func TestMUDeliverySuppressesSenderAndIncludesMutedMention(t *testing.T) {
+func TestMonitaDeliverySuppressesSenderAndIncludesMutedMention(t *testing.T) {
 	db := testdb.NewDB(t)
 	defer db.Close()
 
