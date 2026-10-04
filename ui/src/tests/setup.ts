@@ -62,13 +62,13 @@ export const newTest = async (
         };
     }
 
-    const gotifyFile = testFilePath();
+    const monitaFile = testFilePath();
 
-    await buildGoExecutable(gotifyFile);
+    await buildGoExecutable(monitaFile);
 
-    const gotifyInstance = startMonita(gotifyFile, port, pluginsDir, env);
+    const monitaInstance = startMonita(monitaFile, port, pluginsDir, env);
 
-    const gotifyURL = 'http://localhost:' + port;
+    const monitaURL = 'http://localhost:' + port;
     await waitForMonita('http-get://localhost:' + port);
     const browser = await puppeteer.launch({
         headless: process.env.CI === 'true',
@@ -76,20 +76,20 @@ export const newTest = async (
     });
     const page = await browser.newPage();
     await page.setViewport({width: 1920, height: 1080});
-    await page.goto(gotifyURL);
+    await page.goto(monitaURL);
 
     return {
         close: async () => {
             await Promise.all([
                 browser.close(),
                 new Promise((resolve) =>
-                    kill(gotifyInstance.pid!, 'SIGKILL', () => resolve(undefined))
+                    kill(monitaInstance.pid!, 'SIGKILL', () => resolve(undefined))
                 ),
             ]);
-            rimrafSync(gotifyFile, {maxRetries: 8});
+            rimrafSync(monitaFile, {maxRetries: 8});
             dex?.close();
         },
-        url: gotifyURL,
+        url: monitaURL,
         browser,
         page,
     };
@@ -97,7 +97,7 @@ export const newTest = async (
 
 const testPluginDir = (): {dir: string; generator: () => string} => {
     const random = Math.random().toString(36).substring(2, 15);
-    const dirName = 'gotifyplugin_' + random;
+    const dirName = 'monitaplugin_' + random;
     const dir = path.join(testBuildPath, dirName);
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, {recursive: true, mode: 0o755});
@@ -113,7 +113,7 @@ const testPluginDir = (): {dir: string; generator: () => string} => {
 
 const testFilePath = (): string => {
     const random = Math.random().toString(36).substring(2, 15);
-    const filename = 'gotifytest_' + random + windowsPrefix;
+    const filename = 'monitatest_' + random + windowsPrefix;
     return path.join(testBuildPath, filename);
 };
 
