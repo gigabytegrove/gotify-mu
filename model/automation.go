@@ -114,54 +114,54 @@ type MQTTIntegrationView struct {
 
 // HomeAssistantIntegration subscribes to Home Assistant events over its WebSocket API.
 type HomeAssistantIntegration struct {
-	ID              uint       `gorm:"primaryKey;autoIncrement" json:"id"`
-	Name            string     `gorm:"type:text" json:"name"`
-	ApplicationID   uint       `gorm:"index" json:"applicationId"`
-	ConnectionMode  string     `gorm:"type:varchar(24)" json:"connectionMode"`
-	BaseURL         string     `gorm:"type:text" json:"baseUrl"`
-	Token           string     `gorm:"type:text" json:"-"`
-	NativeWebhookURL string    `gorm:"type:text" json:"-"`
-	NativeSecret    string     `gorm:"type:text" json:"-"`
-	PairingCodeHash string     `gorm:"type:varchar(64)" json:"-"`
+	ID               uint       `gorm:"primaryKey;autoIncrement" json:"id"`
+	Name             string     `gorm:"type:text" json:"name"`
+	ApplicationID    uint       `gorm:"index" json:"applicationId"`
+	ConnectionMode   string     `gorm:"type:varchar(24)" json:"connectionMode"`
+	BaseURL          string     `gorm:"type:text" json:"baseUrl"`
+	Token            string     `gorm:"type:text" json:"-"`
+	NativeWebhookURL string     `gorm:"type:text" json:"-"`
+	NativeSecret     string     `gorm:"type:text" json:"-"`
+	PairingCodeHash  string     `gorm:"type:varchar(64)" json:"-"`
 	PairingExpiresAt *time.Time `json:"-"`
-	EventType       string     `gorm:"type:text" json:"eventType"`
-	EntityIDs       string     `gorm:"type:text" json:"entityIds"`
-	DataField       string     `gorm:"type:text" json:"dataField"`
-	DataValue       string     `gorm:"type:text" json:"dataValue"`
-	Enabled         bool       `json:"enabled"`
-	Status          string     `gorm:"type:varchar(24)" json:"status"`
-	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
-	LastEventAt     *time.Time `json:"lastEventAt,omitempty"`
-	LastError       string     `gorm:"type:text" json:"lastError,omitempty"`
-	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
-	ReconnectCount  int        `json:"reconnectCount"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
+	EventType        string     `gorm:"type:text" json:"eventType"`
+	EntityIDs        string     `gorm:"type:text" json:"entityIds"`
+	DataField        string     `gorm:"type:text" json:"dataField"`
+	DataValue        string     `gorm:"type:text" json:"dataValue"`
+	Enabled          bool       `json:"enabled"`
+	Status           string     `gorm:"type:varchar(24)" json:"status"`
+	LastConnectedAt  *time.Time `json:"lastConnectedAt,omitempty"`
+	LastEventAt      *time.Time `json:"lastEventAt,omitempty"`
+	LastError        string     `gorm:"type:text" json:"lastError,omitempty"`
+	LastErrorAt      *time.Time `json:"lastErrorAt,omitempty"`
+	ReconnectCount   int        `json:"reconnectCount"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
 }
 
 // HomeAssistantIntegrationView masks the stored access token.
 type HomeAssistantIntegrationView struct {
-	ID              uint       `json:"id"`
-	Name            string     `json:"name"`
-	ApplicationID   uint       `json:"applicationId"`
-	ConnectionMode  string     `json:"connectionMode"`
-	BaseURL         string     `json:"baseUrl"`
-	TokenConfigured bool       `json:"tokenConfigured"`
-	NativePaired    bool       `json:"nativePaired"`
+	ID               uint       `json:"id"`
+	Name             string     `json:"name"`
+	ApplicationID    uint       `json:"applicationId"`
+	ConnectionMode   string     `json:"connectionMode"`
+	BaseURL          string     `json:"baseUrl"`
+	TokenConfigured  bool       `json:"tokenConfigured"`
+	NativePaired     bool       `json:"nativePaired"`
 	PairingExpiresAt *time.Time `json:"pairingExpiresAt,omitempty"`
-	EventType       string     `json:"eventType"`
-	EntityIDs       string     `json:"entityIds"`
-	DataField       string     `json:"dataField"`
-	DataValue       string     `json:"dataValue"`
-	Enabled         bool       `json:"enabled"`
-	Status          string     `json:"status"`
-	LastConnectedAt *time.Time `json:"lastConnectedAt,omitempty"`
-	LastEventAt     *time.Time `json:"lastEventAt,omitempty"`
-	LastError       string     `json:"lastError,omitempty"`
-	LastErrorAt     *time.Time `json:"lastErrorAt,omitempty"`
-	ReconnectCount  int        `json:"reconnectCount"`
-	CreatedAt       time.Time  `json:"createdAt"`
-	UpdatedAt       time.Time  `json:"updatedAt"`
+	EventType        string     `json:"eventType"`
+	EntityIDs        string     `json:"entityIds"`
+	DataField        string     `json:"dataField"`
+	DataValue        string     `json:"dataValue"`
+	Enabled          bool       `json:"enabled"`
+	Status           string     `json:"status"`
+	LastConnectedAt  *time.Time `json:"lastConnectedAt,omitempty"`
+	LastEventAt      *time.Time `json:"lastEventAt,omitempty"`
+	LastError        string     `json:"lastError,omitempty"`
+	LastErrorAt      *time.Time `json:"lastErrorAt,omitempty"`
+	ReconnectCount   int        `json:"reconnectCount"`
+	CreatedAt        time.Time  `json:"createdAt"`
+	UpdatedAt        time.Time  `json:"updatedAt"`
 }
 
 // ScheduledNotification is a recurring or one-time Channel notification.

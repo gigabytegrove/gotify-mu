@@ -1,7 +1,7 @@
 package database
 
 import (
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"gorm.io/gorm"
 )
 

@@ -7,9 +7,9 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
 	"github.com/stretchr/testify/assert"
 )
 

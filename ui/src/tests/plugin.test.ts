@@ -4,23 +4,23 @@ import axios from 'axios';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import * as auth from './authentication';
 import * as selector from './selector';
-import {GotifyTest, newTest, newPluginDir} from './setup';
+import {MonitaTest, newTest, newPluginDir} from './setup';
 import {innerText, waitForCount, waitForExists} from './utils';
 
 const pluginSupported = ['linux', 'darwin'].indexOf(os.platform()) !== -1;
 
 let page: Page;
-let gotify: GotifyTest;
+let monita: MonitaTest;
 
 beforeAll(async () => {
-    const gotifyPluginDir = pluginSupported
-        ? await newPluginDir(['github.com/gotify/server/v3/plugin/example/echo'])
+    const monitaPluginDir = pluginSupported
+        ? await newPluginDir(['github.com/gigabytegrove/monita/plugin/example/echo'])
         : '';
-    gotify = await newTest(gotifyPluginDir);
-    page = gotify.page;
+    monita = await newTest(monitaPluginDir);
+    page = monita.page;
 });
 
-afterAll(async () => await gotify.close());
+afterAll(async () => await monita.close());
 
 enum Col {
     ID = 1,
@@ -119,7 +119,7 @@ describe('plugin', () => {
             it('has plugin info', async () => {
                 await inDetailPage(1, async () => {
                     expect(await pluginInfo('module-path')).toBe(
-                        'github.com/gotify/server/v3/plugin/example/echo'
+                        'github.com/gigabytegrove/monita/plugin/example/echo'
                     );
                 });
             });

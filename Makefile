@@ -26,7 +26,7 @@ format:
 
 test-js:
 	go build -ldflags="-s -w -X main.Mode=prod" -o removeme/monita app.go
-	(cd ui && CI=true GOTIFY_EXE=../removeme/monita yarn test)
+	(cd ui && CI=true MONITA_EXE=../removeme/monita yarn test)
 	rm -rf removeme
 
 check-go:

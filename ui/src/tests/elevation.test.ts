@@ -1,18 +1,18 @@
 import {Page} from 'puppeteer';
-import {newTest, GotifyTest} from './setup';
+import {newTest, MonitaTest} from './setup';
 import {clickByText, ClientCol, count, waitForExists, waitToDisappear} from './utils';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import * as auth from './authentication';
 import * as selector from './selector';
 
 let page: Page;
-let gotify: GotifyTest;
+let monita: MonitaTest;
 beforeAll(async () => {
-    gotify = await newTest();
-    page = gotify.page;
+    monita = await newTest();
+    page = monita.page;
 });
 
-afterAll(async () => await gotify.close());
+afterAll(async () => await monita.close());
 
 const $clientTable = selector.table('#client-table');
 const $clientDialog = selector.form('#client-dialog');
@@ -20,7 +20,7 @@ const $tokenDialog = selector.form('#token-dialog');
 
 // This expects the session to be already elevated.
 const cancelElevationViaUI = async (row: number) => {
-    await page.goto(gotify.url + '/#/clients');
+    await page.goto(monita.url + '/#/clients');
     await waitForExists(page, selector.heading(), 'Clients');
 
     await page.click($clientTable.cell(row, ClientCol.Actions, '.elevate'));
@@ -66,7 +66,7 @@ describe('Elevation', () => {
     describe('Users page requires elevation', () => {
         it('de-elevates the current client via UI', () => cancelElevationViaUI(1));
         it('navigates to users and sees elevation form', async () => {
-            await page.goto(gotify.url + '/#/users');
+            await page.goto(monita.url + '/#/users');
             await waitForExists(page, selector.heading(), 'Authentication Required');
             await page.waitForSelector('.elevation-password input');
         });
@@ -92,7 +92,7 @@ describe('Elevation', () => {
             expect(status).toBe(204);
         });
         it('prompts for credentials when the next protected request is rejected', async () => {
-            await page.goto(gotify.url + '/#/clients');
+            await page.goto(monita.url + '/#/clients');
             await waitForExists(page, selector.heading(), 'Clients');
 
             await page.click($clientTable.cell(2, ClientCol.Actions, '.delete'));
@@ -110,7 +110,7 @@ describe('Elevation', () => {
     describe('Client delete requires elevation', () => {
         it('de-elevates the current client via UI', () => cancelElevationViaUI(1));
         it('navigates to clients', async () => {
-            await page.goto(gotify.url + '/#/clients');
+            await page.goto(monita.url + '/#/clients');
             await waitForExists(page, selector.heading(), 'Clients');
         });
         it('clicks delete and sees elevation form in dialog', async () => {

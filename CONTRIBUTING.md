@@ -15,7 +15,7 @@ Please:
 - check existing Issues and pull requests
 - keep changes focused
 - explain what problem the change solves
-- preserve Gotify compatibility where practical
+- preserve supported compatibility contracts where practical
 - include screenshots for visible UI changes
 - add or update tests when behavior changes
 
@@ -40,7 +40,7 @@ yarn build
 
 ## Compatibility
 
-Monita is built from the Gotify Server codebase and continues to support Gotify-compatible clients and integrations.
+Monita is an independent project that maintains selected protocol compatibility for existing clients and integrations. Historical attribution remains documented in the license and release history.
 
 Changes should avoid breaking existing users unless there is a clear migration path.
 

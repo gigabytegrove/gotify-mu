@@ -8,17 +8,17 @@ import (
 	"path/filepath"
 	"time"
 
+	"github.com/gigabytegrove/monita/operations"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/operations"
 )
 
 const maxRestoreUploadBytes int64 = 4 << 30
 
 type diagnosticsReport struct {
-	GeneratedAt    time.Time         `json:"generatedAt"`
-	Version        any               `json:"version"`
-	Operations     any               `json:"operations"`
-	SecurityPolicy any               `json:"securityPolicy"`
+	GeneratedAt    time.Time          `json:"generatedAt"`
+	Version        any                `json:"version"`
+	Operations     any                `json:"operations"`
+	SecurityPolicy any                `json:"securityPolicy"`
 	Storage        diagnosticsStorage `json:"storage"`
 	PendingRestore bool               `json:"pendingRestore"`
 }
@@ -39,19 +39,23 @@ func (a *SystemAPI) DownloadBackup(ctx *gin.Context) {
 		return
 	}
 
-	tempDir, err := os.MkdirTemp("", "gotify-mu-backup-*")
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	tempDir, err := os.MkdirTemp("", "monita-backup-*")
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
 	defer os.RemoveAll(tempDir)
 
-	snapshot := filepath.Join(tempDir, "gotify.db")
-	if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.CreateBackupSnapshot(snapshot)) { return }
+	snapshot := filepath.Join(tempDir, "monita.db")
+	if !successOrAbort(ctx, http.StatusInternalServerError, a.DB.CreateBackupSnapshot(snapshot)) {
+		return
+	}
 
 	version, commit := "unknown", "unknown"
 	if a.VersionInfo != nil {
 		version = a.VersionInfo.Version
 		commit = a.VersionInfo.Commit
 	}
-	filename := "gotify-mu-backup-" + time.Now().UTC().Format("20060102-150405") + ".zip"
+	filename := "monita-backup-" + time.Now().UTC().Format("20060102-150405") + ".zip"
 	bundle := filepath.Join(tempDir, filename)
 	if !successOrAbort(
 		ctx,
@@ -85,16 +89,20 @@ func (a *SystemAPI) StageRestore(ctx *gin.Context) {
 		return
 	}
 	file, err := header.Open()
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
 	defer file.Close()
 
 	manifest, err := operations.ValidateAndStageRestore(file, a.DataDir, maxRestoreUploadBytes)
-	if !successOrAbort(ctx, http.StatusBadRequest, err) { return }
+	if !successOrAbort(ctx, http.StatusBadRequest, err) {
+		return
+	}
 	ctx.JSON(http.StatusAccepted, gin.H{
-		"staged": true,
+		"staged":          true,
 		"restartRequired": true,
-		"manifest": manifest,
-		"message": "Backup validated and staged. Restart Gotify MU to apply the restore before the database opens.",
+		"manifest":        manifest,
+		"message":         "Backup validated and staged. Restart Monita to apply the restore before the database opens.",
 	})
 }
 
@@ -113,14 +121,20 @@ func (a *SystemAPI) CancelRestore(ctx *gin.Context) {
 
 func (a *SystemAPI) DownloadDiagnostics(ctx *gin.Context) {
 	operationsSummary, err := a.DB.GetOperationsSummary(a.Dialect)
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
 	policy, err := a.DB.GetSecurityPolicy()
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
 
 	storage := diagnosticsStorage{DataDirectory: a.DataDir}
 	if a.DataDir != "" {
 		_ = filepath.Walk(a.DataDir, func(path string, info os.FileInfo, walkErr error) error {
-			if walkErr != nil { return nil }
+			if walkErr != nil {
+				return nil
+			}
 			if info.Mode().IsRegular() {
 				storage.Files++
 				storage.Bytes += info.Size()
@@ -135,16 +149,18 @@ func (a *SystemAPI) DownloadDiagnostics(ctx *gin.Context) {
 	}
 
 	report := diagnosticsReport{
-		GeneratedAt: time.Now().UTC(),
-		Version: a.VersionInfo,
-		Operations: operationsSummary,
+		GeneratedAt:    time.Now().UTC(),
+		Version:        a.VersionInfo,
+		Operations:     operationsSummary,
 		SecurityPolicy: policy,
-		Storage: storage,
+		Storage:        storage,
 		PendingRestore: pending,
 	}
 	body, err := json.MarshalIndent(report, "", "  ")
-	if !successOrAbort(ctx, http.StatusInternalServerError, err) { return }
+	if !successOrAbort(ctx, http.StatusInternalServerError, err) {
+		return
+	}
 	ctx.Header("Cache-Control", "no-store")
-	ctx.Header("Content-Disposition", "attachment; filename=gotify-mu-diagnostics.json")
+	ctx.Header("Content-Disposition", "attachment; filename=monita-diagnostics.json")
 	ctx.Data(http.StatusOK, "application/json", body)
 }

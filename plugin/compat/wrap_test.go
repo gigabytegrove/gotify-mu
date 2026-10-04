@@ -10,8 +10,8 @@ import (
 	"plugin"
 	"testing"
 
+	"github.com/gigabytegrove/monita/test"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
@@ -24,7 +24,7 @@ type CompatSuite struct {
 }
 
 func (s *CompatSuite) SetupSuite() {
-	s.tmpDir = test.NewTmpDir("gotify_compatsuite")
+	s.tmpDir = test.NewTmpDir("monita_compatsuite")
 
 	test.WithWd(path.Join(test.GetProjectDir(), "./plugin/example/echo"), func(origWd string) {
 		exec.Command("go", "get", "-d").Run()
@@ -129,13 +129,13 @@ func TestCompatSuite(t *testing.T) {
 }
 
 func TestWrapIncompatiblePlugins(t *testing.T) {
-	tmpDir := test.NewTmpDir("gotify_testwrapincompatibleplugins")
+	tmpDir := test.NewTmpDir("monita_testwrapincompatibleplugins")
 	defer tmpDir.Clean()
 	for i, modulePath := range []string{
-		"github.com/gotify/server/v3/plugin/testing/broken/noinstance",
-		"github.com/gotify/server/v3/plugin/testing/broken/nothing",
-		"github.com/gotify/server/v3/plugin/testing/broken/unknowninfo",
-		"github.com/gotify/server/v3/plugin/testing/broken/malformedconstructor",
+		"github.com/gigabytegrove/monita/plugin/testing/broken/noinstance",
+		"github.com/gigabytegrove/monita/plugin/testing/broken/nothing",
+		"github.com/gigabytegrove/monita/plugin/testing/broken/unknowninfo",
+		"github.com/gigabytegrove/monita/plugin/testing/broken/malformedconstructor",
 	} {
 		fName := tmpDir.Path(fmt.Sprintf("broken_%d.so", i))
 		exec.Command("go", "get", "-d").Run()

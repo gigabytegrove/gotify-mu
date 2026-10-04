@@ -9,7 +9,7 @@ import wait from 'wait-on';
 import kill from 'tree-kill';
 import {startDex, DexUser, DexInstance} from './dex';
 
-export interface GotifyTest {
+export interface MonitaTest {
     url: string;
     close: () => Promise<void>;
     browser: Browser;
@@ -42,7 +42,7 @@ export interface NewTestOptions {
 export const newTest = async (
     pluginsDir = '',
     options: NewTestOptions = {}
-): Promise<GotifyTest> => {
+): Promise<MonitaTest> => {
     const port = await getPort();
 
     let dex: DexInstance | undefined;
@@ -52,44 +52,44 @@ export const newTest = async (
         dex = await startDex(redirectURL, options.oidc.users);
         env = {
             ...env,
-            GOTIFY_OIDC_ENABLED: 'true',
-            GOTIFY_OIDC_ISSUER: dex.issuer,
-            GOTIFY_OIDC_CLIENTID: 'gotify',
-            GOTIFY_OIDC_CLIENTSECRET: 'secret',
-            GOTIFY_OIDC_REDIRECTURL: redirectURL,
-            GOTIFY_OIDC_AUTOREGISTER: String(options.oidc.autoRegister ?? false),
-            GOTIFY_OIDC_LINK_BY_USERNAME: String(options.oidc.linkByUsername ?? false),
+            MONITA_OIDC_ENABLED: 'true',
+            MONITA_OIDC_ISSUER: dex.issuer,
+            MONITA_OIDC_CLIENTID: 'monita',
+            MONITA_OIDC_CLIENTSECRET: 'secret',
+            MONITA_OIDC_REDIRECTURL: redirectURL,
+            MONITA_OIDC_AUTOREGISTER: String(options.oidc.autoRegister ?? false),
+            MONITA_OIDC_LINK_BY_USERNAME: String(options.oidc.linkByUsername ?? false),
         };
     }
 
-    const gotifyFile = testFilePath();
+    const monitaFile = testFilePath();
 
-    await buildGoExecutable(gotifyFile);
+    await buildGoExecutable(monitaFile);
 
-    const gotifyInstance = startGotify(gotifyFile, port, pluginsDir, env);
+    const monitaInstance = startMonita(monitaFile, port, pluginsDir, env);
 
-    const gotifyURL = 'http://localhost:' + port;
-    await waitForGotify('http-get://localhost:' + port);
+    const monitaURL = 'http://localhost:' + port;
+    await waitForMonita('http-get://localhost:' + port);
     const browser = await puppeteer.launch({
         headless: process.env.CI === 'true',
         args: [`--window-size=1920,1080`, '--no-sandbox'],
     });
     const page = await browser.newPage();
     await page.setViewport({width: 1920, height: 1080});
-    await page.goto(gotifyURL);
+    await page.goto(monitaURL);
 
     return {
         close: async () => {
             await Promise.all([
                 browser.close(),
                 new Promise((resolve) =>
-                    kill(gotifyInstance.pid!, 'SIGKILL', () => resolve(undefined))
+                    kill(monitaInstance.pid!, 'SIGKILL', () => resolve(undefined))
                 ),
             ]);
-            rimrafSync(gotifyFile, {maxRetries: 8});
+            rimrafSync(monitaFile, {maxRetries: 8});
             dex?.close();
         },
-        url: gotifyURL,
+        url: monitaURL,
         browser,
         page,
     };
@@ -97,7 +97,7 @@ export const newTest = async (
 
 const testPluginDir = (): {dir: string; generator: () => string} => {
     const random = Math.random().toString(36).substring(2, 15);
-    const dirName = 'gotifyplugin_' + random;
+    const dirName = 'monitaplugin_' + random;
     const dir = path.join(testBuildPath, dirName);
     if (!fs.existsSync(dir)) {
         fs.mkdirSync(dir, {recursive: true, mode: 0o755});
@@ -113,11 +113,11 @@ const testPluginDir = (): {dir: string; generator: () => string} => {
 
 const testFilePath = (): string => {
     const random = Math.random().toString(36).substring(2, 15);
-    const filename = 'gotifytest_' + random + windowsPrefix;
+    const filename = 'monitatest_' + random + windowsPrefix;
     return path.join(testBuildPath, filename);
 };
 
-const waitForGotify = (url: string): Promise<void> =>
+const waitForMonita = (url: string): Promise<void> =>
     new Promise((resolve, err) => {
         wait({resources: [url], timeout: 40000}, (error: string) => {
             if (error) {
@@ -137,16 +137,16 @@ const buildGoPlugin = (filename: string, pluginPath: string): Promise<void> => {
 };
 
 const buildGoExecutable = (filename: string): Promise<void> => {
-    const envGotify = process.env.GOTIFY_EXE;
-    if (envGotify) {
+    const envMonita = process.env.MONITA_EXE;
+    if (envMonita) {
         if (!fs.existsSync(testBuildPath)) {
             fs.mkdirSync(testBuildPath, {recursive: true});
         }
-        fs.copyFileSync(envGotify, filename);
-        process.stdout.write(`### Copying ${envGotify} to ${filename}\n`);
+        fs.copyFileSync(envMonita, filename);
+        process.stdout.write(`### Copying ${envMonita} to ${filename}\n`);
         return Promise.resolve();
     } else {
-        process.stdout.write(`### Building Gotify ${filename}\n`);
+        process.stdout.write(`### Building Monita ${filename}\n`);
         return new Promise((resolve) =>
             exec(`go build -ldflags="-X main.Mode=prod" -o ${filename} ${appDotGo}`, () =>
                 resolve()
@@ -155,23 +155,23 @@ const buildGoExecutable = (filename: string): Promise<void> => {
     }
 };
 
-const startGotify = (
+const startMonita = (
     filename: string,
     port: number,
     pluginDir: string,
     extraEnv: Record<string, string> = {}
 ): ChildProcess => {
-    const gotify = spawn(filename, ['serve'], {
+    const monita = spawn(filename, ['serve'], {
         env: {
-            GOTIFY_SERVER_PORT: '' + port,
-            GOTIFY_DATABASE_CONNECTION: 'file::memory:?mode=memory&cache=shared',
-            GOTIFY_PLUGINSDIR: pluginDir,
+            MONITA_SERVER_PORT: '' + port,
+            MONITA_DATABASE_CONNECTION: 'file::memory:?mode=memory&cache=shared',
+            MONITA_PLUGINSDIR: pluginDir,
             NODE_ENV: process.env.NODE_ENV,
             PUBLIC_URL: process.env.PUBLIC_URL,
             ...extraEnv,
         },
     });
-    gotify.stdout.pipe(process.stdout);
-    gotify.stderr.pipe(process.stderr);
-    return gotify;
+    monita.stdout.pipe(process.stdout);
+    monita.stderr.pipe(process.stderr);
+    return monita;
 };

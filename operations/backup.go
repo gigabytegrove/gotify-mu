@@ -13,8 +13,12 @@ import (
 )
 
 const (
-	ManifestName = "gotify-mu-backup.json"
-	PendingRestoreName = ".gotify-mu-restore-pending.zip"
+	ManifestName             = "monita-backup.json"
+	LegacyManifestName       = "gotify-mu-backup.json"
+	PendingRestoreName       = ".monita-restore-pending.zip"
+	LegacyPendingRestoreName = ".gotify-mu-restore-pending.zip"
+	BackupProduct            = "Monita"
+	LegacyBackupProduct      = "Gotify MU"
 )
 
 func DataDirectory(dialect, connection string) string {
@@ -59,7 +63,7 @@ func CreateBackupBundle(dataDir, databasePath, snapshotPath, destination, versio
 	databasePath = filepath.Clean(databasePath)
 	databaseRel, err := filepath.Rel(dataDir, databasePath)
 	if err != nil || strings.HasPrefix(databaseRel, "..") {
-		return errors.New("database must be inside the Gotify MU data directory")
+		return errors.New("database must be inside the Monita data directory")
 	}
 
 	out, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
@@ -70,37 +74,53 @@ func CreateBackupBundle(dataDir, databasePath, snapshotPath, destination, versio
 	closeWithError := func(primary error) error {
 		zipErr := archive.Close()
 		fileErr := out.Close()
-		if primary != nil { return primary }
-		if zipErr != nil { return zipErr }
+		if primary != nil {
+			return primary
+		}
+		if zipErr != nil {
+			return zipErr
+		}
 		return fileErr
 	}
 
 	manifest := BackupManifest{
 		FormatVersion: 1,
-		Product: "Gotify MU",
-		Version: version,
-		Commit: commit,
-		CreatedAt: time.Now().UTC(),
-		DatabasePath: filepath.ToSlash(databaseRel),
+		Product:       BackupProduct,
+		Version:       version,
+		Commit:        commit,
+		CreatedAt:     time.Now().UTC(),
+		DatabasePath:  filepath.ToSlash(databaseRel),
 	}
 	body, err := json.MarshalIndent(manifest, "", "  ")
-	if err != nil { return closeWithError(err) }
+	if err != nil {
+		return closeWithError(err)
+	}
 	header, err := archive.Create(ManifestName)
-	if err != nil { return closeWithError(err) }
-	if _, err := header.Write(body); err != nil { return closeWithError(err) }
+	if err != nil {
+		return closeWithError(err)
+	}
+	if _, err := header.Write(body); err != nil {
+		return closeWithError(err)
+	}
 
 	if err := addFileToZip(archive, snapshotPath, filepath.ToSlash(databaseRel)); err != nil {
 		return closeWithError(err)
 	}
 
 	err = filepath.Walk(dataDir, func(path string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil { return walkErr }
-		if path == dataDir { return nil }
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == dataDir {
+			return nil
+		}
 		rel, relErr := filepath.Rel(dataDir, path)
-		if relErr != nil { return relErr }
+		if relErr != nil {
+			return relErr
+		}
 		relSlash := filepath.ToSlash(rel)
 		if relSlash == filepath.ToSlash(databaseRel) ||
-			relSlash == PendingRestoreName ||
+			relSlash == PendingRestoreName || relSlash == LegacyPendingRestoreName ||
 			strings.HasPrefix(relSlash, "backups/") ||
 			strings.HasPrefix(relSlash, ".restore-work-") {
 			if info.IsDir() && (strings.HasPrefix(relSlash, "backups") || strings.HasPrefix(relSlash, ".restore-work-")) {
@@ -108,7 +128,9 @@ func CreateBackupBundle(dataDir, databasePath, snapshotPath, destination, versio
 			}
 			return nil
 		}
-		if !info.Mode().IsRegular() { return nil }
+		if !info.Mode().IsRegular() {
+			return nil
+		}
 		return addFileToZip(archive, path, relSlash)
 	})
 	return closeWithError(err)
@@ -116,15 +138,23 @@ func CreateBackupBundle(dataDir, databasePath, snapshotPath, destination, versio
 
 func addFileToZip(archive *zip.Writer, source, name string) error {
 	info, err := os.Stat(source)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	header, err := zip.FileInfoHeader(info)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	header.Name = filepath.ToSlash(name)
 	header.Method = zip.Deflate
 	writer, err := archive.CreateHeader(header)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	file, err := os.Open(source)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer file.Close()
 	_, err = io.Copy(writer, file)
 	return err
@@ -136,26 +166,40 @@ func ValidateAndStageRestore(source io.Reader, dataDir string, maxBytes int64) (
 		return BackupManifest{}, err
 	}
 	temp, err := os.CreateTemp(dataDir, ".restore-upload-*.zip")
-	if err != nil { return BackupManifest{}, err }
+	if err != nil {
+		return BackupManifest{}, err
+	}
 	tempPath := temp.Name()
 	defer func() { _ = os.Remove(tempPath) }()
 
 	written, err := io.Copy(temp, io.LimitReader(source, maxBytes+1))
 	closeErr := temp.Close()
-	if err != nil { return BackupManifest{}, err }
-	if closeErr != nil { return BackupManifest{}, closeErr }
-	if written > maxBytes { return BackupManifest{}, errors.New("backup exceeds restore upload limit") }
+	if err != nil {
+		return BackupManifest{}, err
+	}
+	if closeErr != nil {
+		return BackupManifest{}, closeErr
+	}
+	if written > maxBytes {
+		return BackupManifest{}, errors.New("backup exceeds restore upload limit")
+	}
 
 	manifest, err := ValidateBackupBundle(tempPath)
-	if err != nil { return BackupManifest{}, err }
+	if err != nil {
+		return BackupManifest{}, err
+	}
 	pending := filepath.Join(dataDir, PendingRestoreName)
-	if err := os.Rename(tempPath, pending); err != nil { return BackupManifest{}, err }
+	if err := os.Rename(tempPath, pending); err != nil {
+		return BackupManifest{}, err
+	}
 	return manifest, nil
 }
 
 func ValidateBackupBundle(path string) (BackupManifest, error) {
 	reader, err := zip.OpenReader(path)
-	if err != nil { return BackupManifest{}, err }
+	if err != nil {
+		return BackupManifest{}, err
+	}
 	defer reader.Close()
 	var manifest BackupManifest
 	foundManifest := false
@@ -165,17 +209,21 @@ func ValidateBackupBundle(path string) (BackupManifest, error) {
 		if filepath.IsAbs(clean) || clean == ".." || strings.HasPrefix(clean, ".."+string(os.PathSeparator)) {
 			return manifest, fmt.Errorf("backup contains invalid path %q", entry.Name)
 		}
-		if filepath.ToSlash(clean) == ManifestName {
+		if filepath.ToSlash(clean) == ManifestName || filepath.ToSlash(clean) == LegacyManifestName {
 			file, openErr := entry.Open()
-			if openErr != nil { return manifest, openErr }
+			if openErr != nil {
+				return manifest, openErr
+			}
 			decodeErr := json.NewDecoder(io.LimitReader(file, 1<<20)).Decode(&manifest)
 			_ = file.Close()
-			if decodeErr != nil { return manifest, decodeErr }
+			if decodeErr != nil {
+				return manifest, decodeErr
+			}
 			foundManifest = true
 		}
 	}
-	if !foundManifest || manifest.Product != "Gotify MU" || manifest.FormatVersion != 1 {
-		return manifest, errors.New("file is not a supported Gotify MU backup")
+	if !foundManifest || (manifest.Product != BackupProduct && manifest.Product != LegacyBackupProduct) || manifest.FormatVersion != 1 {
+		return manifest, errors.New("file is not a supported Monita backup")
 	}
 	for _, entry := range reader.File {
 		if filepath.ToSlash(filepath.Clean(entry.Name)) == filepath.ToSlash(manifest.DatabasePath) {
@@ -193,7 +241,14 @@ func ApplyPendingRestore(dataDir string) (string, bool, error) {
 	dataDir = filepath.Clean(dataDir)
 	pending := filepath.Join(dataDir, PendingRestoreName)
 	if _, err := os.Stat(pending); errors.Is(err, os.ErrNotExist) {
-		return "", false, nil
+		legacyPending := filepath.Join(dataDir, LegacyPendingRestoreName)
+		if _, legacyErr := os.Stat(legacyPending); legacyErr == nil {
+			pending = legacyPending
+		} else if !errors.Is(legacyErr, os.ErrNotExist) {
+			return "", false, legacyErr
+		} else {
+			return "", false, nil
+		}
 	} else if err != nil {
 		return "", false, err
 	}
@@ -211,19 +266,27 @@ func ApplyPendingRestore(dataDir string) (string, bool, error) {
 	}
 
 	workDir, err := os.MkdirTemp(dataDir, ".restore-work-*")
-	if err != nil { return safetyPath, true, err }
+	if err != nil {
+		return safetyPath, true, err
+	}
 	defer os.RemoveAll(workDir)
 	if err := extractBackup(pending, workDir); err != nil {
 		return safetyPath, true, err
 	}
 
 	entries, err := os.ReadDir(workDir)
-	if err != nil { return safetyPath, true, err }
+	if err != nil {
+		return safetyPath, true, err
+	}
 	for _, entry := range entries {
-		if entry.Name() == ManifestName { continue }
+		if entry.Name() == ManifestName || entry.Name() == LegacyManifestName {
+			continue
+		}
 		source := filepath.Join(workDir, entry.Name())
 		target := filepath.Join(dataDir, entry.Name())
-		if err := os.RemoveAll(target); err != nil { return safetyPath, true, err }
+		if err := os.RemoveAll(target); err != nil {
+			return safetyPath, true, err
+		}
 		if err := os.Rename(source, target); err != nil {
 			return safetyPath, true, err
 		}
@@ -236,54 +299,87 @@ func ApplyPendingRestore(dataDir string) (string, bool, error) {
 
 func createColdSafetyBundle(dataDir, destination string) error {
 	out, err := os.OpenFile(destination, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o600)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	archive := zip.NewWriter(out)
 	err = filepath.Walk(dataDir, func(path string, info os.FileInfo, walkErr error) error {
-		if walkErr != nil { return walkErr }
-		if path == dataDir { return nil }
-		rel, relErr := filepath.Rel(dataDir, path)
-		if relErr != nil { return relErr }
-		relSlash := filepath.ToSlash(rel)
-		if relSlash == PendingRestoreName || strings.HasPrefix(relSlash, "backups/") || strings.HasPrefix(relSlash, ".restore-work-") {
-			if info.IsDir() { return filepath.SkipDir }
+		if walkErr != nil {
+			return walkErr
+		}
+		if path == dataDir {
 			return nil
 		}
-		if !info.Mode().IsRegular() { return nil }
+		rel, relErr := filepath.Rel(dataDir, path)
+		if relErr != nil {
+			return relErr
+		}
+		relSlash := filepath.ToSlash(rel)
+		if relSlash == PendingRestoreName || relSlash == LegacyPendingRestoreName || strings.HasPrefix(relSlash, "backups/") || strings.HasPrefix(relSlash, ".restore-work-") {
+			if info.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !info.Mode().IsRegular() {
+			return nil
+		}
 		return addFileToZip(archive, path, relSlash)
 	})
 	zipErr := archive.Close()
 	fileErr := out.Close()
-	if err != nil { return err }
-	if zipErr != nil { return zipErr }
+	if err != nil {
+		return err
+	}
+	if zipErr != nil {
+		return zipErr
+	}
 	return fileErr
 }
 
 func extractBackup(path, destination string) error {
 	reader, err := zip.OpenReader(path)
-	if err != nil { return err }
+	if err != nil {
+		return err
+	}
 	defer reader.Close()
 	root := filepath.Clean(destination) + string(os.PathSeparator)
 	for _, entry := range reader.File {
-		if filepath.ToSlash(filepath.Clean(entry.Name)) == ManifestName { continue }
+		if filepath.ToSlash(filepath.Clean(entry.Name)) == ManifestName || filepath.ToSlash(filepath.Clean(entry.Name)) == LegacyManifestName {
+			continue
+		}
 		target := filepath.Join(destination, entry.Name)
 		clean := filepath.Clean(target)
 		if !strings.HasPrefix(clean+string(os.PathSeparator), root) {
 			return fmt.Errorf("backup contains invalid path %q", entry.Name)
 		}
 		if entry.FileInfo().IsDir() {
-			if err := os.MkdirAll(clean, 0o700); err != nil { return err }
+			if err := os.MkdirAll(clean, 0o700); err != nil {
+				return err
+			}
 			continue
 		}
-		if err := os.MkdirAll(filepath.Dir(clean), 0o700); err != nil { return err }
+		if err := os.MkdirAll(filepath.Dir(clean), 0o700); err != nil {
+			return err
+		}
 		source, err := entry.Open()
-		if err != nil { return err }
+		if err != nil {
+			return err
+		}
 		targetFile, err := os.OpenFile(clean, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, entry.Mode())
-		if err != nil { _=source.Close(); return err }
+		if err != nil {
+			_ = source.Close()
+			return err
+		}
 		_, copyErr := io.Copy(targetFile, source)
 		closeErr := targetFile.Close()
 		_ = source.Close()
-		if copyErr != nil { return copyErr }
-		if closeErr != nil { return closeErr }
+		if copyErr != nil {
+			return copyErr
+		}
+		if closeErr != nil {
+			return closeErr
+		}
 	}
 	return nil
 }

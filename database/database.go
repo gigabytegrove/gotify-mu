@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gotify/server/v3/auth/password"
-	"github.com/gotify/server/v3/fracdex"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/security"
+	"github.com/gigabytegrove/monita/auth/password"
+	"github.com/gigabytegrove/monita/fracdex"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/security"
 	"github.com/mattn/go-isatty"
 	"github.com/rs/zerolog/log"
 	"gorm.io/driver/mysql"
@@ -70,7 +70,7 @@ func New(dialect, connection, defaultUser, defaultPass string, strength int, cre
 	}
 
 	// We normally don't need that much connections, so we limit them. F.ex. mysql complains about
-	// "too many connections", while load testing Gotify.
+	// "too many connections", while load testing Monita.
 	sqldb.SetMaxOpenConns(10)
 
 	if dialect == "sqlite3" {

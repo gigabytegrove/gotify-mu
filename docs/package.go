@@ -1,24 +1,25 @@
-// Package docs Gotify REST-API.
+// Package docs Monita REST API.
 //
-// This is the documentation of the Gotify REST-API.
+// This is the documentation of the Monita REST API.
 //
 //	# Authentication
-//	In Gotify there are two token types:
-//	__clientToken__: a client is something that receives message and manages stuff like creating new tokens or delete messages. (f.ex this token should be used for an android app)
-//	__appToken__: an application is something that sends messages (f.ex. this token should be used for a shell script)
+//	Monita uses two primary token types:
+//	__clientToken__: a client receives messages and manages account resources.
+//	__appToken__: an application sends messages.
 //
-//	The token can be transmitted in a header named `X-Gotify-Key`, in a query parameter named `token` or
-//	through a header named `Authorization` with the value prefixed with `Bearer` (Ex. `Bearer randomtoken`).
-//	There is also the possibility to authenticate through basic auth, this should only be used for creating a clientToken.
+//	The token can be transmitted in a header named `X-Monita-Key`, in a query parameter named `token`, or
+//	through an `Authorization` header with the value prefixed with `Bearer` (for example, `Bearer randomtoken`).
+//	For Gotify compatibility, `X-Gotify-Key` remains accepted as a legacy alias.
+//	Basic auth is also available for supported login/elevation flows.
 //
 //	\---
 //
-//	Found a bug or have some questions? [Create an issue on GitHub](https://github.com/gotify/server/issues)
+//	Found a bug or have some questions? [Create an issue on GitHub](https://github.com/gigabytegrove/monita/issues)
 //
 //	    Schemes: http, https
 //	    Host: localhost
-//	    Version: 2.1.0
-//	    License: MIT https://github.com/gotify/server/blob/master/LICENSE
+//	    Version: 1.3.7
+//	    License: MIT https://github.com/gigabytegrove/monita/blob/master/LICENSE
 //
 //	    Consumes:
 //	    - application/json
@@ -37,11 +38,11 @@
 //	          in: query
 //	       appTokenHeader:
 //	          type: apiKey
-//	          name: X-Gotify-Key
+//	          name: X-Monita-Key
 //	          in: header
 //	       clientTokenHeader:
 //	          type: apiKey
-//	          name: X-Gotify-Key
+//	          name: X-Monita-Key
 //	          in: header
 //	       appTokenAuthorizationHeader:
 //	          type: apiKey

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -29,19 +29,19 @@ func (d *GormDatabase) EnrichMessageCollaboration(userID uint, messages []*model
 	for _, item := range attachments {
 		if message := index[item.MessageID]; message != nil {
 			message.Collaboration.Attachments = append(message.Collaboration.Attachments, model.MessageAttachmentView{
-				ID: item.ID,
-				Filename: item.Filename,
+				ID:          item.ID,
+				Filename:    item.Filename,
 				ContentType: item.ContentType,
-				Size: item.Size,
-				URL: "/message/" + uintString(item.MessageID) + "/attachment/" + uintString(item.ID),
+				Size:        item.Size,
+				URL:         "/message/" + uintString(item.MessageID) + "/attachment/" + uintString(item.ID),
 			})
 		}
 	}
 
 	type reactionRow struct {
-		MessageID uint
-		Emoji string
-		Count int
+		MessageID   uint
+		Emoji       string
+		Count       int
 		ReactedByMe bool
 	}
 	var reactions []reactionRow
@@ -56,21 +56,21 @@ func (d *GormDatabase) EnrichMessageCollaboration(userID uint, messages []*model
 	for _, item := range reactions {
 		if message := index[item.MessageID]; message != nil {
 			message.Collaboration.Reactions = append(message.Collaboration.Reactions, model.MessageReactionSummary{
-				Emoji: item.Emoji,
-				Count: item.Count,
+				Emoji:       item.Emoji,
+				Count:       item.Count,
 				ReactedByMe: item.ReactedByMe,
 			})
 		}
 	}
 
 	type workflowRow struct {
-		MessageID uint
-		AssignedUserID uint
+		MessageID        uint
+		AssignedUserID   uint
 		AssignedUserName string
-		Status string
-		ResolvedBy uint
-		ResolvedByName string
-		ResolvedAt *time.Time
+		Status           string
+		ResolvedBy       uint
+		ResolvedByName   string
+		ResolvedAt       *time.Time
 	}
 	var workflows []workflowRow
 	if err := d.DB.Table("message_workflows AS mw").
@@ -118,7 +118,7 @@ func (d *GormDatabase) EnrichMessageCollaboration(userID uint, messages []*model
 
 	type replyRow struct {
 		ThreadRootMessageID uint
-		Count int
+		Count               int
 	}
 	var replies []replyRow
 	if err := d.DB.Model(&model.Message{}).
@@ -163,7 +163,7 @@ func (d *GormDatabase) DeleteMessageReaction(messageID, userID uint, emoji strin
 
 func (d *GormDatabase) SaveMessageWorkflow(item *model.MessageWorkflow) error {
 	return d.DB.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "message_id"}},
+		Columns:   []clause.Column{{Name: "message_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"assigned_user_id", "status", "resolved_by", "resolved_at", "updated_at"}),
 	}).Create(item).Error
 }
@@ -182,7 +182,7 @@ func (d *GormDatabase) GetMessageWorkflow(messageID uint) (*model.MessageWorkflo
 func (d *GormDatabase) MarkMessageRead(userID, messageID uint, at time.Time) error {
 	item := &model.MessageRead{UserID: userID, MessageID: messageID, ReadAt: at}
 	return d.DB.Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "user_id"}, {Name: "message_id"}},
+		Columns:   []clause.Column{{Name: "user_id"}, {Name: "message_id"}},
 		DoUpdates: clause.AssignmentColumns([]string{"read_at"}),
 	}).Create(item).Error
 }
@@ -202,7 +202,7 @@ func (d *GormDatabase) ReplaceMessageMentions(messageID uint, userIDs []uint) er
 			}
 			if err := tx.Clauses(clause.OnConflict{DoNothing: true}).Create(&model.MessageMention{
 				MessageID: messageID,
-				UserID: userID,
+				UserID:    userID,
 			}).Error; err != nil {
 				return err
 			}
@@ -344,7 +344,6 @@ func (d *GormDatabase) SearchMessages(userID uint, filter model.MessageSearchFil
 	}
 	return items, nil
 }
-
 
 func (d *GormDatabase) GetAttachmentStorageNames() ([]string, error) {
 	var names []string

@@ -14,9 +14,9 @@ type OIDCExternalAuthorizeRequest struct {
 	// The app's redirect URI.
 	//
 	// required: true
-	// example: gotify://oidc/callback
+	// example: monita://oidc/callback
 	RedirectURI string `json:"redirect_uri" binding:"required"`
-	// The client name to display in gotify.
+	// The client name to display in Monita.
 	//
 	// required: true
 	// example: Android Phone
@@ -32,7 +32,7 @@ type OIDCExternalAuthorizeResponse struct {
 	// The URL to open in the browser to authenticate with the OIDC provider.
 	//
 	// required: true
-	// example: https://auth.example.com/authorize?client_id=gotify&...
+	// example: https://auth.example.com/authorize?client_id=monita&...
 	AuthorizeURL string `json:"authorize_url"`
 	// The state parameter to send back with the token exchange request.
 	//
@@ -43,7 +43,7 @@ type OIDCExternalAuthorizeResponse struct {
 
 // OIDCExternalTokenRequest Model
 //
-// Used to exchange an authorization code for a gotify client token.
+// Used to exchange an authorization code for a Monita client token.
 //
 // swagger:model OIDCExternalTokenRequest
 type OIDCExternalTokenRequest struct {
@@ -69,7 +69,7 @@ type OIDCExternalTokenRequest struct {
 //
 // swagger:model OIDCExternalTokenResponse
 type OIDCExternalTokenResponse struct {
-	// The gotify client token for API authentication.
+	// The Monita client token for API authentication.
 	//
 	// required: true
 	// example: CWH0wZ5r0Mbac.r

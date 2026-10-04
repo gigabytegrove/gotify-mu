@@ -3,14 +3,13 @@ package api
 import (
 	"errors"
 	"net/http"
-	"strings"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/auth/password"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/security"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/auth/password"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/security"
 )
 
 // SessionDatabase is the interface for session-related database access.
@@ -84,7 +83,7 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 	}
 	if user == nil || !password.ComparePassword(user.Pass, []byte(pass)) {
 		_ = a.DB.CreateAuditEvent(&model.AuditEvent{
-			Username:name, Action:"login_failed", Target:"local_auth", IPAddress:ctx.ClientIP(),
+			Username: name, Action: "login_failed", Target: "local_auth", IPAddress: ctx.ClientIP(),
 		})
 		ctx.AbortWithError(401, errors.New("invalid credentials"))
 		return
@@ -103,10 +102,10 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 	mfaRequired := (policy.RequireMFAForAdmins && user.Admin) || policy.RequireMFAForAllLocalUsers
 	mfaAuthenticated := false
 	if mfa != nil && mfa.Enabled {
-		code := strings.TrimSpace(ctx.GetHeader("X-Gotify-MFA-Code"))
+		code := auth.MFACodeFromRequest(ctx)
 		if code == "" {
 			ctx.AbortWithStatusJSON(http.StatusPreconditionRequired, gin.H{
-				"error":"mfa_required", "mfaRequired":true,
+				"error": "mfa_required", "mfaRequired": true,
 			})
 			return
 		}
@@ -120,7 +119,7 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 		}
 		if !mfaAuthenticated {
 			_ = a.DB.CreateAuditEvent(&model.AuditEvent{
-				UserID:user.ID, Username:user.Name, Action:"mfa_failed", Target:"local_auth", IPAddress:ctx.ClientIP(),
+				UserID: user.ID, Username: user.Name, Action: "mfa_failed", Target: "local_auth", IPAddress: ctx.ClientIP(),
 			})
 			ctx.AbortWithError(http.StatusUnauthorized, errors.New("invalid MFA code"))
 			return
@@ -133,9 +132,13 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 	}
 
 	elevationMinutes := policy.ElevationMinutes
-	if elevationMinutes <= 0 { elevationMinutes = 240 }
+	if elevationMinutes <= 0 {
+		elevationMinutes = 240
+	}
 	sessionMinutes := policy.SessionInactivityMinutes
-	if sessionMinutes <= 0 { sessionMinutes = auth.CookieMaxAge / 60 }
+	if sessionMinutes <= 0 {
+		sessionMinutes = auth.CookieMaxAge / 60
+	}
 	elevatedUntil := time.Now().Add(time.Duration(elevationMinutes) * time.Minute)
 	tokenPublic, tokenPrivate := generateClientToken()
 	client := model.Client{
@@ -152,20 +155,20 @@ func (a *SessionAPI) Login(ctx *gin.Context) {
 
 	auth.SetCookie(ctx.Writer, tokenPrivate, sessionMinutes*60, a.SecureCookie)
 	_ = a.DB.CreateAuditEvent(&model.AuditEvent{
-		UserID:user.ID, Username:user.Name, Action:"login_success", Target:"local_auth", IPAddress:ctx.ClientIP(),
+		UserID: user.ID, Username: user.Name, Action: "login_success", Target: "local_auth", IPAddress: ctx.ClientIP(),
 	})
 
 	ctx.JSON(200, &model.CurrentUserExternal{
-		ID:            user.ID,
-		Name:          user.Name,
-		DisplayName:   user.DisplayName,
-		Admin:         user.Admin,
-		CreatedAt:     user.CreatedAt,
-		ClientID:      client.ID,
-		ElevatedUntil: client.ElevatedUntil,
-		MFAEnabled:    mfa != nil && mfa.Enabled,
-		MFARequired:   mfaRequired && (mfa == nil || !mfa.Enabled),
-		AuthProvider:  "local",
+		ID:                       user.ID,
+		Name:                     user.Name,
+		DisplayName:              user.DisplayName,
+		Admin:                    user.Admin,
+		CreatedAt:                user.CreatedAt,
+		ClientID:                 client.ID,
+		ElevatedUntil:            client.ElevatedUntil,
+		MFAEnabled:               mfa != nil && mfa.Enabled,
+		MFARequired:              mfaRequired && (mfa == nil || !mfa.Enabled),
+		AuthProvider:             "local",
 		ElevationDurationSeconds: elevationMinutes * 60,
 	})
 }

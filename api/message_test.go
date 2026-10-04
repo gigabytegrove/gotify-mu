@@ -7,12 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test"
-	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
@@ -527,12 +527,13 @@ func (s *MessageSuite) Test_CreateMessage_MentionNotifiesMutedChatMember() {
 	assert.Equal(s.T(), 200, s.recorder.Code)
 	assert.ElementsMatch(s.T(), []uint{owner.ID, mentioned.ID}, s.notifiedUserIDs)
 	assert.NotContains(s.T(), s.notifiedUserIDs, sender.ID)
-	
+
 	messages, err := s.db.GetMessagesByApplication(app.ID)
 	require.NoError(s.T(), err)
 	require.Len(s.T(), messages, 1)
 	external := toExternalMessage(messages[0])
 	require.NotNil(s.T(), external.Extras)
+	assert.Equal(s.T(), []any{"jennifer"}, external.Extras["monita::mentions"])
 	assert.Equal(s.T(), []any{"jennifer"}, external.Extras["gotify::mu::mentions"])
 }
 
@@ -701,7 +702,7 @@ func (s *MessageSuite) Test_CreateMessage_WithExtras() {
 	timeNow = func() time.Time { return t }
 	defer func() { timeNow = time.Now }()
 
-	s.ctx.Request = httptest.NewRequest("POST", "/message", strings.NewReader(`{"message": "mymessage", "title": "msg with extras", "extras": {"gotify::test":{"int":1,"float":0.5,"string":"test","array":[1,2,3]}}}`))
+	s.ctx.Request = httptest.NewRequest("POST", "/message", strings.NewReader(`{"message": "mymessage", "title": "msg with extras", "extras": {"monita::test":{"int":1,"float":0.5,"string":"test","array":[1,2,3]}}}`))
 	s.ctx.Request.Header.Set("Content-Type", "application/json")
 
 	s.a.CreateMessage(s.ctx)
@@ -716,7 +717,7 @@ func (s *MessageSuite) Test_CreateMessage_WithExtras() {
 		Date:          t,
 		Priority:      intPtr(0),
 		Extras: map[string]any{
-			"gotify::test": map[string]any{
+			"monita::test": map[string]any{
 				"string": "test",
 				"array":  []any{float64(1), float64(2), float64(3)},
 				"int":    float64(1),

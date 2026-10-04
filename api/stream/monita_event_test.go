@@ -5,17 +5,17 @@ import (
 	"time"
 )
 
-func TestNotifyMUEventUsesSeparateRealtimeQueue(t *testing.T) {
+func TestNotifyMonitaEventUsesSeparateRealtimeQueue(t *testing.T) {
 	api := New(time.Second, time.Second, nil)
-	client := &muEventClient{
+	client := &monitaEventClient{
 		write:  make(chan any, 1),
 		closed: make(chan struct{}),
 		userID: 7,
 	}
-	api.muClients[7] = []*muEventClient{client}
+	api.monitaClients[7] = []*monitaEventClient{client}
 
 	event := map[string]any{"type": "typing", "applicationId": uint(12)}
-	api.NotifyMUEvent(7, event)
+	api.NotifyMonitaEvent(7, event)
 
 	select {
 	case received := <-client.write:

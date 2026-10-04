@@ -1,18 +1,18 @@
 import {Page} from 'puppeteer';
-import {newTest, GotifyTest} from './setup';
+import {newTest, MonitaTest} from './setup';
 import {clearField, clickByText, count, innerText, waitForExists, waitToDisappear} from './utils';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import * as auth from './authentication';
 import * as selector from './selector';
 
 let page: Page;
-let gotify: GotifyTest;
+let monita: MonitaTest;
 beforeAll(async () => {
-    gotify = await newTest();
-    page = gotify.page;
+    monita = await newTest();
+    page = monita.page;
 });
 
-afterAll(async () => await gotify.close());
+afterAll(async () => await monita.close());
 
 enum Col {
     Name = 1,
@@ -28,7 +28,7 @@ const $dialog = selector.form('#add-edit-user-dialog');
 describe('User', () => {
     it('does login', async () => await auth.login(page));
     it('navigates to users through window location', async () => {
-        await page.goto(gotify.url + '/#/users');
+        await page.goto(monita.url + '/#/users');
         await waitForExists(page, selector.heading(), 'Users');
     });
     it('has changed url', async () => {

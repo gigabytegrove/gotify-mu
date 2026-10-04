@@ -27,9 +27,9 @@ type FixedWindowLimiter struct {
 func NewFixedWindowLimiter(limit int, window time.Duration) *FixedWindowLimiter {
 	return &FixedWindowLimiter{
 		entries: make(map[string]limiterEntry),
-		limit: limit,
-		window: window,
-		now: time.Now,
+		limit:   limit,
+		window:  window,
+		now:     time.Now,
 	}
 }
 
@@ -84,7 +84,6 @@ func RateLimitMiddleware(limiter *FixedWindowLimiter, key func(*gin.Context) str
 	}
 }
 
-
 type DynamicLimiter struct {
 	mu      sync.Mutex
 	entries map[string]limiterEntry
@@ -113,11 +112,17 @@ func (l *DynamicLimiter) Allow(key string, limit int, window time.Duration) (boo
 	if len(l.entries) > 4096 {
 		cutoff := now.Add(-2 * window)
 		for k, candidate := range l.entries {
-			if candidate.LastSeen.Before(cutoff) { delete(l.entries, k) }
+			if candidate.LastSeen.Before(cutoff) {
+				delete(l.entries, k)
+			}
 		}
 	}
-	if entry.Count <= limit { return true, 0 }
+	if entry.Count <= limit {
+		return true, 0
+	}
 	retry := window - now.Sub(entry.WindowStart)
-	if retry < time.Second { retry = time.Second }
+	if retry < time.Second {
+		retry = time.Second
+	}
 	return false, retry
 }

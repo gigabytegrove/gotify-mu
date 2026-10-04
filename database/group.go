@@ -3,7 +3,7 @@ package database
 import (
 	"errors"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -38,14 +38,20 @@ func (d *GormDatabase) DeleteUserGroup(id uint) error {
 		return err
 	}
 	if err := d.DB.Transaction(func(tx *gorm.DB) error {
-		if err := tx.Where("group_id = ?", id).Delete(&model.ApplicationGroupAssignment{}).Error; err != nil { return err }
-		if err := tx.Where("group_id = ?", id).Delete(&model.UserGroupMembership{}).Error; err != nil { return err }
+		if err := tx.Where("group_id = ?", id).Delete(&model.ApplicationGroupAssignment{}).Error; err != nil {
+			return err
+		}
+		if err := tx.Where("group_id = ?", id).Delete(&model.UserGroupMembership{}).Error; err != nil {
+			return err
+		}
 		return tx.Delete(&model.UserGroup{}, id).Error
 	}); err != nil {
 		return err
 	}
 	for _, applicationID := range appIDs {
-		if err := d.SyncApplicationGroupAssignments(applicationID); err != nil { return err }
+		if err := d.SyncApplicationGroupAssignments(applicationID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -104,7 +110,9 @@ func (d *GormDatabase) DeleteUserGroupMembershipsForUser(userID uint) error {
 		return err
 	}
 	for _, groupID := range groupIDs {
-		if err := d.SyncGroupAssignmentsForGroup(groupID); err != nil { return err }
+		if err := d.SyncGroupAssignmentsForGroup(groupID); err != nil {
+			return err
+		}
 	}
 	return nil
 }

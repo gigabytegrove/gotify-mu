@@ -5,10 +5,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test"
-	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -128,7 +128,6 @@ func TestApplicationMembershipSetMemberPostingAdminOnly(t *testing.T) {
 	require.NotNil(t, updated)
 	assert.True(t, updated.AllowMemberPost)
 }
-
 
 func TestApplicationMembershipMentionableUsers(t *testing.T) {
 	db := testdb.NewDB(t)
@@ -256,7 +255,6 @@ func TestApplicationMembershipMentionableUsersAdminWithoutMembership(t *testing.
 	assert.Equal(t, 200, recorder.Code)
 	assert.Contains(t, recorder.Body.String(), `"name":"jennifer"`)
 }
-
 
 func TestApplicationMembershipMentionableUsersReadOnlyDenied(t *testing.T) {
 	db := testdb.NewDB(t)

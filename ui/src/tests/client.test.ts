@@ -1,5 +1,5 @@
 import {Page} from 'puppeteer';
-import {newTest, GotifyTest} from './setup';
+import {newTest, MonitaTest} from './setup';
 import {count, innerText, waitForExists, waitToDisappear, clearField, ClientCol} from './utils';
 import {afterAll, beforeAll, describe, expect, it} from 'vitest';
 import * as auth from './authentication';
@@ -7,13 +7,13 @@ import * as auth from './authentication';
 import * as selector from './selector';
 
 let page: Page;
-let gotify: GotifyTest;
+let monita: MonitaTest;
 beforeAll(async () => {
-    gotify = await newTest();
-    page = gotify.page;
+    monita = await newTest();
+    page = monita.page;
 });
 
-afterAll(async () => await gotify.close());
+afterAll(async () => await monita.close());
 
 const waitForClient =
     (name: string, row: number): (() => Promise<void>) =>

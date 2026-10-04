@@ -3,8 +3,8 @@ package database
 import (
 	"testing"
 
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"gorm.io/driver/sqlite"
@@ -21,7 +21,7 @@ type MigrationSuite struct {
 }
 
 func (s *MigrationSuite) BeforeTest(suiteName, testName string) {
-	s.tmpDir = test.NewTmpDir("gotify_migrationsuite")
+	s.tmpDir = test.NewTmpDir("monita_migrationsuite")
 	db, err := gorm.Open(sqlite.Open(s.tmpDir.Path("test_obsolete.db")), &gorm.Config{})
 	assert.NoError(s.T(), err)
 	sqlDB, err := db.DB()
@@ -72,7 +72,6 @@ func (s *MigrationSuite) TestMigration() {
 		assert.Equal(s.T(), "test application", app.Name)
 	}
 }
-
 
 func (s *MigrationSuite) TestMigrationFromPreviewApplicationMembershipSchema() {
 	path := s.tmpDir.Path("test_preview_membership.db")

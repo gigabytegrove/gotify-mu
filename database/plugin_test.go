@@ -1,14 +1,14 @@
 package database
 
 import (
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func (s *DatabaseSuite) TestPluginConf() {
 	plugin := model.PluginConf{
-		ModulePath:    "github.com/gotify/example-plugin",
+		ModulePath:    "example.com/monita/example-plugin",
 		Token:         "Pabc",
 		UserID:        1,
 		Enabled:       true,
@@ -19,7 +19,7 @@ func (s *DatabaseSuite) TestPluginConf() {
 	assert.Nil(s.T(), s.db.CreatePluginConf(&plugin))
 
 	assert.Equal(s.T(), uint(1), plugin.ID)
-	pluginConf, err := s.db.GetPluginConfByUserAndPath(1, "github.com/gotify/example-plugin")
+	pluginConf, err := s.db.GetPluginConfByUserAndPath(1, "example.com/monita/example-plugin")
 	require.NoError(s.T(), err)
 	assert.Equal(s.T(), "Pabc", pluginConf.Token)
 
@@ -33,7 +33,7 @@ func (s *DatabaseSuite) TestPluginConf() {
 
 	pluginConf, err = s.db.GetPluginConfByID(1)
 	require.NoError(s.T(), err)
-	assert.Equal(s.T(), "github.com/gotify/example-plugin", pluginConf.ModulePath)
+	assert.Equal(s.T(), "example.com/monita/example-plugin", pluginConf.ModulePath)
 
 	pluginConf, err = s.db.GetPluginConfByToken("Pnotexist")
 	require.NoError(s.T(), err)

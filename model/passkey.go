@@ -17,12 +17,12 @@ type PasskeyCredential struct {
 
 // WebAuthnChallenge stores a short-lived registration/login/elevation challenge.
 type WebAuthnChallenge struct {
-	Challenge  string    `gorm:"primaryKey;type:varchar(180)"`
-	UserID     uint      `gorm:"index"`
-	Purpose    string    `gorm:"type:varchar(24);index"`
-	RPID       string    `gorm:"type:text"`
-	Origin     string    `gorm:"type:text"`
-	ClientName string    `gorm:"type:text"`
+	Challenge  string `gorm:"primaryKey;type:varchar(180)"`
+	UserID     uint   `gorm:"index"`
+	Purpose    string `gorm:"type:varchar(24);index"`
+	RPID       string `gorm:"type:text"`
+	Origin     string `gorm:"type:text"`
+	ClientName string `gorm:"type:text"`
 	ClientID   uint
 	ExpiresAt  time.Time `gorm:"index"`
 	CreatedAt  time.Time

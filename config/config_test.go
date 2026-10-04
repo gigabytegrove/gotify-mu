@@ -5,25 +5,25 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/gotify/server/v3/mode"
+	"github.com/gigabytegrove/monita/mode"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConfigEnv(t *testing.T) {
 	mode.Set(mode.TestDev)
-	t.Setenv("GOTIFY_DEFAULTUSER_NAME", "jmattheis")
-	t.Setenv("GOTIFY_SERVER_SSL_LETSENCRYPT_HOSTS", "push.example.tld,push.other.tld")
+	t.Setenv("MONITA_DEFAULTUSER_NAME", "jmattheis")
+	t.Setenv("MONITA_SERVER_SSL_LETSENCRYPT_HOSTS", "push.example.tld,push.other.tld")
 	t.Setenv(
-		"GOTIFY_SERVER_RESPONSEHEADERS",
+		"MONITA_SERVER_RESPONSEHEADERS",
 		`{"Access-Control-Allow-Origin":"*","Access-Control-Allow-Methods":"GET,POST"}`,
 	)
-	t.Setenv("GOTIFY_SERVER_CORS_ALLOWORIGINS", ".+.example.com,otherdomain.com")
-	t.Setenv("GOTIFY_SERVER_CORS_ALLOWMETHODS", "GET,POST")
-	t.Setenv("GOTIFY_SERVER_CORS_ALLOWHEADERS", "Authorization,content-type")
-	t.Setenv("GOTIFY_SERVER_STREAM_ALLOWEDORIGINS", ".+.example.com,otherdomain.com")
-	t.Setenv("GOTIFY_OIDC_IDP_NAME", "Company XYZ SSO")
-	t.Setenv("GOTIFY_OIDC_PROMPT", "")
+	t.Setenv("MONITA_SERVER_CORS_ALLOWORIGINS", ".+.example.com,otherdomain.com")
+	t.Setenv("MONITA_SERVER_CORS_ALLOWMETHODS", "GET,POST")
+	t.Setenv("MONITA_SERVER_CORS_ALLOWHEADERS", "Authorization,content-type")
+	t.Setenv("MONITA_SERVER_STREAM_ALLOWEDORIGINS", ".+.example.com,otherdomain.com")
+	t.Setenv("MONITA_OIDC_IDP_NAME", "Company XYZ SSO")
+	t.Setenv("MONITA_OIDC_PROMPT", "")
 
 	conf, _ := Get()
 	assert.Equal(t, 80, conf.Server.Port, "should use defaults")
@@ -95,21 +95,21 @@ func TestFile(t *testing.T) {
 	assert.Nil(t, os.WriteFile(passPath, []byte("filesecret\n"), 0o600))
 	assert.Nil(t, os.WriteFile(hostsPath, []byte("a.example.com,b.example.com"), 0o600))
 
-	t.Setenv("GOTIFY_DEFAULTUSER_PASS_FILE", passPath)
-	t.Setenv("GOTIFY_SERVER_SSL_LETSENCRYPT_HOSTS_FILE", hostsPath)
+	t.Setenv("MONITA_DEFAULTUSER_PASS_FILE", passPath)
+	t.Setenv("MONITA_SERVER_SSL_LETSENCRYPT_HOSTS_FILE", hostsPath)
 
 	conf, _ := Get()
 	assert.Equal(t, "filesecret", conf.DefaultUser.Pass)
 	assert.Equal(t, []string{"a.example.com", "b.example.com"}, conf.Server.SSL.LetsEncrypt.Hosts)
 }
 
-func TestGotifyConfigFile(t *testing.T) {
+func TestMonitaConfigFile(t *testing.T) {
 	mode.Set(mode.TestDev)
 	dir := t.TempDir()
 	configPath := filepath.Join(dir, "custom.env")
-	assert.Nil(t, os.WriteFile(configPath, []byte("GOTIFY_DEFAULTUSER_NAME=fromfile\n"), 0o600))
+	assert.Nil(t, os.WriteFile(configPath, []byte("MONITA_DEFAULTUSER_NAME=fromfile\n"), 0o600))
 
-	t.Setenv("GOTIFY_CONFIG_FILE", configPath)
+	t.Setenv("MONITA_CONFIG_FILE", configPath)
 
 	conf, _ := Get()
 	assert.Equal(t, "fromfile", conf.DefaultUser.Name)
@@ -117,20 +117,20 @@ func TestGotifyConfigFile(t *testing.T) {
 
 func TestAddSlash(t *testing.T) {
 	mode.Set(mode.TestDev)
-	t.Setenv("GOTIFY_UPLOADEDIMAGESDIR", "../data/images")
+	t.Setenv("MONITA_UPLOADEDIMAGESDIR", "../data/images")
 	conf, _ := Get()
 	assert.Equal(t, "../data/images"+string(filepath.Separator), conf.UploadedImagesDir)
 }
 
 func TestNotAddSlash(t *testing.T) {
 	mode.Set(mode.TestDev)
-	t.Setenv("GOTIFY_UPLOADEDIMAGESDIR", "../data/")
+	t.Setenv("MONITA_UPLOADEDIMAGESDIR", "../data/")
 	conf, _ := Get()
 	assert.Equal(t, "../data/", conf.UploadedImagesDir)
 }
 
 func TestParseList(t *testing.T) {
-	const env = "GOTIFY_TEST_PARSELIST"
+	const env = "MONITA_TEST_PARSELIST"
 
 	tests := []struct {
 		name string
@@ -151,4 +151,12 @@ func TestParseList(t *testing.T) {
 			assert.Equal(t, tc.want, got)
 		})
 	}
+}
+
+func TestLegacyEnvironmentFallback(t *testing.T) {
+	mode.Set(mode.TestDev)
+	t.Setenv("GOTIFY_SERVER_PORT", "9187")
+
+	conf, _ := Get()
+	assert.Equal(t, 9187, conf.Server.Port)
 }

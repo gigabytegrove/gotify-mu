@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test"
 )
 
 type presenceTestDB struct {
@@ -52,7 +52,7 @@ type presenceTestNotifier struct {
 	notifications []presenceNotification
 }
 
-func (n *presenceTestNotifier) NotifyMUEvent(userID uint, event any) {
+func (n *presenceTestNotifier) NotifyMonitaEvent(userID uint, event any) {
 	typing, ok := event.(*TypingEvent)
 	if !ok {
 		return
@@ -70,7 +70,7 @@ func newPresenceContext(body string) (*gin.Context, *httptest.ResponseRecorder) 
 	return ctx, recorder
 }
 
-func TestMUPresenceSendsTypingToOtherChatMembers(t *testing.T) {
+func TestMonitaPresenceSendsTypingToOtherChatMembers(t *testing.T) {
 	db := &presenceTestDB{
 		app: &model.Application{ID: 7, UserID: 9, ChannelType: model.ChannelTypeChat, AllowMemberPost: true},
 		membership: &model.ApplicationMembership{
@@ -85,7 +85,7 @@ func TestMUPresenceSendsTypingToOtherChatMembers(t *testing.T) {
 		user: &model.User{ID: 1, Name: "alice"},
 	}
 	notifier := &presenceTestNotifier{}
-	handler := MUPresenceAPI{DB: db, Notifier: notifier}
+	handler := MonitaPresenceAPI{DB: db, Notifier: notifier}
 	ctx, recorder := newPresenceContext(`{"typing":true}`)
 
 	handler.SetTyping(ctx)
@@ -107,7 +107,7 @@ func TestMUPresenceSendsTypingToOtherChatMembers(t *testing.T) {
 	}
 }
 
-func TestMUPresenceRejectsNotificationChannel(t *testing.T) {
+func TestMonitaPresenceRejectsNotificationChannel(t *testing.T) {
 	db := &presenceTestDB{
 		app: &model.Application{ID: 7, UserID: 9, ChannelType: model.ChannelTypeNotification},
 		membership: &model.ApplicationMembership{
@@ -117,7 +117,7 @@ func TestMUPresenceRejectsNotificationChannel(t *testing.T) {
 		},
 		user: &model.User{ID: 1, Name: "alice"},
 	}
-	handler := MUPresenceAPI{DB: db, Notifier: &presenceTestNotifier{}}
+	handler := MonitaPresenceAPI{DB: db, Notifier: &presenceTestNotifier{}}
 	ctx, recorder := newPresenceContext(`{"typing":true}`)
 
 	handler.SetTyping(ctx)
@@ -127,7 +127,7 @@ func TestMUPresenceRejectsNotificationChannel(t *testing.T) {
 	}
 }
 
-func TestMUPresenceRejectsReadOnlyMember(t *testing.T) {
+func TestMonitaPresenceRejectsReadOnlyMember(t *testing.T) {
 	db := &presenceTestDB{
 		app: &model.Application{ID: 7, UserID: 9, ChannelType: model.ChannelTypeChat, AllowMemberPost: true},
 		membership: &model.ApplicationMembership{
@@ -137,7 +137,7 @@ func TestMUPresenceRejectsReadOnlyMember(t *testing.T) {
 		},
 		user: &model.User{ID: 1, Name: "alice"},
 	}
-	handler := MUPresenceAPI{DB: db, Notifier: &presenceTestNotifier{}}
+	handler := MonitaPresenceAPI{DB: db, Notifier: &presenceTestNotifier{}}
 	ctx, recorder := newPresenceContext(`{"typing":true}`)
 
 	handler.SetTyping(ctx)

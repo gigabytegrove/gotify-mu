@@ -4,16 +4,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/mode"
 	"github.com/gin-contrib/cors"
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/mode"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestCorsConfig(t *testing.T) {
 	mode.Set(mode.Prod)
 	serverConf := config.Configuration{}
-	serverConf.Server.Cors.AllowOrigins = []string{"http://gotify\\.net|http://push\\.gotify\\.net", "http://other\\.gotify\\.net"}
+	serverConf.Server.Cors.AllowOrigins = []string{"http://monita\\.test|http://push\\.monita\\.test", "http://other\\.monita\\.test"}
 	serverConf.Server.Cors.AllowHeaders = []string{"content-type"}
 	serverConf.Server.Cors.AllowMethods = []string{"GET"}
 
@@ -29,11 +29,11 @@ func TestCorsConfig(t *testing.T) {
 		AllowBrowserExtensions: true,
 	}, actual)
 	assert.NotNil(t, allowF)
-	assert.True(t, allowF("http://gotify.net"))
-	assert.True(t, allowF("http://push.gotify.net"))
-	assert.True(t, allowF("http://other.gotify.net"))
-	assert.False(t, allowF("http://gotify.net.evil.net"))
-	assert.False(t, allowF("http://evil-gotify.net"))
+	assert.True(t, allowF("http://monita.test"))
+	assert.True(t, allowF("http://push.monita.test"))
+	assert.True(t, allowF("http://other.monita.test"))
+	assert.False(t, allowF("http://monita.test.evil.net"))
+	assert.False(t, allowF("http://evil-monita.test"))
 }
 
 func TestEmptyCorsConfigWithResponseHeaders(t *testing.T) {

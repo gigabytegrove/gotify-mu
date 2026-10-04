@@ -168,7 +168,13 @@ const Navigation = observer(({loggedIn, navOpen, setNavOpen}: IProps) => {
     );
 
     const drawerContent = (
-        <Box sx={{height: '100%', display: 'flex', flexDirection: 'column', bgcolor: 'background.paper'}}>
+        <Box
+            sx={{
+                height: '100%',
+                display: 'flex',
+                flexDirection: 'column',
+                bgcolor: 'background.paper',
+            }}>
             <Box sx={{display: {xs: 'flex', sm: 'none'}, justifyContent: 'flex-end', p: 1}}>
                 <IconButton aria-label="Close navigation" onClick={() => setNavOpen(false)}>
                     <Close />

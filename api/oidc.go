@@ -14,12 +14,12 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/database"
+	"github.com/gigabytegrove/monita/decaymap"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/database"
-	"github.com/gotify/server/v3/decaymap"
-	"github.com/gotify/server/v3/model"
 	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/zitadel/oidc/v3/pkg/client/rp"
@@ -198,7 +198,7 @@ func (a *OIDCAPI) promptURLParams() []rp.URLParamOpt {
 // Handle the OIDC provider callback (browser).
 //
 // Exchanges the authorization code for tokens, resolves the user,
-// creates a gotify client, sets a session cookie, and redirects to the UI.
+// creates a Monita client, sets a session cookie, and redirects to the UI.
 //
 //	---
 //	parameters:
@@ -289,12 +289,12 @@ func (a *OIDCAPI) handleElevationCallback(w http.ResponseWriter, elevate *pendin
 	io.WriteString(w, `<!DOCTYPE html>
 <html lang="en">
 <head>
-  <title>Gotify Session Elevation</title>
+  <title>Monita Session Elevation</title>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 </head>
 <body>
-  <h1 style="text-align:center">Gotify session elevation successful. Close this tab to continue.</h1>
+  <h1 style="text-align:center">Monita session elevation successful. Close this tab to continue.</h1>
   <script>window.close();</script>
 </body>
 </html>`)
@@ -355,12 +355,12 @@ func (a *OIDCAPI) ExternalAuthorizeHandler(ctx *gin.Context) {
 
 // swagger:operation POST /auth/oidc/external/token oidc externalToken
 //
-// Exchange an authorization code for a gotify client token.
+// Exchange an authorization code for a Monita client token.
 //
 // After the user authenticates with the OIDC provider and the app receives
 // the authorization code via redirect, the app calls this endpoint with the
 // code and PKCE code_verifier. The server exchanges the code with the OIDC
-// provider and returns a gotify client token.
+// provider and returns a Monita client token.
 //
 //	---
 //	consumes: [application/json]
@@ -433,9 +433,9 @@ func (a *OIDCAPI) generateState() (string, error) {
 //
 //  1. Look up the user by OIDC id (<iss>#<sub>). If found, use it.
 //  2. Otherwise look up a user by the username claim. If one exists, link it to
-//     this OIDC identity, which requires GOTIFY_OIDC_LINK_BY_USERNAME and
+//     this OIDC identity, which requires MONITA_OIDC_LINK_BY_USERNAME and
 //     that the user is not already bound to a different identity.
-//  3. Otherwise auto-register a new user, which requires GOTIFY_OIDC_AUTOREGISTER.
+//  3. Otherwise auto-register a new user, which requires MONITA_OIDC_AUTOREGISTER.
 func (a *OIDCAPI) resolveUser(idToken *oidc.IDTokenClaims, info *oidc.UserInfo) (*model.User, int, error) {
 	issuer := idToken.GetIssuer()
 	if issuer == "" {

@@ -78,21 +78,21 @@ type OIDC struct {
 }
 
 type LDAP struct {
-	Enabled                  bool
-	URL                      string
-	BindDN                   string
-	BindPassword             string
-	BaseDN                   string
-	UserFilter               string
-	DisplayNameAttribute     string
-	GroupAttribute           string
-	AdminGroupDN             string
-	UserGroupDN              string
-	AutoRegister             bool
-	LinkByUsername           bool
-	IDPName                  string
-	CAFile                   string
-	InsecureSkipVerify       bool
+	Enabled              bool
+	URL                  string
+	BindDN               string
+	BindPassword         string
+	BaseDN               string
+	UserFilter           string
+	DisplayNameAttribute string
+	GroupAttribute       string
+	AdminGroupDN         string
+	UserGroupDN          string
+	AutoRegister         bool
+	LinkByUsername       bool
+	IDPName              string
+	CAFile               string
+	InsecureSkipVerify   bool
 }
 
 type Configuration struct {

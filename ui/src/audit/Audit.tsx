@@ -44,7 +44,7 @@ const Audit = observer(() => {
     return (
         <DefaultPage
             title="Audit Log"
-            description="Security-sensitive and administrative changes recorded by Gotify MU.">
+            description="Security-sensitive and administrative changes recorded by Monita.">
             <SurfaceCard
                 title="Recent Activity"
                 subtitle={`Showing up to ${events.length} recent administrative events`}>

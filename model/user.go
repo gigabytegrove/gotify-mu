@@ -137,10 +137,10 @@ type CurrentUserExternal struct {
 	//
 	// read only: true
 	ElevatedUntil *time.Time `json:"elevatedUntil,omitempty"`
-	MFAEnabled  bool   `json:"mfaEnabled"`
-	MFARequired bool   `json:"mfaRequired"`
-	AuthProvider string `json:"authProvider,omitempty"`
-	PasskeyCount int `json:"passkeyCount"`
+	MFAEnabled    bool       `json:"mfaEnabled"`
+	MFARequired   bool       `json:"mfaRequired"`
+	AuthProvider  string     `json:"authProvider,omitempty"`
+	PasskeyCount  int        `json:"passkeyCount"`
 	// Maximum duration requested for step-up elevation in this session.
 	ElevationDurationSeconds int `json:"elevationDurationSeconds"`
 }

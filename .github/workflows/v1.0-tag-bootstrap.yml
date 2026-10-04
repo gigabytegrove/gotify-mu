@@ -45,10 +45,10 @@ jobs:
               exit 0
             fi
             echo "Moving unpublished ${TAG} from ${TAG_COMMIT} to corrected commit ${GITHUB_SHA}"
-            git tag -fa "${TAG}" -m "Gotify MU v1.0.0"
+            git tag -fa "${TAG}" -m "Monita v1.0.0"
             git push --force origin "${TAG}"
             exit 0
           fi
 
-          git tag -a "${TAG}" -m "Gotify MU v1.0.0"
+          git tag -a "${TAG}" -m "Monita v1.0.0"
           git push origin "${TAG}"

@@ -11,12 +11,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/decaymap"
+	"github.com/gigabytegrove/monita/mode"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/decaymap"
-	"github.com/gotify/server/v3/mode"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 	"github.com/zitadel/oidc/v3/pkg/client/rp"
@@ -96,7 +96,7 @@ func (s *OIDCSuite) Test_LoginHandler_AuthURL() {
 	issuer := newDiscoveryServer(s.T())
 
 	provider, err := rp.NewRelyingPartyOIDC(
-		context.Background(), issuer.URL, "client", "secret", "https://gotify.example/callback", []string{"openid"},
+		context.Background(), issuer.URL, "client", "secret", "https://monita.example/callback", []string{"openid"},
 	)
 	assert.NoError(s.T(), err)
 	s.a.Provider = provider
@@ -126,7 +126,7 @@ func (s *OIDCSuite) Test_LoginHandler_AuthURL() {
 			assert.NotEmpty(s.T(), query.Get("state"))
 			assert.Equal(s.T(), tc.wantPrompt, query.Get("prompt"))
 			assert.Equal(s.T(), "client", query.Get("client_id"))
-			assert.Equal(s.T(), "https://gotify.example/callback", query.Get("redirect_uri"))
+			assert.Equal(s.T(), "https://monita.example/callback", query.Get("redirect_uri"))
 			assert.Equal(s.T(), "openid", query.Get("scope"))
 		})
 	}
@@ -136,7 +136,7 @@ func (s *OIDCSuite) Test_ElevateHandler_AuthURL() {
 	issuer := newDiscoveryServer(s.T())
 
 	provider, err := rp.NewRelyingPartyOIDC(
-		context.Background(), issuer.URL, "client", "secret", "https://gotify.example/callback", []string{"openid"},
+		context.Background(), issuer.URL, "client", "secret", "https://monita.example/callback", []string{"openid"},
 	)
 	assert.NoError(s.T(), err)
 	s.a.Provider = provider
@@ -154,7 +154,7 @@ func (s *OIDCSuite) Test_ElevateHandler_AuthURL() {
 	assert.NotEmpty(s.T(), query.Get("state"))
 	assert.Equal(s.T(), "login", query.Get("prompt"))
 	assert.Equal(s.T(), "client", query.Get("client_id"))
-	assert.Equal(s.T(), "https://gotify.example/callback", query.Get("redirect_uri"))
+	assert.Equal(s.T(), "https://monita.example/callback", query.Get("redirect_uri"))
 	assert.Equal(s.T(), "openid", query.Get("scope"))
 }
 
@@ -605,7 +605,7 @@ func (s *OIDCSuite) Test_ExternalAuthorizeHandler_AuthURL() {
 	issuer := newDiscoveryServer(s.T())
 
 	provider, err := rp.NewRelyingPartyOIDC(
-		context.Background(), issuer.URL, "client", "secret", "https://gotify.example/callback", []string{"openid"},
+		context.Background(), issuer.URL, "client", "secret", "https://monita.example/callback", []string{"openid"},
 	)
 	assert.NoError(s.T(), err)
 	s.a.Provider = provider
@@ -614,7 +614,7 @@ func (s *OIDCSuite) Test_ExternalAuthorizeHandler_AuthURL() {
 	recorder := httptest.NewRecorder()
 	ctx, _ := gin.CreateTestContext(recorder)
 	ctx.Request = httptest.NewRequest("POST", "/auth/oidc/external/authorize", strings.NewReader(
-		`{"code_challenge":"challenge","redirect_uri":"gotify://oidc/callback","name":"Android Phone"}`,
+		`{"code_challenge":"challenge","redirect_uri":"monita://oidc/callback","name":"Android Phone"}`,
 	))
 	ctx.Request.Header.Set("Content-Type", "application/json")
 
@@ -627,7 +627,7 @@ func (s *OIDCSuite) Test_ExternalAuthorizeHandler_AuthURL() {
 	assert.NoError(s.T(), err)
 	query := authorizeURL.Query()
 	assert.Equal(s.T(), response.State, query.Get("state"))
-	assert.Equal(s.T(), "gotify://oidc/callback", query.Get("redirect_uri"))
+	assert.Equal(s.T(), "monita://oidc/callback", query.Get("redirect_uri"))
 	assert.Equal(s.T(), "challenge", query.Get("code_challenge"))
 	assert.Equal(s.T(), "login", query.Get("prompt"))
 	assert.Equal(s.T(), "client", query.Get("client_id"))

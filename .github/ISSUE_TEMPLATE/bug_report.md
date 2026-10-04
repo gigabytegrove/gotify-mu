@@ -29,7 +29,7 @@ Example: `1.1.0`
 
 - [ ] Web UI
 - [ ] Monita for Android
-- [ ] Gotify-compatible client
+- [ ] Legacy protocol-compatible client
 - [ ] Home Assistant
 - [ ] API / integration
 - [ ] Other

@@ -1,4 +1,4 @@
-module github.com/gotify/server/v3
+module github.com/gigabytegrove/monita
 
 require (
 	github.com/fortytw2/leaktest v1.3.0

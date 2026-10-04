@@ -8,21 +8,21 @@ import (
 	"sync"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/config"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/config"
-	"github.com/gotify/server/v3/model"
 )
 
 // The API provides a handler for a WebSocket stream API.
 type API struct {
-	clients     map[uint][]*client
-	muClients   map[uint][]*muEventClient
-	lock        sync.RWMutex
-	pingPeriod  time.Duration
-	pongTimeout time.Duration
-	upgrader    *websocket.Upgrader
+	clients       map[uint][]*client
+	monitaClients map[uint][]*monitaEventClient
+	lock          sync.RWMutex
+	pingPeriod    time.Duration
+	pongTimeout   time.Duration
+	upgrader      *websocket.Upgrader
 }
 
 // New creates a new instance of API.
@@ -31,11 +31,11 @@ type API struct {
 // pong command.
 func New(pingPeriod, pongTimeout time.Duration, allowedWebSocketOrigins []string) *API {
 	return &API{
-		clients:     make(map[uint][]*client),
-		muClients:   make(map[uint][]*muEventClient),
-		pingPeriod:  pingPeriod,
-		pongTimeout: pingPeriod + pongTimeout,
-		upgrader:    newUpgrader(allowedWebSocketOrigins),
+		clients:       make(map[uint][]*client),
+		monitaClients: make(map[uint][]*monitaEventClient),
+		pingPeriod:    pingPeriod,
+		pongTimeout:   pingPeriod + pongTimeout,
+		upgrader:      newUpgrader(allowedWebSocketOrigins),
 	}
 }
 
@@ -49,7 +49,7 @@ func (a *API) CollectConnectedClientTokens() []string {
 			clients = append(clients, c.token)
 		}
 	}
-	for _, cs := range a.muClients {
+	for _, cs := range a.monitaClients {
 		for _, c := range cs {
 			clients = append(clients, c.token)
 		}
@@ -65,7 +65,7 @@ func (a *API) ConnectedClientCount() int {
 	for _, clients := range a.clients {
 		count += len(clients)
 	}
-	for _, clients := range a.muClients {
+	for _, clients := range a.monitaClients {
 		count += len(clients)
 	}
 	return count
@@ -81,11 +81,11 @@ func (a *API) NotifyDeletedUser(userID uint) error {
 		}
 		delete(a.clients, userID)
 	}
-	if clients, ok := a.muClients[userID]; ok {
+	if clients, ok := a.monitaClients[userID]; ok {
 		for _, client := range clients {
 			client.Close()
 		}
-		delete(a.muClients, userID)
+		delete(a.monitaClients, userID)
 	}
 	return nil
 }
@@ -104,7 +104,7 @@ func (a *API) NotifyDeletedClient(userID uint, token string) {
 		}
 		a.clients[userID] = clients
 	}
-	if clients, ok := a.muClients[userID]; ok {
+	if clients, ok := a.monitaClients[userID]; ok {
 		for i := len(clients) - 1; i >= 0; i-- {
 			client := clients[i]
 			if client.token == token {
@@ -112,7 +112,7 @@ func (a *API) NotifyDeletedClient(userID uint, token string) {
 				clients = append(clients[:i], clients[i+1:]...)
 			}
 		}
-		a.muClients[userID] = clients
+		a.monitaClients[userID] = clients
 	}
 }
 
@@ -130,10 +130,10 @@ func (a *API) Notify(userID uint, msg *model.MessageExternal) {
 	}
 }
 
-func (a *API) NotifyMUEvent(userID uint, event any) {
+func (a *API) NotifyMonitaEvent(userID uint, event any) {
 	a.lock.RLock()
 	defer a.lock.RUnlock()
-	if clients, ok := a.muClients[userID]; ok {
+	if clients, ok := a.monitaClients[userID]; ok {
 		for _, c := range clients {
 			select {
 			case c.write <- event:
@@ -146,23 +146,23 @@ func (a *API) NotifyMUEvent(userID uint, event any) {
 	}
 }
 
-func (a *API) removeMU(remove *muEventClient) {
+func (a *API) removeMonita(remove *monitaEventClient) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	if userIDClients, ok := a.muClients[remove.userID]; ok {
+	if userIDClients, ok := a.monitaClients[remove.userID]; ok {
 		for i, client := range userIDClients {
 			if client == remove {
-				a.muClients[remove.userID] = append(userIDClients[:i], userIDClients[i+1:]...)
+				a.monitaClients[remove.userID] = append(userIDClients[:i], userIDClients[i+1:]...)
 				break
 			}
 		}
 	}
 }
 
-func (a *API) registerMU(client *muEventClient) {
+func (a *API) registerMonita(client *monitaEventClient) {
 	a.lock.Lock()
 	defer a.lock.Unlock()
-	a.muClients[client.userID] = append(a.muClients[client.userID], client)
+	a.monitaClients[client.userID] = append(a.monitaClients[client.userID], client)
 }
 
 func (a *API) remove(remove *client) {
@@ -215,7 +215,7 @@ func (a *API) register(client *client) {
 //	    description: Server Error
 //	    schema:
 //	        $ref: "#/definitions/Error"
-func (a *API) HandleMUEvents(ctx *gin.Context) {
+func (a *API) HandleMonitaEvents(ctx *gin.Context) {
 	conn, err := a.upgrader.Upgrade(ctx.Writer, ctx.Request, nil)
 	if err != nil {
 		ctx.Error(err)
@@ -226,8 +226,8 @@ func (a *API) HandleMUEvents(ctx *gin.Context) {
 	if c := auth.GetClient(ctx); c != nil {
 		token = c.Token
 	}
-	client := newMUEventClient(conn, auth.GetUserID(ctx), token, a.removeMU)
-	a.registerMU(client)
+	client := newMonitaEventClient(conn, auth.GetUserID(ctx), token, a.removeMonita)
+	a.registerMonita(client)
 	go client.startReading(a.pongTimeout)
 	go client.startWriteHandler(a.pingPeriod)
 }
@@ -259,7 +259,7 @@ func (a *API) Close() {
 			client.Close()
 		}
 	}
-	for _, clients := range a.muClients {
+	for _, clients := range a.monitaClients {
 		for _, client := range clients {
 			client.Close()
 		}
@@ -267,8 +267,8 @@ func (a *API) Close() {
 	for k := range a.clients {
 		delete(a.clients, k)
 	}
-	for k := range a.muClients {
-		delete(a.muClients, k)
+	for k := range a.monitaClients {
+		delete(a.monitaClients, k)
 	}
 }
 

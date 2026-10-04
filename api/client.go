@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
 )
 
 // The ClientDatabase interface for encapsulating database access.

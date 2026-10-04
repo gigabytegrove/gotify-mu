@@ -98,8 +98,8 @@ identity_providers:
 
     enable_client_debug_messages: true
     clients:
-      - client_id: 'gotify'
-        client_name: 'gotify'
+      - client_id: 'monita'
+        client_name: 'monita'
         client_secret: '$pbkdf2-sha512$310000$PeubGcDkDhxS.WUNH6h04g$SQKuwJmUkPtQVWMz9nJoEUdvkYjRdkWEQO73zLiK4JRLapTWD9DYAHIt25h/FT1Nv059YSiMUpRUBbheSVJBAQ' # secret
         public: false
         authorization_policy: 'one_factor'
@@ -111,7 +111,7 @@ identity_providers:
           - 'http://127.0.0.1:5173/auth/oidc/callback'
           - 'http://localhost:8080/auth/oidc/callback'
           - 'http://localhost:5173/auth/oidc/callback'
-          - 'gotify://oidc/callback'
+          - 'monita://oidc/callback'
         scopes:
           - 'openid'
           - 'profile'

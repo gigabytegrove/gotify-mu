@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/gigabytegrove/monita/mode"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/mode"
 	"github.com/stretchr/testify/assert"
 )
 

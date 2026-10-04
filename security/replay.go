@@ -26,7 +26,9 @@ func (c *ReplayCache) Remember(key string, ttl time.Duration) bool {
 	c.entries[key] = now.Add(ttl)
 	if len(c.entries) > 4096 {
 		for k, expires := range c.entries {
-			if !expires.After(now) { delete(c.entries, k) }
+			if !expires.After(now) {
+				delete(c.entries, k)
+			}
 		}
 	}
 	return true

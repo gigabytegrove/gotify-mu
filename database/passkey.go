@@ -3,7 +3,7 @@ package database
 import (
 	"time"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"gorm.io/gorm"
 )
 
@@ -15,7 +15,9 @@ func (d *GormDatabase) GetPasskeysByUser(userID uint) ([]*model.PasskeyCredentia
 func (d *GormDatabase) GetPasskeyByID(id uint) (*model.PasskeyCredential, error) {
 	item := new(model.PasskeyCredential)
 	if err := d.DB.First(item, id).Error; err != nil {
-		if err == gorm.ErrRecordNotFound { return nil, nil }
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return item, nil
@@ -24,7 +26,9 @@ func (d *GormDatabase) GetPasskeyByID(id uint) (*model.PasskeyCredential, error)
 func (d *GormDatabase) GetPasskeyByCredentialID(credentialID string) (*model.PasskeyCredential, error) {
 	item := new(model.PasskeyCredential)
 	if err := d.DB.First(item, "credential_id = ?", credentialID).Error; err != nil {
-		if err == gorm.ErrRecordNotFound { return nil, nil }
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return item, nil
@@ -43,7 +47,9 @@ func (d *GormDatabase) SaveWebAuthnChallenge(item *model.WebAuthnChallenge) erro
 func (d *GormDatabase) GetWebAuthnChallenge(challenge string, now time.Time) (*model.WebAuthnChallenge, error) {
 	item := new(model.WebAuthnChallenge)
 	if err := d.DB.First(item, "challenge = ? AND expires_at > ?", challenge, now).Error; err != nil {
-		if err == gorm.ErrRecordNotFound { return nil, nil }
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
 	return item, nil

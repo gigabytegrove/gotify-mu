@@ -3,7 +3,7 @@ package database
 import (
 	"testing"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -101,7 +101,6 @@ func (s *DatabaseSuite) TestSharedMessageDismissalIsPerUser() {
 	require.Len(s.T(), ownerMessages, 1)
 	assert.Equal(s.T(), message.ID, ownerMessages[0].ID)
 }
-
 
 func (s *DatabaseSuite) TestChannelNotificationPreference() {
 	owner := &model.User{Name: "mu-notify-owner", Pass: []byte{1}}

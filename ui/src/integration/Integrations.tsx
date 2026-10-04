@@ -85,7 +85,7 @@ const Integrations = () => {
     return (
         <DefaultPage
             title="Integrations"
-            description="Connect external systems directly to Gotify MU."
+            description="Connect external systems directly to Monita."
             rightControl={
                 <Button startIcon={<Refresh />} onClick={() => void refresh()} disabled={loading}>
                     Refresh
@@ -264,7 +264,7 @@ const Integrations = () => {
                         onDelete: async () => {
                             setConfirm({
                                 title: 'Delete MQTT Connection?',
-                                text: 'Gotify MU will stop listening to this MQTT topic.',
+                                text: 'Monita will stop listening to this MQTT topic.',
                                 run: async () => {
                                     await axios.delete(api(`integration/mqtt/${item.id}`));
                                     await refresh();
@@ -348,8 +348,8 @@ const Integrations = () => {
                                         await axios.post(
                                             api('integration/home-assistant/' + item.id + '/event'),
                                             {
-                                                eventType: 'gotify_mu_test',
-                                                data: {message: 'Gotify MU connection test'},
+                                                eventType: 'monita_test',
+                                                data: {message: 'Monita connection test'},
                                             }
                                         );
                                         snackManager.snack('Test event sent to Home Assistant');
@@ -362,7 +362,7 @@ const Integrations = () => {
                         onDelete: async () => {
                             setConfirm({
                                 title: 'Delete Home Assistant Connection?',
-                                text: 'Gotify MU will stop receiving events from this Home Assistant connection.',
+                                text: 'Monita will stop receiving events from this Home Assistant connection.',
                                 run: async () => {
                                     await axios.delete(
                                         api(`integration/home-assistant/${item.id}`)
@@ -1105,16 +1105,14 @@ const HomeAssistantDialog = ({
                         onChange={(e) =>
                             setConnectionMode(e.target.value as 'token' | 'integration')
                         }>
-                        <MenuItem value="integration">
-                            Gotify MU Home Assistant Integration
-                        </MenuItem>
+                        <MenuItem value="integration">Monita Home Assistant Integration</MenuItem>
                         <MenuItem value="token">Long-Lived Access Token</MenuItem>
                     </TextField>
 
                     {connectionMode === 'integration' ? (
                         <Alert severity="info">
-                            Use the Gotify MU custom integration in Home Assistant. Saving copies a
-                            one-time pairing code. Paste that code into the Gotify MU integration in
+                            Use the Monita custom integration in Home Assistant. Saving copies a
+                            one-time pairing code. Paste that code into the Monita integration in
                             Home Assistant. No Home Assistant Long-Lived Access Token is required.
                         </Alert>
                     ) : (

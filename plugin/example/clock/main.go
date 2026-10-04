@@ -7,12 +7,12 @@ import (
 	"github.com/robfig/cron"
 )
 
-// GetGotifyPluginInfo returns gotify plugin info
+// GetGotifyPluginInfo returns the legacy plugin ABI information
 func GetGotifyPluginInfo() plugin.Info {
 	return plugin.Info{
 		Name:        "clock",
 		Description: "Sends an hourly reminder",
-		ModulePath:  "github.com/gotify/server/v3/example/clock",
+		ModulePath:  "github.com/gigabytegrove/monita/example/clock",
 	}
 }
 
@@ -51,7 +51,7 @@ func (c *Plugin) SetMessageHandler(h plugin.MessageHandler) {
 	c.msgHandler = h
 }
 
-// NewGotifyPluginInstance creates a plugin instance for a user context.
+// NewGotifyPluginInstance is the legacy ABI entrypoint for creating a plugin instance.
 func NewGotifyPluginInstance(ctx plugin.UserContext) plugin.Plugin {
 	p := &Plugin{}
 

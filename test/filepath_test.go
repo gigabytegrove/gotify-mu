@@ -15,7 +15,7 @@ func TestProjectPath(t *testing.T) {
 
 func TestWithWd(t *testing.T) {
 	wd1, _ := os.Getwd()
-	tmpDir := NewTmpDir("gotify_withwd")
+	tmpDir := NewTmpDir("monita_withwd")
 	defer tmpDir.Clean()
 	var wd2 string
 	WithWd(tmpDir.Path(), func(origWd string) {

@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
 )
 
 // The MessageDatabase interface for encapsulating database access.
@@ -625,7 +625,7 @@ func (a *MessageAPI) DeleteMessage(ctx *gin.Context) {
 }
 
 // DeleteMessagesForEveryone permanently clears a channel's message history for all members.
-// This is a Gotify MU management action and requires the channel owner or an administrator.
+// This is a Monita management action and requires the channel owner or an administrator.
 func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
 	withID(ctx, "id", func(id uint) {
 		app, err := a.DB.GetApplicationByID(id)
@@ -679,7 +679,7 @@ func (a *MessageAPI) DeleteMessagesForEveryone(ctx *gin.Context) {
 //
 // __NOTE__: When authenticating with a client token or basic auth, the request body
 // must include "appid" referencing an application owned by the authenticated user,
-// or a Gotify MU channel where the authenticated user is a member and member posting is enabled.
+// or a Monita channel where the authenticated user is a member and member posting is enabled.
 // When authenticating with an application token, the application is derived from the
 // token and any "appid" in the body is ignored.
 //
@@ -737,7 +737,9 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 
 		if fetchedApp.UserID != userID {
 			membership, err := a.DB.GetApplicationMembership(fetchedApp.ID, userID)
-			if success := successOrAbort(ctx, 500, err); !success { return }
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
 			if membership == nil {
 				ctx.AbortWithError(400, errors.New("appid not found"))
 				return
@@ -751,14 +753,18 @@ func (a *MessageAPI) CreateMessage(ctx *gin.Context) {
 				return
 			}
 			postingUser, err = a.DB.GetUserByID(userID)
-			if success := successOrAbort(ctx, 500, err); !success { return }
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
 			if postingUser == nil {
 				ctx.AbortWithError(400, errors.New("user not found"))
 				return
 			}
 		} else if fetchedApp.AllowMemberPost {
 			postingUser, err = a.DB.GetUserByID(userID)
-			if success := successOrAbort(ctx, 500, err); !success { return }
+			if success := successOrAbort(ctx, 500, err); !success {
+				return
+			}
 		}
 		app = fetchedApp
 	}
@@ -874,26 +880,26 @@ func toInternalMessage(msg *model.CreateMessage) *model.Message {
 
 func toExternalMessage(msg *model.Message) *model.MessageExternal {
 	res := &model.MessageExternal{
-		ID:            msg.ID,
-		ApplicationID: msg.ApplicationID,
-		Message:       msg.Message,
-		Title:         msg.Title,
-		Priority:      &msg.Priority,
-		Date:          msg.Date,
-		SenderUserID:  msg.SenderUserID,
-		SenderName:             msg.SenderName,
-		ParentMessageID:        msg.ParentMessageID,
-		RootMessageID:          msg.RootMessageID,
-		EscalationRuleID:       msg.EscalationRuleID,
-		EscalationDepth:        msg.EscalationDepth,
-		ReplyToMessageID:       msg.ReplyToMessageID,
-		ThreadRootMessageID:    msg.ThreadRootMessageID,
-		Collaboration:          msg.Collaboration,
-		Acknowledged:           msg.Acknowledged,
-		AcknowledgedByAnyone:   msg.AcknowledgedByAnyone,
-		AcknowledgementCount:   msg.AcknowledgementCount,
-		LastAcknowledgedBy:     msg.LastAcknowledgedBy,
-		LastAcknowledgedAt:     msg.LastAcknowledgedAt,
+		ID:                   msg.ID,
+		ApplicationID:        msg.ApplicationID,
+		Message:              msg.Message,
+		Title:                msg.Title,
+		Priority:             &msg.Priority,
+		Date:                 msg.Date,
+		SenderUserID:         msg.SenderUserID,
+		SenderName:           msg.SenderName,
+		ParentMessageID:      msg.ParentMessageID,
+		RootMessageID:        msg.RootMessageID,
+		EscalationRuleID:     msg.EscalationRuleID,
+		EscalationDepth:      msg.EscalationDepth,
+		ReplyToMessageID:     msg.ReplyToMessageID,
+		ThreadRootMessageID:  msg.ThreadRootMessageID,
+		Collaboration:        msg.Collaboration,
+		Acknowledged:         msg.Acknowledged,
+		AcknowledgedByAnyone: msg.AcknowledgedByAnyone,
+		AcknowledgementCount: msg.AcknowledgementCount,
+		LastAcknowledgedBy:   msg.LastAcknowledgedBy,
+		LastAcknowledgedAt:   msg.LastAcknowledgedAt,
 	}
 	if len(msg.Extras) != 0 {
 		res.Extras = make(map[string]any)

@@ -4,10 +4,10 @@ import (
 	"github.com/gotify/plugin-api"
 )
 
-// GetGotifyPluginInfo returns gotify plugin info
+// GetGotifyPluginInfo returns the legacy plugin ABI information
 func GetGotifyPluginInfo() plugin.Info {
 	return plugin.Info{
-		ModulePath: "github.com/gotify/server/v3/plugin/testing/broken/noinstance",
+		ModulePath: "github.com/gigabytegrove/monita/plugin/testing/broken/noinstance",
 	}
 }
 

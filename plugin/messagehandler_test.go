@@ -3,7 +3,7 @@ package plugin
 import (
 	"testing"
 
-	"github.com/gotify/server/v3/plugin/compat"
+	"github.com/gigabytegrove/monita/plugin/compat"
 	"github.com/stretchr/testify/assert"
 )
 

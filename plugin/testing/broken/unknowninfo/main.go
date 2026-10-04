@@ -1,8 +1,8 @@
 package main
 
-// GetGotifyPluginInfo returns gotify plugin info
+// GetGotifyPluginInfo returns the legacy plugin ABI information
 func GetGotifyPluginInfo() string {
-	return "github.com/gotify/server/v3/plugin/testing/broken/unknowninfo"
+	return "github.com/gigabytegrove/monita/plugin/testing/broken/unknowninfo"
 }
 
 func main() {

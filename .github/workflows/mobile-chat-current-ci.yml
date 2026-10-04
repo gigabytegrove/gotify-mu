@@ -31,7 +31,7 @@ jobs:
       - name: Verify new Go files are formatted
         run: |
           set -euo pipefail
-          FILES="api/mu_capabilities.go api/mu_presence.go api/mu_presence_test.go api/stream/stream.go api/stream/mu_event_client.go"
+          FILES="api/monita_capabilities.go api/monita_presence.go api/monita_presence_test.go api/stream/stream.go api/stream/monita_event_client.go"
           UNFORMATTED="$(gofmt -l $FILES)"
           if [ -n "$UNFORMATTED" ]; then
             echo "Unformatted files:"
@@ -43,7 +43,7 @@ jobs:
         run: go mod download
 
       - name: Test typing presence
-        run: go test ./api -run '^TestMUPresence' -count=1
+        run: go test ./api -run '^TestMonitaPresence' -count=1
 
       - name: Test mention candidates
         run: go test ./api -run '^TestApplicationMembershipMentionableUsers$' -count=1
@@ -58,7 +58,7 @@ jobs:
         run: go test ./api -run '^TestMessageSuite/Test_CreateMessage_MentionIgnoresEmailAndNonMember$' -count=1
 
       - name: Test automation delivery behavior
-        run: go test ./automation -run '^TestMUDeliverySuppressesSenderAndIncludesMutedMention$' -count=1
+        run: go test ./automation -run '^TestMonitaDeliverySuppressesSenderAndIncludesMutedMention$' -count=1
 
       - name: Test realtime stream
         run: go test ./api/stream -count=1

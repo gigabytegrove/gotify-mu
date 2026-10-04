@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gotify/server/v3/model"
+	"github.com/gigabytegrove/monita/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 )
@@ -56,60 +56,78 @@ func (d *GormDatabase) GetSecurityPolicy() (model.SecurityPolicy, error) {
 	policy := defaultSecurityPolicy()
 	settings := map[string]func(string){
 		settingMinimumPasswordLength: func(v string) {
-			if n, err := strconv.Atoi(v); err == nil { policy.MinimumPasswordLength = n }
+			if n, err := strconv.Atoi(v); err == nil {
+				policy.MinimumPasswordLength = n
+			}
 		},
 		settingSessionInactivityMinutes: func(v string) {
-			if n, err := strconv.Atoi(v); err == nil { policy.SessionInactivityMinutes = n }
+			if n, err := strconv.Atoi(v); err == nil {
+				policy.SessionInactivityMinutes = n
+			}
 		},
 		settingElevationMinutes: func(v string) {
-			if n, err := strconv.Atoi(v); err == nil { policy.ElevationMinutes = n }
+			if n, err := strconv.Atoi(v); err == nil {
+				policy.ElevationMinutes = n
+			}
 		},
 		settingRequireMFAForAdmins: func(v string) {
-			if b, err := strconv.ParseBool(v); err == nil { policy.RequireMFAForAdmins = b }
+			if b, err := strconv.ParseBool(v); err == nil {
+				policy.RequireMFAForAdmins = b
+			}
 		},
 		settingRequireMFAForAllLocalUsers: func(v string) {
-			if b, err := strconv.ParseBool(v); err == nil { policy.RequireMFAForAllLocalUsers = b }
+			if b, err := strconv.ParseBool(v); err == nil {
+				policy.RequireMFAForAllLocalUsers = b
+			}
 		},
 		settingAuditRetentionDays: func(v string) {
-			if n, err := strconv.Atoi(v); err == nil { policy.AuditRetentionDays = n }
+			if n, err := strconv.Atoi(v); err == nil {
+				policy.AuditRetentionDays = n
+			}
 		},
 	}
 	for key, apply := range settings {
 		value, ok, err := d.GetSystemSetting(key)
-		if err != nil { return policy, err }
-		if ok { apply(value) }
+		if err != nil {
+			return policy, err
+		}
+		if ok {
+			apply(value)
+		}
 	}
 	return policy, nil
 }
 
 func (d *GormDatabase) SaveSecurityPolicy(policy model.SecurityPolicy) error {
 	values := map[string]string{
-		settingMinimumPasswordLength: strconv.Itoa(policy.MinimumPasswordLength),
-		settingSessionInactivityMinutes: strconv.Itoa(policy.SessionInactivityMinutes),
-		settingElevationMinutes: strconv.Itoa(policy.ElevationMinutes),
-		settingRequireMFAForAdmins: strconv.FormatBool(policy.RequireMFAForAdmins),
+		settingMinimumPasswordLength:      strconv.Itoa(policy.MinimumPasswordLength),
+		settingSessionInactivityMinutes:   strconv.Itoa(policy.SessionInactivityMinutes),
+		settingElevationMinutes:           strconv.Itoa(policy.ElevationMinutes),
+		settingRequireMFAForAdmins:        strconv.FormatBool(policy.RequireMFAForAdmins),
 		settingRequireMFAForAllLocalUsers: strconv.FormatBool(policy.RequireMFAForAllLocalUsers),
-		settingAuditRetentionDays: strconv.Itoa(policy.AuditRetentionDays),
+		settingAuditRetentionDays:         strconv.Itoa(policy.AuditRetentionDays),
 	}
 	return d.DB.Transaction(func(tx *gorm.DB) error {
 		for key, value := range values {
-			item := &model.SystemSetting{Key:key, Value:value}
+			item := &model.SystemSetting{Key: key, Value: value}
 			if err := tx.Clauses(clause.OnConflict{
-				Columns: []clause.Column{{Name:"key"}},
-				DoUpdates: clause.AssignmentColumns([]string{"value","updated_at"}),
-			}).Create(item).Error; err != nil { return err }
+				Columns:   []clause.Column{{Name: "key"}},
+				DoUpdates: clause.AssignmentColumns([]string{"value", "updated_at"}),
+			}).Create(item).Error; err != nil {
+				return err
+			}
 		}
 		return nil
 	})
 }
 
 func (d *GormDatabase) GetOperationsSummary(dialect string) (model.OperationsSummary, error) {
-	result := model.OperationsSummary{DatabaseDialect:dialect}
+	result := model.OperationsSummary{DatabaseDialect: dialect}
 	counts := []struct {
-		model any
+		model  any
 		target *int64
-		where string
-		args []any
+		where  string
+		args   []any
 	}{
 		{&model.User{}, &result.Users, "", nil},
 		{&model.Application{}, &result.Channels, "internal = ?", []any{false}},
@@ -127,12 +145,15 @@ func (d *GormDatabase) GetOperationsSummary(dialect string) (model.OperationsSum
 	}
 	for _, item := range counts {
 		query := d.DB.Model(item.model)
-		if item.where != "" { query = query.Where(item.where, item.args...) }
-		if err := query.Count(item.target).Error; err != nil { return result, err }
+		if item.where != "" {
+			query = query.Where(item.where, item.args...)
+		}
+		if err := query.Count(item.target).Error; err != nil {
+			return result, err
+		}
 	}
 	return result, nil
 }
-
 
 func (d *GormDatabase) CreateBackupSnapshot(destination string) error {
 	if d.DB.Name() != "sqlite" {

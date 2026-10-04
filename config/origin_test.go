@@ -12,11 +12,11 @@ func TestCompileAllowedOrigins(t *testing.T) {
 }
 
 func TestMatchesFully(t *testing.T) {
-	compiledOrigins := CompileAllowedOrigins([]string{"gotify\\.net|push\\.gotify\\.net", "other\\.gotify\\.net"})
+	compiledOrigins := CompileAllowedOrigins([]string{"monita\\.net|push\\.monita\\.net", "other\\.monita\\.net"})
 
-	assert.True(t, MatchesFully(compiledOrigins, "gotify.net"))
-	assert.True(t, MatchesFully(compiledOrigins, "push.gotify.net"))
-	assert.True(t, MatchesFully(compiledOrigins, "other.gotify.net"))
-	assert.False(t, MatchesFully(compiledOrigins, "gotify.net.evil.net"))
-	assert.False(t, MatchesFully(compiledOrigins, "evil-gotify.net"))
+	assert.True(t, MatchesFully(compiledOrigins, "monita.net"))
+	assert.True(t, MatchesFully(compiledOrigins, "push.monita.net"))
+	assert.True(t, MatchesFully(compiledOrigins, "other.monita.net"))
+	assert.False(t, MatchesFully(compiledOrigins, "monita.net.evil.net"))
+	assert.False(t, MatchesFully(compiledOrigins, "evil-monita.net"))
 }

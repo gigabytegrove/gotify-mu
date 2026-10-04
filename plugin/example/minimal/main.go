@@ -4,11 +4,11 @@ import (
 	"github.com/gotify/plugin-api"
 )
 
-// GetGotifyPluginInfo returns gotify plugin info
+// GetGotifyPluginInfo returns the legacy plugin ABI information
 func GetGotifyPluginInfo() plugin.Info {
 	return plugin.Info{
 		Name:       "minimal plugin",
-		ModulePath: "github.com/gotify/server/v3/example/minimal",
+		ModulePath: "github.com/gigabytegrove/monita/example/minimal",
 	}
 }
 
@@ -25,7 +25,7 @@ func (c *Plugin) Disable() error {
 	return nil
 }
 
-// NewGotifyPluginInstance creates a plugin instance for a user context.
+// NewGotifyPluginInstance is the legacy ABI entrypoint for creating a plugin instance.
 func NewGotifyPluginInstance(ctx plugin.UserContext) plugin.Plugin {
 	return &Plugin{}
 }

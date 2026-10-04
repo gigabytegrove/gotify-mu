@@ -6,10 +6,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth/password"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/security"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth/password"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/security"
 	"github.com/rs/zerolog/log"
 )
 
@@ -25,8 +25,10 @@ const (
 )
 
 const (
-	headerName = "X-Gotify-Key"
-	cookieName = "gotify-client-token"
+	headerName          = "X-Monita-Key"
+	legacyHeaderName    = "X-Gotify-Key"
+	mfaHeaderName       = "X-Monita-MFA-Code"
+	legacyMFAHeaderName = "X-Gotify-MFA-Code"
 )
 
 var timeNow = time.Now
@@ -193,15 +195,21 @@ func (a *Auth) handleUser(checks ...func(*model.User) (authState, error)) func(c
 				return authStateSkip, err
 			} else if user != nil && password.ComparePassword(user.Pass, []byte(pass)) {
 				mfa, mfaErr := a.DB.GetUserMFA(user.ID)
-				if mfaErr != nil { return authStateSkip, mfaErr }
+				if mfaErr != nil {
+					return authStateSkip, mfaErr
+				}
 				if mfa != nil && mfa.Enabled {
-					code := strings.TrimSpace(ctx.GetHeader("X-Gotify-MFA-Code"))
+					code := MFACodeFromRequest(ctx)
 					valid := security.VerifyTOTP(mfa.Secret, code, timeNow())
 					if !valid && code != "" {
 						valid, mfaErr = a.DB.ConsumeRecoveryCode(user.ID, security.HashRecoveryCode(code))
-						if mfaErr != nil { return authStateSkip, mfaErr }
+						if mfaErr != nil {
+							return authStateSkip, mfaErr
+						}
 					}
-					if !valid { return authStateMFARequired, nil }
+					if !valid {
+						return authStateMFARequired, nil
+					}
 				}
 				RegisterUser(ctx, user)
 
@@ -242,14 +250,20 @@ func (a *Auth) handleClient(checks ...func(*model.Client) (authState, error)) fu
 		RegisterClient(ctx, client)
 
 		policy, policyErr := a.DB.GetSecurityPolicy()
-		if policyErr != nil { return authStateSkip, policyErr }
+		if policyErr != nil {
+			return authStateSkip, policyErr
+		}
 		if policy.RequireMFAForAllLocalUsers && !client.MFAAuthenticated &&
 			!strings.HasPrefix(ctx.Request.URL.Path, "/current/user/mfa") &&
 			!strings.HasPrefix(ctx.Request.URL.Path, "/current/user/passkeys") &&
 			!strings.HasPrefix(ctx.Request.URL.Path, "/auth/logout") {
 			user, userErr := a.DB.GetUserByID(client.UserID)
-			if userErr != nil { return authStateSkip, userErr }
-			if user != nil && user.OIDCID == nil && user.LDAPID == nil { return authStateMFARequired, nil }
+			if userErr != nil {
+				return authStateSkip, userErr
+			}
+			if user != nil && user.OIDCID == nil && user.LDAPID == nil {
+				return authStateMFARequired, nil
+			}
 		}
 
 		now := timeNow()
@@ -310,7 +324,7 @@ func (a *Auth) handleApplication(ctx *gin.Context) (authState, error) {
 func (a *Auth) readTokenFromRequest(ctx *gin.Context) (string, bool) {
 	if token := a.tokenFromQuery(ctx); token != "" {
 		return token, false
-	} else if token := a.tokenFromXGotifyHeader(ctx); token != "" {
+	} else if token := a.tokenFromKeyHeader(ctx); token != "" {
 		return token, false
 	} else if token := a.tokenFromAuthorizationHeader(ctx); token != "" {
 		return token, false
@@ -321,19 +335,31 @@ func (a *Auth) readTokenFromRequest(ctx *gin.Context) (string, bool) {
 }
 
 func (a *Auth) tokenFromCookie(ctx *gin.Context) string {
-	token, err := ctx.Cookie(cookieName)
-	if err != nil {
-		return ""
+	if token, err := ctx.Cookie(CookieName); err == nil {
+		return token
 	}
-	return token
+	if token, err := ctx.Cookie(LegacyCookieName); err == nil {
+		return token
+	}
+	return ""
 }
 
 func (a *Auth) tokenFromQuery(ctx *gin.Context) string {
 	return ctx.Request.URL.Query().Get("token")
 }
 
-func (a *Auth) tokenFromXGotifyHeader(ctx *gin.Context) string {
-	return ctx.Request.Header.Get(headerName)
+func (a *Auth) tokenFromKeyHeader(ctx *gin.Context) string {
+	if token := strings.TrimSpace(ctx.Request.Header.Get(headerName)); token != "" {
+		return token
+	}
+	return strings.TrimSpace(ctx.Request.Header.Get(legacyHeaderName))
+}
+
+func MFACodeFromRequest(ctx *gin.Context) string {
+	if code := strings.TrimSpace(ctx.GetHeader(mfaHeaderName)); code != "" {
+		return code
+	}
+	return strings.TrimSpace(ctx.GetHeader(legacyMFAHeaderName))
 }
 
 func (a *Auth) tokenFromAuthorizationHeader(ctx *gin.Context) string {
@@ -361,8 +387,12 @@ func (a *Auth) checkClientAdmin(client *model.Client) (authState, error) {
 		return authStateForbidden, nil
 	} else if user.OIDCID == nil && user.LDAPID == nil {
 		policy, err := a.DB.GetSecurityPolicy()
-		if err != nil { return authStateSkip, err }
-		if policy.RequireMFAForAdmins && !client.MFAAuthenticated { return authStateMFARequired, nil }
+		if err != nil {
+			return authStateSkip, err
+		}
+		if policy.RequireMFAForAdmins && !client.MFAAuthenticated {
+			return authStateMFARequired, nil
+		}
 	}
 	return authStateOk, nil
 }
@@ -380,11 +410,17 @@ func (a *Auth) checkUserAdmin(user *model.User) (authState, error) {
 	}
 	if user.OIDCID == nil {
 		policy, err := a.DB.GetSecurityPolicy()
-		if err != nil { return authStateSkip, err }
+		if err != nil {
+			return authStateSkip, err
+		}
 		if policy.RequireMFAForAdmins {
 			mfa, err := a.DB.GetUserMFA(user.ID)
-			if err != nil { return authStateSkip, err }
-			if mfa == nil || !mfa.Enabled { return authStateMFARequired, nil }
+			if err != nil {
+				return authStateSkip, err
+			}
+			if mfa == nil || !mfa.Enabled {
+				return authStateMFARequired, nil
+			}
 		}
 	}
 	return authStateOk, nil

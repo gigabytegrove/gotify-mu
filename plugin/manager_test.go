@@ -13,21 +13,21 @@ import (
 	"testing"
 	"time"
 
+	"github.com/gigabytegrove/monita/auth"
+	"github.com/gigabytegrove/monita/model"
+	"github.com/gigabytegrove/monita/plugin/compat"
+	"github.com/gigabytegrove/monita/plugin/testing/mock"
+	"github.com/gigabytegrove/monita/test"
+	"github.com/gigabytegrove/monita/test/testdb"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/auth"
-	"github.com/gotify/server/v3/model"
-	"github.com/gotify/server/v3/plugin/compat"
-	"github.com/gotify/server/v3/plugin/testing/mock"
-	"github.com/gotify/server/v3/test"
-	"github.com/gotify/server/v3/test/testdb"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
 const (
-	examplePluginPath  = "github.com/gotify/server/v3/plugin/example/echo"
+	examplePluginPath  = "github.com/gigabytegrove/monita/plugin/example/echo"
 	mockPluginPath     = mock.ModulePath
-	danglingPluginPath = "github.com/gotify/server/v3/plugin/testing/removed"
+	danglingPluginPath = "github.com/gigabytegrove/monita/plugin/testing/removed"
 )
 
 type ManagerSuite struct {
@@ -48,7 +48,7 @@ func (s *ManagerSuite) Notify(uid uint, message *model.MessageExternal) {
 }
 
 func (s *ManagerSuite) SetupSuite() {
-	s.tmpDir = test.NewTmpDir("gotify_managersuite")
+	s.tmpDir = test.NewTmpDir("monita_managersuite")
 
 	test.WithWd(path.Join(test.GetProjectDir(), "./plugin/example/echo"), func(origWd string) {
 		exec.Command("go", "get", "-d").Run()
@@ -147,7 +147,7 @@ func (s *ManagerSuite) TestInitializePlugin_noOpIfEmpty() {
 }
 
 func (s *ManagerSuite) TestInitializePlugin_noOpIfDotFile() {
-	tmpDir := test.NewTmpDir("gotify_testinitializeplugin_dotfile")
+	tmpDir := test.NewTmpDir("monita_testinitializeplugin_dotfile")
 	defer tmpDir.Clean()
 	f, err := os.Create(tmpDir.Path(".test"))
 	assert.NoError(s.T(), err)
@@ -158,7 +158,7 @@ func (s *ManagerSuite) TestInitializePlugin_noOpIfDotFile() {
 }
 
 func (s *ManagerSuite) TestInitializePlugin_noOpIfSubDir() {
-	tmpDir := test.NewTmpDir("gotify_testinitializeplugin_subdir")
+	tmpDir := test.NewTmpDir("monita_testinitializeplugin_subdir")
 	defer tmpDir.Clean()
 	os.Mkdir(tmpDir.Path("subdir"), 0o755)
 	assert.Nil(s.T(), s.manager.loadPlugins(tmpDir.Path()))
@@ -173,7 +173,7 @@ func (s *ManagerSuite) TestInitializePlugin_invalidPlugin_expectError() {
 }
 
 func (s *ManagerSuite) TestInitializePlugin_brokenPlugin_expectError() {
-	tmpDir := test.NewTmpDir("gotify_testbrokenplugin")
+	tmpDir := test.NewTmpDir("monita_testbrokenplugin")
 	defer tmpDir.Clean()
 	test.WithWd(path.Join(test.GetProjectDir(), "./plugin/testing/broken/nothing"), func(origWd string) {
 		exec.Command("go", "get", "-d").Run()
@@ -554,7 +554,7 @@ func TestInstallPlugin_NoDirectory_expectError(t *testing.T) {
 }
 
 func TestInstallPlugin_InvalidExtension_expectError(t *testing.T) {
-	tmpDir := test.NewTmpDir("gotify_installplugin_extension")
+	tmpDir := test.NewTmpDir("monita_installplugin_extension")
 	defer tmpDir.Clean()
 
 	db := testdb.NewDBWithDefaultUser(t)
@@ -567,7 +567,7 @@ func TestInstallPlugin_InvalidExtension_expectError(t *testing.T) {
 }
 
 func TestInstallPlugin_InvalidBinary_removesFile(t *testing.T) {
-	tmpDir := test.NewTmpDir("gotify_installplugin_invalidbinary")
+	tmpDir := test.NewTmpDir("monita_installplugin_invalidbinary")
 	defer tmpDir.Clean()
 
 	db := testdb.NewDBWithDefaultUser(t)

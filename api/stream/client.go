@@ -3,8 +3,8 @@ package stream
 import (
 	"time"
 
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gorilla/websocket"
-	"github.com/gotify/server/v3/model"
 	"github.com/rs/zerolog/log"
 )
 

@@ -3,8 +3,8 @@ package api
 import (
 	"strconv"
 
+	"github.com/gigabytegrove/monita/model"
 	"github.com/gin-gonic/gin"
-	"github.com/gotify/server/v3/model"
 )
 
 type AuditDatabase interface {
