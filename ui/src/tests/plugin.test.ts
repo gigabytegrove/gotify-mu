@@ -13,10 +13,10 @@ let page: Page;
 let monita: MonitaTest;
 
 beforeAll(async () => {
-    const gotifyPluginDir = pluginSupported
+    const monitaPluginDir = pluginSupported
         ? await newPluginDir(['github.com/gigabytegrove/monita/plugin/example/echo'])
         : '';
-    monita = await newTest(gotifyPluginDir);
+    monita = await newTest(monitaPluginDir);
     page = monita.page;
 });
 
