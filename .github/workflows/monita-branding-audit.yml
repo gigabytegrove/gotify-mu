@@ -24,7 +24,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          matches="$(git grep -nIi -E 'Gotify[ -]?MU' -- .             ':!CHANGELOG.md' ':!LICENSE' ':!README.md' ':!docs/releases/**'             ':!operations/backup.go' || true)"
+          matches="$(git grep -nI -E 'Gotify[ -]MU' -- .             ':!CHANGELOG.md' ':!LICENSE' ':!README.md' ':!docs/releases/**'             ':!operations/backup.go' || true)"
           if [ -n "$matches" ]; then
             printf '%s\n' "$matches"
             echo "::error::Stale Gotify MU product branding remains outside approved history/compatibility locations."
