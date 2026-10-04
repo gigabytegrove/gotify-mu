@@ -58,17 +58,7 @@ jobs:
         run: go test ./api -run '^TestMessageSuite/Test_CreateMessage_MentionIgnoresEmailAndNonMember$' -count=1
 
       - name: Test automation delivery behavior
-        run: go test ./automation -run '^TestMonitaDeliverySuppressesSenderAndIncludesMutedMention -count=1
-
-      - name: Test realtime stream
-        run: go test ./api/stream -count=1
-
-      - name: Compile router wiring
-        run: |
-          mkdir -p ui/build
-          printf '<html></html>\n' > ui/build/index.html
-          go test ./router -run TestDoesNotExist -count=1
- -count=1
+        run: go test ./automation -run '^TestMonitaDeliverySuppressesSenderAndIncludesMutedMention$' -count=1
 
       - name: Test realtime stream
         run: go test ./api/stream -count=1
