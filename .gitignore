@@ -10,6 +10,7 @@ coverage.txt
 config.yml
 data/
 images/
+/monita-server.env
 /gotify-server.env
 
 .env
