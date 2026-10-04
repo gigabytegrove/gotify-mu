@@ -24,7 +24,7 @@ type CompatSuite struct {
 }
 
 func (s *CompatSuite) SetupSuite() {
-	s.tmpDir = test.NewTmpDir("gotify_compatsuite")
+	s.tmpDir = test.NewTmpDir("monita_compatsuite")
 
 	test.WithWd(path.Join(test.GetProjectDir(), "./plugin/example/echo"), func(origWd string) {
 		exec.Command("go", "get", "-d").Run()
@@ -129,7 +129,7 @@ func TestCompatSuite(t *testing.T) {
 }
 
 func TestWrapIncompatiblePlugins(t *testing.T) {
-	tmpDir := test.NewTmpDir("gotify_testwrapincompatibleplugins")
+	tmpDir := test.NewTmpDir("monita_testwrapincompatibleplugins")
 	defer tmpDir.Clean()
 	for i, modulePath := range []string{
 		"github.com/gigabytegrove/monita/plugin/testing/broken/noinstance",
