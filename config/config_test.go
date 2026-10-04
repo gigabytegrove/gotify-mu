@@ -153,7 +153,7 @@ func TestParseList(t *testing.T) {
 	}
 }
 
-func TestLegacyGotifyEnvironmentFallback(t *testing.T) {
+func TestLegacyEnvironmentFallback(t *testing.T) {
 	mode.Set(mode.TestDev)
 	t.Setenv("GOTIFY_SERVER_PORT", "9187")
 
