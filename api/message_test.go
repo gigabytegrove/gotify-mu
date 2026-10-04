@@ -534,6 +534,7 @@ func (s *MessageSuite) Test_CreateMessage_MentionNotifiesMutedChatMember() {
 	external := toExternalMessage(messages[0])
 	require.NotNil(s.T(), external.Extras)
 	assert.Equal(s.T(), []any{"jennifer"}, external.Extras["monita::mentions"])
+	assert.Equal(s.T(), []any{"jennifer"}, external.Extras["gotify::mu::mentions"])
 }
 
 func (s *MessageSuite) Test_CreateMessage_MentionIgnoresEmailAndNonMember() {
