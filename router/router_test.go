@@ -102,8 +102,8 @@ func (s *IntegrationSuite) TestVersionInfo() {
 	doRequestAndExpect(s.T(), req, 200, `{"version":"1.0.0", "commit":"asdasds", "buildDate":"2018-02-20-17:30:47"}`)
 }
 
-func (s *IntegrationSuite) TestGotifyInfo() {
-	req := s.newRequest("GET", "gotifyinfo", "")
+func (s *IntegrationSuite) TestMonitaInfo() {
+	req := s.newRequest("GET", "monitainfo", "")
 	doRequestAndExpect(s.T(), req, 200, `{"version":"1.0.0", "oidc":false, "register":false, "localAuth":true, "oidcIdpName":"Company XYZ SSO", "oidcAutoRedirect":false, "ldap":false, "ldapIdpName":""}`)
 }
 
@@ -378,7 +378,7 @@ func (s *IntegrationSuite) TestSendMessage() {
 	assert.Equal(s.T(), "backup-server", token.Name)
 
 	req = s.newRequest("POST", "message", `{"message": "backup done", "title": "backup done"}`)
-	req.Header.Add("X-Gotify-Key", token.Token)
+	req.Header.Add("X-Monita-Key", token.Token)
 	res, err = client.Do(req)
 	assert.Nil(s.T(), err)
 	assert.Equal(s.T(), 200, res.StatusCode)
@@ -449,19 +449,19 @@ func (s *IntegrationSuite) TestAdminPagesDoNotRequireStepUpButSensitiveChangesDo
 	s.db.AdminUser(2).ClientWithToken(1, "Cadminplain")
 
 	req := s.newRequest("GET", "admin/security-policy", "")
-	req.Header.Set("X-Gotify-Key", "Cadminplain")
+	req.Header.Set("X-Monita-Key", "Cadminplain")
 	res, err := client.Do(req)
 	assert.NoError(s.T(), err)
 	assert.Equal(s.T(), http.StatusOK, res.StatusCode)
 
 	req = s.newRequest("GET", "admin/operations", "")
-	req.Header.Set("X-Gotify-Key", "Cadminplain")
+	req.Header.Set("X-Monita-Key", "Cadminplain")
 	res, err = client.Do(req)
 	assert.NoError(s.T(), err)
 	assert.Equal(s.T(), http.StatusOK, res.StatusCode)
 
 	req = s.newRequest("PUT", "admin/security-policy", `{"minimumPasswordLength":12,"sessionInactivityMinutes":10080,"elevationMinutes":240,"requireMfaForAdmins":false,"requireMfaForAllLocalUsers":false,"auditRetentionDays":90}`)
-	req.Header.Set("X-Gotify-Key", "Cadminplain")
+	req.Header.Set("X-Monita-Key", "Cadminplain")
 	doRequestAndExpect(s.T(), req, 403, `{"error":"Forbidden", "errorCode":403, "errorDescription":"session not elevated, use basic auth or call /client:elevate"}`)
 }
 
@@ -473,19 +473,19 @@ func (s *IntegrationSuite) TestCreateUser_RequiresElevatedAdmin() {
 
 	// admin, but not elevated
 	req := s.newRequest("POST", "user", body)
-	req.Header.Set("X-Gotify-Key", "Cadminplain")
+	req.Header.Set("X-Monita-Key", "Cadminplain")
 	doRequestAndExpect(s.T(), req, 403, `{"error":"Forbidden", "errorCode":403, "errorDescription":"session not elevated, use basic auth or call /client:elevate"}`)
 	s.db.AssertUsernameNotExist("newadmin")
 
 	// elevated, but not admin
 	req = s.newRequest("POST", "user", body)
-	req.Header.Set("X-Gotify-Key", "Cnormalelevated")
+	req.Header.Set("X-Monita-Key", "Cnormalelevated")
 	doRequestAndExpect(s.T(), req, 403, forbiddenJSON)
 	s.db.AssertUsernameNotExist("newadmin")
 
 	// elevated admin
 	req = s.newRequest("POST", "user", body)
-	req.Header.Set("X-Gotify-Key", "Cadminelevated")
+	req.Header.Set("X-Monita-Key", "Cadminelevated")
 	doRequestAndExpect(s.T(), req, 200, `{"id": 4, "name": "newadmin", "admin": true, "createdAt":"2020-01-01T00:00:00Z"}`)
 	created, err := s.db.GetUserByName("newadmin")
 	assert.NoError(s.T(), err)
