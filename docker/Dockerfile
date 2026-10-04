@@ -34,9 +34,6 @@ ARG RUN_TESTS=0
 ARG MONITA_VERSION=
 ARG MONITA_COMMIT=
 ARG MONITA_BUILD_DATE=
-ARG GOTIFY_MU_VERSION=
-ARG GOTIFY_MU_COMMIT=
-ARG GOTIFY_MU_BUILD_DATE=
 ARG LD_FLAGS=""
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -57,13 +54,12 @@ RUN cd /src/monita && \
     fi && \
     EFFECTIVE_LD_FLAGS="$LD_FLAGS" && \
     if [ -z "$EFFECTIVE_LD_FLAGS" ]; then \
-    EFFECTIVE_VERSION="${MONITA_VERSION:-${GOTIFY_MU_VERSION:-master-local}}"; \
-    EFFECTIVE_COMMIT="${MONITA_COMMIT:-${GOTIFY_MU_COMMIT:-local}}"; \
-    EFFECTIVE_BUILD_DATE="${MONITA_BUILD_DATE:-${GOTIFY_MU_BUILD_DATE:-local}}"; \
+    EFFECTIVE_VERSION="${MONITA_VERSION:-master-local}"; \
+    EFFECTIVE_COMMIT="${MONITA_COMMIT:-local}"; \
+    EFFECTIVE_BUILD_DATE="${MONITA_BUILD_DATE:-local}"; \
     EFFECTIVE_LD_FLAGS="-w -s -X main.Version=${EFFECTIVE_VERSION} -X main.Commit=${EFFECTIVE_COMMIT} -X main.BuildDate=${EFFECTIVE_BUILD_DATE} -X main.Mode=prod"; \
     fi && \
-    LD_FLAGS="$EFFECTIVE_LD_FLAGS" make OUTPUT=/target/app/monita-app _build_within_docker && \
-    ln -s monita-app /target/app/gotify-app
+    LD_FLAGS="$EFFECTIVE_LD_FLAGS" make OUTPUT=/target/app/monita-app _build_within_docker
 
 # --- Runtime ---
 
@@ -80,8 +76,7 @@ LABEL org.opencontainers.image.version=${MONITA_VERSION}
 LABEL org.opencontainers.image.revision=${MONITA_COMMIT}
 LABEL org.opencontainers.image.licenses="MIT"
 
-ARG GOTIFY_SERVER_EXPOSE=80
-ARG MONITA_SERVER_EXPOSE=$GOTIFY_SERVER_EXPOSE
+ARG MONITA_SERVER_EXPOSE=80
 ENV MONITA_SERVER_PORT=$MONITA_SERVER_EXPOSE
 
 WORKDIR /app
