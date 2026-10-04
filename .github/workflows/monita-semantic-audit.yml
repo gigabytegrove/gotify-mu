@@ -1,0 +1,25 @@
+name: Monita semantic rebrand audit
+
+on:
+  push:
+    branches:
+      - monita-complete-cleanup
+  workflow_dispatch:
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Review semantic rename artifacts
+        shell: bash
+        run: |
+          set -u
+          echo "=== SUSPICIOUS CURRENT-NAME/HISTORY PHRASES ==="
+          git grep -nIi -E '(formerly|former|previous|old|legacy).{0,80}Monita|Monita.{0,80}(formerly|former|previous|old|legacy)' -- .             ':!CHANGELOG.md' ':!README.md' ':!docs/releases/**' ':!scripts/monita_brand_cleanup.py' || true
+          echo
+          echo "=== UPSTREAM MODULE IDENTITY THAT SHOULD NOT BE INTERNAL IMPORTS ==="
+          git grep -nI -E 'github\.com/gotify/server' -- . ':!CHANGELOG.md' ':!README.md' ':!docs/releases/**' || true
+          echo
+          echo "=== CURRENT PRODUCT OLD-NAME PHRASES ==="
+          git grep -nIi -E 'Gotify[ -]?MU' -- .             ':!CHANGELOG.md' ':!LICENSE' ':!README.md' ':!docs/releases/**'             ':!operations/backup.go' ':!scripts/monita_brand_cleanup.py'             ':!.github/workflows/monita-semantic-audit.yml' || true
