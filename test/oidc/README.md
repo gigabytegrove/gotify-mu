@@ -6,11 +6,11 @@ Check config in ./dex/config/dex.conf and do a `docker-compose up -d`.
 
 Use this monita config.
 ```ini
-GOTIFY_OIDC_ENABLED=true
-GOTIFY_OIDC_ISSUER=http://127.0.0.1:5556/dex
-GOTIFY_OIDC_CLIENTID=monita
-GOTIFY_OIDC_CLIENTSECRET=secret
-GOTIFY_OIDC_REDIRECTURL=http://127.0.0.1:8080/auth/oidc/callback
+MONITA_OIDC_ENABLED=true
+MONITA_OIDC_ISSUER=http://127.0.0.1:5556/dex
+MONITA_OIDC_CLIENTID=monita
+MONITA_OIDC_CLIENTSECRET=secret
+MONITA_OIDC_REDIRECTURL=http://127.0.0.1:8080/auth/oidc/callback
 ```
 
 When testing external apps like monita/android change every occurence of
@@ -29,15 +29,15 @@ Check config in ./authelia/config/configuration.yml and do a `docker-compose up 
 
 Use this monita config.
 ```ini
-GOTIFY_OIDC_ENABLED=true
-GOTIFY_OIDC_ISSUER=https://127.0.0.1:9091
-GOTIFY_OIDC_CLIENTID=monita
-GOTIFY_OIDC_CLIENTSECRET=secret
-GOTIFY_OIDC_REDIRECTURL=http://127.0.0.1:8080/auth/oidc/callback
-GOTIFY_OIDC_SCOPES=openid,profile,email,groups
-# GOTIFY_OIDC_GROUPS_CLAIM=groups
-# GOTIFY_OIDC_GROUPS_USER=
-# GOTIFY_OIDC_GROUPS_ADMIN=authelia-group
+MONITA_OIDC_ENABLED=true
+MONITA_OIDC_ISSUER=https://127.0.0.1:9091
+MONITA_OIDC_CLIENTID=monita
+MONITA_OIDC_CLIENTSECRET=secret
+MONITA_OIDC_REDIRECTURL=http://127.0.0.1:8080/auth/oidc/callback
+MONITA_OIDC_SCOPES=openid,profile,email,groups
+# MONITA_OIDC_GROUPS_CLAIM=groups
+# MONITA_OIDC_GROUPS_USER=
+# MONITA_OIDC_GROUPS_ADMIN=authelia-group
 ```
 
 When testing external apps like monita/android change every occurence of
