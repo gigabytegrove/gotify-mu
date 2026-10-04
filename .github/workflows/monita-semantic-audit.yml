@@ -21,5 +21,8 @@ jobs:
           echo "=== UPSTREAM MODULE IDENTITY THAT SHOULD NOT BE INTERNAL IMPORTS ==="
           git grep -nI -E 'github\.com/gotify/server' -- . ':!CHANGELOG.md' ':!README.md' ':!docs/releases/**' || true
           echo
+          echo "=== MONITA WIRE KEY REVIEW ==="
+          git grep -nI -E 'monita::' -- '*.go' '*.ts' '*.tsx' || true
+          echo
           echo "=== CURRENT PRODUCT OLD-NAME PHRASES ==="
           git grep -nIi -E 'Gotify[ -]?MU' -- .             ':!CHANGELOG.md' ':!LICENSE' ':!README.md' ':!docs/releases/**'             ':!operations/backup.go' ':!scripts/monita_brand_cleanup.py'             ':!.github/workflows/monita-semantic-audit.yml' || true
